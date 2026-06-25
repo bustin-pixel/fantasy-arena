@@ -16,3 +16,8 @@ export const RARITIES: Record<Rarity, RarityDef> = {
 };
 
 export const RARITY_ORDER: Rarity[] = ["rare", "epic", "legendary"];
+
+/** Power rank for sorting: higher = rarer (legendary > epic > rare). */
+export function rarityRank(r: Rarity): number {
+  return RARITY_ORDER.indexOf(r);
+}

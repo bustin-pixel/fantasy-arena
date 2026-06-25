@@ -1,5 +1,6 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { DECKABLE_UNIT_IDS, getUnitDef } from "@/data/units";
+import { RARITIES, rarityRank } from "@/data/rarities";
 import { CardPortrait } from "@/components/CardPortrait";
 import { useGameState } from "@/state/GameStateContext";
 
@@ -9,9 +10,12 @@ interface Props {
 
 const MAX_DECK = 4;
 
+type SortMode = "default" | "rarity";
+
 export function HubScreen({ onBattle }: Props) {
   const { save, setDeck } = useGameState();
   const deck = save.deck;
+  const [sortMode, setSortMode] = useState<SortMode>("default");
 
   // Does the current deck already contain a legendary?
   const hasLegendary = useMemo(
@@ -34,6 +38,15 @@ export function HubScreen({ onBattle }: Props) {
     const total = save.wins + save.losses;
     return total === 0 ? 0 : Math.round((save.wins / total) * 100);
   }, [save.wins, save.losses]);
+
+  // Roster order for the card grid. "rarity" groups rarest-first; ties keep
+  // their original (stable) order so the grid stays predictable.
+  const rosterIds = useMemo(() => {
+    if (sortMode === "default") return DECKABLE_UNIT_IDS;
+    return [...DECKABLE_UNIT_IDS].sort(
+      (a, b) => rarityRank(getUnitDef(b).rarity) - rarityRank(getUnitDef(a).rarity)
+    );
+  }, [sortMode]);
 
   return (
     <div className="screen hub">
@@ -65,8 +78,64 @@ export function HubScreen({ onBattle }: Props) {
             {deck.length} / {MAX_DECK} selected
           </span>
         </div>
+
+        {/* Current deck, in deploy order (front-to-back). Tap a slot to remove. */}
+        <div className="deck-strip" aria-label="Current deck">
+          {Array.from({ length: MAX_DECK }).map((_, slot) => {
+            const id = deck[slot];
+            if (!id) {
+              return (
+                <div key={`empty-${slot}`} className="deck-slot empty">
+                  <span className="deck-slot-num">{slot + 1}</span>
+                  <span className="deck-slot-name">Empty</span>
+                </div>
+              );
+            }
+            const def = getUnitDef(id);
+            const rarity = RARITIES[def.rarity];
+            return (
+              <button
+                key={id}
+                type="button"
+                className="deck-slot filled"
+                style={{ borderColor: rarity.color }}
+                onClick={() => toggle(id)}
+                title={`Remove ${def.name}`}
+              >
+                <span className="deck-slot-num">{slot + 1}</span>
+                <span className="deck-slot-name">{def.name}</span>
+                <span className="deck-slot-rarity" style={{ color: rarity.color }}>
+                  {rarity.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="roster-head">
+          <h3>All Units</h3>
+          <div className="sort-control" role="group" aria-label="Sort units">
+            <button
+              type="button"
+              className={`sort-btn${sortMode === "default" ? " active" : ""}`}
+              onClick={() => setSortMode("default")}
+              aria-pressed={sortMode === "default"}
+            >
+              Default
+            </button>
+            <button
+              type="button"
+              className={`sort-btn${sortMode === "rarity" ? " active" : ""}`}
+              onClick={() => setSortMode("rarity")}
+              aria-pressed={sortMode === "rarity"}
+            >
+              Rarity
+            </button>
+          </div>
+        </div>
+
         <div className="card-grid">
-          {DECKABLE_UNIT_IDS.map((id) => {
+          {rosterIds.map((id) => {
             const isLegendary = getUnitDef(id).rarity === "legendary";
             const selected = deck.includes(id);
             // A legendary the player can't add because they already have one.
