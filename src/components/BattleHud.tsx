@@ -1,4 +1,4 @@
-import type { BattleUiState } from "@/hooks/useBattleEngine";
+import type { BattleMode, BattleUiState } from "@/hooks/useBattleEngine";
 import { getUnitDef } from "@/data/units";
 
 interface Props {
@@ -6,6 +6,7 @@ interface Props {
   speed: number;
   onSpeed: (s: number) => void;
   onBegin: () => void;
+  mode: BattleMode;
 }
 
 function fmtClock(sec: number): string {
@@ -14,7 +15,7 @@ function fmtClock(sec: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-export function BattleHud({ ui, speed, onSpeed, onBegin }: Props) {
+export function BattleHud({ ui, speed, onSpeed, onBegin, mode }: Props) {
   const next = ui.playerNext ? getUnitDef(ui.playerNext) : null;
   return (
     <div className="hud">
@@ -43,29 +44,25 @@ export function BattleHud({ ui, speed, onSpeed, onBegin }: Props) {
           </div>
         )}
         {ui.phase === "battle" && (
-          <div className="deploy-bar">
-            <div className="deploy-hint">
-              {ui.canDeploy && next ? (
-                <>
-                  Slot open — tap to deploy{" "}
-                  <strong style={{ color: next.accent }}>{next.name}</strong>
-                </>
-              ) : (
-                <>Battle underway</>
-              )}
-            </div>
-            <div className="speed-controls">
-              {[1, 2, 3].map((s) => (
-                <button
-                  key={s}
-                  className={`btn btn-speed ${speed === s ? "active" : ""}`}
-                  onClick={() => onSpeed(s)}
-                >
-                  {s}×
-                </button>
-              ))}
-            </div>
-          </div>
+          <>
+            {/* Mid-battle "Slot open — tap to deploy" hint intentionally omitted
+                for now. Planned to return as part of a first-time-player tutorial
+                / onboarding flow rather than always-on chrome. */}
+            {/* Fast-forward is solo-only; PVP is server-paced at 1×. */}
+            {mode === "solo" && (
+              <div className="speed-controls">
+                {[1, 2, 3].map((s) => (
+                  <button
+                    key={s}
+                    className={`btn btn-speed ${speed === s ? "active" : ""}`}
+                    onClick={() => onSpeed(s)}
+                  >
+                    {s}×
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

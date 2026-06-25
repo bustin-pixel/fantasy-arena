@@ -43,6 +43,8 @@ export function createUnit(defId: string, team: Team, pos: Vec2): Unit {
     targetUid: null,
     attackedByUid: null,
     tauntedByUid: null,
+    chargeTicks: 0,
+    chargeTargetUid: null,
     shieldHp: 0,
     shieldHpMax: 0,
     effects: [],

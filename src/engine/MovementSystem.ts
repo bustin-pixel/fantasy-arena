@@ -81,6 +81,10 @@ export function stepMovement(ctx: MovementContext): void {
   const { units, unitsByUid } = ctx;
 
   for (const unit of units) {
+    // An Orc mid-charge has its movement driven by CombatSystem (stepCharge);
+    // skip it here so the dash isn't applied twice in one tick.
+    if (unit.chargeTicks > 0) continue;
+
     // Movement runs in the moving state. Ranged units are also allowed to
     // reposition while attacking, so they can kite-and-shoot rather than stand
     // and trade. Stunned / casting / dead never move.
