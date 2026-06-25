@@ -15,12 +15,14 @@ import type {
   Vec2,
 } from "@/types";
 import {
+  DEPLOY_TIME_SEC,
   ENEMY_ZONE,
   FIELD_WIDTH,
   MATCH_TIME_SEC,
   MAX_ACTIVE_UNITS_PER_SIDE,
   PLAYER_ZONE,
   TICK_RATE,
+  UNIT_RADIUS,
   secToTicks,
 } from "@/utils/constants";
 import { createUnit, resetUidCounter } from "@/entities/createUnit";
@@ -46,8 +48,9 @@ export class MatchController {
   private aiCooldown = 0;
   /** Pre-battle countdown once both sides have 2 down (-1 = not armed yet). */
   private startCountdown = -1;
-  /** Ticks of player inactivity in deployment before we auto-place their opener. */
-  private deployAutoFillCountdown = 0;
+  /** Placement timer for the deployment phase; when it hits 0 we auto-place any
+   *  units the player hasn't set down (spread out, never stacked). */
+  private deployTimer = secToTicks(DEPLOY_TIME_SEC);
   /** Ticks an empty player slot waits before the engine auto-deploys a reserve. */
   private autoDeployCountdown = 0;
   readonly seed: number;
@@ -169,7 +172,6 @@ export class MatchController {
     if (team === "player") this.selectedIndex = null;
 
     this.autoDeployCountdown = 0;
-    if (team === "player") this.deployAutoFillCountdown = 0;
 
     this.deployments.push({
       tick: this.state.tick,
@@ -195,36 +197,65 @@ export class MatchController {
     return Math.ceil(this.startCountdown / TICK_RATE);
   }
 
+  /** Seconds left on the deployment placement timer, or null once it no longer
+   *  applies (battle started, or the pre-battle countdown has taken over). */
+  deploySecLeft(): number | null {
+    if (this.state.phase !== "deployment") return null;
+    if (this.startCountdown >= 0) return null;
+    return Math.max(0, Math.ceil(this.deployTimer / TICK_RATE));
+  }
+
   // -- Deployment auto-fill ---------------------------------------------------
-  // Safety net so the 2v2 start condition is always reachable: if the player
-  // dawdles during deployment, place their remaining opening unit(s) for them
-  // after a short grace window. Positions come from the sim RNG (deterministic).
+  // When the placement timer expires, fill any opening slots the player left
+  // empty. Positions are spread out — each pick keeps clear of already-placed
+  // player units, so an auto-placed unit is never stacked on or directly under
+  // one the player set down. Positions come from the sim RNG (deterministic).
   private autoFillPlayerDeployment(): void {
     if (this.state.phase !== "deployment") return;
-    if (this.countActive("player") >= MAX_ACTIVE_UNITS_PER_SIDE) return;
-    if (this.deckRemaining("player") <= 0) return;
-
-    this.deployAutoFillCountdown++;
-    if (this.deployAutoFillCountdown < secToTicks(5)) return;
-    this.deployAutoFillCountdown = 0;
-
-    // Fill up to the 2-unit opening in one go.
     while (
       this.countActive("player") < MAX_ACTIVE_UNITS_PER_SIDE &&
       this.deckRemaining("player") > 0
     ) {
       const card = this.nextCard("player");
       if (!card) break;
-      const def = getUnitDef(card);
-      const rng = this.state.rng;
-      const yLo = PLAYER_ZONE.top;
-      const yHi = PLAYER_ZONE.bottom;
+      this.deploy("player", card, this.pickSpreadPlayerPos(getUnitDef(card)));
+    }
+  }
+
+  /** Distance from (x,y) to the nearest living player unit (Infinity if none). */
+  private nearestPlayerDist(x: number, y: number): number {
+    let min = Infinity;
+    for (const u of this.state.units) {
+      if (u.team !== "player" || u.state === "dead") continue;
+      const d = Math.hypot(u.pos.x - x, u.pos.y - y);
+      if (d < min) min = d;
+    }
+    return min;
+  }
+
+  /** A deployment spot in the player zone kept well clear of existing player
+   *  units (so auto-placed reinforcements never stack). Falls back to the most
+   *  spread-out candidate if the zone is crowded. */
+  private pickSpreadPlayerPos(def: ReturnType<typeof getUnitDef>): Vec2 {
+    const rng = this.state.rng;
+    const yLo = PLAYER_ZONE.top;
+    const yHi = PLAYER_ZONE.bottom;
+    const minSep = UNIT_RADIUS * 3;
+    let best: Vec2 = { x: FIELD_WIDTH / 2, y: (yLo + yHi) / 2 };
+    let bestDist = -1;
+    for (let i = 0; i < 12; i++) {
       const y = isMelee(def)
         ? rng.float(yLo, yLo + (yHi - yLo) * 0.6)
         : rng.float(yLo + (yHi - yLo) * 0.5, yHi);
       const x = rng.float(60, FIELD_WIDTH - 60);
-      this.deploy("player", card, { x, y });
+      const d = this.nearestPlayerDist(x, y);
+      if (d >= minSep) return { x, y };
+      if (d > bestDist) {
+        bestDist = d;
+        best = { x, y };
+      }
     }
+    return best;
   }
 
   // -- Player reserve auto-deploy --------------------------------------------
@@ -409,7 +440,10 @@ export class MatchController {
   tick(): void {
     if (this.state.phase === "deployment") {
       this.runAI();
-      this.autoFillPlayerDeployment();
+      // Placement timer: while it runs the player sets units down manually; when
+      // it expires, auto-place whatever's left (spread out, never stacked).
+      if (this.deployTimer > 0) this.deployTimer--;
+      if (this.deployTimer <= 0) this.autoFillPlayerDeployment();
       // Start only when both sides have their full 2-unit opening down. Once
       // they do, run a 3-second countdown, then begin the battle.
       if (this.bothSidesReady()) {

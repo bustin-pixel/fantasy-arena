@@ -41,6 +41,13 @@ export function BattleHud({ ui, speed, onSpeed, mode }: Props) {
               Tap your zone to deploy{" "}
               <strong style={{ color: next.accent }}>{next.name}</strong>
             </div>
+            {ui.deploySecLeft != null && (
+              <div
+                className={`deploy-timer${ui.deploySecLeft <= 5 ? " urgent" : ""}`}
+              >
+                {ui.deploySecLeft}s
+              </div>
+            )}
           </div>
         )}
         {ui.phase === "battle" && (

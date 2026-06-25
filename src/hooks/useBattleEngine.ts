@@ -17,7 +17,7 @@ import type { MatchPhase, Team, Vec2 } from "@/types";
 import { MatchController } from "@/engine/MatchController";
 import { renderBattle } from "@/engine/Renderer";
 import { generateEnemyDeck } from "@/engine/AIDeck";
-import { TICK_MS, TICK_RATE } from "@/utils/constants";
+import { DEPLOY_TIME_SEC, TICK_MS, TICK_RATE } from "@/utils/constants";
 import { generateSeed } from "@/utils/rng";
 
 /** Battle mode. Solo allows client-side fast-forward; PVP is server-paced at 1×
@@ -42,6 +42,8 @@ export interface BattleUiState {
   hand: HandCard[];
   /** Seconds left on the pre-battle countdown, or null when not counting. */
   startCountdownSec: number | null;
+  /** Seconds left to place units in deployment, or null when not applicable. */
+  deploySecLeft: number | null;
 }
 
 export interface UseBattleEngine {
@@ -79,6 +81,7 @@ export function useBattleEngine(
       selected: index === 0,
     })),
     startCountdownSec: null,
+    deploySecLeft: DEPLOY_TIME_SEC,
   });
   const [speed, setSpeedState] = useState(1);
 
@@ -145,6 +148,7 @@ export function useBattleEngine(
           canDeploy: c.canDeploy("player"),
           hand: c.playerHand(),
           startCountdownSec: c.startCountdownSec(),
+          deploySecLeft: c.deploySecLeft(),
         });
       }
 
