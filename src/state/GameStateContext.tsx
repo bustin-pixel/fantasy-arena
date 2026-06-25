@@ -18,12 +18,14 @@ import {
   loadSave,
   writeSave,
   type PlayerSave,
+  type SortMode,
 } from "./persistence";
 
 interface GameStateValue {
   save: PlayerSave;
   setDeck: (deck: string[]) => void;
   setUsername: (name: string) => void;
+  setSortMode: (mode: SortMode) => void;
   recordResult: (won: boolean) => void;
 }
 
@@ -40,6 +42,8 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
     setSave((s) => ({ ...s, deck }));
   const setUsername = (username: string) =>
     setSave((s) => ({ ...s, username }));
+  const setSortMode = (sortMode: SortMode) =>
+    setSave((s) => ({ ...s, sortMode }));
   const recordResult = (won: boolean) =>
     setSave((s) => ({
       ...s,
@@ -49,7 +53,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
 
   return (
     <GameStateContext.Provider
-      value={{ save, setDeck, setUsername, recordResult }}
+      value={{ save, setDeck, setUsername, setSortMode, recordResult }}
     >
       {children}
     </GameStateContext.Provider>
