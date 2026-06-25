@@ -1,19 +1,20 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { DECKABLE_UNIT_IDS, getUnitDef } from "@/data/units";
 import { RARITIES, rarityRank } from "@/data/rarities";
 import { CardPortrait } from "@/components/CardPortrait";
+import { UnitDetail } from "@/components/UnitDetail";
+import { MAX_DECK } from "@/utils/constants";
 import { useGameState } from "@/state/GameStateContext";
 
 interface Props {
   onBattle: () => void;
 }
 
-const MAX_DECK = 4;
-
 export function HubScreen({ onBattle }: Props) {
   const { save, setDeck, setSortMode } = useGameState();
   const deck = save.deck;
   const sortMode = save.sortMode;
+  const [detailId, setDetailId] = useState<string | null>(null);
 
   // Does the current deck already contain a legendary?
   const hasLegendary = useMemo(
@@ -144,7 +145,7 @@ export function HubScreen({ onBattle }: Props) {
                 defId={id}
                 selected={selected}
                 locked={locked}
-                onClick={() => toggle(id)}
+                onClick={() => setDetailId(id)}
               />
             );
           })}
@@ -165,6 +166,15 @@ export function HubScreen({ onBattle }: Props) {
           {deck.length < 2 ? "Pick at least 2 units" : "Battle"}
         </button>
       </div>
+
+      {detailId && (
+        <UnitDetail
+          defId={detailId}
+          deck={deck}
+          onToggle={toggle}
+          onClose={() => setDetailId(null)}
+        />
+      )}
     </div>
   );
 }

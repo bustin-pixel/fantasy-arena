@@ -312,6 +312,187 @@ body {
   white-space: nowrap;
 }
 
+/* ---- Unit detail modal --------------------------------------------------- */
+.detail-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.62);
+}
+.detail-modal {
+  position: relative;
+  width: 100%;
+  max-width: 340px;
+  max-height: 90dvh;
+  overflow-y: auto;
+  background: #1a140d;
+  border: 2px solid var(--stone-dark);
+  border-radius: 16px;
+}
+.detail-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid var(--stone-dark);
+  background: rgba(0, 0, 0, 0.5);
+  color: var(--parchment);
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+}
+.detail-art {
+  height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #221a10;
+  border-bottom: 1px solid var(--brown);
+  border-radius: 14px 14px 0 0;
+}
+.detail-art canvas {
+  width: 120px;
+  height: 120px;
+}
+.detail-body {
+  padding: 14px 16px;
+}
+.detail-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.detail-name {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--gold);
+}
+.detail-rarity {
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 1px solid;
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+.detail-deckcount {
+  margin-left: auto;
+  font-size: 0.72rem;
+  color: var(--stone);
+}
+.detail-role {
+  font-size: 0.78rem;
+  color: var(--stone);
+  margin-top: 3px;
+  margin-bottom: 12px;
+}
+.stat-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 7px 0;
+}
+.stat-label {
+  width: 84px;
+  font-size: 0.75rem;
+  color: var(--stone);
+}
+.stat-track {
+  flex: 1;
+  height: 7px;
+  background: #221a10;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.stat-fill {
+  height: 100%;
+  border-radius: 4px;
+}
+.stat-value {
+  width: 44px;
+  text-align: right;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--parchment);
+}
+.detail-section {
+  margin-top: 11px;
+  padding-top: 10px;
+  border-top: 1px solid var(--brown);
+}
+.detail-skill-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.detail-skill-name {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--parchment);
+}
+.detail-tag {
+  font-size: 0.56rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 1px solid;
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+.detail-tag.active {
+  color: var(--gold);
+  border-color: var(--gold);
+}
+.detail-tag.passive {
+  color: var(--stone);
+  border-color: var(--stone);
+}
+.detail-skill-text {
+  font-size: 0.78rem;
+  color: #cbb9a0;
+  line-height: 1.5;
+}
+.detail-footer {
+  display: flex;
+  gap: 10px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--brown);
+}
+.btn-close-ghost {
+  flex: 0 0 auto;
+  border: 1px solid var(--stone-dark);
+  background: transparent;
+  color: var(--parchment);
+  border-radius: 10px;
+}
+.btn-add {
+  flex: 1;
+  border: none;
+  background: var(--gold);
+  color: var(--ink);
+  border-radius: 10px;
+}
+.btn-add.in-deck {
+  background: #3b6d11;
+  color: #eaf3de;
+}
+.btn-add:disabled {
+  background: var(--stone-dark);
+  color: #2c2c2a;
+  cursor: not-allowed;
+  opacity: 0.75;
+}
+
 /* ---- Battle -------------------------------------------------------------- */
 .battle {
   height: 100dvh;
@@ -490,6 +671,30 @@ body {
   pointer-events: auto;
   display: flex;
   gap: 6px;
+}
+.countdown-overlay {
+  position: absolute;
+  top: 36%;
+  left: 0;
+  right: 0;
+  text-align: center;
+  pointer-events: none;
+}
+.countdown-num {
+  font-size: 5rem;
+  font-weight: 900;
+  color: var(--gold);
+  line-height: 1;
+  text-shadow: 0 2px 8px #000, 0 0 24px rgba(245, 179, 1, 0.5);
+}
+.countdown-label {
+  margin-top: 4px;
+  font-size: 1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--parchment);
+  text-shadow: 0 1px 4px #000;
 }
 
 /* ---- Result overlay ------------------------------------------------------ */

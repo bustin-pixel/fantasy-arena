@@ -28,6 +28,13 @@ export const UNITS: Record<string, UnitDef> = {
     ability: "crushing_slam",
     color: "#6b8e3a",
     accent: "#c2410c",
+    traits: [
+      {
+        name: "Second Wind",
+        description:
+          "Once per match, the first hit that would drop it to 25% HP or below fully heals it instead.",
+      },
+    ],
   },
   orc: {
     id: "orc",
@@ -43,6 +50,12 @@ export const UNITS: Record<string, UnitDef> = {
     lifesteal: 0.4,
     color: "#557d4a",
     accent: "#22c55e",
+    traits: [
+      {
+        name: "Lifesteal",
+        description: "Heals for 40% of the damage its basic attacks deal.",
+      },
+    ],
   },
   archer: {
     id: "archer",
@@ -99,6 +112,12 @@ export const UNITS: Record<string, UnitDef> = {
     ability: "frost_blast",
     color: "#2563eb",
     accent: "#7dd3fc",
+    traits: [
+      {
+        name: "Frostbite",
+        description: "Every second basic attack freezes the target for 2s.",
+      },
+    ],
   },
   assassin: {
     id: "assassin",
@@ -110,9 +129,16 @@ export const UNITS: Record<string, UnitDef> = {
     attackSpeed: 0.8, // very fast
     moveSpeed: 105, // fastest in the game — rushes
     range: MELEE,
-    ability: "shadow_step",
+    ability: "ambush",
     color: "#4b2e6b",
     accent: "#c084fc",
+    traits: [
+      {
+        name: "Vanish",
+        description:
+          "The first lethal blow leaves it at 1 HP — stealthed and unable to die for 2.5s.",
+      },
+    ],
   },
   healer: {
     id: "healer",
@@ -141,6 +167,13 @@ export const UNITS: Record<string, UnitDef> = {
     ability: "summon_wolves",
     color: "#5c4326",
     accent: "#a3e635",
+    traits: [
+      {
+        name: "Bear Form",
+        description:
+          "At 30% HP it transforms into a bear: a melee bruiser that takes 80% less damage. One-way, and it stops summoning.",
+      },
+    ],
   },
   // Spirit wolf — summoned by the Druid, never in a deck. Small, fast, weak.
   wolf: {
@@ -184,6 +217,13 @@ export const UNITS: Record<string, UnitDef> = {
     ability: "raise_dead", // primary; fear is a second ability handled in logic
     color: "#3b2a52",
     accent: "#a78bfa",
+    traits: [
+      {
+        name: "Terrify",
+        description:
+          "When no corpse is available to raise, nearby enemies flee in terror for 2s instead.",
+      },
+    ],
   },
   // Skeleton — raised by the Necromancer, never in a deck. Weak, expendable body.
   skeleton: {

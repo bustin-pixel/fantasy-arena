@@ -40,7 +40,7 @@ export type AbilityId =
   | "fireball"
   | "frost_blast"
   | "backstab"
-  | "shadow_step"
+  | "ambush"
   | "charge"
   | "bloodrage"
   | "fear_aura"
@@ -88,6 +88,8 @@ export interface UnitDef {
   /** Hex accent for ability effects/projectiles. */
   accent: string;
   role: string;
+  /** Human-readable passive traits (engine-coded behaviors) for the detail UI. */
+  traits?: { name: string; description: string }[];
 }
 
 // ---------------------------------------------------------------------------
@@ -141,6 +143,8 @@ export interface Unit {
   transformed: boolean;
   /** True once the Assassin's death-cheat (Vanish) has been spent this match. */
   vanishUsed: boolean;
+  /** Assassin Ambush: true until its first strike (opening stealth + stun). */
+  ambushReady: boolean;
   /** True once the Ogre's Second Wind full-heal has triggered this match. */
   secondWindUsed: boolean;
   /** Number of split-clones the slime has already spawned (caps splitting). */

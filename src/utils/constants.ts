@@ -25,7 +25,7 @@ export const PLAYER_ZONE = { top: FIELD_HEIGHT * 0.6, bottom: FIELD_HEIGHT - 40 
 // Match rules.
 export const MATCH_TIME_SEC = 120; // 2:00
 export const MAX_ACTIVE_UNITS_PER_SIDE = 2;
-export const MIN_UNITS_TO_START = 2;
+export const MAX_DECK = 4;
 
 // Collision / melee.
 export const UNIT_RADIUS = 32;
