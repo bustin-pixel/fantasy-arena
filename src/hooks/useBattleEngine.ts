@@ -40,6 +40,8 @@ export interface BattleUiState {
   canDeploy: boolean;
   /** Remaining undeployed player cards, for the bottom tray. */
   hand: HandCard[];
+  /** Seconds left on the pre-battle countdown, or null when not counting. */
+  startCountdownSec: number | null;
 }
 
 export interface UseBattleEngine {
@@ -47,7 +49,6 @@ export interface UseBattleEngine {
   ui: BattleUiState;
   deployAt: (pos: Vec2) => void;
   selectCard: (index: number) => void;
-  begin: () => void;
   speed: number;
   setSpeed: (s: number) => void;
 }
@@ -77,6 +78,7 @@ export function useBattleEngine(
       defId,
       selected: index === 0,
     })),
+    startCountdownSec: null,
   });
   const [speed, setSpeedState] = useState(1);
 
@@ -142,6 +144,7 @@ export function useBattleEngine(
           playerNext: c.nextCard("player"),
           canDeploy: c.canDeploy("player"),
           hand: c.playerHand(),
+          startCountdownSec: c.startCountdownSec(),
         });
       }
 
@@ -173,11 +176,7 @@ export function useBattleEngine(
     }));
   }, []);
 
-  const begin = useCallback(() => {
-    controllerRef.current?.forceStart();
-  }, []);
-
-  return { canvasRef, ui, deployAt, selectCard, begin, speed, setSpeed };
+  return { canvasRef, ui, deployAt, selectCard, speed, setSpeed };
 }
 
 export { type Team };

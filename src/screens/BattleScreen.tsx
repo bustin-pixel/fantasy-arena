@@ -17,7 +17,7 @@ interface Props {
 }
 
 export function BattleScreen({ deck, onExit, mode = "solo" }: Props) {
-  const { canvasRef, ui, deployAt, selectCard, begin, speed, setSpeed } =
+  const { canvasRef, ui, deployAt, selectCard, speed, setSpeed } =
     useBattleEngine(deck, mode);
   const { recordResult } = useGameState();
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -69,13 +69,7 @@ export function BattleScreen({ deck, onExit, mode = "solo" }: Props) {
             if (t) handleTap(t.clientX, t.clientY);
           }}
         />
-        <BattleHud
-          ui={ui}
-          speed={speed}
-          onSpeed={setSpeed}
-          onBegin={begin}
-          mode={mode}
-        />
+        <BattleHud ui={ui} speed={speed} onSpeed={setSpeed} mode={mode} />
       </div>
 
       <CardTray

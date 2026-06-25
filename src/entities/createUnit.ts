@@ -31,6 +31,7 @@ export function createUnit(defId: string, team: Team, pos: Vec2): Unit {
     damageTakenMult: 1,
     transformed: false,
     vanishUsed: false,
+    ambushReady: def.ability === "ambush",
     secondWindUsed: false,
     splitsSpawned: 0,
     mysticForm: "light",

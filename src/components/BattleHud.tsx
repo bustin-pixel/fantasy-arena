@@ -5,7 +5,6 @@ interface Props {
   ui: BattleUiState;
   speed: number;
   onSpeed: (s: number) => void;
-  onBegin: () => void;
   mode: BattleMode;
 }
 
@@ -15,7 +14,7 @@ function fmtClock(sec: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-export function BattleHud({ ui, speed, onSpeed, onBegin, mode }: Props) {
+export function BattleHud({ ui, speed, onSpeed, mode }: Props) {
   const next = ui.playerNext ? getUnitDef(ui.playerNext) : null;
   return (
     <div className="hud">
@@ -25,22 +24,23 @@ export function BattleHud({ ui, speed, onSpeed, onBegin, mode }: Props) {
         <div className="hud-pill player">You · {ui.playerActive}</div>
       </div>
 
+      {/* Pre-battle countdown once both sides have their 2 units down. */}
+      {ui.phase === "deployment" && ui.startCountdownSec != null && (
+        <div className="countdown-overlay">
+          <div className="countdown-num">
+            {ui.startCountdownSec > 0 ? ui.startCountdownSec : "Fight!"}
+          </div>
+          <div className="countdown-label">Battle starts</div>
+        </div>
+      )}
+
       <div className="hud-bottom">
-        {ui.phase === "deployment" && (
+        {ui.phase === "deployment" && ui.canDeploy && next && (
           <div className="deploy-bar">
             <div className="deploy-hint">
-              {next ? (
-                <>
-                  Tap your zone to deploy{" "}
-                  <strong style={{ color: next.accent }}>{next.name}</strong>
-                </>
-              ) : (
-                <>No cards left to deploy</>
-              )}
+              Tap your zone to deploy{" "}
+              <strong style={{ color: next.accent }}>{next.name}</strong>
             </div>
-            <button className="btn btn-gold" onClick={onBegin}>
-              Begin Battle
-            </button>
           </div>
         )}
         {ui.phase === "battle" && (

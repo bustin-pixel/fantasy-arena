@@ -62,11 +62,12 @@ export const ABILITIES: Record<AbilityId, AbilityDef> = {
     description: "On reaching a target, a burst of bonus damage. 7s cooldown.",
     cooldown: 7,
   },
-  shadow_step: {
-    id: "shadow_step",
-    name: "Shadow Step",
-    description: "Every 5s: blink behind the target and strike for bonus damage.",
-    cooldown: 5,
+  ambush: {
+    id: "ambush",
+    name: "Ambush",
+    description:
+      "Passive: starts the battle hidden. Its first strike stuns the target for 3s and reveals it.",
+    cooldown: 0,
   },
   mend: {
     id: "mend",

@@ -43,7 +43,7 @@ export interface AbilityContext {
 }
 
 /** Abilities that are passive (no active cast). Everything else is cast-gated. */
-const PASSIVE_ABILITIES = new Set<Unit["ability"]>(["lifesteal", "bloodrage", "slime_split", "mystic_shift"]);
+const PASSIVE_ABILITIES = new Set<Unit["ability"]>(["lifesteal", "bloodrage", "slime_split", "mystic_shift", "ambush"]);
 
 /** True if this ability is an active (cooldown-gated) cast. */
 function isActiveAbility(unit: Unit): boolean {
@@ -80,8 +80,6 @@ export function tryCastAbility(ctx: AbilityContext): boolean {
       return castFrostBlast(ctx);
     case "backstab":
       return castBackstab(ctx);
-    case "shadow_step":
-      return castShadowStep(ctx);
     case "charge":
       return castCharge(ctx);
     case "mend":
@@ -269,54 +267,8 @@ function castBackstab(ctx: AbilityContext): boolean {
   return true;
 }
 
-// --- ASSASSIN: Shadow Step ---------------------------------------------------
-// A blink: the assassin vanishes and reappears just behind its target, then
-// strikes for bonus damage. Fires when not already on top of the target, so it
-// works as a gap-closer to reach the backline. 5s cooldown.
-function castShadowStep(ctx: AbilityContext): boolean {
-  const { unit, unitsByUid } = ctx;
-  const target = unit.targetUid ? unitsByUid.get(unit.targetUid) : null;
-  if (!target || target.state === "dead") return false;
-
-  const d = dist(unit.pos, target.pos);
-  // Only blink if there's a meaningful gap to close.
-  if (d < unit.range + unit.radius + 10) return false;
-
-  // Leave a puff of shadow where the assassin was.
-  ctx.spawnVfx({
-    kind: "death",
-    pos: { x: unit.pos.x, y: unit.pos.y },
-    life: secToTicks(0.35),
-    maxLife: secToTicks(0.35),
-    color: getUnitDef(unit.defId).accent,
-  });
-
-  // Reappear on the far side of the target, relative to the assassin's approach.
-  const approach = dir(unit.pos, target.pos);
-  const behindX = target.pos.x + approach.x * (target.radius + unit.radius);
-  const behindY = target.pos.y + approach.y * (target.radius + unit.radius);
-  unit.pos.x = clamp(behindX, unit.radius, FIELD_WIDTH - unit.radius);
-  unit.pos.y = clamp(behindY, unit.radius, FIELD_HEIGHT - unit.radius);
-  unit.facing = target.pos.x >= unit.pos.x ? 1 : -1;
-
-  // Strike on arrival.
-  ctx.dealDamage(target, 28, unit);
-  ctx.spawnVfx({
-    kind: "slam",
-    pos: { x: target.pos.x, y: target.pos.y },
-    life: secToTicks(0.35),
-    maxLife: secToTicks(0.35),
-    color: getUnitDef(unit.defId).accent,
-  });
-  ctx.spawnVfx({
-    kind: "death",
-    pos: { x: unit.pos.x, y: unit.pos.y },
-    life: secToTicks(0.3),
-    maxLife: secToTicks(0.3),
-    color: getUnitDef(unit.defId).accent,
-  });
-  return true;
-}
+// Assassin "Ambush" is a passive (opening stealth + first-strike stun) resolved
+// in CombatSystem, not an active cast — see performBasicAttack / deploy().
 
 // --- ORC: Charge -------------------------------------------------------------
 // A gap-closer: when its target is out of melee reach, the orc commits to a fast

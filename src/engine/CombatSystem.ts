@@ -187,8 +187,8 @@ function makeDamageDealer(state: SimState) {
         target.hp = 1;
       } else if (target.defId === "assassin" && !target.vanishUsed) {
         // Vanish: the first lethal blow doesn't kill. The assassin survives at
-        // 1 HP, becomes untargetable (stealth) and immune to death for 5s, and
-        // its Shadow Step instantly resets so it can blink to safety.
+        // 1 HP and becomes untargetable (stealth) + immune to death for 2.5s so
+        // it can slip away.
         target.vanishUsed = true;
         target.hp = 1;
         applyEffect(
@@ -199,7 +199,6 @@ function makeDamageDealer(state: SimState) {
           target,
           makeEffect("stealth", { source: target.uid, durationSec: 2.5 })
         );
-        target.abilityCooldown = 0; // reset Shadow Step
         target.attackedByUid = null;
         spawnFloatingText(state, target, "Vanish!", "heal");
         spawnVfx(state, {
@@ -611,6 +610,22 @@ function performBasicAttack(
 ): void {
   const def = getUnitDef(unit.defId);
   const ranged = def.range > 80;
+
+  // Assassin Ambush: the first strike out of opening stealth stuns the victim for
+  // 3s and reveals the assassin. One-time (ambushReady) so a later re-stealth
+  // (e.g. Vanish) never re-triggers it.
+  if (unit.ambushReady) {
+    unit.ambushReady = false;
+    unit.effects = unit.effects.filter((e) => e.type !== "stealth");
+    applyEffect(target, makeEffect("stun", { source: unit.uid, durationSec: 3 }));
+    spawnVfx(state, {
+      kind: "slam",
+      pos: { x: target.pos.x, y: target.pos.y },
+      life: secToTicks(0.4),
+      maxLife: secToTicks(0.4),
+      color: def.accent,
+    });
+  }
 
   unit.attackCount += 1;
   // Ice Mage: every second basic attack freezes the target (2s stun).

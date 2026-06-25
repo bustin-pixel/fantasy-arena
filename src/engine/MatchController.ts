@@ -19,8 +19,8 @@ import {
   FIELD_WIDTH,
   MATCH_TIME_SEC,
   MAX_ACTIVE_UNITS_PER_SIDE,
-  MIN_UNITS_TO_START,
   PLAYER_ZONE,
+  TICK_RATE,
   secToTicks,
 } from "@/utils/constants";
 import { createUnit, resetUidCounter } from "@/entities/createUnit";
@@ -30,6 +30,7 @@ import {
   stepSimulation,
   type SimState,
 } from "./CombatSystem";
+import { applyEffect, makeEffect } from "./StatusEffectSystem";
 import { isMelee, getUnitDef } from "@/data/units";
 
 export class MatchController {
@@ -43,8 +44,10 @@ export class MatchController {
   private selectedIndex: number | null = null;
   private deployments: DeploymentRecord[] = [];
   private aiCooldown = 0;
-  /** Ticks spent in the deployment phase, for the auto-start fallback. */
-  private deploymentTicks = 0;
+  /** Pre-battle countdown once both sides have 2 down (-1 = not armed yet). */
+  private startCountdown = -1;
+  /** Ticks of player inactivity in deployment before we auto-place their opener. */
+  private deployAutoFillCountdown = 0;
   /** Ticks an empty player slot waits before the engine auto-deploys a reserve. */
   private autoDeployCountdown = 0;
   readonly seed: number;
@@ -141,6 +144,15 @@ export class MatchController {
     });
     this.state.units.push(unit);
 
+    // Assassin Ambush: enters the field stealthed (untargetable) until its first
+    // strike. Deploy is the only path onto the field, so apply opening stealth here.
+    if (unit.ability === "ambush") {
+      applyEffect(
+        unit,
+        makeEffect("stealth", { source: unit.uid, durationSec: MATCH_TIME_SEC })
+      );
+    }
+
     // Mark the consumed deck index. For the player, deploy the selected card;
     // otherwise the first undeployed copy matching defId.
     const used = this.usedSet(team);
@@ -157,6 +169,7 @@ export class MatchController {
     if (team === "player") this.selectedIndex = null;
 
     this.autoDeployCountdown = 0;
+    if (team === "player") this.deployAutoFillCountdown = 0;
 
     this.deployments.push({
       tick: this.state.tick,
@@ -165,36 +178,52 @@ export class MatchController {
       pos: { x: unit.pos.x, y: unit.pos.y },
     });
 
-    this.maybeStartBattle();
     return unit;
   }
 
-  /** Auto-begin battle once both sides are ready.
-   *  Primary rule (per spec): both sides have the minimum (2) deployed.
-   *  Fallback: if the player chose to commit fewer, the battle still starts
-   *  automatically a short time after the enemy has placed its opening units,
-   *  so a one-unit opening never soft-locks in the deployment phase. */
-  private maybeStartBattle(): void {
-    if (this.state.phase !== "deployment") return;
-    const p = this.countActive("player");
-    const e = this.countActive("enemy");
-    if (p >= MIN_UNITS_TO_START && e >= MIN_UNITS_TO_START) {
-      this.state.phase = "battle";
-    }
+  /** True once both sides have their full opening of 2 units down. */
+  private bothSidesReady(): boolean {
+    return (
+      this.countActive("player") >= MAX_ACTIVE_UNITS_PER_SIDE &&
+      this.countActive("enemy") >= MAX_ACTIVE_UNITS_PER_SIDE
+    );
   }
 
-  /** Force-start (player pressed Begin with at least 1 unit).
-   *  Ensures the enemy has at least one unit first so the battle never starts
-   *  one-sided. */
-  forceStart(): void {
-    if (this.countActive("player") < 1) return;
-    // Make sure the enemy has opened; deploy one immediately if the board is bare.
-    if (this.countActive("enemy") < 1) {
-      this.aiCooldown = 0;
-      this.runAI();
-    }
-    if (this.countActive("enemy") >= 1) {
-      this.state.phase = "battle";
+  /** Seconds left on the pre-battle countdown, or null if it hasn't armed yet. */
+  startCountdownSec(): number | null {
+    if (this.startCountdown < 0) return null;
+    return Math.ceil(this.startCountdown / TICK_RATE);
+  }
+
+  // -- Deployment auto-fill ---------------------------------------------------
+  // Safety net so the 2v2 start condition is always reachable: if the player
+  // dawdles during deployment, place their remaining opening unit(s) for them
+  // after a short grace window. Positions come from the sim RNG (deterministic).
+  private autoFillPlayerDeployment(): void {
+    if (this.state.phase !== "deployment") return;
+    if (this.countActive("player") >= MAX_ACTIVE_UNITS_PER_SIDE) return;
+    if (this.deckRemaining("player") <= 0) return;
+
+    this.deployAutoFillCountdown++;
+    if (this.deployAutoFillCountdown < secToTicks(5)) return;
+    this.deployAutoFillCountdown = 0;
+
+    // Fill up to the 2-unit opening in one go.
+    while (
+      this.countActive("player") < MAX_ACTIVE_UNITS_PER_SIDE &&
+      this.deckRemaining("player") > 0
+    ) {
+      const card = this.nextCard("player");
+      if (!card) break;
+      const def = getUnitDef(card);
+      const rng = this.state.rng;
+      const yLo = PLAYER_ZONE.top;
+      const yHi = PLAYER_ZONE.bottom;
+      const y = isMelee(def)
+        ? rng.float(yLo, yLo + (yHi - yLo) * 0.6)
+        : rng.float(yLo + (yHi - yLo) * 0.5, yHi);
+      const x = rng.float(60, FIELD_WIDTH - 60);
+      this.deploy("player", card, { x, y });
     }
   }
 
@@ -380,19 +409,17 @@ export class MatchController {
   tick(): void {
     if (this.state.phase === "deployment") {
       this.runAI();
-      this.deploymentTicks++;
-      // Fallback auto-start: once the enemy has opened and the player has at
-      // least one unit down, begin automatically after a brief window even if
-      // neither side reached the 2-unit threshold. Prevents a soft-lock when
-      // the player commits a single opening unit and waits.
-      const enemyOpened = !this.canDeploy("enemy") || this.countActive("enemy") >= 2;
-      if (
-        this.countActive("player") >= 1 &&
-        this.countActive("enemy") >= 1 &&
-        enemyOpened &&
-        this.deploymentTicks > secToTicks(1.5)
-      ) {
-        this.state.phase = "battle";
+      this.autoFillPlayerDeployment();
+      // Start only when both sides have their full 2-unit opening down. Once
+      // they do, run a 3-second countdown, then begin the battle.
+      if (this.bothSidesReady()) {
+        if (this.startCountdown < 0) {
+          this.startCountdown = secToTicks(3);
+        } else if (this.startCountdown === 0) {
+          this.state.phase = "battle";
+        } else {
+          this.startCountdown--;
+        }
       }
       return;
     }
