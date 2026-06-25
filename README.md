@@ -87,4 +87,3 @@ The `engine/` folder imports nothing from React or the DOM (except the optional
 
 Never trust client values for stats/rewards — the deterministic core means the
 server can validate any client-claimed outcome by re-simulating from the seed.
-```
