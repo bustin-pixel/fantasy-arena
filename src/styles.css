@@ -173,6 +173,91 @@ body {
   line-height: 1.4;
 }
 
+/* ---- Current-deck strip -------------------------------------------------- */
+.deck-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 18px;
+}
+.deck-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 58px;
+  padding: 6px 4px;
+  border: 2px solid var(--stone-dark);
+  border-radius: 10px;
+  background: linear-gradient(180deg, #2c2118, #1a140d);
+  font-family: inherit;
+}
+.deck-slot.empty {
+  border-style: dashed;
+  opacity: 0.5;
+}
+.deck-slot.filled {
+  cursor: pointer;
+}
+.deck-slot-num {
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: var(--gold-soft);
+}
+.deck-slot-name {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--parchment);
+  text-align: center;
+  line-height: 1.1;
+}
+.deck-slot.empty .deck-slot-name {
+  color: var(--stone-dark);
+  font-weight: 400;
+}
+.deck-slot-rarity {
+  font-size: 0.56rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* ---- Roster sort control ------------------------------------------------- */
+.roster-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.roster-head h3 {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--parchment);
+}
+.sort-control {
+  display: inline-flex;
+  border: 1px solid var(--stone-dark);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.sort-btn {
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--stone);
+  background: transparent;
+  border: none;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.sort-btn + .sort-btn {
+  border-left: 1px solid var(--stone-dark);
+}
+.sort-btn.active {
+  background: var(--gold);
+  color: var(--ink);
+}
+
 .hub-footer {
   position: sticky;
   bottom: 0;
