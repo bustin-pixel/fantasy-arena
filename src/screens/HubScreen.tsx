@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { DECKABLE_UNIT_IDS, getUnitDef } from "@/data/units";
 import { RARITIES, rarityRank } from "@/data/rarities";
 import { CardPortrait } from "@/components/CardPortrait";
@@ -10,12 +10,10 @@ interface Props {
 
 const MAX_DECK = 4;
 
-type SortMode = "default" | "rarity";
-
 export function HubScreen({ onBattle }: Props) {
-  const { save, setDeck } = useGameState();
+  const { save, setDeck, setSortMode } = useGameState();
   const deck = save.deck;
-  const [sortMode, setSortMode] = useState<SortMode>("default");
+  const sortMode = save.sortMode;
 
   // Does the current deck already contain a legendary?
   const hasLegendary = useMemo(
