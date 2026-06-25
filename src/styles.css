@@ -540,7 +540,7 @@ body {
   flex: 0 0 auto;
   width: 100%;
   max-width: 480px;
-  min-height: 94px;
+  height: 104px;
   display: flex;
   gap: 8px;
   justify-content: center;
@@ -554,7 +554,7 @@ body {
   align-items: center;
   color: var(--stone);
   font-size: 0.85rem;
-  min-height: 94px;
+  height: 104px;
 }
 .tray-card {
   position: relative;
