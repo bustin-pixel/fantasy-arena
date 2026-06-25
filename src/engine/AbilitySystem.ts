@@ -1,0 +1,526 @@
+// ============================================================================
+// AbilitySystem
+// Implements each unit's special ability. Abilities are keyed by AbilityId and
+// fire when their cooldown reaches 0 and conditions are met. Cooldowns are
+// driven down by the CombatSystem each tick.
+//
+// Effects funnel through StatusEffectSystem; damage funnels through the
+// dealDamage callback supplied by CombatSystem so all HP changes, lifesteal,
+// shields, and floating numbers stay centralized and deterministic.
+// ============================================================================
+
+import type { Projectile, Unit, Vfx } from "@/types";
+import { ABILITIES } from "@/data/abilities";
+import { getUnitDef } from "@/data/units";
+import {
+  FIELD_HEIGHT,
+  FIELD_WIDTH,
+  secToTicks,
+} from "@/utils/constants";
+import { clamp, dist, dir } from "@/utils/math";
+import {
+  applyEffect,
+  isSilenced,
+  isStunned,
+  makeEffect,
+} from "./StatusEffectSystem";
+
+export interface AbilityContext {
+  unit: Unit;
+  unitsByUid: Map<string, Unit>;
+  enemies: Unit[];
+  /** Living allies (same team, excluding self) — for healing/support abilities. */
+  allies: Unit[];
+  /** Centralized damage application (handles shield/lifesteal/flash/death). */
+  dealDamage: (target: Unit, amount: number, source: Unit) => void;
+  spawnProjectile: (p: Omit<Projectile, "id" | "alive">) => void;
+  spawnVfx: (v: Omit<Vfx, "id">) => void;
+  heal: (target: Unit, amount: number) => void;
+  /** Spawn a fresh unit into the live sim (e.g. summoner's wolves). */
+  spawnUnit: (defId: string, team: Unit["team"], pos: { x: number; y: number }) => void;
+  /** Claim the nearest recent corpse for raising; returns its position or null. */
+  claimCorpse: () => { x: number; y: number } | null;
+}
+
+/** Abilities that are passive (no active cast). Everything else is cast-gated. */
+const PASSIVE_ABILITIES = new Set<Unit["ability"]>(["lifesteal", "bloodrage", "slime_split", "mystic_shift"]);
+
+/** True if this ability is an active (cooldown-gated) cast. */
+function isActiveAbility(unit: Unit): boolean {
+  return !PASSIVE_ABILITIES.has(unit.ability);
+}
+
+/** Convert seconds to ticks for the given ability cooldown. */
+export function abilityCooldownTicks(abilityId: Unit["ability"]): number {
+  return secToTicks(ABILITIES[abilityId].cooldown);
+}
+
+/**
+ * Attempt to fire `unit`'s ability this tick. Returns true if it fired (the
+ * CombatSystem then resets the cooldown and may enter the casting state).
+ */
+export function tryCastAbility(ctx: AbilityContext): boolean {
+  const { unit } = ctx;
+  if (!isActiveAbility(unit)) return false;
+  if (unit.abilityCooldown > 0) return false;
+  if (isStunned(unit) || isSilenced(unit)) return false;
+
+  switch (unit.ability) {
+    case "crushing_slam":
+      return castCrushingSlam(ctx);
+    case "kiting_leap":
+      return castKitingLeap(ctx);
+    case "shield_block":
+      return castShieldBlock(ctx);
+    case "taunt_roar":
+      return castTauntRoar(ctx);
+    case "fireball":
+      return castFireball(ctx);
+    case "frost_blast":
+      return castFrostBlast(ctx);
+    case "backstab":
+      return castBackstab(ctx);
+    case "shadow_step":
+      return castShadowStep(ctx);
+    case "charge":
+      return castCharge(ctx);
+    case "mend":
+      return castMend(ctx);
+    case "summon_wolves":
+      return castSummonWolves(ctx);
+    case "raise_dead":
+      return castNecromancer(ctx);
+    case "fear_aura":
+      return castFear(ctx);
+    default:
+      return false;
+  }
+}
+
+// --- OGRE: Crushing Slam -----------------------------------------------------
+function castCrushingSlam(ctx: AbilityContext): boolean {
+  const { unit, unitsByUid } = ctx;
+  const target = unit.targetUid ? unitsByUid.get(unit.targetUid) : null;
+  if (!target || target.state === "dead") return false;
+  if (dist(unit.pos, target.pos) > unit.range + unit.radius) return false;
+
+  ctx.dealDamage(target, 25, unit);
+  applyEffect(
+    target,
+    makeEffect("stun", { source: unit.uid, durationSec: 1.5 })
+  );
+  ctx.spawnVfx({
+    kind: "slam",
+    pos: { x: target.pos.x, y: target.pos.y },
+    life: secToTicks(0.4),
+    maxLife: secToTicks(0.4),
+    color: getUnitDef(unit.defId).accent,
+  });
+  return true;
+}
+
+// --- ARCHER: Kiting Leap -----------------------------------------------------
+function castKitingLeap(ctx: AbilityContext): boolean {
+  const { unit, enemies } = ctx;
+  // Only leap if a melee enemy is closing in.
+  const threatRange = unit.radius * 2.4;
+  const threat = enemies.find(
+    (e) =>
+      e.state !== "dead" &&
+      getUnitDef(e.defId).range <= 80 &&
+      dist(unit.pos, e.pos) <= threatRange
+  );
+  if (!threat) return false;
+
+  // Leap away from the threat (~2 tiles ≈ 130px), clamped to field.
+  const away = dir(threat.pos, unit.pos);
+  const leap = 130;
+  unit.pos.x = clamp(unit.pos.x + away.x * leap, unit.radius, FIELD_WIDTH - unit.radius);
+  unit.pos.y = clamp(unit.pos.y + away.y * leap, unit.radius, FIELD_HEIGHT - unit.radius);
+  ctx.spawnVfx({
+    kind: "frost",
+    pos: { x: unit.pos.x, y: unit.pos.y },
+    life: secToTicks(0.25),
+    maxLife: secToTicks(0.25),
+    color: "#fde68a",
+  });
+  return true;
+}
+
+// --- KNIGHT: Shield Block ----------------------------------------------------
+// NOTE: shield_block is currently UNUSED by any unit — the Knight switched to
+// taunt_roar. Kept because it's clean, reusable logic a future tank could claim.
+// If you remove it, also delete the type entry, the dispatch case, and the
+// ability definition in data/abilities.ts.
+function castShieldBlock(ctx: AbilityContext): boolean {
+  const { unit } = ctx;
+  applyEffect(
+    unit,
+    makeEffect("shield", { source: unit.uid, durationSec: 6, charges: 1 })
+  );
+  ctx.spawnVfx({
+    kind: "shield_pop",
+    pos: { x: unit.pos.x, y: unit.pos.y - 4 },
+    life: secToTicks(0.5),
+    maxLife: secToTicks(0.5),
+    color: getUnitDef(unit.defId).accent,
+  });
+  return true;
+}
+
+// --- KNIGHT: Taunting Roar ---------------------------------------------------
+// Forces nearby enemies to attack the Knight for a few seconds (overriding their
+// normal target priority) and grants the Knight an absorb shield so it can soak
+// the incoming fire. The protector tank: it pulls aggro off your backline.
+function castTauntRoar(ctx: AbilityContext): boolean {
+  const { unit, enemies } = ctx;
+  const TAUNT_RADIUS = 200;
+  const TAUNT_SEC = 2.5;
+
+  let taunted = 0;
+  for (const e of enemies) {
+    if (e.state === "dead") continue;
+    if (dist(unit.pos, e.pos) <= TAUNT_RADIUS) {
+      applyEffect(
+        e,
+        makeEffect("taunt", { source: unit.uid, durationSec: TAUNT_SEC })
+      );
+      e.tauntedByUid = unit.uid;
+      e.targetUid = unit.uid; // immediately yank their target
+      taunted++;
+    }
+  }
+
+  // Grant the Knight an absorb shield (overhealth) — scales a bit with how many
+  // it pulled, so a big group taunt is rewarded with more protection.
+  const bubble = 60 + taunted * 15;
+  unit.shieldHp = Math.max(unit.shieldHp, bubble);
+  unit.shieldHpMax = Math.max(unit.shieldHpMax, unit.shieldHp);
+
+  ctx.spawnVfx({
+    kind: "shield_pop",
+    pos: { x: unit.pos.x, y: unit.pos.y - 4 },
+    life: secToTicks(0.6),
+    maxLife: secToTicks(0.6),
+    color: "#cbd5e1",
+  });
+  return true;
+}
+
+// --- FIRE MAGE: Fireball -----------------------------------------------------
+function castFireball(ctx: AbilityContext): boolean {
+  const { unit, unitsByUid } = ctx;
+  const target = unit.targetUid ? unitsByUid.get(unit.targetUid) : null;
+  if (!target || target.state === "dead") return false;
+
+  ctx.spawnProjectile({
+    pos: { x: unit.pos.x, y: unit.pos.y },
+    target: { x: target.pos.x, y: target.pos.y },
+    targetUid: target.uid,
+    speed: 300,
+    damage: 25,
+    team: unit.team,
+    sourceUid: unit.uid,
+    ability: "fireball",
+    color: getUnitDef(unit.defId).accent,
+    angle: 0,
+  });
+  return true;
+}
+
+// --- ICE MAGE: Frost Blast ---------------------------------------------------
+function castFrostBlast(ctx: AbilityContext): boolean {
+  const { unit, unitsByUid } = ctx;
+  const target = unit.targetUid ? unitsByUid.get(unit.targetUid) : null;
+  if (!target || target.state === "dead") return false;
+
+  ctx.spawnProjectile({
+    pos: { x: unit.pos.x, y: unit.pos.y },
+    target: { x: target.pos.x, y: target.pos.y },
+    targetUid: target.uid,
+    speed: 320,
+    damage: 20,
+    team: unit.team,
+    sourceUid: unit.uid,
+    ability: "frost_blast",
+    color: getUnitDef(unit.defId).accent,
+    angle: 0,
+  });
+  return true;
+}
+
+// --- ASSASSIN: Backstab ------------------------------------------------------
+// Fires only when the assassin is in melee contact with its target: a burst of
+// bonus damage rewarding it for reaching the backline.
+function castBackstab(ctx: AbilityContext): boolean {
+  const { unit, unitsByUid } = ctx;
+  const target = unit.targetUid ? unitsByUid.get(unit.targetUid) : null;
+  if (!target || target.state === "dead") return false;
+  if (dist(unit.pos, target.pos) > unit.range + unit.radius) return false;
+
+  ctx.dealDamage(target, 30, unit);
+  ctx.spawnVfx({
+    kind: "slam",
+    pos: { x: target.pos.x, y: target.pos.y },
+    life: secToTicks(0.35),
+    maxLife: secToTicks(0.35),
+    color: getUnitDef(unit.defId).accent,
+  });
+  return true;
+}
+
+// --- ASSASSIN: Shadow Step ---------------------------------------------------
+// A blink: the assassin vanishes and reappears just behind its target, then
+// strikes for bonus damage. Fires when not already on top of the target, so it
+// works as a gap-closer to reach the backline. 5s cooldown.
+function castShadowStep(ctx: AbilityContext): boolean {
+  const { unit, unitsByUid } = ctx;
+  const target = unit.targetUid ? unitsByUid.get(unit.targetUid) : null;
+  if (!target || target.state === "dead") return false;
+
+  const d = dist(unit.pos, target.pos);
+  // Only blink if there's a meaningful gap to close.
+  if (d < unit.range + unit.radius + 10) return false;
+
+  // Leave a puff of shadow where the assassin was.
+  ctx.spawnVfx({
+    kind: "death",
+    pos: { x: unit.pos.x, y: unit.pos.y },
+    life: secToTicks(0.35),
+    maxLife: secToTicks(0.35),
+    color: getUnitDef(unit.defId).accent,
+  });
+
+  // Reappear on the far side of the target, relative to the assassin's approach.
+  const approach = dir(unit.pos, target.pos);
+  const behindX = target.pos.x + approach.x * (target.radius + unit.radius);
+  const behindY = target.pos.y + approach.y * (target.radius + unit.radius);
+  unit.pos.x = clamp(behindX, unit.radius, FIELD_WIDTH - unit.radius);
+  unit.pos.y = clamp(behindY, unit.radius, FIELD_HEIGHT - unit.radius);
+  unit.facing = target.pos.x >= unit.pos.x ? 1 : -1;
+
+  // Strike on arrival.
+  ctx.dealDamage(target, 28, unit);
+  ctx.spawnVfx({
+    kind: "slam",
+    pos: { x: target.pos.x, y: target.pos.y },
+    life: secToTicks(0.35),
+    maxLife: secToTicks(0.35),
+    color: getUnitDef(unit.defId).accent,
+  });
+  ctx.spawnVfx({
+    kind: "death",
+    pos: { x: unit.pos.x, y: unit.pos.y },
+    life: secToTicks(0.3),
+    maxLife: secToTicks(0.3),
+    color: getUnitDef(unit.defId).accent,
+  });
+  return true;
+}
+
+// --- ORC: Charge -------------------------------------------------------------
+// A gap-closer: when its target is out of melee reach, the orc rushes to contact
+// and slams for bonus damage plus a brief stagger (stun). This lets the orc catch
+// kiting ranged units it could otherwise never reach.
+function castCharge(ctx: AbilityContext): boolean {
+  const { unit, unitsByUid } = ctx;
+  const target = unit.targetUid ? unitsByUid.get(unit.targetUid) : null;
+  if (!target || target.state === "dead") return false;
+
+  const d = dist(unit.pos, target.pos);
+  // Only worth charging if there's real distance to cover.
+  if (d < unit.range + unit.radius + 40) return false;
+
+  // Dash to just inside melee range, on the near side of the target.
+  const approach = dir(unit.pos, target.pos);
+  const stop = target.radius + unit.radius - 6;
+  const nx = target.pos.x - approach.x * stop;
+  const ny = target.pos.y - approach.y * stop;
+  unit.pos.x = clamp(nx, unit.radius, FIELD_WIDTH - unit.radius);
+  unit.pos.y = clamp(ny, unit.radius, FIELD_HEIGHT - unit.radius);
+  unit.facing = target.pos.x >= unit.pos.x ? 1 : -1;
+
+  // Impact: bonus damage + a short stagger.
+  ctx.dealDamage(target, 22, unit);
+  applyEffect(
+    target,
+    makeEffect("stun", { source: unit.uid, durationSec: 0.8 })
+  );
+  ctx.spawnVfx({
+    kind: "slam",
+    pos: { x: target.pos.x, y: target.pos.y },
+    life: secToTicks(0.4),
+    maxLife: secToTicks(0.4),
+    color: getUnitDef(unit.defId).accent,
+  });
+  return true;
+}
+
+// --- CLERIC: Mend ------------------------------------------------------------
+// Heals the most-wounded ally within range (including self). Only fires if
+// someone actually needs healing, so the cooldown isn't wasted at full HP.
+function castMend(ctx: AbilityContext): boolean {
+  const { unit, allies } = ctx;
+  const candidates = [unit, ...allies].filter(
+    (u) => u.state !== "dead" && u.hp < u.maxHp
+  );
+  if (candidates.length === 0) return false;
+
+  const healRange = unit.range + unit.radius;
+  const inRange = candidates.filter((u) => dist(unit.pos, u.pos) <= healRange);
+  const pool = inRange.length > 0 ? inRange : [unit];
+
+  // Most-wounded by missing HP.
+  let best = pool[0];
+  let bestMissing = best.maxHp - best.hp;
+  for (const u of pool) {
+    const missing = u.maxHp - u.hp;
+    if (missing > bestMissing || (missing === bestMissing && u.uid < best.uid)) {
+      best = u;
+      bestMissing = missing;
+    }
+  }
+  if (bestMissing <= 0) return false;
+
+  ctx.heal(best, 32);
+  ctx.spawnVfx({
+    kind: "shield_pop",
+    pos: { x: best.pos.x, y: best.pos.y - 4 },
+    life: secToTicks(0.5),
+    maxLife: secToTicks(0.5),
+    color: getUnitDef(unit.defId).accent,
+  });
+  return true;
+}
+
+// --- DRUID: Summon Wolves ----------------------------------------------------
+// Spawns a spirit wolf next to the summoner, on the same team. The wolf is a
+// full sim unit and fights under the same rules as everyone else.
+function castSummonWolves(ctx: AbilityContext): boolean {
+  const { unit } = ctx;
+  const offsetX = unit.facing >= 0 ? 36 : -36;
+  ctx.spawnUnit("wolf", unit.team, {
+    x: clamp(unit.pos.x + offsetX, 40, FIELD_WIDTH - 40),
+    y: clamp(unit.pos.y + 24, 40, FIELD_HEIGHT - 40),
+  });
+  ctx.spawnVfx({
+    kind: "frost",
+    pos: { x: unit.pos.x, y: unit.pos.y },
+    life: secToTicks(0.4),
+    maxLife: secToTicks(0.4),
+    color: getUnitDef(unit.defId).accent,
+  });
+  return true;
+}
+
+// --- NECROMANCER: Raise Dead + Terrify ---------------------------------------
+// The Necromancer raises a skeleton from the nearest fresh corpse when one is
+// available; if there are no corpses to feed on, it instead terrifies nearby
+// enemies (fear) to buy its team space. One unit, two behaviors driven by the
+// state of the battlefield — it gets stronger the more carnage there is.
+function castNecromancer(ctx: AbilityContext): boolean {
+  const corpse = ctx.claimCorpse();
+  if (corpse) {
+    const { unit } = ctx;
+    ctx.spawnUnit("skeleton", unit.team, {
+      x: clamp(corpse.x, 40, FIELD_WIDTH - 40),
+      y: clamp(corpse.y, 40, FIELD_HEIGHT - 40),
+    });
+    ctx.spawnVfx({
+      kind: "death",
+      pos: { x: corpse.x, y: corpse.y },
+      life: secToTicks(0.5),
+      maxLife: secToTicks(0.5),
+      color: getUnitDef(unit.defId).accent,
+    });
+    return true;
+  }
+  // No corpse to raise — terrify instead.
+  return castFear(ctx);
+}
+
+// Terrify: nearby enemies flee in terror (fear status) and can't attack for 2s.
+function castFear(ctx: AbilityContext): boolean {
+  const { unit, enemies } = ctx;
+  const FEAR_RADIUS = 200;
+  let feared = 0;
+  for (const e of enemies) {
+    if (e.state === "dead") continue;
+    if (dist(unit.pos, e.pos) <= FEAR_RADIUS) {
+      applyEffect(
+        e,
+        makeEffect("fear", { source: unit.uid, durationSec: 2 })
+      );
+      feared++;
+    }
+  }
+  if (feared === 0) return false; // nothing in range; don't waste the cooldown
+  ctx.spawnVfx({
+    kind: "frost",
+    pos: { x: unit.pos.x, y: unit.pos.y },
+    life: secToTicks(0.5),
+    maxLife: secToTicks(0.5),
+    color: getUnitDef(unit.defId).accent,
+  });
+  return true;
+}
+
+// --- Projectile impact resolution (called by CombatSystem) -------------------
+export function onProjectileHit(
+  proj: Projectile,
+  target: Unit,
+  source: Unit | undefined,
+  ctx: Pick<AbilityContext, "dealDamage" | "spawnVfx">
+): void {
+  if (!source) return;
+  ctx.dealDamage(target, proj.damage, source);
+
+  if (proj.ability === "fireball") {
+    applyEffect(
+      target,
+      makeEffect("burn", {
+        source: proj.sourceUid,
+        durationSec: 3,
+        damagePerTick: 7,
+        tickIntervalSec: 1,
+      })
+    );
+    ctx.spawnVfx({
+      kind: "burn_burst",
+      pos: { x: target.pos.x, y: target.pos.y },
+      life: secToTicks(0.4),
+      maxLife: secToTicks(0.4),
+      color: proj.color,
+    });
+  } else if (proj.ability === "frost_blast") {
+    applyEffect(
+      target,
+      makeEffect("slow", {
+        source: proj.sourceUid,
+        durationSec: 2.5,
+        magnitude: 0.5,
+      })
+    );
+    ctx.spawnVfx({
+      kind: "frost",
+      pos: { x: target.pos.x, y: target.pos.y },
+      life: secToTicks(0.4),
+      maxLife: secToTicks(0.4),
+      color: proj.color,
+    });
+  }
+}
+
+/** Passive lifesteal hook, invoked by CombatSystem after a basic attack lands.
+ *  Driven by the unit's `lifesteal` fraction in data, independent of its ability
+ *  slot, so a unit can have both lifesteal and an active ability (e.g. the Orc). */
+export function applyLifesteal(
+  attacker: Unit,
+  damageDealt: number,
+  heal: (u: Unit, amt: number) => void
+): void {
+  const frac = getUnitDef(attacker.defId).lifesteal ?? 0;
+  if (frac > 0) {
+    heal(attacker, Math.round(damageDealt * frac));
+  }
+}

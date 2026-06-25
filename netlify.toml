@@ -1,0 +1,19 @@
+# Netlify configuration for Fantasy Arena.
+# Tells Netlify how to build the project and where the finished site lives.
+# If you connect this repo to Netlify (the GitHub path), it reads this file
+# automatically. For the drag-and-drop path you can ignore it — you'll just
+# drop the dist/ folder yourself.
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Single-page-app fallback: serve index.html for any unknown path so deep
+# links never 404. (Harmless here since the game is a single screen.)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
