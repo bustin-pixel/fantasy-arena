@@ -165,6 +165,10 @@ export interface Unit {
   attackedByUid: string | null;
   /** uid of a unit that has taunted this one — forces target until taunt expires. */
   tauntedByUid: string | null;
+  /** Orc Charge: ticks remaining in an active rush (0 = not charging). */
+  chargeTicks: number;
+  /** Orc Charge: uid of the unit currently being charged, or null. */
+  chargeTargetUid: string | null;
   /** Absorb shield (overhealth): soaks damage before HP. Shown as a silver bar. */
   shieldHp: number;
   /** Max absorb shield, for rendering the silver segment proportionally. */

@@ -20,6 +20,10 @@ import { generateEnemyDeck } from "@/engine/AIDeck";
 import { TICK_MS, TICK_RATE } from "@/utils/constants";
 import { generateSeed } from "@/utils/rng";
 
+/** Battle mode. Solo allows client-side fast-forward; PVP is server-paced at 1×
+ *  (a real-time match can't let one client run the sim faster than the other). */
+export type BattleMode = "solo" | "pvp";
+
 export interface HandCard {
   index: number;
   defId: string;
@@ -50,6 +54,7 @@ export interface UseBattleEngine {
 
 export function useBattleEngine(
   playerDeck: string[],
+  mode: BattleMode = "solo",
   seedOverride?: number
 ): UseBattleEngine {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -75,10 +80,15 @@ export function useBattleEngine(
   });
   const [speed, setSpeedState] = useState(1);
 
-  const setSpeed = useCallback((s: number) => {
-    speedRef.current = s;
-    setSpeedState(s);
-  }, []);
+  const setSpeed = useCallback(
+    (s: number) => {
+      // In PVP the sim is server-paced; ignore client speed changes and stay 1×.
+      if (mode === "pvp") return;
+      speedRef.current = s;
+      setSpeedState(s);
+    },
+    [mode]
+  );
 
   // (Re)initialize a match whenever the deck or seed changes.
   useEffect(() => {

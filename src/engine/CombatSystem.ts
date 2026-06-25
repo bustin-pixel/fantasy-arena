@@ -25,6 +25,8 @@ import type {
 } from "@/types";
 import { RNG } from "@/utils/rng";
 import {
+  FIELD_HEIGHT,
+  FIELD_WIDTH,
   FLOAT_TEXT_TICKS,
   HIT_FLASH_TICKS,
   MAX_EFFECTS,
@@ -32,7 +34,7 @@ import {
   SEC_PER_TICK,
   secToTicks,
 } from "@/utils/constants";
-import { dist } from "@/utils/math";
+import { clamp, dir, dist } from "@/utils/math";
 import { getUnitDef } from "@/data/units";
 import { createUnit } from "@/entities/createUnit";
 import {
@@ -321,6 +323,65 @@ function transformDruid(state: SimState, unit: Unit): void {
   spawnFloatingText(state, unit, "Bear Form!", "heal");
 }
 
+// Orc Charge speed — well above any unit's normal moveSpeed so the rush reads as
+// a fast lunge that quickly closes the gap, without being an instant teleport.
+const CHARGE_SPEED = 340; // px/sec
+
+// Advance an in-progress Orc charge by one tick. The orc dashes toward its locked
+// target at CHARGE_SPEED and slams on contact (bonus damage + brief stun). This
+// owns the unit's movement for the duration (MovementSystem skips charging units)
+// so the dash can't be double-applied. Fully deterministic — no randomness.
+function stepCharge(
+  state: SimState,
+  unit: Unit,
+  byUid: Map<string, Unit>,
+  dealDamage: (target: Unit, amount: number, source: Unit) => void
+): void {
+  unit.chargeTicks--;
+
+  const target = unit.chargeTargetUid ? byUid.get(unit.chargeTargetUid) : null;
+  if (!target || target.state === "dead") {
+    // Target gone — abandon the charge and resume normal AI next tick.
+    unit.chargeTicks = 0;
+    unit.chargeTargetUid = null;
+    return;
+  }
+
+  const contact = unit.radius + target.radius - 6;
+  const d = dist(unit.pos, target.pos);
+
+  if (d <= contact) {
+    // Arrived — slam for bonus damage and a short stagger.
+    dealDamage(target, 22, unit);
+    applyEffect(
+      target,
+      makeEffect("stun", { source: unit.uid, durationSec: 0.8 })
+    );
+    spawnVfx(state, {
+      kind: "slam",
+      pos: { x: target.pos.x, y: target.pos.y },
+      life: secToTicks(0.4),
+      maxLife: secToTicks(0.4),
+      color: getUnitDef(unit.defId).accent,
+    });
+    unit.chargeTicks = 0;
+    unit.chargeTargetUid = null;
+    transitionTo(unit, "attacking");
+    return;
+  }
+
+  // Dash one step toward the (possibly moving) target.
+  const v = dir(unit.pos, target.pos);
+  const step = CHARGE_SPEED * SEC_PER_TICK;
+  unit.pos.x = clamp(unit.pos.x + v.x * step, unit.radius, FIELD_WIDTH - unit.radius);
+  unit.pos.y = clamp(unit.pos.y + v.y * step, unit.radius, FIELD_HEIGHT - unit.radius);
+  unit.facing = v.x >= 0 ? 1 : -1;
+  transitionTo(unit, "moving");
+
+  // Safety cap reached without connecting — end the charge gracefully.
+  if (unit.chargeTicks <= 0) unit.chargeTargetUid = null;
+}
+
 // ---------------------------------------------------------------------------
 // Main tick
 // ---------------------------------------------------------------------------
@@ -411,6 +472,12 @@ export function stepSimulation(state: SimState): void {
     // combat logic so it never attacks while afraid.
     if (isFeared(unit)) {
       transitionTo(unit, "moving");
+      continue;
+    }
+
+    // Orc Charge: while a rush is in progress it owns movement until contact.
+    if (unit.chargeTicks > 0) {
+      stepCharge(state, unit, byUid, dealDamage);
       continue;
     }
 

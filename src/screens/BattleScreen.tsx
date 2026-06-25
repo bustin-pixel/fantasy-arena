@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useBattleEngine } from "@/hooks/useBattleEngine";
+import { useBattleEngine, type BattleMode } from "@/hooks/useBattleEngine";
 import { BattleHud } from "@/components/BattleHud";
 import { CardTray } from "@/components/CardTray";
 import {
@@ -12,11 +12,13 @@ import { useGameState } from "@/state/GameStateContext";
 interface Props {
   deck: string[];
   onExit: () => void;
+  /** Solo allows fast-forward; PVP hides it and locks the sim to 1×. */
+  mode?: BattleMode;
 }
 
-export function BattleScreen({ deck, onExit }: Props) {
+export function BattleScreen({ deck, onExit, mode = "solo" }: Props) {
   const { canvasRef, ui, deployAt, selectCard, begin, speed, setSpeed } =
-    useBattleEngine(deck);
+    useBattleEngine(deck, mode);
   const { recordResult } = useGameState();
   const wrapRef = useRef<HTMLDivElement>(null);
   const recordedRef = useRef(false);
@@ -67,7 +69,13 @@ export function BattleScreen({ deck, onExit }: Props) {
             if (t) handleTap(t.clientX, t.clientY);
           }}
         />
-        <BattleHud ui={ui} speed={speed} onSpeed={setSpeed} onBegin={begin} />
+        <BattleHud
+          ui={ui}
+          speed={speed}
+          onSpeed={setSpeed}
+          onBegin={begin}
+          mode={mode}
+        />
       </div>
 
       <CardTray

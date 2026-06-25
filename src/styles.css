@@ -465,9 +465,14 @@ body {
 }
 .hud-bottom {
   padding: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
 }
 .deploy-bar {
   pointer-events: auto;
+  align-self: stretch;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -482,6 +487,7 @@ body {
   color: var(--parchment);
 }
 .speed-controls {
+  pointer-events: auto;
   display: flex;
   gap: 6px;
 }

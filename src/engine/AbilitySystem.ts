@@ -319,9 +319,10 @@ function castShadowStep(ctx: AbilityContext): boolean {
 }
 
 // --- ORC: Charge -------------------------------------------------------------
-// A gap-closer: when its target is out of melee reach, the orc rushes to contact
-// and slams for bonus damage plus a brief stagger (stun). This lets the orc catch
-// kiting ranged units it could otherwise never reach.
+// A gap-closer: when its target is out of melee reach, the orc commits to a fast
+// RUSH toward it (not a teleport). The dash and the slam-on-contact are resolved
+// over several ticks in CombatSystem (stepCharge); this cast just locks in the
+// charge. Lets the orc catch kiting ranged units it could otherwise never reach.
 function castCharge(ctx: AbilityContext): boolean {
   const { unit, unitsByUid } = ctx;
   const target = unit.targetUid ? unitsByUid.get(unit.targetUid) : null;
@@ -331,26 +332,17 @@ function castCharge(ctx: AbilityContext): boolean {
   // Only worth charging if there's real distance to cover.
   if (d < unit.range + unit.radius + 40) return false;
 
-  // Dash to just inside melee range, on the near side of the target.
-  const approach = dir(unit.pos, target.pos);
-  const stop = target.radius + unit.radius - 6;
-  const nx = target.pos.x - approach.x * stop;
-  const ny = target.pos.y - approach.y * stop;
-  unit.pos.x = clamp(nx, unit.radius, FIELD_WIDTH - unit.radius);
-  unit.pos.y = clamp(ny, unit.radius, FIELD_HEIGHT - unit.radius);
+  // Commit to the rush. CombatSystem drives the dash each tick and slams on
+  // contact; chargeTicks is a safety cap so a charge that never connects ends.
+  unit.chargeTargetUid = target.uid;
+  unit.chargeTicks = secToTicks(1.5);
   unit.facing = target.pos.x >= unit.pos.x ? 1 : -1;
-
-  // Impact: bonus damage + a short stagger.
-  ctx.dealDamage(target, 22, unit);
-  applyEffect(
-    target,
-    makeEffect("stun", { source: unit.uid, durationSec: 0.8 })
-  );
+  // Dust kick-up at the orc's feet as it launches forward.
   ctx.spawnVfx({
-    kind: "slam",
-    pos: { x: target.pos.x, y: target.pos.y },
-    life: secToTicks(0.4),
-    maxLife: secToTicks(0.4),
+    kind: "frost",
+    pos: { x: unit.pos.x, y: unit.pos.y },
+    life: secToTicks(0.25),
+    maxLife: secToTicks(0.25),
     color: getUnitDef(unit.defId).accent,
   });
   return true;
