@@ -172,7 +172,10 @@ export function UnitDetail({ defId, deck, onToggle, onClose }: Props) {
           <button
             className={addClass}
             disabled={addDisabled}
-            onClick={() => onToggle(defId)}
+            onClick={() => {
+              onToggle(defId);
+              onClose();
+            }}
           >
             {addLabel}
           </button>

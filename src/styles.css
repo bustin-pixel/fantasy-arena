@@ -667,6 +667,22 @@ body {
   font-size: 0.85rem;
   color: var(--parchment);
 }
+.deploy-timer {
+  flex: none;
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: var(--gold);
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--brown);
+  border-radius: 8px;
+  padding: 4px 10px;
+  min-width: 42px;
+  text-align: center;
+}
+.deploy-timer.urgent {
+  color: #fca5a5;
+  border-color: #7f1d1d;
+}
 .speed-controls {
   pointer-events: auto;
   display: flex;
