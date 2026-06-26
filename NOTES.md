@@ -142,9 +142,18 @@ they perform better in long, messy fights than 1v1 numbers suggest. Re-audit
 2v2 after any balance change — it's closer to real play than 1v1.
 
 ## Testing approach
-There's no test runner installed, but the engine can be exercised headlessly by
-transpiling to CommonJS and running under Node (the chat assistant has done this
-throughout). The key invariants to re-verify after any combat change:
-1. Determinism — same seed + inputs ⇒ identical result, run twice.
-2. No crashes — every unit can fight.
-3. Unit cap holds — peak simultaneous units ≤ 8-ish.
+The engine is tested with **Vitest** — run `npm test`. Specs live in
+`src/engine/__tests__/` (`invariants.test.ts`, `arcaneMage.test.ts`, plus shared
+`helpers.ts`). They run headlessly (node env, no DOM/React) and exploit the pure,
+deterministic engine. The key invariants to re-verify after any combat change:
+1. Determinism — same seed + inputs ⇒ identical result, run twice (the
+   `digest()` fingerprint in `helpers.ts` makes this a one-line assert).
+2. No crashes — every unit in `DECKABLE_UNIT_IDS` can fight (covered by a
+   table-driven `it.each`).
+3. Unit cap holds — peak simultaneous units ≤ 8-ish (not yet asserted; add a
+   spec if you touch summoning).
+
+When testing a new unit, copy the `arcaneMage.test.ts` pattern: build a
+`battleState`, `place` the unit + a `makeDummy` target, step, and assert. Dummy
+gotcha: don't use a unit whose ability grants a shield (e.g. the Knight) — the
+shield silently soaks the damage you're trying to measure.
