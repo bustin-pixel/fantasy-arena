@@ -6,6 +6,26 @@ type-clean under strict mode, determinism verified across every unit type.
 
 ---
 
+## ✅ Checklist for adding a new unit
+
+Every playable unit must surface fully in the hub click-to-view detail panel
+(`components/UnitDetail.tsx`), which is data-driven. When adding one:
+
+1. **Stats** — define it in `data/units.ts` with full stats (hp, damage,
+   attackSpeed, moveSpeed, range, role, color, accent). These render in the panel
+   automatically.
+2. **Ability** — its `ability` MUST have a matching entry in `data/abilities.ts`
+   (name / description / cooldown). The panel reads `ABILITIES[def.ability]`, so a
+   missing entry crashes it. If the ability is passive (no active cast), also add
+   it to `PASSIVE_ABILITIES` in `engine/AbilitySystem.ts`.
+3. **Traits** — add a `traits: [{ name, description }]` array for any passive or
+   hidden behavior (anything gated by `defId` in `CombatSystem.ts`, e.g. Second
+   Wind, Vanish, Frostbite) so the panel lists it. Pure-stat units can omit it.
+4. **Visibility** — non-summon units appear in the hub automatically via
+   `DECKABLE_UNIT_IDS` (everything not in `NON_DECK_UNITS`).
+5. **Verify** — open the unit's card in the hub and confirm stats, ability, and
+   traits all show.
+
 ## ⚠️ Maintenance hazards (read before adding code)
 
 ### 1. Unit id ≠ display name for two units
