@@ -22,6 +22,9 @@ export function BattleScreen({ deck, onExit, mode = "solo" }: Props) {
   const { recordResult } = useGameState();
   const wrapRef = useRef<HTMLDivElement>(null);
   const recordedRef = useRef(false);
+  // Timestamp of the last touch, to suppress the synthetic click a touchscreen
+  // fires right after a tap (which would otherwise deploy a second unit).
+  const lastTouchRef = useRef(0);
   const [showResult, setShowResult] = useState(false);
 
   // Record win/loss once when the match resolves.
@@ -63,8 +66,14 @@ export function BattleScreen({ deck, onExit, mode = "solo" }: Props) {
           width={FIELD_WIDTH}
           height={FIELD_HEIGHT}
           className="field-canvas"
-          onClick={(e) => handleTap(e.clientX, e.clientY)}
+          onClick={(e) => {
+            // Skip the synthetic click a touchscreen fires ~300ms after a tap,
+            // so one tap deploys one unit (not two on the same spot).
+            if (Date.now() - lastTouchRef.current < 600) return;
+            handleTap(e.clientX, e.clientY);
+          }}
           onTouchStart={(e) => {
+            lastTouchRef.current = Date.now();
             const t = e.touches[0];
             if (t) handleTap(t.clientX, t.clientY);
           }}
