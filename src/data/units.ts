@@ -285,6 +285,18 @@ export const UNITS: Record<string, UnitDef> = {
     school: "magic",
     color: "#7c3aed",
     accent: "#fcd34d",
+    traits: [
+      {
+        name: "Light Form",
+        description:
+          "Single-target. Arrows mark one enemy with Light; at 3 marks it detonates for burst damage and the Archer shifts to Dark.",
+      },
+      {
+        name: "Dark Form",
+        description:
+          "Area. Arrows chain to all nearby foes, marking each with Dark; 3 marks on any of them detonates and shifts the Archer back to Light.",
+      },
+    ],
   },
   aegis_knight: {
     id: "aegis_knight",
