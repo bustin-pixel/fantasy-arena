@@ -7,7 +7,9 @@
 //   2. Lowest-HP enemy within range
 //   3. Enemy attacking me, out of range (move to retaliate)
 //   4. Nearest enemy (move to engage)
-// Units re-acquire when their target dies, vanishes, or drifts out of range.
+// Units re-acquire when their target dies or vanishes; if it merely drifts out
+// of range they only switch when another enemy is in range, else they commit to
+// chasing it (so they don't flip-flop between two equally-far targets).
 // Pure & deterministic: ties broken by uid ordering, never by Math.random.
 // ============================================================================
 
@@ -108,11 +110,19 @@ export function updateTarget(
     return;
   }
 
-  // If the current target has drifted out of attack range, re-evaluate —
-  // acquireTarget prefers an enemy we can actually hit, so we don't stay locked
-  // on (and chase) an unreachable target while closer ones are shootable.
+  // If the current target has drifted out of attack range, only switch off it
+  // when another enemy is actually in range to switch to. With nothing in range
+  // we commit to closing on the current target — re-acquiring every tick made a
+  // unit flip between two equally-far targets each time one of them landed a hit
+  // (e.g. a slow Ogre stuck shuffling between two kiting ranged units) instead
+  // of picking one and chasing it down.
   if (distSq(unit.pos, current.pos) > rangeSq) {
-    unit.targetUid = acquireTarget(unit, unitsByUid, enemies);
+    const someoneInRange = enemies.some(
+      (e) => targetable(e) && distSq(unit.pos, e.pos) <= rangeSq
+    );
+    if (someoneInRange) {
+      unit.targetUid = acquireTarget(unit, unitsByUid, enemies);
+    }
     return;
   }
 

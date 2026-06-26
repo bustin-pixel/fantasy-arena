@@ -61,8 +61,9 @@ targets 8 active units / 60fps on mobile.
   Add new on-damage/on-death effects there, not scattered around.
 - **All target changes go through TargetingSystem.** Priority favours a target
   we can hit *now*: taunt → in-range attacker → lowest-HP in range → out-of-range
-  attacker → nearest. Units re-acquire when a target dies, stealths, or drifts
-  out of range (so they don't get stuck chasing the unreachable). Fear is handled
+  attacker → nearest. Units re-acquire when a target dies/stealths; if it only
+  drifts out of range they switch only when another enemy is in range, else they
+  commit to chasing it (no flip-flop between two far targets). Fear is handled
   separately (feared units flee in MovementSystem, can't acquire targets).
 - **The renderer only reads state, never mutates it.** Presentation-only fields
   (hitFlash, animTime, deathFade) are advanced by AnimationSystem.
