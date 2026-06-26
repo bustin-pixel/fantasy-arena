@@ -298,6 +298,33 @@ export const UNITS: Record<string, UnitDef> = {
       },
     ],
   },
+  arcane_mage: {
+    id: "arcane_mage",
+    name: "Arcane Mage",
+    rarity: "epic",
+    role: "Ramping Artillery",
+    hp: 100,
+    damage: 9, // low per missile — it fires fast and ramps
+    attackSpeed: 1.2, // base; Instability drives it down toward ~0.48s
+    moveSpeed: 64,
+    range: FIELD_WIDTH * 0.33, // medium-long
+    ability: "arcane_barrage",
+    school: "magic",
+    color: "#6d28d9",
+    accent: "#c084fc",
+    traits: [
+      {
+        name: "Instability",
+        description:
+          "The mounting magical pressure chips the mage's own health while Instability is high. It bleeds off whenever the mage stops attacking to reposition.",
+      },
+      {
+        name: "Blink",
+        description:
+          "Roughly every 10s, when a melee attacker closes in, the mage blinks a safe distance away.",
+      },
+    ],
+  },
   aegis_knight: {
     id: "aegis_knight",
     name: "Aegis Knight",
