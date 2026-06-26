@@ -78,8 +78,6 @@ export function tryCastAbility(ctx: AbilityContext): boolean {
       return castFireball(ctx);
     case "frost_blast":
       return castFrostBlast(ctx);
-    case "backstab":
-      return castBackstab(ctx);
     case "charge":
       return castCharge(ctx);
     case "mend":
@@ -243,26 +241,6 @@ function castFrostBlast(ctx: AbilityContext): boolean {
     ability: "frost_blast",
     color: getUnitDef(unit.defId).accent,
     angle: 0,
-  });
-  return true;
-}
-
-// --- ASSASSIN: Backstab ------------------------------------------------------
-// Fires only when the assassin is in melee contact with its target: a burst of
-// bonus damage rewarding it for reaching the backline.
-function castBackstab(ctx: AbilityContext): boolean {
-  const { unit, unitsByUid } = ctx;
-  const target = unit.targetUid ? unitsByUid.get(unit.targetUid) : null;
-  if (!target || target.state === "dead") return false;
-  if (dist(unit.pos, target.pos) > unit.range + unit.radius) return false;
-
-  ctx.dealDamage(target, 30, unit);
-  ctx.spawnVfx({
-    kind: "slam",
-    pos: { x: target.pos.x, y: target.pos.y },
-    life: secToTicks(0.35),
-    maxLife: secToTicks(0.35),
-    color: getUnitDef(unit.defId).accent,
   });
   return true;
 }

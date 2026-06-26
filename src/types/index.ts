@@ -39,7 +39,6 @@ export type AbilityId =
   | "taunt_roar"
   | "fireball"
   | "frost_blast"
-  | "backstab"
   | "ambush"
   | "charge"
   | "bloodrage"

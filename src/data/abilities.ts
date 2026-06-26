@@ -56,12 +56,6 @@ export const ABILITIES: Record<AbilityId, AbilityDef> = {
     description: "Every 5s: 20 damage + 50% slow for 2.5s.",
     cooldown: 5,
   },
-  backstab: {
-    id: "backstab",
-    name: "Backstab",
-    description: "On reaching a target, a burst of bonus damage. 7s cooldown.",
-    cooldown: 7,
-  },
   ambush: {
     id: "ambush",
     name: "Ambush",

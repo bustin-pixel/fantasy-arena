@@ -17,6 +17,10 @@ import {
 import { clamp, dir, dist } from "@/utils/math";
 import { moveSpeedMultiplier } from "./StatusEffectSystem";
 
+// Overlap (px) left uncorrected by collision resolution, so units at rest in a
+// crowd don't get shoved a sub-pixel amount every tick (which looked like jitter).
+const COLLISION_SLOP = 1.5;
+
 /** Count how many enemies are already in melee contact with `target`. */
 function meleeAttackerCount(
   target: Unit,
@@ -50,8 +54,11 @@ function resolveCollisions(units: Unit[]): void {
         b.pos.x += 0.5;
         d = 0.5;
       }
-      if (d < minDist) {
-        const overlap = (minDist - d) / 2;
+      // Ignore tiny overlaps (slop) so units settled in a crowd aren't shoved a
+      // fraction of a pixel every tick — that micro-correction read as jitter.
+      const penetration = minDist - d;
+      if (penetration > COLLISION_SLOP) {
+        const overlap = penetration / 2;
         const nx = dx / d;
         const ny = dy / d;
         a.pos.x -= nx * overlap;
@@ -184,9 +191,13 @@ export function stepMovement(ctx: MovementContext): void {
       }
     }
 
-    // Melee overflow: if too many already swarming, hold at a queue ring.
+    // Melee: stop just outside body contact (both radii) rather than exactly on
+    // the collision boundary, where the per-tick push-apart would jitter the
+    // unit. Still well within attack reach (range + radius). Overflow attackers
+    // hold farther back at a queue ring.
     let desiredStop = stopDist;
     if (isMeleeRange) {
+      desiredStop = target.radius + unit.radius + 8;
       const attackers = meleeAttackerCount(target, units, unit.uid);
       if (attackers >= MAX_MELEE_SURROUND) {
         desiredStop = target.radius + unit.radius + 28; // wait in line
