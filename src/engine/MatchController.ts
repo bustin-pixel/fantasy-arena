@@ -381,7 +381,7 @@ export class MatchController {
     | "support"
     | "assassin" {
     if (def.ability === "mend") return "support";
-    if (def.ability === "backstab") return "assassin";
+    if (def.ability === "ambush") return "assassin";
     if (isMelee(def)) return "melee";
     return "ranged";
   }

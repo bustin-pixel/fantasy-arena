@@ -1,10 +1,13 @@
 // ============================================================================
 // TargetingSystem
-// Target priority (per spec):
-//   1. Enemy currently attacking me
+// Target priority — always favour something we can actually hit right now, so a
+// unit never gets stuck chasing an unreachable target while ignoring closer ones:
+//   0. Taunt (forced)
+//   1. Enemy attacking me, IF it's in range
 //   2. Lowest-HP enemy within range
-//   3. Nearest enemy (anywhere)
-// Units re-acquire automatically when their target dies or goes invalid.
+//   3. Enemy attacking me, out of range (move to retaliate)
+//   4. Nearest enemy (move to engage)
+// Units re-acquire when their target dies, vanishes, or drifts out of range.
 // Pure & deterministic: ties broken by uid ordering, never by Math.random.
 // ============================================================================
 
@@ -28,6 +31,9 @@ export function acquireTarget(
   const living = enemies.filter(targetable);
   if (living.length === 0) return null;
 
+  const rangeSq = (unit.range + unit.radius) * (unit.range + unit.radius);
+  const inRange = (e: Unit) => distSq(unit.pos, e.pos) <= rangeSq;
+
   // (0) Taunt overrides everything: if taunted by a living, visible enemy, the
   // unit is forced to attack the taunter until the taunt expires.
   if (unit.tauntedByUid && unit.effects.some((e) => e.type === "taunt")) {
@@ -37,20 +43,20 @@ export function acquireTarget(
     }
   }
 
-  // (1) Whoever is attacking me, if still alive and visible.
-  if (unit.attackedByUid) {
-    const aggressor = unitsByUid.get(unit.attackedByUid);
-    if (targetable(aggressor) && aggressor.team !== unit.team) {
-      return aggressor.uid;
-    }
-  }
+  const aggressor = unit.attackedByUid
+    ? unitsByUid.get(unit.attackedByUid)
+    : undefined;
+  const aggressorValid =
+    targetable(aggressor) && aggressor.team !== unit.team;
 
-  const rangeSq = (unit.range + unit.radius) * (unit.range + unit.radius);
+  // (1) Whoever is attacking me — but only if I can actually hit them now, so an
+  // out-of-range attacker can't pull me off an enemy I could be shooting.
+  if (aggressorValid && inRange(aggressor)) return aggressor.uid;
 
   // (2) Lowest-HP enemy within range.
   let bestInRange: Unit | null = null;
   for (const e of living) {
-    if (distSq(unit.pos, e.pos) <= rangeSq) {
+    if (inRange(e)) {
       if (
         !bestInRange ||
         e.hp < bestInRange.hp ||
@@ -62,7 +68,10 @@ export function acquireTarget(
   }
   if (bestInRange) return bestInRange.uid;
 
-  // (3) Nearest enemy overall.
+  // (3) Nothing in range: move to retaliate against my attacker if I have one.
+  if (aggressorValid) return aggressor.uid;
+
+  // (4) Otherwise close on the nearest enemy.
   let nearest: Unit | null = null;
   let nearestD = Infinity;
   for (const e of living) {
@@ -82,6 +91,7 @@ export function updateTarget(
   enemies: Unit[]
 ): void {
   const current = unit.targetUid ? unitsByUid.get(unit.targetUid) : undefined;
+  const rangeSq = (unit.range + unit.radius) * (unit.range + unit.radius);
 
   // Taunt forces the target regardless of current lock (highest priority).
   if (unit.tauntedByUid && unit.effects.some((e) => e.type === "taunt")) {
@@ -97,11 +107,24 @@ export function updateTarget(
     unit.targetUid = acquireTarget(unit, unitsByUid, enemies);
     return;
   }
-  // Always allow priority (1) to override: if someone started hitting me,
-  // and I'm not already locked onto them, re-evaluate.
+
+  // If the current target has drifted out of attack range, re-evaluate —
+  // acquireTarget prefers an enemy we can actually hit, so we don't stay locked
+  // on (and chase) an unreachable target while closer ones are shootable.
+  if (distSq(unit.pos, current.pos) > rangeSq) {
+    unit.targetUid = acquireTarget(unit, unitsByUid, enemies);
+    return;
+  }
+
+  // Current target is in range. Only switch to a fresh attacker if it's also in
+  // range — never abandon an enemy we're hitting to chase an out-of-range one.
   if (unit.attackedByUid && unit.attackedByUid !== unit.targetUid) {
     const aggressor = unitsByUid.get(unit.attackedByUid);
-    if (targetable(aggressor) && aggressor.team !== unit.team) {
+    if (
+      targetable(aggressor) &&
+      aggressor.team !== unit.team &&
+      distSq(unit.pos, aggressor.pos) <= rangeSq
+    ) {
       unit.targetUid = aggressor.uid;
     }
   }

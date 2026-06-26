@@ -38,9 +38,9 @@ loops over traits instead of hardcoding ids. Not urgent at current scale.
 `lifesteal` started as an *ability* but is now also a unit *property*
 (`def.lifesteal: number`). The Orc has `ability: "charge"` AND
 `lifesteal: 0.4`. The `PASSIVE_ABILITIES` set in `AbilitySystem.ts` lists
-abilities that never "cast" (`lifesteal`, `bloodrage`, `slime_split`). When
-adding a passive ability, remember to add it to that set or the unit will waste
-cycles trying to cast nothing.
+abilities that never "cast" (`lifesteal`, `bloodrage`, `slime_split`,
+`mystic_shift`, `ambush`). When adding a passive ability, remember to add it to
+that set or the unit will waste cycles trying to cast nothing.
 
 ### 4. Summon caps protect the 8-unit ceiling
 `CombatSystem` enforces a per-team live-unit cap (5 normal, 7 for slime clones)
@@ -59,8 +59,10 @@ targets 8 active units / 60fps on mobile.
 - **All HP changes funnel through `dealDamage` / `heal`** in CombatSystem. Shields,
   lifesteal, damage reduction, death triggers, floating numbers — one place.
   Add new on-damage/on-death effects there, not scattered around.
-- **All target changes go through TargetingSystem.** Priority order is now:
-  taunt → stealth-aware → attacker → low-HP-in-range → nearest. Fear is handled
+- **All target changes go through TargetingSystem.** Priority favours a target
+  we can hit *now*: taunt → in-range attacker → lowest-HP in range → out-of-range
+  attacker → nearest. Units re-acquire when a target dies, stealths, or drifts
+  out of range (so they don't get stuck chasing the unreachable). Fear is handled
   separately (feared units flee in MovementSystem, can't acquire targets).
 - **The renderer only reads state, never mutates it.** Presentation-only fields
   (hitFlash, animTime, deathFade) are advanced by AnimationSystem.
