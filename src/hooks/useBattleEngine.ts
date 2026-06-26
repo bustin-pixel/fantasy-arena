@@ -13,11 +13,13 @@
 // ============================================================================
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { MatchPhase, Team, Vec2 } from "@/types";
+import type { MatchPhase, Rarity, StatusEffectType, Team, Vec2 } from "@/types";
 import { MatchController } from "@/engine/MatchController";
 import { renderBattle } from "@/engine/Renderer";
 import { generateEnemyDeck } from "@/engine/AIDeck";
-import { DEPLOY_TIME_SEC, TICK_MS, TICK_RATE } from "@/utils/constants";
+import { getUnitDef } from "@/data/units";
+import { ABILITIES } from "@/data/abilities";
+import { DEPLOY_TIME_SEC, TICK_MS, TICK_RATE, UNIT_RADIUS } from "@/utils/constants";
 import { generateSeed } from "@/utils/rng";
 
 /** Battle mode. Solo allows client-side fast-forward; PVP is server-paced at 1×
@@ -46,6 +48,26 @@ export interface BattleUiState {
   deploySecLeft: number | null;
 }
 
+/** Live snapshot of one combatant, for the in-battle stat tooltip. */
+export interface InspectedUnit {
+  uid: string;
+  name: string;
+  rarity: Rarity;
+  role: string;
+  team: Team;
+  hp: number;
+  maxHp: number;
+  damage: number;
+  attackSpeed: number;
+  range: number;
+  abilityName: string;
+  /** Passive trait names (the unit's "second" mechanics). */
+  traits: string[];
+  effects: StatusEffectType[];
+  /** Live field position (so the tooltip can sit by the unit). */
+  pos: Vec2;
+}
+
 export interface UseBattleEngine {
   canvasRef: React.RefObject<HTMLCanvasElement>;
   ui: BattleUiState;
@@ -53,6 +75,10 @@ export interface UseBattleEngine {
   selectCard: (index: number) => void;
   speed: number;
   setSpeed: (s: number) => void;
+  /** uid of the living unit nearest a field point (within tap radius), or null. */
+  pickUnitAt: (pos: Vec2) => string | null;
+  /** Live stats for a unit by uid, or null if it's gone/dead. */
+  inspectUnit: (uid: string) => InspectedUnit | null;
 }
 
 export function useBattleEngine(
@@ -180,7 +206,59 @@ export function useBattleEngine(
     }));
   }, []);
 
-  return { canvasRef, ui, deployAt, selectCard, speed, setSpeed };
+  const pickUnitAt = useCallback((pos: Vec2): string | null => {
+    const c = controllerRef.current;
+    if (!c) return null;
+    const hitR = UNIT_RADIUS + 10; // a little forgiving for touch
+    let best: string | null = null;
+    let bestD = hitR * hitR;
+    for (const u of c.state.units) {
+      if (u.state === "dead") continue;
+      const dx = u.pos.x - pos.x;
+      const dy = u.pos.y - pos.y;
+      const d = dx * dx + dy * dy;
+      if (d <= bestD) {
+        bestD = d;
+        best = u.uid;
+      }
+    }
+    return best;
+  }, []);
+
+  const inspectUnit = useCallback((uid: string): InspectedUnit | null => {
+    const c = controllerRef.current;
+    if (!c) return null;
+    const u = c.state.units.find((x) => x.uid === uid);
+    if (!u || u.state === "dead") return null;
+    const def = getUnitDef(u.defId);
+    return {
+      uid: u.uid,
+      name: def.name,
+      rarity: def.rarity,
+      role: def.role,
+      team: u.team,
+      hp: Math.ceil(u.hp),
+      maxHp: u.maxHp,
+      damage: u.damage,
+      attackSpeed: u.attackSpeed,
+      range: u.range,
+      abilityName: ABILITIES[u.ability]?.name ?? "",
+      traits: def.traits?.map((t) => t.name) ?? [],
+      effects: u.effects.map((e) => e.type),
+      pos: { x: u.pos.x, y: u.pos.y },
+    };
+  }, []);
+
+  return {
+    canvasRef,
+    ui,
+    deployAt,
+    selectCard,
+    speed,
+    setSpeed,
+    pickUnitAt,
+    inspectUnit,
+  };
 }
 
 export { type Team };
