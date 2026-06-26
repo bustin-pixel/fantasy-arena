@@ -32,6 +32,7 @@ import {
   MAX_EFFECTS,
   MAX_PROJECTILES,
   SEC_PER_TICK,
+  TICK_RATE,
   secToTicks,
 } from "@/utils/constants";
 import { clamp, dir, dist } from "@/utils/math";
@@ -113,6 +114,13 @@ function isMagicSource(source: Unit): boolean {
 
 /** Cap on the Aegis Knight's banked magic shield; also its Backlash threshold. */
 const AEGIS_SHIELD_CAP = 120;
+
+// Arcane Mage tuning. Instability ramps 0..MAX as the mage lands consecutive
+// Arcane Barrage hits; at/above VOLATILE_AT the missiles splash and the mage
+// takes minor self-damage from the magical pressure.
+const INSTABILITY_MAX = 6;
+const INSTABILITY_VOLATILE_AT = 3;
+const ARCANE_SPLASH_RADIUS = 72;
 
 function makeDamageDealer(state: SimState) {
   return function dealDamage(target: Unit, amount: number, source: Unit): void {
@@ -405,6 +413,43 @@ function stepCharge(
   if (unit.chargeTicks <= 0) unit.chargeTargetUid = null;
 }
 
+// Arcane Mage: Blink. An instant defensive teleport (not a dash) away from the
+// nearest melee attacker that has closed in. Reactive and on its own cooldown,
+// so it's independent of the unit's ability slot (Arcane Barrage). Blinking away
+// also bleeds Instability, since the mage has to stop firing to reposition.
+function tryBlink(state: SimState, unit: Unit, enemies: Unit[]): boolean {
+  const threatRange = unit.radius * 2.6;
+  let threat: Unit | null = null;
+  let bestD = Infinity;
+  for (const e of enemies) {
+    if (e.state === "dead") continue;
+    if (getUnitDef(e.defId).range > 80) continue; // only melee threats trigger Blink
+    const d = dist(unit.pos, e.pos);
+    if (d <= threatRange && d < bestD) {
+      bestD = d;
+      threat = e;
+    }
+  }
+  if (!threat) return false;
+
+  let away = dir(threat.pos, unit.pos);
+  // Degenerate case (threat exactly overlapping): retreat toward own side.
+  if (away.x === 0 && away.y === 0) {
+    away = { x: 0, y: unit.team === "player" ? -1 : 1 };
+  }
+  const BLINK = 170;
+  unit.pos.x = clamp(unit.pos.x + away.x * BLINK, unit.radius, FIELD_WIDTH - unit.radius);
+  unit.pos.y = clamp(unit.pos.y + away.y * BLINK, unit.radius, FIELD_HEIGHT - unit.radius);
+  spawnVfx(state, {
+    kind: "frost",
+    pos: { x: unit.pos.x, y: unit.pos.y },
+    life: secToTicks(0.3),
+    maxLife: secToTicks(0.3),
+    color: getUnitDef(unit.defId).accent,
+  });
+  return true;
+}
+
 // ---------------------------------------------------------------------------
 // Main tick
 // ---------------------------------------------------------------------------
@@ -459,6 +504,7 @@ export function stepSimulation(state: SimState): void {
     // Cooldowns always tick down.
     if (unit.attackCooldown > 0) unit.attackCooldown--;
     if (unit.abilityCooldown > 0) unit.abilityCooldown--;
+    if (unit.blinkCooldown > 0) unit.blinkCooldown--;
 
     // Druid shapeshift: at <30% HP, transform into a bear — melee bruiser that
     // takes only 20% damage (80% reduction). One-way. Stops summoning; becomes
@@ -481,6 +527,22 @@ export function stepSimulation(state: SimState): void {
       const spdBonus = 1 - missing * 0.4; // up to 40% faster attacks
       unit.damage = Math.round(def.damage * dmgBonus);
       unit.attackSpeed = def.attackSpeed * spdBonus;
+    }
+
+    // Arcane Mage Instability: consecutive Arcane Barrage hits speed up the
+    // mage's fire rate (recomputed from base each tick). It bleeds off (1 stack
+    // per second) while the mage isn't actively attacking — so being chased off
+    // its target costs the ramp, but a brief kite or Blink barely dents it.
+    if (unit.defId === "arcane_mage") {
+      const def = getUnitDef(unit.defId);
+      if (
+        unit.state !== "attacking" &&
+        unit.instability > 0 &&
+        state.tick % TICK_RATE === 0
+      ) {
+        unit.instability--;
+      }
+      unit.attackSpeed = def.attackSpeed * (1 - unit.instability * 0.1);
     }
 
     // Stun overrides everything.
@@ -506,6 +568,16 @@ export function stepSimulation(state: SimState): void {
 
     const enemies = alive.filter((e) => e.team !== unit.team);
     updateTarget(unit, byUid, enemies);
+
+    // Arcane Mage: Blink away from a closing melee threat (own cooldown, so it's
+    // independent of the passive ability slot). Just repositions; the rest of the
+    // tick (movement/kiting) resumes from the new spot.
+    if (unit.defId === "arcane_mage" && unit.blinkCooldown <= 0) {
+      if (tryBlink(state, unit, enemies)) {
+        unit.blinkCooldown = secToTicks(10);
+      }
+    }
+
     const target = unit.targetUid ? byUid.get(unit.targetUid) : null;
 
     if (!target || target.state === "dead") {
@@ -676,6 +748,35 @@ function performBasicAttack(
     return;
   }
 
+  // Arcane Mage fires an arcane missile and builds Instability. Past the
+  // volatile threshold the missile splashes (tagged here, resolved on impact)
+  // and the surging magic chips the mage's own health.
+  if (unit.defId === "arcane_mage") {
+    unit.instability = Math.min(INSTABILITY_MAX, unit.instability + 1);
+    const volatile = unit.instability >= INSTABILITY_VOLATILE_AT;
+    spawnProjectile(state, {
+      pos: { x: unit.pos.x, y: unit.pos.y },
+      target: { x: target.pos.x, y: target.pos.y },
+      targetUid: target.uid,
+      speed: 360,
+      damage: unit.damage,
+      team: unit.team,
+      sourceUid: unit.uid,
+      ability: "arcane_barrage",
+      color: def.accent,
+      angle: 0,
+      splashRadius: volatile ? ARCANE_SPLASH_RADIUS : undefined,
+    });
+    if (volatile) {
+      // Minor self-damage from the pressure; scales with how unstable it is.
+      // Route through dealDamage but don't let self-hits pollute aggro tracking.
+      const prevAggro = unit.attackedByUid;
+      dealDamage(unit, unit.instability - INSTABILITY_VOLATILE_AT + 1, unit);
+      if (unit.attackedByUid === unit.uid) unit.attackedByUid = prevAggro;
+    }
+    return;
+  }
+
   if (ranged) {
     // Ranged basic attacks spawn a simple projectile (archer arrows etc.).
     spawnProjectile(state, {
@@ -835,8 +936,31 @@ function stepProjectiles(
         const isBasic =
           proj.ability === "lifesteal"; // sentinel for basic ranged shot
         const isMystic = proj.ability === "mystic_shift";
+        const isArcane = proj.ability === "arcane_barrage";
         if (isMystic) {
           if (source) resolveMysticHit(state, source, target, proj.damage, dealDamage);
+        } else if (isArcane) {
+          if (source) {
+            dealDamage(target, proj.damage, source);
+            // Volatile missiles splash a fraction of their damage to nearby foes.
+            if (proj.splashRadius) {
+              const splash = Math.round(proj.damage * 0.6);
+              for (const e of state.units) {
+                if (e.state === "dead" || e.team === source.team) continue;
+                if (e.uid === target.uid) continue;
+                if (dist(target.pos, e.pos) <= proj.splashRadius) {
+                  dealDamage(e, splash, source);
+                }
+              }
+              spawnVfx(state, {
+                kind: "burn_burst",
+                pos: { x: target.pos.x, y: target.pos.y },
+                life: secToTicks(0.35),
+                maxLife: secToTicks(0.35),
+                color: proj.color,
+              });
+            }
+          }
         } else if (isBasic) {
           if (source) dealDamage(target, proj.damage, source);
           // Ice Mage every-second-attack freeze.

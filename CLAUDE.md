@@ -16,6 +16,8 @@ See **`progress.md`** for the roadmap — planned features (PvE mode, PvP, an it
 npm run dev         # Vite dev server (http://localhost:5173)
 npm run build       # production build -> dist/  (Vite ONLY — does NOT type-check)
 npm run typecheck   # tsc --noEmit, strict mode — run this separately
+npm test            # Vitest (engine specs, headless) — run after any engine change
+npm run test:watch  # Vitest in watch mode
 npm run preview     # serve the built dist/
 ```
 
@@ -23,17 +25,15 @@ npm run preview     # serve the built dist/
 - Path alias: `@/*` → `src/*` (see `tsconfig.json` `paths`).
 - Deploy: static `dist/` to Netlify (see `DEPLOY.md` / `netlify.toml`). The repo is GitHub-connected, so merging to `master` auto-deploys.
 
-## Testing (no test runner is installed)
+## Testing (Vitest)
 
-The engine is pure and deterministic, so it is tested **headlessly under Node** by bundling a throwaway harness with esbuild and running it:
+The engine is pure and deterministic, so it's tested **headlessly** with Vitest (node environment — no DOM/React). Run `npm test`. Specs live in `src/engine/__tests__/`:
 
-```bash
-# write a temp harness at repo root, e.g. audit-test.ts, importing from "@/engine/..."
-npx esbuild audit-test.ts --bundle --platform=node --format=cjs --outfile=audit-test.cjs --tsconfig=tsconfig.json
-node audit-test.cjs        # then delete both temp files
-```
+- **`invariants.test.ts`** — the contract every combat change must uphold: **determinism** (same seed + inputs → byte-identical end state across two runs, via the `digest()` fingerprint) and **no crashes** (every unit in `DECKABLE_UNIT_IDS` completes a match).
+- **`arcaneMage.test.ts`** — a per-unit behavior spec; a good template for testing a new unit's mechanics in isolation.
+- **`helpers.ts`** — shared drivers: `runMatch` (full auto-played match), `digest`, and `battleState`/`place`/`makeDummy` for hand-built scenarios. `makeDummy` gotcha: pick a `defId` whose ability grants **no shield** (the Knight's Taunting Roar soaks hits and will mask incoming damage).
 
-esbuild resolves the `@/` alias via `--tsconfig`. A harness typically constructs a `MatchController` (or `createSimState` + `stepSimulation` from `@/engine/CombatSystem`), drives ticks, and asserts the invariants below. After any engine change, verify: **determinism** (same seed + inputs → byte-identical end state across two runs), **no crashes** (every unit in `DECKABLE_UNIT_IDS` completes a match), and the specific behavior you touched.
+Vitest auto-resolves the `@/` alias from `vite.config.ts`. After any engine change, run `npm test`, and add/extend a spec for the specific behavior you touched. Tests live under `src/` so `tsc --noEmit` type-checks them; they're excluded from the production build (nothing imports them).
 
 ## Architecture — the big picture
 

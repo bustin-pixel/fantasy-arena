@@ -52,6 +52,13 @@ Special mechanics are gated by `defId` string literals in `CombatSystem.ts`:
 - `"aegis_knight"` → soaks magic into a shield, Backlash AoE, Warded (immune
   to burn/slow/poison). Magic is identified by the source unit's `school: "magic"`
   field (the casters) — see `isMagicSource` in CombatSystem.
+- `"mystic_archer"` → Light/Dark form-tagged shots + on-hit stack/detonate
+  resolution (`resolveMysticHit`).
+- `"arcane_mage"` → Arcane Barrage ramp (Instability scales fire rate, adds
+  missile splash + minor self-damage past a threshold; decays while not
+  attacking) and the Blink defensive teleport. Blink runs on its own
+  `blinkCooldown` field, independent of the ability slot (which holds the passive
+  `arcane_barrage`).
 
 This works but isn't data-driven. If the roster grows a lot, consider moving
 these into a per-unit "passive traits" field in the unit data so the engine
@@ -62,8 +69,10 @@ loops over traits instead of hardcoding ids. Not urgent at current scale.
 (`def.lifesteal: number`). The Orc has `ability: "charge"` AND
 `lifesteal: 0.4`. The `PASSIVE_ABILITIES` set in `AbilitySystem.ts` lists
 abilities that never "cast" (`lifesteal`, `bloodrage`, `slime_split`,
-`mystic_shift`, `ambush`). When adding a passive ability, remember to add it to
-that set or the unit will waste cycles trying to cast nothing.
+`mystic_shift`, `arcane_barrage`, `ambush`, `aegis`). When adding a passive
+ability, remember to add it to that set or the unit will waste cycles trying to
+cast nothing. (The Arcane Mage is an example of a unit whose ability slot is a
+passive while a *second* ability — Blink — runs off its own cooldown field.)
 
 ### 4. Summon caps protect the 8-unit ceiling
 `CombatSystem` enforces a per-team live-unit cap (5 normal, 7 for slime clones)
@@ -133,9 +142,18 @@ they perform better in long, messy fights than 1v1 numbers suggest. Re-audit
 2v2 after any balance change — it's closer to real play than 1v1.
 
 ## Testing approach
-There's no test runner installed, but the engine can be exercised headlessly by
-transpiling to CommonJS and running under Node (the chat assistant has done this
-throughout). The key invariants to re-verify after any combat change:
-1. Determinism — same seed + inputs ⇒ identical result, run twice.
-2. No crashes — every unit can fight.
-3. Unit cap holds — peak simultaneous units ≤ 8-ish.
+The engine is tested with **Vitest** — run `npm test`. Specs live in
+`src/engine/__tests__/` (`invariants.test.ts`, `arcaneMage.test.ts`, plus shared
+`helpers.ts`). They run headlessly (node env, no DOM/React) and exploit the pure,
+deterministic engine. The key invariants to re-verify after any combat change:
+1. Determinism — same seed + inputs ⇒ identical result, run twice (the
+   `digest()` fingerprint in `helpers.ts` makes this a one-line assert).
+2. No crashes — every unit in `DECKABLE_UNIT_IDS` can fight (covered by a
+   table-driven `it.each`).
+3. Unit cap holds — peak simultaneous units ≤ 8-ish (not yet asserted; add a
+   spec if you touch summoning).
+
+When testing a new unit, copy the `arcaneMage.test.ts` pattern: build a
+`battleState`, `place` the unit + a `makeDummy` target, step, and assert. Dummy
+gotcha: don't use a unit whose ability grants a shield (e.g. the Knight) — the
+shield silently soaks the damage you're trying to measure.
