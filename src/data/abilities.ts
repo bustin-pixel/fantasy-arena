@@ -111,7 +111,7 @@ export const ABILITIES: Record<AbilityId, AbilityDef> = {
     id: "mystic_shift",
     name: "Light & Dark",
     description:
-      "Passive: Light form marks one target — 3 stacks detonate it and flip to Dark. Dark form chains to all nearby foes; 3 stacks on any of them detonate and flip back to Light.",
+      "Passive: shifts between two forms. Each shot marks its target; at 3 marks the foe detonates and the Archer flips to its other form.",
     cooldown: 0,
   },
 };
