@@ -201,19 +201,8 @@ function drawOrc(ctx: Ctx, body: string, dark: string, light: string, accent: st
   ctx.fillStyle = "#1a1a1a";
   ctx.fillRect(-4, -12, 2, 2);
   ctx.fillRect(2, -12, 2, 2);
-  // axe
-  ctx.strokeStyle = "#6b4423";
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(11, -6);
-  ctx.lineTo(15, 14);
-  ctx.stroke();
-  ctx.fillStyle = accent;
-  ctx.beginPath();
-  ctx.moveTo(11, -10);
-  ctx.lineTo(20, -6);
-  ctx.lineTo(11, -2);
-  ctx.fill();
+  // big two-handed axe in the right hand
+  drawBigAxe(ctx, 12, -2, 1);
 }
 
 function drawArcher(ctx: Ctx, body: string, dark: string, light: string, accent: string) {
@@ -269,6 +258,32 @@ function drawKnight(ctx: Ctx, body: string, dark: string, light: string, accent:
   ctx.lineTo(-16, 10);
   ctx.closePath();
   ctx.fill();
+  // sword in the right hand, held upright
+  ctx.save();
+  ctx.translate(12, 2);
+  // handle + pommel
+  ctx.fillStyle = "#3a2a18";
+  ctx.fillRect(-1.5, 2, 3, 9);
+  ctx.fillStyle = "#d8c08a";
+  ctx.fillRect(-2, 10, 4, 2); // pommel
+  ctx.fillRect(-5, 0, 10, 2.5); // crossguard
+  // steel blade, pointing up
+  ctx.fillStyle = "#d6d9de";
+  ctx.beginPath();
+  ctx.moveTo(-2.5, 0);
+  ctx.lineTo(2.5, 0);
+  ctx.lineTo(0, -22);
+  ctx.closePath();
+  ctx.fill();
+  // blade highlight
+  ctx.fillStyle = "rgba(255,255,255,0.5)";
+  ctx.beginPath();
+  ctx.moveTo(-0.7, -2);
+  ctx.lineTo(0.7, -2);
+  ctx.lineTo(0, -19);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
 }
 
 function drawMage(
@@ -367,6 +382,47 @@ function drawDagger(ctx: Ctx, hx: number, hy: number, side: number, accent: stri
   ctx.lineTo(0, -11);
   ctx.closePath();
   ctx.fill();
+  ctx.restore();
+}
+
+/** A chunky two-handed-style axe at (hx,hy): wooden haft + big steel bit.
+ *  `side` mirrors it (1 = bit faces right, -1 = left). */
+function drawBigAxe(ctx: Ctx, hx: number, hy: number, side: number) {
+  ctx.save();
+  ctx.translate(hx, hy);
+  ctx.scale(side, 1);
+  // wooden haft
+  ctx.strokeStyle = "#5a3a1f";
+  ctx.lineWidth = 3.5;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(-1, -15);
+  ctx.lineTo(2, 18);
+  ctx.stroke();
+  // big steel bit — a crescent blade flaring outward
+  ctx.fillStyle = "#c4c9d0";
+  ctx.beginPath();
+  ctx.moveTo(-1, -15);
+  ctx.bezierCurveTo(14, -17, 17, -10, 15, -6);
+  ctx.bezierCurveTo(17, -2, 12, 2, -1, 1);
+  ctx.closePath();
+  ctx.fill();
+  // darker steel near the haft (the poll/eye)
+  ctx.fillStyle = "#8a9099";
+  ctx.beginPath();
+  ctx.moveTo(-1, -13);
+  ctx.lineTo(6, -11);
+  ctx.lineTo(6, -2);
+  ctx.lineTo(-1, -1);
+  ctx.closePath();
+  ctx.fill();
+  // bright cutting edge
+  ctx.strokeStyle = "rgba(255,255,255,0.55)";
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(15, -6);
+  ctx.bezierCurveTo(17, -10, 14, -17, -1, -15);
+  ctx.stroke();
   ctx.restore();
 }
 
@@ -514,18 +570,9 @@ function drawBerserker(ctx: Ctx, body: string, dark: string, light: string, acce
   ctx.fillStyle = accent;
   ctx.fillRect(-5, -10, 3, 2);
   ctx.fillRect(2, -10, 3, 2);
-  // twin axes
-  ctx.strokeStyle = "#6b4423";
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  ctx.moveTo(13, -8); ctx.lineTo(17, 12);
-  ctx.moveTo(-13, -8); ctx.lineTo(-17, 12);
-  ctx.stroke();
-  ctx.fillStyle = accent;
-  ctx.beginPath();
-  ctx.moveTo(13, -10); ctx.lineTo(22, -6); ctx.lineTo(13, -2); ctx.closePath();
-  ctx.moveTo(-13, -10); ctx.lineTo(-22, -6); ctx.lineTo(-13, -2); ctx.closePath();
-  ctx.fill();
+  // twin big axes
+  drawBigAxe(ctx, 14, -2, 1);
+  drawBigAxe(ctx, -14, -2, -1);
 }
 
 function drawNecromancer(ctx: Ctx, body: string, dark: string, light: string, accent: string) {

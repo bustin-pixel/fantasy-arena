@@ -206,6 +206,9 @@ export interface Projectile {
   /** If set, the projectile applies a stun of this many seconds on impact.
    *  Used by the Ice Mage's every-second-attack freeze. */
   onHitStunSec?: number;
+  /** If set, the projectile applies Burn on impact.
+   *  Used by the Fire Mage's every-third-attack ignite. */
+  onHitBurn?: boolean;
 }
 
 export type FloatingTextKind = "damage" | "heal" | "crit";

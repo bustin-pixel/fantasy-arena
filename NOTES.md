@@ -46,7 +46,7 @@ If you ever add a unit, make the id match the name to avoid extending this trap.
 Special mechanics are gated by `defId` string literals in `CombatSystem.ts`:
 - `"summoner"` → Druid bear transform at 30% HP
 - `"ogre"` → Second Wind full-heal at 25% HP
-- `"berserker"` → Bloodrage damage/speed scaling
+- `"berserker"` → Bloodrage damage/speed scaling + melee Cleave (AoE swing)
 - `"assassin"` → Vanish death-cheat
 - `"slime"` / `"slime_clone"` → split-on-damage and death explosion
 
