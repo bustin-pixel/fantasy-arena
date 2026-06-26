@@ -37,6 +37,7 @@ export type AbilityId =
   | "kiting_leap"
   | "shield_block"
   | "taunt_roar"
+  | "aegis"
   | "fireball"
   | "frost_blast"
   | "ambush"
@@ -87,6 +88,8 @@ export interface UnitDef {
   /** Hex accent for ability effects/projectiles. */
   accent: string;
   role: string;
+  /** Damage school of this unit's attacks/abilities. Absent = physical. */
+  school?: "physical" | "magic";
   /** Human-readable passive traits (engine-coded behaviors) for the detail UI. */
   traits?: { name: string; description: string }[];
 }

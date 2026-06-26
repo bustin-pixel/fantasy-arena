@@ -106,6 +106,14 @@ function nextId(state: SimState, prefix: string): string {
 // HP mutation helpers — the ONLY places hp changes.
 // ---------------------------------------------------------------------------
 
+/** True if the damage comes from a magic-school unit (the casters). */
+function isMagicSource(source: Unit): boolean {
+  return getUnitDef(source.defId).school === "magic";
+}
+
+/** Cap on the Aegis Knight's banked magic shield; also its Backlash threshold. */
+const AEGIS_SHIELD_CAP = 120;
+
 function makeDamageDealer(state: SimState) {
   return function dealDamage(target: Unit, amount: number, source: Unit): void {
     if (target.state === "dead") return;
@@ -117,7 +125,17 @@ function makeDamageDealer(state: SimState) {
       return;
     }
 
-    let dmg = Math.max(0, Math.round(amount * target.damageTakenMult));
+    // Aegis Knight soaks magic: most of a magic hit is banked as overhealth
+    // shield (applied after, so it doesn't absorb this same hit) — only a sliver
+    // leaks through as HP damage.
+    let effAmount = amount;
+    let aegisBank = 0;
+    if (amount > 0 && target.defId === "aegis_knight" && isMagicSource(source)) {
+      effAmount = amount * 0.25;
+      aegisBank = Math.round(amount * 0.6);
+    }
+
+    let dmg = Math.max(0, Math.round(effAmount * target.damageTakenMult));
 
     // Absorb shield (overhealth) soaks damage before HP.
     if (target.shieldHp > 0 && dmg > 0) {
@@ -130,7 +148,13 @@ function makeDamageDealer(state: SimState) {
     target.hp = Math.max(0, target.hp - dmg);
     target.hitFlash = HIT_FLASH_TICKS;
     target.attackedByUid = source.uid;
-    spawnFloatingText(state, target, `-${Math.round(amount * target.damageTakenMult)}`, "damage");
+    spawnFloatingText(state, target, `-${Math.round(effAmount * target.damageTakenMult)}`, "damage");
+
+    // Bank the absorbed magic into the Aegis shield (capped), after the hit.
+    if (aegisBank > 0 && target.hp > 0) {
+      target.shieldHpMax = AEGIS_SHIELD_CAP;
+      target.shieldHp = Math.min(AEGIS_SHIELD_CAP, target.shieldHp + aegisBank);
+    }
 
     // Slime Split: the ORIGINAL slime spawns a weaker clone each time its health
     // crosses a 25% threshold (at 75%, 50%, 25% remaining → up to 3 clones).
@@ -687,6 +711,25 @@ function performBasicAttack(
         pos: { x: unit.pos.x, y: unit.pos.y },
         life: secToTicks(0.3),
         maxLife: secToTicks(0.3),
+        color: def.accent,
+      });
+    }
+
+    // Aegis Knight Backlash: a full magic shield discharges as an area burst on
+    // the next swing, spending the shield.
+    if (unit.defId === "aegis_knight" && unit.shieldHp >= AEGIS_SHIELD_CAP) {
+      const burst = Math.min(55, Math.round(unit.shieldHp * 0.5));
+      unit.shieldHp = 0;
+      unit.shieldHpMax = 0;
+      for (const e of state.units) {
+        if (e.team === unit.team || e.state === "dead") continue;
+        if (dist(unit.pos, e.pos) <= 100) dealDamage(e, burst, unit);
+      }
+      spawnVfx(state, {
+        kind: "slam",
+        pos: { x: unit.pos.x, y: unit.pos.y },
+        life: secToTicks(0.5),
+        maxLife: secToTicks(0.5),
         color: def.accent,
       });
     }

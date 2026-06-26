@@ -113,6 +113,9 @@ export function drawUnitSprite(
     case "knight":
       drawKnight(ctx, body, dark, light, accent);
       break;
+    case "aegis_knight":
+      drawAegisKnight(ctx, body, dark, light, accent);
+      break;
     case "fire_mage":
       drawMage(ctx, body, dark, light, accent, cast);
       break;
@@ -281,6 +284,63 @@ function drawKnight(ctx: Ctx, body: string, dark: string, light: string, accent:
   ctx.moveTo(-0.7, -2);
   ctx.lineTo(0.7, -2);
   ctx.lineTo(0, -19);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawAegisKnight(ctx: Ctx, body: string, dark: string, light: string, accent: string) {
+  roundedBody(ctx, 22, 26, -2, body);
+  // armor seam
+  ctx.strokeStyle = dark;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(0, -4);
+  ctx.lineTo(0, 18);
+  ctx.stroke();
+  // helm
+  ctx.fillStyle = light;
+  ctx.beginPath();
+  ctx.arc(0, -12, 8, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#111";
+  ctx.fillRect(-5, -13, 10, 3); // visor
+  // big runic tower shield (left)
+  ctx.fillStyle = dark;
+  ctx.beginPath();
+  ctx.roundRect(-20, -13, 13, 31, 4);
+  ctx.fill();
+  // glowing rune
+  ctx.strokeStyle = accent;
+  ctx.shadowColor = accent;
+  ctx.shadowBlur = 6;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-13.5, -8);
+  ctx.lineTo(-13.5, 13); // vertical bar
+  ctx.moveTo(-17, 2);
+  ctx.lineTo(-10, 2); // crossbar
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-13.5, -5);
+  ctx.lineTo(-10.5, -1);
+  ctx.lineTo(-13.5, 3);
+  ctx.lineTo(-16.5, -1);
+  ctx.closePath();
+  ctx.stroke(); // diamond rune
+  ctx.shadowBlur = 0;
+  // sword (right hand)
+  ctx.save();
+  ctx.translate(12, 2);
+  ctx.fillStyle = "#3a2a18";
+  ctx.fillRect(-1.5, 2, 3, 8);
+  ctx.fillStyle = "#d8c08a";
+  ctx.fillRect(-5, 0, 10, 2.5);
+  ctx.fillStyle = "#d6d9de";
+  ctx.beginPath();
+  ctx.moveTo(-2.5, 0);
+  ctx.lineTo(2.5, 0);
+  ctx.lineTo(0, -20);
   ctx.closePath();
   ctx.fill();
   ctx.restore();
