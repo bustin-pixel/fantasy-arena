@@ -47,7 +47,7 @@ export const ABILITIES: Record<AbilityId, AbilityDef> = {
   fireball: {
     id: "fireball",
     name: "Fireball",
-    description: "Every 4s: 25 damage + Burn (3 ticks of 10).",
+    description: "Every 4s: hurls a fireball for 25 burst damage.",
     cooldown: 4,
   },
   frost_blast: {

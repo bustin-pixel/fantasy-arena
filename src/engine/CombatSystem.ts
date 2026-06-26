@@ -631,6 +631,9 @@ function performBasicAttack(
   // Ice Mage: every second basic attack freezes the target (2s stun).
   const freezeThisHit =
     unit.defId === "ice_mage" && unit.attackCount % 2 === 0;
+  // Fire Mage: every third basic attack sets the target ablaze (Burn).
+  const burnThisHit =
+    unit.defId === "fire_mage" && unit.attackCount % 3 === 0;
 
   // Mystic Archer fires a form-tagged shot; stacking/detonation resolves on hit.
   if (unit.defId === "mystic_archer") {
@@ -660,13 +663,33 @@ function performBasicAttack(
       team: unit.team,
       sourceUid: unit.uid,
       ability: "lifesteal", // sentinel: "basic"; no on-hit status
-      color: freezeThisHit ? "#bae6fd" : def.accent,
+      color: freezeThisHit ? "#bae6fd" : burnThisHit ? "#fb923c" : def.accent,
       angle: 0,
       onHitStunSec: freezeThisHit ? 2 : undefined,
+      onHitBurn: burnThisHit || undefined,
     });
   } else {
     dealDamage(target, unit.damage, unit);
     applyLifesteal(unit, unit.damage, heal);
+
+    // Berserker Cleave: the same swing also strikes every other enemy within
+    // melee reach, so it carves through a crowd.
+    if (unit.defId === "berserker") {
+      const reach = unit.range + unit.radius;
+      for (const e of state.units) {
+        if (e === target || e.team === unit.team || e.state === "dead") continue;
+        if (dist(unit.pos, e.pos) <= reach) {
+          dealDamage(e, unit.damage, unit);
+        }
+      }
+      spawnVfx(state, {
+        kind: "slam",
+        pos: { x: unit.pos.x, y: unit.pos.y },
+        life: secToTicks(0.3),
+        maxLife: secToTicks(0.3),
+        color: def.accent,
+      });
+    }
   }
 }
 
@@ -788,6 +811,25 @@ function stepProjectiles(
               life: secToTicks(0.4),
               maxLife: secToTicks(0.4),
               color: "#bae6fd",
+            });
+          }
+          // Fire Mage every-third-attack burn.
+          if (proj.onHitBurn) {
+            applyEffect(
+              target,
+              makeEffect("burn", {
+                source: proj.sourceUid,
+                durationSec: 3,
+                damagePerTick: 7,
+                tickIntervalSec: 1,
+              })
+            );
+            spawnVfx(state, {
+              kind: "burn_burst",
+              pos: { x: target.pos.x, y: target.pos.y },
+              life: secToTicks(0.4),
+              maxLife: secToTicks(0.4),
+              color: "#fb923c",
             });
           }
         } else {

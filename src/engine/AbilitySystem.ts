@@ -398,15 +398,8 @@ export function onProjectileHit(
   ctx.dealDamage(target, proj.damage, source);
 
   if (proj.ability === "fireball") {
-    applyEffect(
-      target,
-      makeEffect("burn", {
-        source: proj.sourceUid,
-        durationSec: 3,
-        damagePerTick: 7,
-        tickIntervalSec: 1,
-      })
-    );
+    // Fireball is now pure burst damage; the Fire Mage's burn comes from its
+    // every-third basic attack instead (see performBasicAttack / onHitBurn).
     ctx.spawnVfx({
       kind: "burn_burst",
       pos: { x: target.pos.x, y: target.pos.y },

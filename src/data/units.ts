@@ -39,7 +39,7 @@ export const UNITS: Record<string, UnitDef> = {
   orc: {
     id: "orc",
     name: "Orc",
-    rarity: "rare",
+    rarity: "epic",
     role: "Sustained Fighter",
     hp: 230,
     damage: 17,
@@ -98,6 +98,13 @@ export const UNITS: Record<string, UnitDef> = {
     ability: "fireball",
     color: "#b91c1c",
     accent: "#fb923c",
+    traits: [
+      {
+        name: "Kindling",
+        description:
+          "Every third basic attack sets the target ablaze — Burn (3 ticks of 7).",
+      },
+    ],
   },
   ice_mage: {
     id: "ice_mage",
@@ -143,7 +150,7 @@ export const UNITS: Record<string, UnitDef> = {
   healer: {
     id: "healer",
     name: "Cleric",
-    rarity: "epic",
+    rarity: "rare",
     role: "Support / Healer",
     hp: 140,
     damage: 8,
@@ -203,6 +210,13 @@ export const UNITS: Record<string, UnitDef> = {
     ability: "bloodrage",
     color: "#7f1d1d",
     accent: "#ef4444",
+    traits: [
+      {
+        name: "Cleave",
+        description:
+          "Each swing also strikes every other enemy in melee range, not just its target.",
+      },
+    ],
   },
   necromancer: {
     id: "necromancer",
