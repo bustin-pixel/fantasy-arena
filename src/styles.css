@@ -713,6 +713,96 @@ body {
   text-shadow: 0 1px 4px #000;
 }
 
+/* ---- In-battle unit tooltip ---------------------------------------------- */
+.unit-tip {
+  position: absolute;
+  z-index: 15;
+  width: 152px;
+  pointer-events: auto;
+  background: rgba(20, 16, 10, 0.95);
+  border: 2px solid var(--stone-dark);
+  border-radius: 10px;
+  padding: 8px 9px 9px;
+  color: var(--parchment);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
+}
+.unit-tip-close {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  width: 16px;
+  height: 16px;
+  border: none;
+  background: transparent;
+  color: var(--stone);
+  font-size: 0.7rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  font-family: inherit;
+}
+.unit-tip-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 5px;
+  padding-right: 14px;
+}
+.unit-tip-name {
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+.unit-tip-team {
+  font-size: 0.55rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-radius: 4px;
+  padding: 1px 4px;
+}
+.unit-tip-team.player {
+  color: #86efac;
+  border: 1px solid #2f5d2a;
+}
+.unit-tip-team.enemy {
+  color: #fca5a5;
+  border: 1px solid #7f1d1d;
+}
+.unit-tip-hpbar {
+  height: 6px;
+  background: #2a1f14;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 2px;
+}
+.unit-tip-hpfill {
+  height: 100%;
+  background: #86efac;
+}
+.unit-tip-hpval {
+  font-size: 0.6rem;
+  color: var(--stone);
+  margin-bottom: 5px;
+}
+.unit-tip-stats {
+  font-size: 0.66rem;
+  margin-bottom: 3px;
+}
+.unit-tip-ability {
+  font-size: 0.66rem;
+  color: var(--gold-soft);
+}
+.unit-tip-trait {
+  font-size: 0.64rem;
+  color: #cbb9a0;
+  margin-top: 1px;
+}
+.unit-tip-effects {
+  margin-top: 4px;
+  font-size: 0.62rem;
+  color: #fcd34d;
+}
+
 /* ---- Result overlay ------------------------------------------------------ */
 .result-overlay {
   position: absolute;

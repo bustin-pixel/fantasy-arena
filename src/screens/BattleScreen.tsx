@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useBattleEngine, type BattleMode } from "@/hooks/useBattleEngine";
 import { BattleHud } from "@/components/BattleHud";
+import { BattleUnitTip } from "@/components/BattleUnitTip";
 import { CardTray } from "@/components/CardTray";
 import {
   FIELD_HEIGHT,
@@ -17,7 +18,7 @@ interface Props {
 }
 
 export function BattleScreen({ deck, onExit, mode = "solo" }: Props) {
-  const { canvasRef, ui, deployAt, selectCard, speed, setSpeed } =
+  const { canvasRef, ui, deployAt, selectCard, speed, setSpeed, pickUnitAt, inspectUnit } =
     useBattleEngine(deck, mode);
   const { recordResult } = useGameState();
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -26,6 +27,12 @@ export function BattleScreen({ deck, onExit, mode = "solo" }: Props) {
   // fires right after a tap (which would otherwise deploy a second unit).
   const lastTouchRef = useRef(0);
   const [showResult, setShowResult] = useState(false);
+  // uid of the unit whose stat tooltip is open (tap a combatant to inspect).
+  const [inspectedUid, setInspectedUid] = useState<string | null>(null);
+
+  // Re-read live every render (~6/s on the throttled ui sync) so HP/effects and
+  // the unit's position stay current; clears itself when the unit dies.
+  const inspected = inspectedUid ? inspectUnit(inspectedUid) : null;
 
   // Record win/loss once when the match resolves.
   useEffect(() => {
@@ -39,19 +46,25 @@ export function BattleScreen({ deck, onExit, mode = "solo" }: Props) {
     }
   }, [ui.phase, recordResult]);
 
-  // Map a screen tap to field coordinates and deploy in the player zone.
+  // A tap inspects a tapped unit (either team); on empty space it dismisses any
+  // tooltip and deploys a reinforcement if a slot is open in the player zone.
   const handleTap = (clientX: number, clientY: number) => {
-    if (!ui.canDeploy) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
-    const sx = (clientX - rect.left) / rect.width;
-    const sy = (clientY - rect.top) / rect.height;
-    const fx = sx * FIELD_WIDTH;
-    const fy = sy * FIELD_HEIGHT;
-    // Only allow deployment in the player's bottom half.
-    if (fy < PLAYER_ZONE.top) return;
-    deployAt({ x: fx, y: fy });
+    const fx = ((clientX - rect.left) / rect.width) * FIELD_WIDTH;
+    const fy = ((clientY - rect.top) / rect.height) * FIELD_HEIGHT;
+
+    const hitUid = pickUnitAt({ x: fx, y: fy });
+    if (hitUid) {
+      // Tapping the same unit again closes its tooltip; a different unit switches.
+      setInspectedUid((prev) => (prev === hitUid ? null : hitUid));
+      return;
+    }
+    setInspectedUid(null);
+    if (ui.canDeploy && fy >= PLAYER_ZONE.top) {
+      deployAt({ x: fx, y: fy });
+    }
   };
 
   return (
@@ -79,6 +92,9 @@ export function BattleScreen({ deck, onExit, mode = "solo" }: Props) {
           }}
         />
         <BattleHud ui={ui} speed={speed} onSpeed={setSpeed} mode={mode} />
+        {inspected && (
+          <BattleUnitTip unit={inspected} onClose={() => setInspectedUid(null)} />
+        )}
       </div>
 
       <CardTray
