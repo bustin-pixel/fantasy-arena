@@ -44,6 +44,13 @@ export const ABILITIES: Record<AbilityId, AbilityDef> = {
       "Every 8s: forces nearby enemies to attack it for 2.5s and gains a protective shield.",
     cooldown: 8,
   },
+  aegis: {
+    id: "aegis",
+    name: "Mana-Siphon Shield",
+    description:
+      "Passive: soaks most incoming magic damage, banking it as a growing shield.",
+    cooldown: 0,
+  },
   fireball: {
     id: "fireball",
     name: "Fireball",

@@ -96,6 +96,7 @@ export const UNITS: Record<string, UnitDef> = {
     moveSpeed: 58,
     range: FIELD_WIDTH * 0.3, // a bit more reach so it isn't caught in melee
     ability: "fireball",
+    school: "magic",
     color: "#b91c1c",
     accent: "#fb923c",
     traits: [
@@ -117,6 +118,7 @@ export const UNITS: Record<string, UnitDef> = {
     moveSpeed: 60,
     range: FIELD_WIDTH * 0.32, // medium
     ability: "frost_blast",
+    school: "magic",
     color: "#2563eb",
     accent: "#7dd3fc",
     traits: [
@@ -229,6 +231,7 @@ export const UNITS: Record<string, UnitDef> = {
     moveSpeed: 55,
     range: FIELD_WIDTH * 0.32,
     ability: "raise_dead", // primary; fear is a second ability handled in logic
+    school: "magic",
     color: "#3b2a52",
     accent: "#a78bfa",
     traits: [
@@ -279,8 +282,34 @@ export const UNITS: Record<string, UnitDef> = {
     moveSpeed: 72,
     range: FIELD_WIDTH * 0.34,
     ability: "mystic_shift",
+    school: "magic",
     color: "#7c3aed",
     accent: "#fcd34d",
+  },
+  aegis_knight: {
+    id: "aegis_knight",
+    name: "Aegis Knight",
+    rarity: "legendary",
+    role: "Anti-Magic Bulwark",
+    hp: 230,
+    damage: 14,
+    attackSpeed: 1.7,
+    moveSpeed: 52,
+    range: MELEE,
+    ability: "aegis",
+    color: "#5b6b8a",
+    accent: "#7dd3fc",
+    traits: [
+      {
+        name: "Backlash",
+        description:
+          "When its shield fills with absorbed magic, its next swing releases it as an area burst.",
+      },
+      {
+        name: "Warded",
+        description: "Immune to Burn, Slow, and Poison.",
+      },
+    ],
   },
   // Slime clone — spawned when the original splits. Never in a deck. Doesn't
   // split further (terminal), but still bursts on death.

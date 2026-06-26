@@ -43,6 +43,13 @@ export function makeEffect(
 /** Attach an effect, merging with an existing one of the same type (refresh). */
 export function applyEffect(unit: Unit, effect: ActiveStatusEffect): void {
   if (unit.state === "dead") return;
+  // Aegis Knight is warded against magical afflictions.
+  if (
+    unit.defId === "aegis_knight" &&
+    (effect.type === "burn" || effect.type === "slow" || effect.type === "poison")
+  ) {
+    return;
+  }
   const existing = unit.effects.find((e) => e.type === effect.type);
   if (existing) {
     // Refresh duration to the longer of the two; keep stronger magnitude.

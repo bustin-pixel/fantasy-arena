@@ -49,6 +49,9 @@ Special mechanics are gated by `defId` string literals in `CombatSystem.ts`:
 - `"berserker"` → Bloodrage damage/speed scaling + melee Cleave (AoE swing)
 - `"assassin"` → Vanish death-cheat
 - `"slime"` / `"slime_clone"` → split-on-damage and death explosion
+- `"aegis_knight"` → soaks magic into a shield, Backlash AoE, Warded (immune
+  to burn/slow/poison). Magic is identified by the source unit's `school: "magic"`
+  field (the casters) — see `isMagicSource` in CombatSystem.
 
 This works but isn't data-driven. If the roster grows a lot, consider moving
 these into a per-unit "passive traits" field in the unit data so the engine
