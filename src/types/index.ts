@@ -49,6 +49,7 @@ export type AbilityId =
   | "mystic_shift"
   | "momentum"
   | "arcane_barrage"
+  | "blessing"
   | "mend"
   | "summon_wolves";
 

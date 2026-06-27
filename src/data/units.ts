@@ -345,6 +345,27 @@ export const UNITS: Record<string, UnitDef> = {
       },
     ],
   },
+  holy_knight: {
+    id: "holy_knight",
+    name: "Holy Knight",
+    rarity: "epic",
+    role: "Support Bulwark",
+    hp: 200,
+    damage: 14,
+    attackSpeed: 1.8,
+    moveSpeed: 55,
+    range: MELEE,
+    ability: "blessing",
+    color: "#c9a227",
+    accent: "#fff4c2",
+    traits: [
+      {
+        name: "Bulwark of Faith",
+        description:
+          "Blessing's absorb shields stack on top of other shields (the Knight's Taunt, the Aegis Knight's bank), up to 150 overhealth per ally.",
+      },
+    ],
+  },
   // Slime clone — spawned when the original splits. Never in a deck. Doesn't
   // split further (terminal), but still bursts on death.
   slime_clone: {

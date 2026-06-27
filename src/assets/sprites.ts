@@ -116,6 +116,9 @@ export function drawUnitSprite(
     case "aegis_knight":
       drawAegisKnight(ctx, body, dark, light, accent);
       break;
+    case "holy_knight":
+      drawKnight(ctx, body, dark, light, accent);
+      break;
     case "fire_mage":
       drawMage(ctx, body, dark, light, accent, cast);
       break;
