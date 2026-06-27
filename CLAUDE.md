@@ -24,6 +24,7 @@ npm run preview     # serve the built dist/
 - **`build` does not type-check.** This is deliberate (a stray React-types issue shouldn't block a deploy). Always run `npm run typecheck` AND `npm run build` before considering a change done.
 - Path alias: `@/*` → `src/*` (see `tsconfig.json` `paths`).
 - Deploy: static `dist/` to Netlify (see `DEPLOY.md` / `netlify.toml`). The repo is GitHub-connected, so merging to `master` auto-deploys.
+- **How we build & ship (verify → batch on one PR → ask before merging; merges are infrequent because each one is a Netlify deploy/credits):** see `WORKFLOW.md`.
 
 ## Testing (Vitest)
 
