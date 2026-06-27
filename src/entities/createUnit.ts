@@ -37,7 +37,6 @@ export function createUnit(defId: string, team: Team, pos: Vec2): Unit {
     mysticForm: "light",
     lightStacks: 0,
     darkStacks: 0,
-    instability: 0,
     blinkCooldown: 0,
     attackCooldown: 0,
     abilityCooldown: 0, // abilities can fire as soon as their interval elapses

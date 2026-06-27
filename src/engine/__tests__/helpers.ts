@@ -38,7 +38,7 @@ export function digest(s: SimState): string {
   for (const u of [...s.units].sort((a, b) => (a.uid < b.uid ? -1 : 1))) {
     parts.push(
       `${u.uid}:${u.defId}:${u.state}:${u.hp.toFixed(2)}:` +
-        `${u.pos.x.toFixed(3)},${u.pos.y.toFixed(3)}:i${u.instability}:b${u.blinkCooldown}`
+        `${u.pos.x.toFixed(3)},${u.pos.y.toFixed(3)}:b${u.blinkCooldown}`
     );
   }
   return parts.join("|");

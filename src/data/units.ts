@@ -302,10 +302,10 @@ export const UNITS: Record<string, UnitDef> = {
     id: "arcane_mage",
     name: "Arcane Mage",
     rarity: "epic",
-    role: "Ramping Artillery",
+    role: "Arcane Artillery",
     hp: 100,
-    damage: 9, // low per missile — it fires fast and ramps
-    attackSpeed: 1.2, // base; Instability drives it down toward ~0.48s
+    damage: 9, // light basic shot; the burst comes from the Arcane Barrage active
+    attackSpeed: 1.2, // basic-attack cadence
     moveSpeed: 64,
     range: FIELD_WIDTH * 0.33, // medium-long
     ability: "arcane_barrage",
@@ -313,11 +313,6 @@ export const UNITS: Record<string, UnitDef> = {
     color: "#6d28d9",
     accent: "#c084fc",
     traits: [
-      {
-        name: "Instability",
-        description:
-          "The mounting magical pressure chips the mage's own health while Instability is high. It bleeds off whenever the mage stops attacking to reposition.",
-      },
       {
         name: "Blink",
         description:

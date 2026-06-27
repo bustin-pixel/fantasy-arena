@@ -1,59 +1,73 @@
-// Arcane Mage behavior: the ramping Arcane Barrage (fire-rate ramp, volatile
-// splash, self-damage) and the defensive Blink. Each mechanic is exercised in
-// isolation with a controlled, stationary, harmless dummy so the assertion
-// targets exactly one thing.
+// Arcane Mage behavior: the active Arcane Barrage (a 3-missile volley on a 6s
+// cooldown) and the defensive Blink. Each mechanic is exercised in isolation with
+// a controlled, stationary, harmless dummy so the assertion targets one thing.
 import { describe, it, expect } from "vitest";
 import { stepSimulation } from "@/engine/CombatSystem";
-import { getUnitDef } from "@/data/units";
 import { battleState, place, makeDummy } from "./helpers";
 
-describe("Arcane Mage — Arcane Barrage (Instability ramp)", () => {
-  it("builds Instability and shortens the attack interval below base", () => {
+/** Count the arcane-missile projectiles currently in flight. */
+function arcaneInFlight(s: ReturnType<typeof battleState>): number {
+  return s.projectiles.filter((p) => p.ability === "arcane_barrage").length;
+}
+
+describe("Arcane Mage — Arcane Barrage (active)", () => {
+  it("fires a volley of 3 arcane missiles when it casts", () => {
     const s = battleState(1);
     const mage = place(s, "arcane_mage", "player", 240, 600);
-    // Stationary dummy ~150px away: in firing range, but far enough not to trigger
-    // kiting (comfort = range*0.7 ≈ 110px) or Blink — so the mage parks and ramps.
-    makeDummy(place(s, "ogre", "enemy", 240, 450));
-    const baseAtk = getUnitDef("arcane_mage").attackSpeed;
+    // One stationary dummy ~150px away: in range, doesn't trigger kiting/Blink.
+    // (Ogre = no shield ability, so the volley's damage shows cleanly.)
+    const dummy = makeDummy(place(s, "ogre", "enemy", 240, 450));
 
-    for (let i = 0; i < 160; i++) stepSimulation(s);
-
-    expect(mage.instability).toBeGreaterThanOrEqual(5); // near max (6)
-    expect(mage.attackSpeed).toBeLessThan(baseAtk);
-  });
-
-  it("self-damages once Instability is volatile, but only mildly", () => {
-    const s = battleState(2);
-    const mage = place(s, "arcane_mage", "player", 240, 600);
-    // Harmless dummy: any HP the mage loses is its own Instability backlash.
-    makeDummy(place(s, "ogre", "enemy", 240, 450));
-
-    for (let i = 0; i < 160; i++) stepSimulation(s);
-
-    expect(mage.instability).toBeGreaterThanOrEqual(3); // past the volatile threshold
-    expect(mage.hp).toBeLessThan(mage.maxHp); // took self-damage
-    expect(mage.state).not.toBe("dead"); // self-damage is minor
-  });
-
-  it("volatile missiles splash to a clustered foe that is never targeted", () => {
-    const s = battleState(3);
-    const mage = place(s, "arcane_mage", "player", 240, 600);
-    mage.instability = 6; // pre-charge so every missile is volatile from shot one
-    // Two stationary ogres (no shield ability) clustered within splash radius. The
-    // mage locks the lower-uid one; the other can only be hurt by splash.
-    const a = makeDummy(place(s, "ogre", "enemy", 235, 450));
-    const b = makeDummy(place(s, "ogre", "enemy", 285, 450));
-
-    let bEverTargeted = false;
-    let bHurtWhileUntargeted = false;
-    for (let i = 0; i < 40; i++) {
+    let maxInFlight = 0;
+    for (let i = 0; i < 14; i++) {
       stepSimulation(s);
-      if (mage.targetUid === b.uid) bEverTargeted = true;
-      if (!bEverTargeted && b.hp < b.maxHp) bHurtWhileUntargeted = true;
+      maxInFlight = Math.max(maxInFlight, arcaneInFlight(s));
     }
 
-    expect(bHurtWhileUntargeted).toBe(true); // damage reached b purely via splash
-    expect(a.hp).toBeLessThan(a.maxHp); // primary foe took direct hits too
+    expect(maxInFlight).toBe(3); // exactly three missiles per volley
+    expect(dummy.hp).toBeLessThan(dummy.maxHp); // they connect
+    expect(mage.abilityCooldown).toBeGreaterThan(0); // went on cooldown after casting
+  });
+
+  it("respects the 6s cooldown (≈ one volley per 6s, not faster)", () => {
+    const s = battleState(2);
+    place(s, "arcane_mage", "player", 240, 600);
+    makeDummy(place(s, "ogre", "enemy", 240, 450));
+
+    const seen = new Set<string>();
+    const collect = () => {
+      for (const p of s.projectiles)
+        if (p.ability === "arcane_barrage") seen.add(p.id);
+    };
+
+    // First volley fires ~immediately (cooldown starts at 0).
+    for (let i = 0; i < 110; i++) {
+      stepSimulation(s); // 110 ticks ≈ 5.5s — still inside the first 6s window
+      collect();
+    }
+    expect(seen.size).toBe(3); // only one volley so far
+
+    for (let i = 0; i < 30; i++) {
+      stepSimulation(s); // out to ~7s — the cooldown has elapsed once
+      collect();
+    }
+    expect(seen.size).toBe(6); // a second volley, i.e. 3 missiles every 6s
+  });
+
+  it("spreads missiles across multiple foes (up to 3 distinct targets)", () => {
+    const s = battleState(3);
+    place(s, "arcane_mage", "player", 240, 600);
+    // Three spread-out dummies, all in range. The first volley should tag all three.
+    const a = makeDummy(place(s, "ogre", "enemy", 120, 440));
+    const b = makeDummy(place(s, "ogre", "enemy", 240, 440));
+    const c = makeDummy(place(s, "ogre", "enemy", 360, 440));
+
+    for (let i = 0; i < 30; i++) stepSimulation(s);
+
+    // Each foe took damage from a missile aimed at it (the volley spread out).
+    expect(a.hp).toBeLessThan(a.maxHp);
+    expect(b.hp).toBeLessThan(b.maxHp);
+    expect(c.hp).toBeLessThan(c.maxHp);
   });
 });
 

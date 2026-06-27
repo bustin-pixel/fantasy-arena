@@ -117,8 +117,7 @@ export const ABILITIES: Record<AbilityId, AbilityDef> = {
   arcane_barrage: {
     id: "arcane_barrage",
     name: "Arcane Barrage",
-    description:
-      "Passive: a volley of arcane missiles. Each consecutive hit builds Instability, ramping the mage's fire rate; at high Instability the missiles splash to nearby foes.",
-    cooldown: 0,
+    description: "Every 6s: fires a volley of 3 arcane missiles at nearby enemies.",
+    cooldown: 6,
   },
 };

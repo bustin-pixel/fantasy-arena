@@ -43,7 +43,7 @@ export interface AbilityContext {
 }
 
 /** Abilities that are passive (no active cast). Everything else is cast-gated. */
-const PASSIVE_ABILITIES = new Set<Unit["ability"]>(["lifesteal", "bloodrage", "slime_split", "mystic_shift", "arcane_barrage", "ambush", "aegis"]);
+const PASSIVE_ABILITIES = new Set<Unit["ability"]>(["lifesteal", "bloodrage", "slime_split", "mystic_shift", "ambush", "aegis"]);
 
 /** True if this ability is an active (cooldown-gated) cast. */
 function isActiveAbility(unit: Unit): boolean {
@@ -78,6 +78,8 @@ export function tryCastAbility(ctx: AbilityContext): boolean {
       return castFireball(ctx);
     case "frost_blast":
       return castFrostBlast(ctx);
+    case "arcane_barrage":
+      return castArcaneBarrage(ctx);
     case "charge":
       return castCharge(ctx);
     case "mend":
@@ -242,6 +244,45 @@ function castFrostBlast(ctx: AbilityContext): boolean {
     color: getUnitDef(unit.defId).accent,
     angle: 0,
   });
+  return true;
+}
+
+// --- ARCANE MAGE: Arcane Barrage ---------------------------------------------
+// A burst nuke: lobs 3 homing arcane missiles, spread across the nearest living
+// enemies (the current target first, then next-nearest). With fewer than 3 foes
+// the extra missiles pile onto the primary target. Each missile resolves as
+// straight damage on impact (see onProjectileHit).
+function castArcaneBarrage(ctx: AbilityContext): boolean {
+  const { unit, unitsByUid, enemies } = ctx;
+  const primary = unit.targetUid ? unitsByUid.get(unit.targetUid) : null;
+  if (!primary || primary.state === "dead") return false;
+
+  const others = enemies
+    .filter((e) => e.state !== "dead" && e.uid !== primary.uid)
+    .sort((a, b) => {
+      const da = dist(unit.pos, a.pos);
+      const db = dist(unit.pos, b.pos);
+      return da !== db ? da - db : a.uid < b.uid ? -1 : 1;
+    });
+  const order = [primary, ...others];
+
+  const MISSILES = 3;
+  const MISSILE_DAMAGE = 12;
+  for (let i = 0; i < MISSILES; i++) {
+    const tgt = order[i] ?? primary; // pile onto primary when foes < 3
+    ctx.spawnProjectile({
+      pos: { x: unit.pos.x, y: unit.pos.y },
+      target: { x: tgt.pos.x, y: tgt.pos.y },
+      targetUid: tgt.uid,
+      speed: 360,
+      damage: MISSILE_DAMAGE,
+      team: unit.team,
+      sourceUid: unit.uid,
+      ability: "arcane_barrage",
+      color: getUnitDef(unit.defId).accent,
+      angle: 0,
+    });
+  }
   return true;
 }
 
@@ -421,6 +462,15 @@ export function onProjectileHit(
       pos: { x: target.pos.x, y: target.pos.y },
       life: secToTicks(0.4),
       maxLife: secToTicks(0.4),
+      color: proj.color,
+    });
+  } else if (proj.ability === "arcane_barrage") {
+    // Arcane Barrage missiles are pure burst; just a small impact pop.
+    ctx.spawnVfx({
+      kind: "burn_burst",
+      pos: { x: target.pos.x, y: target.pos.y },
+      life: secToTicks(0.3),
+      maxLife: secToTicks(0.3),
       color: proj.color,
     });
   }
