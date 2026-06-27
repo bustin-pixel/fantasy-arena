@@ -54,10 +54,12 @@ Special mechanics are gated by `defId` string literals in `CombatSystem.ts`:
   field (the casters) — see `isMagicSource` in CombatSystem.
 - `"mystic_archer"` → Light/Dark form-tagged shots + on-hit stack/detonate
   resolution (`resolveMysticHit`).
-- `"arcane_mage"` → the Blink defensive teleport, gated here and run on its own
-  `blinkCooldown` field (independent of the ability slot). Its Arcane Barrage is a
-  normal *active* ability (`castArcaneBarrage` in AbilitySystem), and its basic
-  attack is the default ranged shot — nothing else about it is hardcoded here.
+- `"arcane_mage"` → the Blink defensive teleport (own `blinkCooldown` field, 5s),
+  plus the Arcane Barrage volley streamer (`stepArcaneBarrage`): the active cast
+  (`castArcaneBarrage` in AbilitySystem) only *arms* a 3-shot burst locked onto one
+  target, and CombatSystem fires the missiles one at a time in quick succession via
+  the `barrageShots`/`barrageTimer`/`barrageTargetUid` fields. Basic attack is the
+  default ranged shot.
 
 This works but isn't data-driven. If the roster grows a lot, consider moving
 these into a per-unit "passive traits" field in the unit data so the engine

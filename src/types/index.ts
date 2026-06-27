@@ -159,6 +159,13 @@ export interface Unit {
   darkStacks: number;
   /** Arcane Mage: ticks until Blink (defensive teleport) is ready again. */
   blinkCooldown: number;
+  /** Arcane Mage: missiles left to fire in the current Arcane Barrage volley
+   *  (0 = not firing). The volley streams out one missile at a time. */
+  barrageShots: number;
+  /** Arcane Mage: ticks until the next missile in the volley. */
+  barrageTimer: number;
+  /** Arcane Mage: the target locked for the whole volley (all 3 hit it). */
+  barrageTargetUid: string | null;
 
   // timers (in ticks)
   attackCooldown: number;

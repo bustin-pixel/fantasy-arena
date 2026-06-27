@@ -1,73 +1,74 @@
-// Arcane Mage behavior: the active Arcane Barrage (a 3-missile volley on a 6s
-// cooldown) and the defensive Blink. Each mechanic is exercised in isolation with
-// a controlled, stationary, harmless dummy so the assertion targets one thing.
+// Arcane Mage behavior: the active Arcane Barrage (3 missiles fired one after
+// another at a single locked target, on a 6s cooldown) and the defensive Blink.
+// Each mechanic is exercised in isolation with controlled, stationary, harmless
+// dummies so the assertion targets one thing.
 import { describe, it, expect } from "vitest";
-import { stepSimulation } from "@/engine/CombatSystem";
+import { stepSimulation, type SimState } from "@/engine/CombatSystem";
 import { battleState, place, makeDummy } from "./helpers";
 
-/** Count the arcane-missile projectiles currently in flight. */
-function arcaneInFlight(s: ReturnType<typeof battleState>): number {
-  return s.projectiles.filter((p) => p.ability === "arcane_barrage").length;
+/** Record each Arcane Barrage missile the first time it appears: which tick it was
+ *  fired on and who it targets. Lets us assert "3 missiles, one after another, same
+ *  target" without depending on projectile travel time. */
+function trackMissiles(
+  s: SimState,
+  ticks: number
+): { tick: number; tgt: string; id: string }[] {
+  const seen = new Map<string, { tick: number; tgt: string; id: string }>();
+  for (let i = 0; i < ticks; i++) {
+    stepSimulation(s);
+    for (const p of s.projectiles) {
+      if (p.ability === "arcane_barrage" && !seen.has(p.id)) {
+        seen.set(p.id, { tick: s.tick, tgt: p.targetUid, id: p.id });
+      }
+    }
+  }
+  return [...seen.values()];
 }
 
 describe("Arcane Mage — Arcane Barrage (active)", () => {
-  it("fires a volley of 3 arcane missiles when it casts", () => {
+  it("fires 3 missiles one after another at the same target", () => {
     const s = battleState(1);
-    const mage = place(s, "arcane_mage", "player", 240, 600);
-    // One stationary dummy ~150px away: in range, doesn't trigger kiting/Blink.
-    // (Ogre = no shield ability, so the volley's damage shows cleanly.)
-    const dummy = makeDummy(place(s, "ogre", "enemy", 240, 450));
+    place(s, "arcane_mage", "player", 240, 600);
+    const dummy = makeDummy(place(s, "ogre", "enemy", 240, 450)); // in range
 
-    let maxInFlight = 0;
-    for (let i = 0; i < 14; i++) {
-      stepSimulation(s);
-      maxInFlight = Math.max(maxInFlight, arcaneInFlight(s));
-    }
+    const volley = trackMissiles(s, 30); // < 6s, so just the first volley
 
-    expect(maxInFlight).toBe(3); // exactly three missiles per volley
-    expect(dummy.hp).toBeLessThan(dummy.maxHp); // they connect
-    expect(mage.abilityCooldown).toBeGreaterThan(0); // went on cooldown after casting
+    expect(volley.length).toBe(3); // three missiles
+    expect(new Set(volley.map((m) => m.tgt)).size).toBe(1); // all at one target
+    expect(volley.every((m) => m.tgt === dummy.uid)).toBe(true);
+    expect(new Set(volley.map((m) => m.tick)).size).toBe(3); // fired on 3 distinct ticks (in succession)
+  });
+
+  it("focuses one target even when several foes are in range", () => {
+    const s = battleState(2);
+    place(s, "arcane_mage", "player", 240, 600);
+    // Three foes, all within firing range (~120-145px).
+    makeDummy(place(s, "ogre", "enemy", 160, 480));
+    makeDummy(place(s, "ogre", "enemy", 240, 480));
+    makeDummy(place(s, "ogre", "enemy", 320, 480));
+
+    const volley = trackMissiles(s, 30);
+
+    expect(volley.length).toBe(3);
+    expect(new Set(volley.map((m) => m.tgt)).size).toBe(1); // all 3 hit the SAME foe
   });
 
   it("respects the 6s cooldown (≈ one volley per 6s, not faster)", () => {
-    const s = battleState(2);
+    const s = battleState(3);
     place(s, "arcane_mage", "player", 240, 600);
     makeDummy(place(s, "ogre", "enemy", 240, 450));
 
+    // Accumulate every distinct missile id across the whole run.
     const seen = new Set<string>();
     const collect = () => {
       for (const p of s.projectiles)
         if (p.ability === "arcane_barrage") seen.add(p.id);
     };
 
-    // First volley fires ~immediately (cooldown starts at 0).
-    for (let i = 0; i < 110; i++) {
-      stepSimulation(s); // 110 ticks ≈ 5.5s — still inside the first 6s window
-      collect();
-    }
+    for (let i = 0; i < 110; i++) (stepSimulation(s), collect()); // ~5.5s
     expect(seen.size).toBe(3); // only one volley so far
-
-    for (let i = 0; i < 30; i++) {
-      stepSimulation(s); // out to ~7s — the cooldown has elapsed once
-      collect();
-    }
-    expect(seen.size).toBe(6); // a second volley, i.e. 3 missiles every 6s
-  });
-
-  it("spreads missiles across multiple foes (up to 3 distinct targets)", () => {
-    const s = battleState(3);
-    place(s, "arcane_mage", "player", 240, 600);
-    // Three spread-out dummies, all in range. The first volley should tag all three.
-    const a = makeDummy(place(s, "ogre", "enemy", 120, 440));
-    const b = makeDummy(place(s, "ogre", "enemy", 240, 440));
-    const c = makeDummy(place(s, "ogre", "enemy", 360, 440));
-
-    for (let i = 0; i < 30; i++) stepSimulation(s);
-
-    // Each foe took damage from a missile aimed at it (the volley spread out).
-    expect(a.hp).toBeLessThan(a.maxHp);
-    expect(b.hp).toBeLessThan(b.maxHp);
-    expect(c.hp).toBeLessThan(c.maxHp);
+    for (let i = 0; i < 30; i++) (stepSimulation(s), collect()); // out to ~7s
+    expect(seen.size).toBe(6); // a second volley fired — 3 missiles every 6s
   });
 });
 
@@ -82,6 +83,6 @@ describe("Arcane Mage — Blink", () => {
 
     const moved = Math.hypot(mage.pos.x - before.x, mage.pos.y - before.y);
     expect(moved).toBeGreaterThan(150);
-    expect(mage.blinkCooldown).toBeGreaterThan(0);
+    expect(mage.blinkCooldown).toBe(100); // 5s × 20 ticks/s
   });
 });

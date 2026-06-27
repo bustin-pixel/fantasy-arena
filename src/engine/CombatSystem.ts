@@ -405,6 +405,45 @@ function stepCharge(
   if (unit.chargeTicks <= 0) unit.chargeTargetUid = null;
 }
 
+// Arcane Mage: Arcane Barrage volley. The active cast (castArcaneBarrage) arms a
+// 3-shot burst locked onto one target; this fires the missiles one at a time in
+// quick succession so they stream out rather than all leaving at once. Runs every
+// tick while a volley is queued; the locked target is held for the whole volley.
+const ARCANE_MISSILE_DAMAGE = 12;
+const ARCANE_VOLLEY_GAP = 2; // ticks between consecutive missiles (~0.15s)
+
+function stepArcaneBarrage(
+  state: SimState,
+  unit: Unit,
+  byUid: Map<string, Unit>
+): void {
+  if (unit.barrageTimer > 0) {
+    unit.barrageTimer--;
+    return;
+  }
+  const tgt = unit.barrageTargetUid ? byUid.get(unit.barrageTargetUid) : null;
+  if (!tgt || tgt.state === "dead") {
+    // Locked target gone — abort the rest of the volley.
+    unit.barrageShots = 0;
+    unit.barrageTargetUid = null;
+    return;
+  }
+  spawnProjectile(state, {
+    pos: { x: unit.pos.x, y: unit.pos.y },
+    target: { x: tgt.pos.x, y: tgt.pos.y },
+    targetUid: tgt.uid,
+    speed: 360,
+    damage: ARCANE_MISSILE_DAMAGE,
+    team: unit.team,
+    sourceUid: unit.uid,
+    ability: "arcane_barrage",
+    color: getUnitDef(unit.defId).accent,
+    angle: 0,
+  });
+  unit.barrageShots--;
+  unit.barrageTimer = unit.barrageShots > 0 ? ARCANE_VOLLEY_GAP : 0;
+}
+
 // Arcane Mage: Blink. An instant defensive teleport (not a dash) away from the
 // nearest melee attacker that has closed in. Reactive and on its own cooldown,
 // so it's independent of the unit's active ability (Arcane Barrage).
@@ -535,6 +574,10 @@ export function stepSimulation(state: SimState): void {
       continue;
     }
 
+    // Arcane Mage: stream out any queued Arcane Barrage missiles (one at a time).
+    // Non-blocking — the mage still moves/attacks normally during the volley.
+    if (unit.barrageShots > 0) stepArcaneBarrage(state, unit, byUid);
+
     // Orc Charge: while a rush is in progress it owns movement until contact.
     if (unit.chargeTicks > 0) {
       stepCharge(state, unit, byUid, dealDamage);
@@ -549,7 +592,7 @@ export function stepSimulation(state: SimState): void {
     // tick (movement/kiting) resumes from the new spot.
     if (unit.defId === "arcane_mage" && unit.blinkCooldown <= 0) {
       if (tryBlink(state, unit, enemies)) {
-        unit.blinkCooldown = secToTicks(10);
+        unit.blinkCooldown = secToTicks(5);
       }
     }
 

@@ -248,41 +248,18 @@ function castFrostBlast(ctx: AbilityContext): boolean {
 }
 
 // --- ARCANE MAGE: Arcane Barrage ---------------------------------------------
-// A burst nuke: lobs 3 homing arcane missiles, spread across the nearest living
-// enemies (the current target first, then next-nearest). With fewer than 3 foes
-// the extra missiles pile onto the primary target. Each missile resolves as
-// straight damage on impact (see onProjectileHit).
+// A burst nuke at a single target. This cast just ARMS a 3-missile volley locked
+// onto the current target; CombatSystem (stepArcaneBarrage) streams the missiles
+// out one after another in quick succession, so they fire in sequence rather than
+// all leaving at once. Each missile resolves as straight damage on impact.
 function castArcaneBarrage(ctx: AbilityContext): boolean {
-  const { unit, unitsByUid, enemies } = ctx;
-  const primary = unit.targetUid ? unitsByUid.get(unit.targetUid) : null;
-  if (!primary || primary.state === "dead") return false;
+  const { unit, unitsByUid } = ctx;
+  const target = unit.targetUid ? unitsByUid.get(unit.targetUid) : null;
+  if (!target || target.state === "dead") return false;
 
-  const others = enemies
-    .filter((e) => e.state !== "dead" && e.uid !== primary.uid)
-    .sort((a, b) => {
-      const da = dist(unit.pos, a.pos);
-      const db = dist(unit.pos, b.pos);
-      return da !== db ? da - db : a.uid < b.uid ? -1 : 1;
-    });
-  const order = [primary, ...others];
-
-  const MISSILES = 3;
-  const MISSILE_DAMAGE = 12;
-  for (let i = 0; i < MISSILES; i++) {
-    const tgt = order[i] ?? primary; // pile onto primary when foes < 3
-    ctx.spawnProjectile({
-      pos: { x: unit.pos.x, y: unit.pos.y },
-      target: { x: tgt.pos.x, y: tgt.pos.y },
-      targetUid: tgt.uid,
-      speed: 360,
-      damage: MISSILE_DAMAGE,
-      team: unit.team,
-      sourceUid: unit.uid,
-      ability: "arcane_barrage",
-      color: getUnitDef(unit.defId).accent,
-      angle: 0,
-    });
-  }
+  unit.barrageShots = 3;
+  unit.barrageTimer = 0; // the first missile fires on the next tick
+  unit.barrageTargetUid = target.uid;
   return true;
 }
 

@@ -117,7 +117,7 @@ export const ABILITIES: Record<AbilityId, AbilityDef> = {
   arcane_barrage: {
     id: "arcane_barrage",
     name: "Arcane Barrage",
-    description: "Every 6s: fires a volley of 3 arcane missiles at nearby enemies.",
+    description: "Every 6s: rapidly fires 3 arcane missiles in quick succession at a single target.",
     cooldown: 6,
   },
 };

@@ -316,7 +316,7 @@ export const UNITS: Record<string, UnitDef> = {
       {
         name: "Blink",
         description:
-          "Roughly every 10s, when a melee attacker closes in, the mage blinks a safe distance away.",
+          "Roughly every 5s, when a melee attacker closes in, the mage blinks a safe distance away.",
       },
     ],
   },
