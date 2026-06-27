@@ -119,6 +119,12 @@ export function drawUnitSprite(
     case "holy_knight":
       drawKnight(ctx, body, dark, light, accent);
       break;
+    case "engineer":
+      drawEngineer(ctx, body, dark, light, accent);
+      break;
+    case "turret":
+      drawTurret(ctx, body, dark, light, accent);
+      break;
     case "fire_mage":
       drawMage(ctx, body, dark, light, accent, cast);
       break;
@@ -166,11 +172,75 @@ export function drawUnitSprite(
 }
 
 // Each draw fn works in a normalized space (~ -20..20 wide, -28..28 tall).
+
+// Turret — a stubby armored base with a barrel pointing up. Symmetric, so the
+// renderer's facing-flip is a no-op.
+function drawTurret(ctx: Ctx, body: string, dark: string, light: string, accent: string) {
+  // Wide base.
+  ctx.fillStyle = dark;
+  ctx.beginPath();
+  ctx.roundRect(-16, 8, 32, 12, 3);
+  ctx.fill();
+  // Armored housing.
+  ctx.fillStyle = body;
+  ctx.beginPath();
+  ctx.roundRect(-12, -4, 24, 14, 4);
+  ctx.fill();
+  // Dome cap.
+  ctx.fillStyle = light;
+  ctx.beginPath();
+  ctx.arc(0, -4, 10, Math.PI, Math.PI * 2);
+  ctx.fill();
+  // Barrel.
+  ctx.fillStyle = dark;
+  ctx.fillRect(-4, -22, 8, 18);
+  // Glowing muzzle.
+  ctx.fillStyle = accent;
+  ctx.fillRect(-4, -24, 8, 4);
+  // Rivets.
+  ctx.fillStyle = dark;
+  ctx.fillRect(-9, 1, 3, 3);
+  ctx.fillRect(6, 1, 3, 3);
+}
+
 function roundedBody(ctx: Ctx, w: number, h: number, y: number, fill: string) {
   ctx.fillStyle = fill;
   ctx.beginPath();
   ctx.roundRect(-w / 2, y, w, h, 5);
   ctx.fill();
+}
+
+// Engineer — a stout figure in a hard hat shouldering a long musket. The musket
+// points forward (to the right) and flips with the unit's facing.
+function drawEngineer(ctx: Ctx, body: string, dark: string, light: string, accent: string) {
+  // Stout torso + belt.
+  roundedBody(ctx, 26, 22, 2, body);
+  ctx.fillStyle = dark;
+  ctx.fillRect(-13, 15, 26, 5);
+  // Head.
+  ctx.fillStyle = light;
+  ctx.beginPath();
+  ctx.arc(0, -7, 9, 0, Math.PI * 2);
+  ctx.fill();
+  // Hard hat (dome + brim).
+  ctx.fillStyle = accent;
+  ctx.beginPath();
+  ctx.arc(0, -9, 9, Math.PI, Math.PI * 2);
+  ctx.fill();
+  ctx.fillRect(-11, -9, 22, 3);
+  // Eyes + beard.
+  ctx.fillStyle = "#1a1a1a";
+  ctx.fillRect(-4, -7, 3, 3);
+  ctx.fillRect(2, -7, 3, 3);
+  ctx.fillStyle = dark;
+  ctx.fillRect(-6, -2, 12, 5);
+  // Musket: wooden stock, long steel barrel, glinting muzzle.
+  ctx.fillStyle = "#5a3d22";
+  ctx.fillRect(-10, 4, 13, 5);
+  ctx.fillStyle = "#b8bcc4";
+  ctx.fillRect(1, 5, 23, 3);
+  ctx.fillStyle = accent;
+  ctx.fillRect(22, 4, 4, 4);
 }
 
 function drawOgre(ctx: Ctx, body: string, dark: string, light: string, accent: string) {

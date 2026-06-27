@@ -50,6 +50,7 @@ export type AbilityId =
   | "momentum"
   | "arcane_barrage"
   | "blessing"
+  | "deploy_turret"
   | "mend"
   | "summon_wolves";
 

@@ -52,6 +52,9 @@ Special mechanics are gated by `defId` string literals in `CombatSystem.ts`:
 - `"aegis_knight"` → soaks magic into a shield, Backlash AoE, Warded (immune
   to burn/slow/poison). Magic is identified by the source unit's `school: "magic"`
   field (the casters) — see `isMagicSource` in CombatSystem.
+- `"engineer"` → Field Repairs (defId-gated periodic heal of itself + nearby
+  turrets). `"turret"` → stationary (moveSpeed 0) ranged construct, summoned via
+  Deploy Turret; leaves no raisable corpse (like `skeleton`/`wolf`).
 - `"mystic_archer"` → Light/Dark form-tagged shots + on-hit stack/detonate
   resolution (`resolveMysticHit`), plus the Momentum passive: each form shift
   adds a `momentumStacks` (capped at 5) that ramps attack speed +15%/shift up to

@@ -137,4 +137,10 @@ export const ABILITIES: Record<AbilityId, AbilityDef> = {
     description: "Shields itself and nearby allies for 40 absorb and heals them for 15.",
     cooldown: 8,
   },
+  deploy_turret: {
+    id: "deploy_turret",
+    name: "Deploy Turret",
+    description: "Builds a stationary turret beside it that holds ground until destroyed.",
+    cooldown: 9,
+  },
 };
