@@ -457,10 +457,16 @@ body {
   color: var(--stone);
   border-color: var(--stone);
 }
-/* Cooldown chip for active abilities — pushed to the right edge of the head row
-   so each active reads like an activatable skill with a recharge time. */
-.detail-cd {
+/* Right-aligned cluster of meta chips (cast time + cooldown) for an active. */
+.detail-skill-meta {
   margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+/* Cast-time / cooldown chips — so each active reads like an activatable skill
+   with a wind-up and a recharge time. */
+.detail-cd {
   font-size: 0.62rem;
   font-weight: 700;
   color: var(--gold);

@@ -150,9 +150,18 @@ export function UnitDetail({ defId, deck, onToggle, onClose }: Props) {
               <span className={`detail-tag ${abilityKind === "Active" ? "active" : "passive"}`}>
                 {abilityKind}
               </span>
-              {ability.cooldown > 0 && (
-                <span className="detail-cd" title="Cooldown">
-                  ⟳ {ability.cooldown}s
+              {(ability.castTimeSec || ability.cooldown > 0) && (
+                <span className="detail-skill-meta">
+                  {ability.castTimeSec ? (
+                    <span className="detail-cd" title="Cast time">
+                      ⏲ Cast {ability.castTimeSec}s
+                    </span>
+                  ) : null}
+                  {ability.cooldown > 0 ? (
+                    <span className="detail-cd" title="Cooldown">
+                      ⟳ {ability.cooldown}s
+                    </span>
+                  ) : null}
                 </span>
               )}
             </div>

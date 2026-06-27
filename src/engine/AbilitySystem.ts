@@ -56,17 +56,14 @@ export function abilityCooldownTicks(abilityId: Unit["ability"]): number {
   return secToTicks(ABILITIES[abilityId].cooldown);
 }
 
-/**
- * Attempt to fire `unit`'s ability this tick. Returns true if it fired (the
- * CombatSystem then resets the cooldown and may enter the casting state).
- */
-export function tryCastAbility(ctx: AbilityContext): boolean {
-  const { unit } = ctx;
-  if (!isActiveAbility(unit)) return false;
-  if (unit.abilityCooldown > 0) return false;
-  if (isStunned(unit) || isSilenced(unit)) return false;
+/** Convert seconds to ticks for an ability's cast (wind-up) time, 0 if instant. */
+export function abilityCastTimeTicks(abilityId: Unit["ability"]): number {
+  return secToTicks(ABILITIES[abilityId].castTimeSec ?? 0);
+}
 
-  switch (unit.ability) {
+/** Dispatch an ability's EFFECT (no cooldown/stun gating). */
+function dispatchAbility(ctx: AbilityContext): boolean {
+  switch (ctx.unit.ability) {
     case "crushing_slam":
       return castCrushingSlam(ctx);
     case "kiting_leap":
@@ -81,6 +78,8 @@ export function tryCastAbility(ctx: AbilityContext): boolean {
       return castFrostBlast(ctx);
     case "arcane_barrage":
       return castArcaneBarrage(ctx);
+    case "chain_lightning":
+      return castChainLightning(ctx);
     case "charge":
       return castCharge(ctx);
     case "mend":
@@ -89,8 +88,6 @@ export function tryCastAbility(ctx: AbilityContext): boolean {
       return castBlessing(ctx);
     case "deploy_turret":
       return castDeployTurret(ctx);
-    case "chain_lightning":
-      return castChainLightning(ctx);
     case "summon_wolves":
       return castSummonWolves(ctx);
     case "raise_dead":
@@ -100,6 +97,25 @@ export function tryCastAbility(ctx: AbilityContext): boolean {
     default:
       return false;
   }
+}
+
+/**
+ * Attempt to fire `unit`'s ability this tick. For INSTANT abilities the effect
+ * fires immediately. Cast-time abilities (the mages) are begun + released by
+ * CombatSystem instead; their effect is fired via fireCastAbility on completion.
+ */
+export function tryCastAbility(ctx: AbilityContext): boolean {
+  const { unit } = ctx;
+  if (!isActiveAbility(unit)) return false;
+  if (unit.abilityCooldown > 0) return false;
+  if (isStunned(unit) || isSilenced(unit)) return false;
+  return dispatchAbility(ctx);
+}
+
+/** Fire a cast-time ability's effect when its cast completes (the cooldown was
+ *  paid at cast start; a stun/fear interrupts earlier, so there's no re-check). */
+export function fireCastAbility(ctx: AbilityContext): boolean {
+  return dispatchAbility(ctx);
 }
 
 // --- OGRE: Crushing Slam -----------------------------------------------------
@@ -396,18 +412,67 @@ function castSummonWolves(ctx: AbilityContext): boolean {
 }
 
 // --- ELECTRIC MAGE: Chain Lightning ------------------------------------------
-// This cast only ARMS a ~2s cast locked onto the current target; CombatSystem's
-// cast step ticks it down (showing the cast bar), locks the mage in place, and
-// releases the chain-lightning blast when it completes. A stun/fear mid-cast
-// interrupts it (see CombatSystem).
+// Fired when the ~2s cast completes. Arcs from the mage to the cast target (or
+// the nearest enemy if it died during the cast), then jumps to the nearest
+// un-hit enemy within range, up to 5 targets — heavy damage decaying per jump,
+// briefly paralyzing (stunning) each. Each arc spawns a lightning vfx. Hits
+// stealthed units too (consistent with the game's other AoE). Deterministic:
+// ties broken by uid.
 function castChainLightning(ctx: AbilityContext): boolean {
-  const { unit, unitsByUid } = ctx;
-  const target = unit.targetUid ? unitsByUid.get(unit.targetUid) : null;
-  if (!target || target.state === "dead") return false;
-  const castTime = secToTicks(2);
-  unit.castTicks = castTime;
-  unit.castTicksMax = castTime;
-  unit.castTargetUid = target.uid;
+  const { unit, unitsByUid, enemies } = ctx;
+  let origin = unit.castTargetUid ? unitsByUid.get(unit.castTargetUid) : null;
+  if (!origin || origin.state === "dead") {
+    origin = null;
+    let nd = Infinity;
+    for (const e of enemies) {
+      if (e.state === "dead") continue;
+      const d = dist(unit.pos, e.pos);
+      if (d < nd || (d === nd && origin && e.uid < origin.uid)) {
+        nd = d;
+        origin = e;
+      }
+    }
+  }
+  if (!origin) return false; // no enemies left — the cast fizzles harmlessly
+
+  const MAX_TARGETS = 5;
+  const JUMP_RADIUS = 130;
+  const STUN_SEC = 0.8;
+  let dmg = 30;
+  const hit = new Set<string>();
+  let current: Unit | null = origin;
+  let from = { x: unit.pos.x, y: unit.pos.y - unit.radius * 0.4 };
+
+  for (let i = 0; i < MAX_TARGETS && current; i++) {
+    ctx.dealDamage(current, Math.round(dmg), unit);
+    applyEffect(
+      current,
+      makeEffect("stun", { source: unit.uid, durationSec: STUN_SEC })
+    );
+    ctx.spawnVfx({
+      kind: "lightning",
+      pos: { x: from.x, y: from.y },
+      to: { x: current.pos.x, y: current.pos.y },
+      life: secToTicks(0.35),
+      maxLife: secToTicks(0.35),
+      color: "#fde047",
+    });
+    hit.add(current.uid);
+    from = { x: current.pos.x, y: current.pos.y };
+    dmg *= 0.8; // decay per jump
+
+    let next: Unit | null = null;
+    let nd = Infinity;
+    for (const e of enemies) {
+      if (e.state === "dead" || hit.has(e.uid)) continue;
+      const d = dist(current.pos, e.pos);
+      if (d <= JUMP_RADIUS && (d < nd || (d === nd && next && e.uid < next.uid))) {
+        nd = d;
+        next = e;
+      }
+    }
+    current = next;
+  }
   return true;
 }
 
