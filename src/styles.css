@@ -457,6 +457,19 @@ body {
   color: var(--stone);
   border-color: var(--stone);
 }
+/* Cooldown chip for active abilities — pushed to the right edge of the head row
+   so each active reads like an activatable skill with a recharge time. */
+.detail-cd {
+  margin-left: auto;
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--gold);
+  background: rgba(212, 175, 55, 0.12);
+  border: 1px solid var(--gold);
+  border-radius: 999px;
+  padding: 1px 8px;
+  white-space: nowrap;
+}
 .detail-skill-text {
   font-size: 0.78rem;
   color: #cbb9a0;
