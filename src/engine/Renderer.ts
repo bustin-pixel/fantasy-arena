@@ -120,6 +120,18 @@ function drawHealthBar(ctx: Ctx, u: Unit): void {
   ctx.strokeStyle = "rgba(0,0,0,0.4)";
   ctx.lineWidth = 0.5;
   ctx.strokeRect(x, y, w, h);
+
+  // Cast bar (Electric Mage's Chain Lightning wind-up): a thin yellow bar just
+  // below the HP bar that fills as the cast completes.
+  if (u.castTicks > 0 && u.castTicksMax > 0) {
+    const cy = y + h + 2;
+    const ch = 3;
+    const progress = 1 - u.castTicks / u.castTicksMax;
+    ctx.fillStyle = "rgba(0,0,0,0.6)";
+    ctx.fillRect(x - 1, cy - 1, w + 2, ch + 2);
+    ctx.fillStyle = "#fde047";
+    ctx.fillRect(x, cy, w * progress, ch);
+  }
 }
 
 function drawStatusIcons(ctx: Ctx, u: Unit): void {
@@ -232,6 +244,26 @@ function drawProjectile(ctx: Ctx, p: BattleSnapshot["projectiles"][number]): voi
   ctx.restore();
 }
 
+// A jagged lightning bolt between two points. Per-frame jitter makes it flicker
+// (reads as electricity). Render-only — Math.random here never touches the sim.
+function drawBolt(
+  ctx: Ctx,
+  from: { x: number; y: number },
+  to: { x: number; y: number }
+): void {
+  const segments = 6;
+  ctx.beginPath();
+  ctx.moveTo(from.x, from.y);
+  for (let i = 1; i < segments; i++) {
+    const f = i / segments;
+    const jx = (Math.random() - 0.5) * 14;
+    const jy = (Math.random() - 0.5) * 14;
+    ctx.lineTo(from.x + (to.x - from.x) * f + jx, from.y + (to.y - from.y) * f + jy);
+  }
+  ctx.lineTo(to.x, to.y);
+  ctx.stroke();
+}
+
 function drawVfx(ctx: Ctx, v: BattleSnapshot["vfx"][number]): void {
   const t = 1 - v.life / v.maxLife;
   ctx.save();
@@ -272,6 +304,20 @@ function drawVfx(ctx: Ctx, v: BattleSnapshot["vfx"][number]): void {
         const r = t * 24;
         ctx.globalAlpha = (1 - t) * 0.7;
         ctx.fillRect(v.pos.x + Math.cos(a) * r, v.pos.y + Math.sin(a) * r, 3, 3);
+      }
+      break;
+    }
+    case "lightning": {
+      if (v.to) {
+        // Wide faint glow, then a bright white core — both jagged and flickering.
+        ctx.globalAlpha = (1 - t) * 0.35;
+        ctx.strokeStyle = v.color;
+        ctx.lineWidth = 4;
+        drawBolt(ctx, v.pos, v.to);
+        ctx.globalAlpha = 1 - t;
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 1.5;
+        drawBolt(ctx, v.pos, v.to);
       }
       break;
     }

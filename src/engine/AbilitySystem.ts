@@ -89,6 +89,8 @@ export function tryCastAbility(ctx: AbilityContext): boolean {
       return castBlessing(ctx);
     case "deploy_turret":
       return castDeployTurret(ctx);
+    case "chain_lightning":
+      return castChainLightning(ctx);
     case "summon_wolves":
       return castSummonWolves(ctx);
     case "raise_dead":
@@ -390,6 +392,22 @@ function castSummonWolves(ctx: AbilityContext): boolean {
     maxLife: secToTicks(0.4),
     color: getUnitDef(unit.defId).accent,
   });
+  return true;
+}
+
+// --- ELECTRIC MAGE: Chain Lightning ------------------------------------------
+// This cast only ARMS a ~2s cast locked onto the current target; CombatSystem's
+// cast step ticks it down (showing the cast bar), locks the mage in place, and
+// releases the chain-lightning blast when it completes. A stun/fear mid-cast
+// interrupts it (see CombatSystem).
+function castChainLightning(ctx: AbilityContext): boolean {
+  const { unit, unitsByUid } = ctx;
+  const target = unit.targetUid ? unitsByUid.get(unit.targetUid) : null;
+  if (!target || target.state === "dead") return false;
+  const castTime = secToTicks(2);
+  unit.castTicks = castTime;
+  unit.castTicksMax = castTime;
+  unit.castTargetUid = target.uid;
   return true;
 }
 

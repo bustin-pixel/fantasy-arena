@@ -143,4 +143,11 @@ export const ABILITIES: Record<AbilityId, AbilityDef> = {
     description: "Builds a stationary turret beside it that holds ground until destroyed.",
     cooldown: 9,
   },
+  chain_lightning: {
+    id: "chain_lightning",
+    name: "Chain Lightning",
+    description:
+      "Casts for ~2s, then arcs a bolt through up to 5 nearby enemies for heavy damage, briefly stunning each. Interrupted if stunned mid-cast.",
+    cooldown: 8,
+  },
 };

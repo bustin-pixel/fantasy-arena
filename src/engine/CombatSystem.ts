@@ -486,6 +486,73 @@ function tryBlink(state: SimState, unit: Unit, enemies: Unit[]): boolean {
   return true;
 }
 
+// Electric Mage: resolve a Chain Lightning blast. It arcs from the mage to the
+// cast target (or the nearest enemy if it died mid-cast), then jumps to the
+// nearest un-hit enemy within range, up to 5 targets — heavy damage that decays
+// per jump, briefly stunning (paralyzing) each. Every arc spawns a lightning vfx
+// between the two points. Hits stealthed units too (consistent with the game's
+// other AoE). Deterministic: ties broken by uid.
+function releaseChainLightning(
+  state: SimState,
+  unit: Unit,
+  byUid: Map<string, Unit>,
+  dealDamage: (target: Unit, amount: number, source: Unit) => void
+): void {
+  let origin = unit.castTargetUid ? byUid.get(unit.castTargetUid) : null;
+  if (!origin || origin.state === "dead") {
+    origin = null;
+    let nd = Infinity;
+    for (const e of state.units) {
+      if (e.state === "dead" || e.team === unit.team) continue;
+      const d = dist(unit.pos, e.pos);
+      if (d < nd || (d === nd && origin && e.uid < origin.uid)) {
+        nd = d;
+        origin = e;
+      }
+    }
+  }
+  if (!origin) return; // no enemies left — the cast fizzles harmlessly
+
+  const MAX_TARGETS = 5;
+  const JUMP_RADIUS = 130;
+  const STUN_SEC = 0.8;
+  let dmg = 30;
+  const hit = new Set<string>();
+  let current: Unit | null = origin;
+  let from = { x: unit.pos.x, y: unit.pos.y - unit.radius * 0.4 };
+
+  for (let i = 0; i < MAX_TARGETS && current; i++) {
+    dealDamage(current, Math.round(dmg), unit);
+    applyEffect(
+      current,
+      makeEffect("stun", { source: unit.uid, durationSec: STUN_SEC })
+    );
+    spawnVfx(state, {
+      kind: "lightning",
+      pos: { x: from.x, y: from.y },
+      to: { x: current.pos.x, y: current.pos.y },
+      life: secToTicks(0.35),
+      maxLife: secToTicks(0.35),
+      color: "#fde047",
+    });
+    hit.add(current.uid);
+    from = { x: current.pos.x, y: current.pos.y };
+    dmg *= 0.8; // decay per jump
+
+    let next: Unit | null = null;
+    let nd = Infinity;
+    for (const e of state.units) {
+      if (e.state === "dead" || e.team === unit.team || hit.has(e.uid)) continue;
+      const d = dist(current.pos, e.pos);
+      if (d <= JUMP_RADIUS && (d < nd || (d === nd && next && e.uid < next.uid))) {
+        nd = d;
+        next = e;
+      }
+    }
+    current = next;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Main tick
 // ---------------------------------------------------------------------------
@@ -552,6 +619,37 @@ export function stepSimulation(state: SimState): void {
         if (ally.state === "dead" || ally.team !== unit.team) continue;
         if (ally.defId === "turret" && dist(unit.pos, ally.pos) <= REPAIR_RADIUS) {
           heal(ally, REPAIR);
+        }
+      }
+    }
+
+    // Electric Mage: Chain Lightning has a ~2s cast (the cast bar). A stun or
+    // fear mid-cast interrupts it (fizzle). While casting it stands locked in
+    // place — committed and vulnerable. Runs before the stun check so the stun
+    // can cancel it.
+    if (unit.defId === "electric_mage" && unit.castTicks > 0) {
+      if (isStunned(unit) || isFeared(unit)) {
+        unit.castTicks = 0;
+        unit.castTicksMax = 0;
+        unit.castTargetUid = null;
+        spawnVfx(state, {
+          kind: "frost",
+          pos: { x: unit.pos.x, y: unit.pos.y - 4 },
+          life: secToTicks(0.3),
+          maxLife: secToTicks(0.3),
+          color: "#fde047",
+        });
+        // fall through — the stun/fear handling below takes over
+      } else {
+        unit.castTicks--;
+        if (unit.castTicks <= 0) {
+          releaseChainLightning(state, unit, byUid, dealDamage);
+          unit.castTicksMax = 0;
+          unit.castTargetUid = null;
+          // released — resume normal behavior this tick (ability now on cooldown)
+        } else {
+          transitionTo(unit, "casting");
+          continue; // locked while casting
         }
       }
     }
@@ -678,6 +776,11 @@ export function stepSimulation(state: SimState): void {
         ) {
           transitionTo(unit, "casting");
           unit.actionTimer = secToTicks(0.25);
+          continue;
+        }
+        // Chain Lightning begins a longer cast driven by the cast step above.
+        if (unit.ability === "chain_lightning") {
+          transitionTo(unit, "casting");
           continue;
         }
       }
