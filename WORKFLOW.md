@@ -13,6 +13,8 @@ All three must pass:
 ## Batch changes; merge infrequently (conserve deploys)
 Merging to `master` auto-deploys to Netlify, and **each deploy costs build
 credits** (the user has run out before). So:
+- **At session start, run `gh pr list`** — if a batch PR is already open, continue
+  it (don't start a fresh PR or re-merge already-merged work).
 - Work on **one running branch / PR** and keep adding verified commits to it —
   **do not open a new PR per change.**
 - **Never merge without explicit approval.** Take the work to the open PR, then
