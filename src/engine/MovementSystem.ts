@@ -15,7 +15,7 @@ import {
   SEC_PER_TICK,
 } from "@/utils/constants";
 import { clamp, dir, dist } from "@/utils/math";
-import { moveSpeedMultiplier } from "./StatusEffectSystem";
+import { isStealthed, moveSpeedMultiplier } from "./StatusEffectSystem";
 
 // Overlap (px) left uncorrected by collision resolution, so units at rest in a
 // crowd don't get shoved a sub-pixel amount every tick (which looked like jitter).
@@ -135,6 +135,7 @@ export function stepMovement(ctx: MovementContext): void {
       let nd = Infinity;
       for (const e of units) {
         if (e.state === "dead" || e.team === unit.team) continue;
+        if (isStealthed(e)) continue; // can't kite away from what you can't see
         const ed = dist(unit.pos, e.pos);
         if (ed < nd) {
           nd = ed;
