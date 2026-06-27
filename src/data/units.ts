@@ -368,7 +368,7 @@ export const UNITS: Record<string, UnitDef> = {
   },
   engineer: {
     id: "engineer",
-    name: "Dwarven Engineer",
+    name: "Engineer",
     rarity: "legendary",
     role: "Fortifier",
     hp: 175,
@@ -392,7 +392,7 @@ export const UNITS: Record<string, UnitDef> = {
       },
     ],
   },
-  // Turret — built by the Dwarven Engineer, never in a deck. Stationary
+  // Turret — built by the Engineer, never in a deck. Stationary
   // (moveSpeed 0) ranged emplacement; destructible, leaves no raisable corpse.
   turret: {
     id: "turret",

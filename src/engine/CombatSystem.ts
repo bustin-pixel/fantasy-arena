@@ -542,7 +542,7 @@ export function stepSimulation(state: SimState): void {
     if (unit.abilityCooldown > 0) unit.abilityCooldown--;
     if (unit.blinkCooldown > 0) unit.blinkCooldown--;
 
-    // Dwarven Engineer Field Repairs: every 2s, repair itself and nearby turrets,
+    // Engineer Field Repairs: every 2s, repair itself and nearby turrets,
     // keeping its emplacements alive longer than their raw HP suggests.
     if (unit.defId === "engineer" && state.tick % secToTicks(2) === 0) {
       const REPAIR = 8;

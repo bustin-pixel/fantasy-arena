@@ -1,6 +1,6 @@
-// Dwarven Engineer: the Deploy Turret active (builds a stationary ranged
-// construct on a 9s cooldown) and the Field Repairs passive (every 2s it heals
-// itself and nearby turrets).
+// Engineer: the Deploy Turret active (builds a stationary ranged construct on a
+// 9s cooldown) and the Field Repairs passive (every 2s it heals itself and
+// nearby turrets).
 import { describe, it, expect } from "vitest";
 import { stepSimulation, type SimState } from "@/engine/CombatSystem";
 import { battleState, place, makeDummy } from "./helpers";
@@ -8,7 +8,7 @@ import { battleState, place, makeDummy } from "./helpers";
 const turretCount = (s: SimState) =>
   s.units.filter((u) => u.defId === "turret" && u.state !== "dead").length;
 
-describe("Dwarven Engineer", () => {
+describe("Engineer", () => {
   it("Deploy Turret builds a stationary turret beside it", () => {
     const s = battleState(1);
     const eng = place(s, "engineer", "player", 240, 600);
