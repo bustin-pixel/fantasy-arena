@@ -1,59 +1,74 @@
-// Arcane Mage behavior: the ramping Arcane Barrage (fire-rate ramp, volatile
-// splash, self-damage) and the defensive Blink. Each mechanic is exercised in
-// isolation with a controlled, stationary, harmless dummy so the assertion
-// targets exactly one thing.
+// Arcane Mage behavior: the active Arcane Barrage (3 missiles fired one after
+// another at a single locked target, on a 6s cooldown) and the defensive Blink.
+// Each mechanic is exercised in isolation with controlled, stationary, harmless
+// dummies so the assertion targets one thing.
 import { describe, it, expect } from "vitest";
-import { stepSimulation } from "@/engine/CombatSystem";
-import { getUnitDef } from "@/data/units";
+import { stepSimulation, type SimState } from "@/engine/CombatSystem";
 import { battleState, place, makeDummy } from "./helpers";
 
-describe("Arcane Mage — Arcane Barrage (Instability ramp)", () => {
-  it("builds Instability and shortens the attack interval below base", () => {
-    const s = battleState(1);
-    const mage = place(s, "arcane_mage", "player", 240, 600);
-    // Stationary dummy ~150px away: in firing range, but far enough not to trigger
-    // kiting (comfort = range*0.7 ≈ 110px) or Blink — so the mage parks and ramps.
-    makeDummy(place(s, "ogre", "enemy", 240, 450));
-    const baseAtk = getUnitDef("arcane_mage").attackSpeed;
-
-    for (let i = 0; i < 160; i++) stepSimulation(s);
-
-    expect(mage.instability).toBeGreaterThanOrEqual(5); // near max (6)
-    expect(mage.attackSpeed).toBeLessThan(baseAtk);
-  });
-
-  it("self-damages once Instability is volatile, but only mildly", () => {
-    const s = battleState(2);
-    const mage = place(s, "arcane_mage", "player", 240, 600);
-    // Harmless dummy: any HP the mage loses is its own Instability backlash.
-    makeDummy(place(s, "ogre", "enemy", 240, 450));
-
-    for (let i = 0; i < 160; i++) stepSimulation(s);
-
-    expect(mage.instability).toBeGreaterThanOrEqual(3); // past the volatile threshold
-    expect(mage.hp).toBeLessThan(mage.maxHp); // took self-damage
-    expect(mage.state).not.toBe("dead"); // self-damage is minor
-  });
-
-  it("volatile missiles splash to a clustered foe that is never targeted", () => {
-    const s = battleState(3);
-    const mage = place(s, "arcane_mage", "player", 240, 600);
-    mage.instability = 6; // pre-charge so every missile is volatile from shot one
-    // Two stationary ogres (no shield ability) clustered within splash radius. The
-    // mage locks the lower-uid one; the other can only be hurt by splash.
-    const a = makeDummy(place(s, "ogre", "enemy", 235, 450));
-    const b = makeDummy(place(s, "ogre", "enemy", 285, 450));
-
-    let bEverTargeted = false;
-    let bHurtWhileUntargeted = false;
-    for (let i = 0; i < 40; i++) {
-      stepSimulation(s);
-      if (mage.targetUid === b.uid) bEverTargeted = true;
-      if (!bEverTargeted && b.hp < b.maxHp) bHurtWhileUntargeted = true;
+/** Record each Arcane Barrage missile the first time it appears: which tick it was
+ *  fired on and who it targets. Lets us assert "3 missiles, one after another, same
+ *  target" without depending on projectile travel time. */
+function trackMissiles(
+  s: SimState,
+  ticks: number
+): { tick: number; tgt: string; id: string }[] {
+  const seen = new Map<string, { tick: number; tgt: string; id: string }>();
+  for (let i = 0; i < ticks; i++) {
+    stepSimulation(s);
+    for (const p of s.projectiles) {
+      if (p.ability === "arcane_barrage" && !seen.has(p.id)) {
+        seen.set(p.id, { tick: s.tick, tgt: p.targetUid, id: p.id });
+      }
     }
+  }
+  return [...seen.values()];
+}
 
-    expect(bHurtWhileUntargeted).toBe(true); // damage reached b purely via splash
-    expect(a.hp).toBeLessThan(a.maxHp); // primary foe took direct hits too
+describe("Arcane Mage — Arcane Barrage (active)", () => {
+  it("fires 3 missiles one after another at the same target", () => {
+    const s = battleState(1);
+    place(s, "arcane_mage", "player", 240, 600);
+    const dummy = makeDummy(place(s, "ogre", "enemy", 240, 450)); // in range
+
+    const volley = trackMissiles(s, 30); // < 6s, so just the first volley
+
+    expect(volley.length).toBe(3); // three missiles
+    expect(new Set(volley.map((m) => m.tgt)).size).toBe(1); // all at one target
+    expect(volley.every((m) => m.tgt === dummy.uid)).toBe(true);
+    expect(new Set(volley.map((m) => m.tick)).size).toBe(3); // fired on 3 distinct ticks (in succession)
+  });
+
+  it("focuses one target even when several foes are in range", () => {
+    const s = battleState(2);
+    place(s, "arcane_mage", "player", 240, 600);
+    // Three foes, all within firing range (~120-145px).
+    makeDummy(place(s, "ogre", "enemy", 160, 480));
+    makeDummy(place(s, "ogre", "enemy", 240, 480));
+    makeDummy(place(s, "ogre", "enemy", 320, 480));
+
+    const volley = trackMissiles(s, 30);
+
+    expect(volley.length).toBe(3);
+    expect(new Set(volley.map((m) => m.tgt)).size).toBe(1); // all 3 hit the SAME foe
+  });
+
+  it("respects the 6s cooldown (≈ one volley per 6s, not faster)", () => {
+    const s = battleState(3);
+    place(s, "arcane_mage", "player", 240, 600);
+    makeDummy(place(s, "ogre", "enemy", 240, 450));
+
+    // Accumulate every distinct missile id across the whole run.
+    const seen = new Set<string>();
+    const collect = () => {
+      for (const p of s.projectiles)
+        if (p.ability === "arcane_barrage") seen.add(p.id);
+    };
+
+    for (let i = 0; i < 110; i++) (stepSimulation(s), collect()); // ~5.5s
+    expect(seen.size).toBe(3); // only one volley so far
+    for (let i = 0; i < 30; i++) (stepSimulation(s), collect()); // out to ~7s
+    expect(seen.size).toBe(6); // a second volley fired — 3 missiles every 6s
   });
 });
 
@@ -68,6 +83,6 @@ describe("Arcane Mage — Blink", () => {
 
     const moved = Math.hypot(mage.pos.x - before.x, mage.pos.y - before.y);
     expect(moved).toBeGreaterThan(150);
-    expect(mage.blinkCooldown).toBeGreaterThan(0);
+    expect(mage.blinkCooldown).toBe(100); // 5s × 20 ticks/s
   });
 });

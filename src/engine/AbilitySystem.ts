@@ -43,7 +43,7 @@ export interface AbilityContext {
 }
 
 /** Abilities that are passive (no active cast). Everything else is cast-gated. */
-const PASSIVE_ABILITIES = new Set<Unit["ability"]>(["lifesteal", "bloodrage", "slime_split", "mystic_shift", "arcane_barrage", "ambush", "aegis"]);
+const PASSIVE_ABILITIES = new Set<Unit["ability"]>(["lifesteal", "bloodrage", "slime_split", "mystic_shift", "ambush", "aegis"]);
 
 /** True if this ability is an active (cooldown-gated) cast. */
 function isActiveAbility(unit: Unit): boolean {
@@ -78,6 +78,8 @@ export function tryCastAbility(ctx: AbilityContext): boolean {
       return castFireball(ctx);
     case "frost_blast":
       return castFrostBlast(ctx);
+    case "arcane_barrage":
+      return castArcaneBarrage(ctx);
     case "charge":
       return castCharge(ctx);
     case "mend":
@@ -242,6 +244,22 @@ function castFrostBlast(ctx: AbilityContext): boolean {
     color: getUnitDef(unit.defId).accent,
     angle: 0,
   });
+  return true;
+}
+
+// --- ARCANE MAGE: Arcane Barrage ---------------------------------------------
+// A burst nuke at a single target. This cast just ARMS a 3-missile volley locked
+// onto the current target; CombatSystem (stepArcaneBarrage) streams the missiles
+// out one after another in quick succession, so they fire in sequence rather than
+// all leaving at once. Each missile resolves as straight damage on impact.
+function castArcaneBarrage(ctx: AbilityContext): boolean {
+  const { unit, unitsByUid } = ctx;
+  const target = unit.targetUid ? unitsByUid.get(unit.targetUid) : null;
+  if (!target || target.state === "dead") return false;
+
+  unit.barrageShots = 3;
+  unit.barrageTimer = 0; // the first missile fires on the next tick
+  unit.barrageTargetUid = target.uid;
   return true;
 }
 
@@ -421,6 +439,15 @@ export function onProjectileHit(
       pos: { x: target.pos.x, y: target.pos.y },
       life: secToTicks(0.4),
       maxLife: secToTicks(0.4),
+      color: proj.color,
+    });
+  } else if (proj.ability === "arcane_barrage") {
+    // Arcane Barrage missiles are pure burst; just a small impact pop.
+    ctx.spawnVfx({
+      kind: "burn_burst",
+      pos: { x: target.pos.x, y: target.pos.y },
+      life: secToTicks(0.3),
+      maxLife: secToTicks(0.3),
       color: proj.color,
     });
   }

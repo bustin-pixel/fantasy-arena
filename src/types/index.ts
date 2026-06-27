@@ -157,12 +157,15 @@ export interface Unit {
   /** Affliction stacks ON this unit from a Mystic Archer (per-target). */
   lightStacks: number;
   darkStacks: number;
-  /** Arcane Mage: rising charge from consecutive Arcane Barrage hits. Speeds up
-   *  fire rate and, past a threshold, adds splash + minor self-damage. Decays
-   *  while not attacking. */
-  instability: number;
   /** Arcane Mage: ticks until Blink (defensive teleport) is ready again. */
   blinkCooldown: number;
+  /** Arcane Mage: missiles left to fire in the current Arcane Barrage volley
+   *  (0 = not firing). The volley streams out one missile at a time. */
+  barrageShots: number;
+  /** Arcane Mage: ticks until the next missile in the volley. */
+  barrageTimer: number;
+  /** Arcane Mage: the target locked for the whole volley (all 3 hit it). */
+  barrageTargetUid: string | null;
 
   // timers (in ticks)
   attackCooldown: number;
@@ -219,9 +222,6 @@ export interface Projectile {
   /** If set, the projectile applies Burn on impact.
    *  Used by the Fire Mage's every-third-attack ignite. */
   onHitBurn?: boolean;
-  /** If set, the projectile splashes a fraction of its damage to enemies within
-   *  this pixel radius of the impact. Used by the Arcane Mage's volatile missiles. */
-  splashRadius?: number;
 }
 
 export type FloatingTextKind = "damage" | "heal" | "crit";
