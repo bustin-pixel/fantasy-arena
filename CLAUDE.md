@@ -57,6 +57,7 @@ The defining decision: **the simulation is a pure, deterministic, React-free eng
 
 ## Conventions when editing
 
+- **Designing a unit (from a loose idea):** follow `UNIT_DESIGN.md` — the brainstorm→spec playbook (identity & niche → kit grounded in existing systems → mechanic-interaction answers → real decisions → concrete numbers → confirm before building). Then build it via the checklist below.
 - **Adding a unit:** follow the checklist in `NOTES.md`. The hub detail panel and in-battle tooltip are data-driven, so a new unit needs full stats in `data/units.ts`, an `ABILITIES` entry in `data/abilities.ts` (a missing one crashes the panel), and a `traits: [{name, description}]` array for any passive/hidden behavior. Passive abilities must also be added to `PASSIVE_ABILITIES` in `AbilitySystem.ts` or the unit wastes ticks trying to cast nothing.
 - **Rarity convention:** rare = 1 special mechanic, epic = 2+, legendary = top tier (one-per-deck, enforced in the hub).
 - **Damage school:** `UnitDef.school` (`"magic"` for the casters) is read off the *source* in `dealDamage`; used by the Aegis Knight's magic soak. Reusable for future armor-type units.
