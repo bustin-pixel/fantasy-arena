@@ -43,7 +43,7 @@ export interface AbilityContext {
 }
 
 /** Abilities that are passive (no active cast). Everything else is cast-gated. */
-const PASSIVE_ABILITIES = new Set<Unit["ability"]>(["lifesteal", "bloodrage", "slime_split", "mystic_shift", "ambush", "aegis"]);
+const PASSIVE_ABILITIES = new Set<Unit["ability"]>(["lifesteal", "bloodrage", "slime_split", "momentum", "ambush", "aegis"]);
 
 /** True if this ability is an active (cooldown-gated) cast. */
 function isActiveAbility(unit: Unit): boolean {

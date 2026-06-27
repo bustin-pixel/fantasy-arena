@@ -281,7 +281,7 @@ export const UNITS: Record<string, UnitDef> = {
     attackSpeed: 1.0,
     moveSpeed: 72,
     range: FIELD_WIDTH * 0.34,
-    ability: "mystic_shift",
+    ability: "momentum",
     school: "magic",
     color: "#7c3aed",
     accent: "#fcd34d",
