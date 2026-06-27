@@ -128,6 +128,28 @@ export const UNITS: Record<string, UnitDef> = {
       },
     ],
   },
+  electric_mage: {
+    id: "electric_mage",
+    name: "Electric Mage",
+    rarity: "epic",
+    role: "Chain Burst",
+    hp: 100,
+    damage: 16,
+    attackSpeed: 2.4,
+    moveSpeed: 58,
+    range: FIELD_WIDTH * 0.32, // medium
+    ability: "chain_lightning",
+    school: "magic",
+    color: "#4338ca", // indigo robe
+    accent: "#fde047", // electric yellow
+    traits: [
+      {
+        name: "Paralyze",
+        description:
+          "Every enemy struck by its Chain Lightning is briefly stunned (0.8s) — heavy AoE damage and control.",
+      },
+    ],
+  },
   assassin: {
     id: "assassin",
     name: "Assassin",

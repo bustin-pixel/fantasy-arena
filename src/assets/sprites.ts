@@ -134,6 +134,9 @@ export function drawUnitSprite(
     case "arcane_mage":
       drawMage(ctx, body, dark, light, accent, cast);
       break;
+    case "electric_mage":
+      drawMage(ctx, body, dark, light, accent, cast);
+      break;
     case "assassin":
       drawAssassin(ctx, body, dark, light, accent);
       break;

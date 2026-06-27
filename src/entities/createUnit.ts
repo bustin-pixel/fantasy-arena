@@ -42,6 +42,9 @@ export function createUnit(defId: string, team: Team, pos: Vec2): Unit {
     barrageShots: 0,
     barrageTimer: 0,
     barrageTargetUid: null,
+    castTicks: 0,
+    castTicksMax: 0,
+    castTargetUid: null,
     attackCooldown: 0,
     abilityCooldown: 0, // abilities can fire as soon as their interval elapses
     actionTimer: 0,

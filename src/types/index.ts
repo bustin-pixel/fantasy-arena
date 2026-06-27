@@ -51,6 +51,7 @@ export type AbilityId =
   | "arcane_barrage"
   | "blessing"
   | "deploy_turret"
+  | "chain_lightning"
   | "mend"
   | "summon_wolves";
 
@@ -172,6 +173,13 @@ export interface Unit {
   barrageTimer: number;
   /** Arcane Mage: the target locked for the whole volley (all 3 hit it). */
   barrageTargetUid: string | null;
+  /** Electric Mage: ticks left in the Chain Lightning cast (0 = not casting).
+   *  Drives the cast bar; a stun/fear mid-cast resets it (interrupt). */
+  castTicks: number;
+  /** Electric Mage: the cast's full duration, for the cast-bar proportion. */
+  castTicksMax: number;
+  /** Electric Mage: target locked at the start of the cast (blast origin). */
+  castTargetUid: string | null;
 
   // timers (in ticks)
   attackCooldown: number;
@@ -242,12 +250,20 @@ export interface FloatingText {
   maxLife: number;
 }
 
-export type VfxKind = "slam" | "frost" | "burn_burst" | "shield_pop" | "death";
+export type VfxKind =
+  | "slam"
+  | "frost"
+  | "burn_burst"
+  | "shield_pop"
+  | "death"
+  | "lightning";
 
 export interface Vfx {
   id: string;
   kind: VfxKind;
   pos: Vec2;
+  /** For line-style vfx (lightning): the far endpoint the bolt arcs to. */
+  to?: Vec2;
   life: number;
   maxLife: number;
   color: string;
