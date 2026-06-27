@@ -76,7 +76,7 @@ export const UNITS: Record<string, UnitDef> = {
     name: "Knight",
     rarity: "rare",
     role: "Tank",
-    hp: 240,
+    hp: 200,
     damage: 18,
     attackSpeed: 2.0,
     moveSpeed: 60,

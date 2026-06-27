@@ -192,8 +192,9 @@ function castTauntRoar(ctx: AbilityContext): boolean {
   }
 
   // Grant the Knight an absorb shield (overhealth) — scales a bit with how many
-  // it pulled, so a big group taunt is rewarded with more protection.
-  const bubble = 60 + taunted * 15;
+  // it pulled, so a big group taunt is rewarded with more protection. (Kept in
+  // sync with the absorb numbers in the taunt_roar description in abilities.ts.)
+  const bubble = 45 + taunted * 10;
   unit.shieldHp = Math.max(unit.shieldHp, bubble);
   unit.shieldHpMax = Math.max(unit.shieldHpMax, unit.shieldHp);
 
