@@ -131,4 +131,10 @@ export const ABILITIES: Record<AbilityId, AbilityDef> = {
     description: "Rapidly fires 3 arcane missiles in quick succession at a single target.",
     cooldown: 6,
   },
+  blessing: {
+    id: "blessing",
+    name: "Blessing",
+    description: "Shields itself and nearby allies for 40 absorb and heals them for 15.",
+    cooldown: 8,
+  },
 };

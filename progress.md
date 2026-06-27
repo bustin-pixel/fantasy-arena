@@ -4,7 +4,7 @@ Forward-looking only — what's planned, deferred, and open. For what's already
 **done** and why, read the git history (`git log --oneline`, `gh pr list`) — that's
 the source of truth, so this file deliberately doesn't duplicate it.
 
-**Current state:** deterministic 4v4 auto-battler, 15 deckable units, hub deck-builder
+**Current state:** deterministic 4v4 auto-battler, 16 deckable units, hub deck-builder
 with a click-to-inspect detail panel, in-battle unit tooltips, and a 2v2 + countdown
 start. Solo battles only. Deployed to Netlify (auto-deploys on merge to `master`).
 
