@@ -47,6 +47,7 @@ export type AbilityId =
   | "raise_dead"
   | "slime_split"
   | "mystic_shift"
+  | "momentum"
   | "arcane_barrage"
   | "mend"
   | "summon_wolves";
@@ -154,6 +155,9 @@ export interface Unit {
   splitsSpawned: number;
   /** Mystic Archer's stance: "light" (single-target) or "dark" (chain AoE). */
   mysticForm: "light" | "dark";
+  /** Mystic Archer Momentum: stacks gained per form shift (capped at 5 =
+   *  +75% attack speed). */
+  momentumStacks: number;
   /** Affliction stacks ON this unit from a Mystic Archer (per-target). */
   lightStacks: number;
   darkStacks: number;
