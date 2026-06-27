@@ -51,6 +51,7 @@ import {
   attackDelayMultiplier,
   hasEffect,
   isFeared,
+  isStealthed,
   isStunned,
   makeEffect,
   tickEffects,
@@ -453,6 +454,7 @@ function tryBlink(state: SimState, unit: Unit, enemies: Unit[]): boolean {
   let bestD = Infinity;
   for (const e of enemies) {
     if (e.state === "dead") continue;
+    if (isStealthed(e)) continue; // can't blink away from an unseen attacker
     if (getUnitDef(e.defId).range > 80) continue; // only melee threats trigger Blink
     const d = dist(unit.pos, e.pos);
     if (d <= threatRange && d < bestD) {

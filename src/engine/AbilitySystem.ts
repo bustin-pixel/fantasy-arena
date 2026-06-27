@@ -21,6 +21,7 @@ import { clamp, dist, dir } from "@/utils/math";
 import {
   applyEffect,
   isSilenced,
+  isStealthed,
   isStunned,
   makeEffect,
 } from "./StatusEffectSystem";
@@ -127,6 +128,7 @@ function castKitingLeap(ctx: AbilityContext): boolean {
   const threat = enemies.find(
     (e) =>
       e.state !== "dead" &&
+      !isStealthed(e) && // can't leap away from an unseen attacker
       getUnitDef(e.defId).range <= 80 &&
       dist(unit.pos, e.pos) <= threatRange
   );
@@ -180,6 +182,7 @@ function castTauntRoar(ctx: AbilityContext): boolean {
   let taunted = 0;
   for (const e of enemies) {
     if (e.state === "dead") continue;
+    if (isStealthed(e)) continue; // can't taunt an enemy it can't see
     if (dist(unit.pos, e.pos) <= TAUNT_RADIUS) {
       applyEffect(
         e,
@@ -421,6 +424,7 @@ function castFear(ctx: AbilityContext): boolean {
   let feared = 0;
   for (const e of enemies) {
     if (e.state === "dead") continue;
+    if (isStealthed(e)) continue; // can't terrify an enemy it can't see
     if (dist(unit.pos, e.pos) <= FEAR_RADIUS) {
       applyEffect(
         e,

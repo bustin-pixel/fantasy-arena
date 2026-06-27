@@ -93,6 +93,13 @@ export function isSilenced(unit: Unit): boolean {
   return hasEffect(unit, "silence");
 }
 
+/** Stealthed = invisible to enemies: untargetable AND ignored by reactive AI
+ *  (kiting, Blink, taunt, fear). The canonical "you can't react to what you
+ *  can't see" check. */
+export function isStealthed(unit: Unit): boolean {
+  return hasEffect(unit, "stealth");
+}
+
 /** Movement multiplier from slow (and future haste). */
 export function moveSpeedMultiplier(unit: Unit): number {
   let mult = 1;
