@@ -107,11 +107,22 @@ export const ABILITIES: Record<AbilityId, AbilityDef> = {
       "Passive: spawns a weaker clone each time it loses 25% HP. Every slime bursts for AoE on death.",
     cooldown: 0,
   },
+  // The Mystic Archer's headline passive is now `momentum`; `mystic_shift` is kept
+  // only as the projectile tag that drives the Light/Dark on-hit resolution (its
+  // name/description are no longer surfaced in the UI). The Light Form / Dark Form
+  // *traits* in data/units.ts explain the form mechanic instead.
   mystic_shift: {
     id: "mystic_shift",
     name: "Light & Dark",
     description:
       "Passive: shifts between two forms. Each shot marks its target; at 3 marks the foe detonates and the Archer flips to its other form.",
+    cooldown: 0,
+  },
+  momentum: {
+    id: "momentum",
+    name: "Momentum",
+    description:
+      "Passive: every time it shifts between Light and Dark, its attack speed ramps up by 15% — stacking up to +75%.",
     cooldown: 0,
   },
   arcane_barrage: {

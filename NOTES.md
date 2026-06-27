@@ -53,7 +53,12 @@ Special mechanics are gated by `defId` string literals in `CombatSystem.ts`:
   to burn/slow/poison). Magic is identified by the source unit's `school: "magic"`
   field (the casters) — see `isMagicSource` in CombatSystem.
 - `"mystic_archer"` → Light/Dark form-tagged shots + on-hit stack/detonate
-  resolution (`resolveMysticHit`).
+  resolution (`resolveMysticHit`), plus the Momentum passive: each form shift
+  adds a `momentumStacks` (capped at 5) that ramps attack speed +15%/shift up to
+  +75%. NOTE: its `ability` slot is `momentum` (the headline passive shown in the
+  UI); the Light/Dark mechanic is driven by `defId` + the `mystic_shift` projectile
+  tag, and is explained by the Light Form / Dark Form *traits* — there is no longer
+  a "Light & Dark" header in the UI.
 - `"arcane_mage"` → the Blink defensive teleport (own `blinkCooldown` field, 5s),
   plus the Arcane Barrage volley streamer (`stepArcaneBarrage`): the active cast
   (`castArcaneBarrage` in AbilitySystem) only *arms* a 3-shot burst locked onto one

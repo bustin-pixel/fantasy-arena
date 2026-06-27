@@ -559,6 +559,14 @@ export function stepSimulation(state: SimState): void {
       unit.attackSpeed = def.attackSpeed * spdBonus;
     }
 
+    // Mystic Archer Momentum: each Light/Dark form shift permanently ramps its
+    // attack speed by 15% (capped at +75%). Recomputed from base each tick.
+    if (unit.defId === "mystic_archer") {
+      const def = getUnitDef(unit.defId);
+      const bonus = Math.min(0.75, unit.momentumStacks * 0.15);
+      unit.attackSpeed = def.attackSpeed / (1 + bonus);
+    }
+
     // Stun overrides everything.
     if (isStunned(unit)) {
       if (unit.state !== "dead") transitionTo(unit, "stunned");
@@ -864,6 +872,8 @@ function resolveMysticHit(
       dealDamage(target, DETONATE, archer);
       target.lightStacks = 0;
       archer.mysticForm = "dark";
+      archer.momentumStacks = Math.min(5, archer.momentumStacks + 1); // +15% atk speed/shift
+
       spawnVfx(state, {
         kind: "death",
         pos: { x: target.pos.x, y: target.pos.y },
@@ -904,7 +914,10 @@ function resolveMysticHit(
         });
       }
     }
-    if (flipped) archer.mysticForm = "light";
+    if (flipped) {
+      archer.mysticForm = "light";
+      archer.momentumStacks = Math.min(5, archer.momentumStacks + 1); // +15% atk speed/shift
+    }
   }
 }
 
