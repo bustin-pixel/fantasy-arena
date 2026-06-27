@@ -8,7 +8,7 @@ export const ABILITIES: Record<AbilityId, AbilityDef> = {
   crushing_slam: {
     id: "crushing_slam",
     name: "Crushing Slam",
-    description: "Every 5s: +25 damage and stuns the target for 1.5s.",
+    description: "Slams the target for +25 damage and stuns it for 1.5s.",
     cooldown: 5,
   },
   lifesteal: {
@@ -20,13 +20,13 @@ export const ABILITIES: Record<AbilityId, AbilityDef> = {
   charge: {
     id: "charge",
     name: "Charge",
-    description: "Every 7s: charge a distant enemy, slamming for bonus damage.",
+    description: "Charges a distant enemy, slamming it for bonus damage.",
     cooldown: 7,
   },
   kiting_leap: {
     id: "kiting_leap",
     name: "Kiting Leap",
-    description: "When a melee enemy closes in, leap back. 6s cooldown.",
+    description: "Leaps backward when a melee enemy closes in.",
     cooldown: 6,
   },
   shield_block: {
@@ -34,14 +34,14 @@ export const ABILITIES: Record<AbilityId, AbilityDef> = {
     // Currently unused — no unit has this ability (Knight uses taunt_roar).
     // Retained as reusable logic; see castShieldBlock in AbilitySystem.ts.
     name: "Shield Block",
-    description: "Every 2.5s: fully blocks the next incoming attack.",
+    description: "Fully blocks the next incoming attack.",
     cooldown: 2.5,
   },
   taunt_roar: {
     id: "taunt_roar",
     name: "Taunting Roar",
     description:
-      "Every 8s: forces nearby enemies to attack it for 2.5s and gains a protective shield.",
+      "Forces nearby enemies to attack it for 2.5s and gains a protective shield.",
     cooldown: 8,
   },
   aegis: {
@@ -54,13 +54,13 @@ export const ABILITIES: Record<AbilityId, AbilityDef> = {
   fireball: {
     id: "fireball",
     name: "Fireball",
-    description: "Every 4s: hurls a fireball for 25 burst damage.",
+    description: "Hurls a fireball for 25 burst damage.",
     cooldown: 4,
   },
   frost_blast: {
     id: "frost_blast",
     name: "Frost Blast",
-    description: "Every 5s: 20 damage + 50% slow for 2.5s.",
+    description: "Blasts the target for 20 damage and slows it 50% for 2.5s.",
     cooldown: 5,
   },
   ambush: {
@@ -73,13 +73,13 @@ export const ABILITIES: Record<AbilityId, AbilityDef> = {
   mend: {
     id: "mend",
     name: "Mend",
-    description: "Every 3s: heals the most-wounded ally in range for 32.",
+    description: "Heals the most-wounded ally in range for 32.",
     cooldown: 3,
   },
   summon_wolves: {
     id: "summon_wolves",
     name: "Summon Wolves",
-    description: "Every 12s: calls a spirit wolf to fight alongside.",
+    description: "Calls a spirit wolf to fight alongside it.",
     cooldown: 12,
   },
   bloodrage: {
@@ -91,13 +91,13 @@ export const ABILITIES: Record<AbilityId, AbilityDef> = {
   fear_aura: {
     id: "fear_aura",
     name: "Terrify",
-    description: "Every 8s: nearby enemies flee in terror for 2s, unable to attack.",
+    description: "Nearby enemies flee in terror for 2s, unable to attack.",
     cooldown: 8,
   },
   raise_dead: {
     id: "raise_dead",
     name: "Raise Dead",
-    description: "Every 4s: raises a skeleton from a recent corpse to fight for it.",
+    description: "Raises a skeleton from a recent corpse to fight for it.",
     cooldown: 4,
   },
   slime_split: {
@@ -128,7 +128,7 @@ export const ABILITIES: Record<AbilityId, AbilityDef> = {
   arcane_barrage: {
     id: "arcane_barrage",
     name: "Arcane Barrage",
-    description: "Every 6s: rapidly fires 3 arcane missiles in quick succession at a single target.",
+    description: "Rapidly fires 3 arcane missiles in quick succession at a single target.",
     cooldown: 6,
   },
 };
