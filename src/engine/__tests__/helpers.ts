@@ -67,8 +67,11 @@ export function place(
 
 /** Turn a placed unit into a stationary, harmless practice dummy: it never moves
  *  (so it won't trigger a ranged unit's kiting/Blink) and deals no damage (so any
- *  HP loss is self-inflicted). NOTE: pick a defId whose ability grants no shield —
- *  e.g. the Knight's Taunting Roar would soak hits and mask incoming damage. */
+ *  HP loss is self-inflicted). NOTE: pick a defId whose ability neither grants a
+ *  shield (the Knight's Taunting Roar soaks hits and masks damage) nor deals
+ *  damage on cast (the Ogre's Crushing Slam hits for a hardcoded 25 regardless of
+ *  `damage`). The Skeleton / Wolf (passive filler) are universally safe dummies;
+ *  the Ogre is fine only when it can't reach its target in melee. */
 export function makeDummy(u: Unit): Unit {
   u.moveSpeed = 0;
   u.damage = 0;

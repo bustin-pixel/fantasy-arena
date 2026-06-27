@@ -41,7 +41,7 @@ export const ABILITIES: Record<AbilityId, AbilityDef> = {
     id: "taunt_roar",
     name: "Taunting Roar",
     description:
-      "Forces nearby enemies to attack it for 2.5s and gains a protective shield.",
+      "Forces nearby enemies to attack it for 2.5s and raises a shield that absorbs 45 damage, +10 per foe taunted.",
     cooldown: 8,
   },
   aegis: {
