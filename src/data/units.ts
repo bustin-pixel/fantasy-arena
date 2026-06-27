@@ -366,6 +366,48 @@ export const UNITS: Record<string, UnitDef> = {
       },
     ],
   },
+  engineer: {
+    id: "engineer",
+    name: "Dwarven Engineer",
+    rarity: "legendary",
+    role: "Fortifier",
+    hp: 175,
+    damage: 12,
+    attackSpeed: 1.6,
+    moveSpeed: 52, // slow dwarf, hangs mid-line
+    range: FIELD_WIDTH * 0.22, // short-range
+    ability: "deploy_turret",
+    color: "#8a6a3d", // dwarven brass
+    accent: "#f59e0b", // amber spark
+    traits: [
+      {
+        name: "Field Repairs",
+        description:
+          "Every 2s, repairs itself and nearby turrets for 8 HP, keeping its emplacements alive.",
+      },
+      {
+        name: "Turret",
+        description:
+          "Its turrets are stationary ranged constructs (70 HP) that hold ground until destroyed. Bounded by the summon cap.",
+      },
+    ],
+  },
+  // Turret — built by the Dwarven Engineer, never in a deck. Stationary
+  // (moveSpeed 0) ranged emplacement; destructible, leaves no raisable corpse.
+  turret: {
+    id: "turret",
+    name: "Turret",
+    rarity: "rare",
+    role: "Construct",
+    hp: 70,
+    damage: 10,
+    attackSpeed: 1.2,
+    moveSpeed: 0, // stationary
+    range: FIELD_WIDTH * 0.3,
+    ability: "lifesteal", // passive filler — never casts
+    color: "#8a6a3d",
+    accent: "#f59e0b",
+  },
   // Slime clone — spawned when the original splits. Never in a deck. Doesn't
   // split further (terminal), but still bursts on death.
   slime_clone: {
@@ -387,7 +429,7 @@ export const UNITS: Record<string, UnitDef> = {
 export const UNIT_IDS = Object.keys(UNITS);
 
 /** Unit ids that are NOT selectable cards (summoned at runtime only). */
-export const NON_DECK_UNITS = new Set<string>(["wolf", "skeleton", "slime_clone"]);
+export const NON_DECK_UNITS = new Set<string>(["wolf", "skeleton", "slime_clone", "turret"]);
 
 /** Units that can appear in a player/AI deck or the hub card grid. */
 export const DECKABLE_UNIT_IDS = UNIT_IDS.filter(

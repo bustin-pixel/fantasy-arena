@@ -119,6 +119,12 @@ export function drawUnitSprite(
     case "holy_knight":
       drawKnight(ctx, body, dark, light, accent);
       break;
+    case "engineer":
+      drawOgre(ctx, body, dark, light, accent); // stout placeholder until dwarf art
+      break;
+    case "turret":
+      drawTurret(ctx, body, dark, light, accent);
+      break;
     case "fire_mage":
       drawMage(ctx, body, dark, light, accent, cast);
       break;
@@ -166,6 +172,37 @@ export function drawUnitSprite(
 }
 
 // Each draw fn works in a normalized space (~ -20..20 wide, -28..28 tall).
+
+// Turret — a stubby armored base with a barrel pointing up. Symmetric, so the
+// renderer's facing-flip is a no-op.
+function drawTurret(ctx: Ctx, body: string, dark: string, light: string, accent: string) {
+  // Wide base.
+  ctx.fillStyle = dark;
+  ctx.beginPath();
+  ctx.roundRect(-16, 8, 32, 12, 3);
+  ctx.fill();
+  // Armored housing.
+  ctx.fillStyle = body;
+  ctx.beginPath();
+  ctx.roundRect(-12, -4, 24, 14, 4);
+  ctx.fill();
+  // Dome cap.
+  ctx.fillStyle = light;
+  ctx.beginPath();
+  ctx.arc(0, -4, 10, Math.PI, Math.PI * 2);
+  ctx.fill();
+  // Barrel.
+  ctx.fillStyle = dark;
+  ctx.fillRect(-4, -22, 8, 18);
+  // Glowing muzzle.
+  ctx.fillStyle = accent;
+  ctx.fillRect(-4, -24, 8, 4);
+  // Rivets.
+  ctx.fillStyle = dark;
+  ctx.fillRect(-9, 1, 3, 3);
+  ctx.fillRect(6, 1, 3, 3);
+}
+
 function roundedBody(ctx: Ctx, w: number, h: number, y: number, fill: string) {
   ctx.fillStyle = fill;
   ctx.beginPath();

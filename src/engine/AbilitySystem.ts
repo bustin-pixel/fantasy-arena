@@ -87,6 +87,8 @@ export function tryCastAbility(ctx: AbilityContext): boolean {
       return castMend(ctx);
     case "blessing":
       return castBlessing(ctx);
+    case "deploy_turret":
+      return castDeployTurret(ctx);
     case "summon_wolves":
       return castSummonWolves(ctx);
     case "raise_dead":
@@ -384,6 +386,27 @@ function castSummonWolves(ctx: AbilityContext): boolean {
   ctx.spawnVfx({
     kind: "frost",
     pos: { x: unit.pos.x, y: unit.pos.y },
+    life: secToTicks(0.4),
+    maxLife: secToTicks(0.4),
+    color: getUnitDef(unit.defId).accent,
+  });
+  return true;
+}
+
+// --- DWARVEN ENGINEER: Deploy Turret -----------------------------------------
+// Builds a stationary ranged turret beside the engineer (a summoned, non-deck
+// unit). Like the Druid's wolves it's queued via spawnUnit; the per-team summon
+// cap bounds how many turrets can exist, so the fort can't flood the board.
+function castDeployTurret(ctx: AbilityContext): boolean {
+  const { unit } = ctx;
+  const offsetX = unit.facing >= 0 ? 40 : -40;
+  ctx.spawnUnit("turret", unit.team, {
+    x: clamp(unit.pos.x + offsetX, 40, FIELD_WIDTH - 40),
+    y: clamp(unit.pos.y, 40, FIELD_HEIGHT - 40),
+  });
+  ctx.spawnVfx({
+    kind: "slam",
+    pos: { x: clamp(unit.pos.x + offsetX, 40, FIELD_WIDTH - 40), y: unit.pos.y },
     life: secToTicks(0.4),
     maxLife: secToTicks(0.4),
     color: getUnitDef(unit.defId).accent,

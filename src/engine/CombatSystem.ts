@@ -237,7 +237,11 @@ function makeDamageDealer(state: SimState) {
         transitionTo(target, "dead");
         target.targetUid = null;
         // Record a corpse (skeletons/wolves don't leave raisable corpses).
-        if (target.defId !== "skeleton" && target.defId !== "wolf") {
+        if (
+          target.defId !== "skeleton" &&
+          target.defId !== "wolf" &&
+          target.defId !== "turret"
+        ) {
           state.corpses.push({
             x: target.pos.x,
             y: target.pos.y,
@@ -537,6 +541,20 @@ export function stepSimulation(state: SimState): void {
     if (unit.attackCooldown > 0) unit.attackCooldown--;
     if (unit.abilityCooldown > 0) unit.abilityCooldown--;
     if (unit.blinkCooldown > 0) unit.blinkCooldown--;
+
+    // Dwarven Engineer Field Repairs: every 2s, repair itself and nearby turrets,
+    // keeping its emplacements alive longer than their raw HP suggests.
+    if (unit.defId === "engineer" && state.tick % secToTicks(2) === 0) {
+      const REPAIR = 8;
+      const REPAIR_RADIUS = 200;
+      heal(unit, REPAIR);
+      for (const ally of state.units) {
+        if (ally.state === "dead" || ally.team !== unit.team) continue;
+        if (ally.defId === "turret" && dist(unit.pos, ally.pos) <= REPAIR_RADIUS) {
+          heal(ally, REPAIR);
+        }
+      }
+    }
 
     // Druid shapeshift: at <30% HP, transform into a bear — melee bruiser that
     // takes only 20% damage (80% reduction). One-way. Stops summoning; becomes
