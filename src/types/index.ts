@@ -70,6 +70,9 @@ export interface AbilityDef {
   description: string;
   /** Cooldown in seconds. */
   cooldown: number;
+  /** Cast (wind-up) time in seconds before the effect fires. Absent/0 = instant.
+   *  A cast shows a cast bar and is interrupted by a stun/fear (the mages). */
+  castTimeSec?: number;
 }
 
 export interface UnitDef {

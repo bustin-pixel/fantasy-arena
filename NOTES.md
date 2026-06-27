@@ -52,10 +52,6 @@ Special mechanics are gated by `defId` string literals in `CombatSystem.ts`:
 - `"aegis_knight"` → soaks magic into a shield, Backlash AoE, Warded (immune
   to burn/slow/poison). Magic is identified by the source unit's `school: "magic"`
   field (the casters) — see `isMagicSource` in CombatSystem.
-- `"electric_mage"` → Chain Lightning's ~2s cast (the `castTicks` cast step:
-  ticks down, locks it in place, fizzles on stun/fear, releases the chain on
-  completion via `releaseChainLightning`). The cast bar (Renderer) reads
-  `castTicks`/`castTicksMax`; the chain spawns `"lightning"` line-vfx (Vfx `to`).
 - `"engineer"` → Field Repairs (defId-gated periodic heal of itself + nearby
   turrets). `"turret"` → stationary (moveSpeed 0) ranged construct, summoned via
   Deploy Turret; leaves no raisable corpse (like `skeleton`/`wolf`).
@@ -115,6 +111,12 @@ targets 8 active units / 60fps on mobile.
   (hitFlash, animTime, deathFade) are advanced by AnimationSystem.
 
 ## Reusable systems now available for future units
+- **Cast-time abilities** (the cast bar): give an active ability `castTimeSec` in
+  `data/abilities.ts` and CombatSystem winds up a cast before the effect fires —
+  the unit locks in place (vulnerable), a stun/fear interrupts it (fizzle), and
+  the Renderer draws a cast bar from `castTicks`/`castTicksMax`. The effect is
+  fired via `fireCastAbility` on completion (same cast function as instant casts).
+  Used by all four mages (fireball, frost_blast, arcane_barrage, chain_lightning).
 - **Status effect framework** (StatusEffectSystem): burn, slow, stun, shield,
   haste, poison, silence, stealth, death_immune, taunt, fear. Adding a new
   status is a one-line type addition + handling where it matters.

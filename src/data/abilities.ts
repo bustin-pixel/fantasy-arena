@@ -56,12 +56,14 @@ export const ABILITIES: Record<AbilityId, AbilityDef> = {
     name: "Fireball",
     description: "Hurls a fireball for 25 burst damage.",
     cooldown: 4,
+    castTimeSec: 0.8,
   },
   frost_blast: {
     id: "frost_blast",
     name: "Frost Blast",
     description: "Blasts the target for 20 damage and slows it 50% for 2.5s.",
     cooldown: 5,
+    castTimeSec: 0.8,
   },
   ambush: {
     id: "ambush",
@@ -130,6 +132,7 @@ export const ABILITIES: Record<AbilityId, AbilityDef> = {
     name: "Arcane Barrage",
     description: "Rapidly fires 3 arcane missiles in quick succession at a single target.",
     cooldown: 6,
+    castTimeSec: 0.6,
   },
   blessing: {
     id: "blessing",
@@ -149,5 +152,6 @@ export const ABILITIES: Record<AbilityId, AbilityDef> = {
     description:
       "Casts for ~2s, then arcs a bolt through up to 5 nearby enemies for heavy damage, briefly stunning each. Interrupted if stunned mid-cast.",
     cooldown: 8,
+    castTimeSec: 2,
   },
 };

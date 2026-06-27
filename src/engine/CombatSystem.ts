@@ -38,8 +38,10 @@ import { clamp, dir, dist } from "@/utils/math";
 import { getUnitDef } from "@/data/units";
 import { createUnit } from "@/entities/createUnit";
 import {
+  abilityCastTimeTicks,
   abilityCooldownTicks,
   applyLifesteal,
+  fireCastAbility,
   onProjectileHit,
   tryCastAbility,
   type AbilityContext,
@@ -51,6 +53,7 @@ import {
   attackDelayMultiplier,
   hasEffect,
   isFeared,
+  isSilenced,
   isStealthed,
   isStunned,
   makeEffect,
@@ -486,73 +489,6 @@ function tryBlink(state: SimState, unit: Unit, enemies: Unit[]): boolean {
   return true;
 }
 
-// Electric Mage: resolve a Chain Lightning blast. It arcs from the mage to the
-// cast target (or the nearest enemy if it died mid-cast), then jumps to the
-// nearest un-hit enemy within range, up to 5 targets — heavy damage that decays
-// per jump, briefly stunning (paralyzing) each. Every arc spawns a lightning vfx
-// between the two points. Hits stealthed units too (consistent with the game's
-// other AoE). Deterministic: ties broken by uid.
-function releaseChainLightning(
-  state: SimState,
-  unit: Unit,
-  byUid: Map<string, Unit>,
-  dealDamage: (target: Unit, amount: number, source: Unit) => void
-): void {
-  let origin = unit.castTargetUid ? byUid.get(unit.castTargetUid) : null;
-  if (!origin || origin.state === "dead") {
-    origin = null;
-    let nd = Infinity;
-    for (const e of state.units) {
-      if (e.state === "dead" || e.team === unit.team) continue;
-      const d = dist(unit.pos, e.pos);
-      if (d < nd || (d === nd && origin && e.uid < origin.uid)) {
-        nd = d;
-        origin = e;
-      }
-    }
-  }
-  if (!origin) return; // no enemies left — the cast fizzles harmlessly
-
-  const MAX_TARGETS = 5;
-  const JUMP_RADIUS = 130;
-  const STUN_SEC = 0.8;
-  let dmg = 30;
-  const hit = new Set<string>();
-  let current: Unit | null = origin;
-  let from = { x: unit.pos.x, y: unit.pos.y - unit.radius * 0.4 };
-
-  for (let i = 0; i < MAX_TARGETS && current; i++) {
-    dealDamage(current, Math.round(dmg), unit);
-    applyEffect(
-      current,
-      makeEffect("stun", { source: unit.uid, durationSec: STUN_SEC })
-    );
-    spawnVfx(state, {
-      kind: "lightning",
-      pos: { x: from.x, y: from.y },
-      to: { x: current.pos.x, y: current.pos.y },
-      life: secToTicks(0.35),
-      maxLife: secToTicks(0.35),
-      color: "#fde047",
-    });
-    hit.add(current.uid);
-    from = { x: current.pos.x, y: current.pos.y };
-    dmg *= 0.8; // decay per jump
-
-    let next: Unit | null = null;
-    let nd = Infinity;
-    for (const e of state.units) {
-      if (e.state === "dead" || e.team === unit.team || hit.has(e.uid)) continue;
-      const d = dist(current.pos, e.pos);
-      if (d <= JUMP_RADIUS && (d < nd || (d === nd && next && e.uid < next.uid))) {
-        nd = d;
-        next = e;
-      }
-    }
-    current = next;
-  }
-}
-
 // ---------------------------------------------------------------------------
 // Main tick
 // ---------------------------------------------------------------------------
@@ -623,35 +559,20 @@ export function stepSimulation(state: SimState): void {
       }
     }
 
-    // Electric Mage: Chain Lightning has a ~2s cast (the cast bar). A stun or
-    // fear mid-cast interrupts it (fizzle). While casting it stands locked in
-    // place — committed and vulnerable. Runs before the stun check so the stun
-    // can cancel it.
-    if (unit.defId === "electric_mage" && unit.castTicks > 0) {
-      if (isStunned(unit) || isFeared(unit)) {
-        unit.castTicks = 0;
-        unit.castTicksMax = 0;
-        unit.castTargetUid = null;
-        spawnVfx(state, {
-          kind: "frost",
-          pos: { x: unit.pos.x, y: unit.pos.y - 4 },
-          life: secToTicks(0.3),
-          maxLife: secToTicks(0.3),
-          color: "#fde047",
-        });
-        // fall through — the stun/fear handling below takes over
-      } else {
-        unit.castTicks--;
-        if (unit.castTicks <= 0) {
-          releaseChainLightning(state, unit, byUid, dealDamage);
-          unit.castTicksMax = 0;
-          unit.castTargetUid = null;
-          // released — resume normal behavior this tick (ability now on cooldown)
-        } else {
-          transitionTo(unit, "casting");
-          continue; // locked while casting
-        }
-      }
+    // A spell cast in progress (the cast bar) is interrupted by a stun or fear —
+    // the spell fizzles. Runs before the stun check so the stun can cancel it;
+    // the cast's tick-down + release happens after targeting (see below).
+    if (unit.castTicks > 0 && (isStunned(unit) || isFeared(unit))) {
+      unit.castTicks = 0;
+      unit.castTicksMax = 0;
+      unit.castTargetUid = null;
+      spawnVfx(state, {
+        kind: "frost",
+        pos: { x: unit.pos.x, y: unit.pos.y - 4 },
+        life: secToTicks(0.3),
+        maxLife: secToTicks(0.3),
+        color: "#fde047",
+      });
     }
 
     // Druid shapeshift: at <30% HP, transform into a bear — melee bruiser that
@@ -724,7 +645,9 @@ export function stepSimulation(state: SimState): void {
 
     const target = unit.targetUid ? byUid.get(unit.targetUid) : null;
 
-    if (!target || target.state === "dead") {
+    // A casting unit keeps going even if its target died — the spell still fires
+    // on completion (re-acquiring the nearest enemy as the origin).
+    if ((!target || target.state === "dead") && unit.castTicks <= 0) {
       transitionTo(unit, "idle");
       continue;
     }
@@ -763,31 +686,42 @@ export function stepSimulation(state: SimState): void {
       },
     };
 
-    // Try ability first (kiting leap can interrupt approach).
-    if (unit.abilityCooldown <= 0) {
-      const fired = tryCastAbility(abilityCtx);
-      if (fired) {
-        unit.abilityCooldown = abilityCooldownTicks(unit.ability);
-        // brief cast pose (visual); doesn't block this tick's movement logic
-        if (
-          unit.ability === "fireball" ||
-          unit.ability === "frost_blast" ||
-          unit.ability === "arcane_barrage"
-        ) {
+    // Cast handling. An in-flight cast (the cast bar) ticks down and fires its
+    // spell on completion, locking the mage meanwhile. Otherwise, begin a
+    // cast-time ability (the mages) or fire an instant one (taunt, mend, charge,
+    // kiting leap, summon, …) — kiting leap can interrupt the approach.
+    if (unit.castTicks > 0) {
+      unit.castTicks--;
+      if (unit.castTicks <= 0) {
+        fireCastAbility(abilityCtx); // the spell goes off
+        unit.castTicksMax = 0;
+        unit.castTargetUid = null;
+      } else {
+        transitionTo(unit, "casting"); // locked in place, committed
+        continue;
+      }
+    } else if (unit.abilityCooldown <= 0) {
+      const castTime = abilityCastTimeTicks(unit.ability);
+      if (castTime > 0) {
+        // Begin a cast. Target is valid here; a stun/silence blocks the start.
+        if (!isStunned(unit) && !isSilenced(unit)) {
+          unit.castTicks = castTime;
+          unit.castTicksMax = castTime;
+          unit.castTargetUid = target ? target.uid : null;
+          unit.abilityCooldown = abilityCooldownTicks(unit.ability);
           transitionTo(unit, "casting");
-          unit.actionTimer = secToTicks(0.25);
           continue;
         }
-        // Chain Lightning begins a longer cast driven by the cast step above.
-        if (unit.ability === "chain_lightning") {
-          transitionTo(unit, "casting");
-          continue;
-        }
+      } else {
+        const fired = tryCastAbility(abilityCtx);
+        if (fired) unit.abilityCooldown = abilityCooldownTicks(unit.ability);
       }
     }
 
-    if (unit.state === "casting" && unit.actionTimer > 0) {
-      unit.actionTimer--;
+    // A unit that just finished a cast may have lost its target (it died during
+    // the cast). With nothing to attack, idle out the rest of the tick.
+    if (!target || target.state === "dead") {
+      transitionTo(unit, "idle");
       continue;
     }
 
