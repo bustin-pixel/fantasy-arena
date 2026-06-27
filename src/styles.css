@@ -35,6 +35,16 @@ body {
   overscroll-behavior: none;
 }
 
+/* Hide scrollbars app-wide — content still scrolls, there's just no visible
+   scroll line (keeps the game UI clean). */
+* {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* legacy Edge */
+}
+*::-webkit-scrollbar {
+  display: none; /* Chromium / Safari */
+}
+
 .app-root {
   height: 100dvh;
   display: flex;
