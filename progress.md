@@ -58,6 +58,14 @@ roster lacks. Follow the rarity rule (rare = 1 mechanic, epic = 2, legendary = c
 and the "adding a unit" checklist in `NOTES.md`.
 - **Spearman** (rare) — Skewer: a thrust that pierces to the enemy behind.
 - **Arbalest** (rare) — armor-piercing bolts; counters high-reduction units (Druid bear).
+- **Witch Hunter** (rare) — Disrupt: every 3rd basic attack briefly Silences the
+  target. Accessible anti-caster that wakes the dormant `silence` status; keep the
+  silence short / single-target so it stays under the planned epic Spellbreaker.
+- **Stalker** (rare) — First Strike: deploys Stealthed; its opening attack deals
+  bonus damage, then it's revealed. A rare backline threat that wakes the `stealth`
+  status — lighter than the epic Assassin's Vanish.
+- **Marksman** (rare) — Execute: bonus damage to enemies below ~35% HP. A focus-fire
+  ranged finisher; reuses the target-HP read already in the damage calc.
 - **Plague Doctor** (epic) — stacking, spreading poison; shreds swarms.
 - **Warlord** (epic) — War Horn grants allies haste; the first offensive support.
 - **Spellbreaker** (epic) — silences casters; anti-mage.

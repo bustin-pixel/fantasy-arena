@@ -76,7 +76,30 @@ export const ABILITIES: Record<AbilityId, AbilityDef> = {
     id: "mend",
     name: "Mend",
     description: "Heals the most-wounded ally in range for 32.",
-    cooldown: 3,
+    cooldown: 5,
+    castTimeSec: 2.5,
+  },
+  venom: {
+    id: "venom",
+    name: "Venom",
+    description:
+      "Passive: its blades drip with poison — every strike envenoms the target, dealing damage over time (refreshes on each hit, does not stack).",
+    cooldown: 0,
+  },
+  shadow_step: {
+    id: "shadow_step",
+    name: "Shadow Step",
+    description:
+      "When an enemy nearby begins casting, blinks to it and kicks — interrupting the cast and dealing light damage.",
+    cooldown: 6,
+  },
+  curse: {
+    id: "curse",
+    name: "Curse",
+    description:
+      "Afflicts an enemy with a withering curse — heavy damage over time (42 over 6s). Long cooldown.",
+    cooldown: 14,
+    castTimeSec: 1.5,
   },
   summon_wolves: {
     id: "summon_wolves",

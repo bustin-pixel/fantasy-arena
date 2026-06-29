@@ -147,9 +147,10 @@ export class MatchController {
     });
     this.state.units.push(unit);
 
-    // Assassin Ambush: enters the field stealthed (untargetable) until its first
-    // strike. Deploy is the only path onto the field, so apply opening stealth here.
-    if (unit.ability === "ambush") {
+    // Opening stealth: the Assassin (Ambush), the Rogue, and the Trickster all enter
+    // the field stealthed (untargetable) until their first strike reveals them.
+    // Deploy is the only path onto the field, so apply it here.
+    if (unit.ability === "ambush" || unit.defId === "rogue" || unit.defId === "trickster") {
       applyEffect(
         unit,
         makeEffect("stealth", { source: unit.uid, durationSec: MATCH_TIME_SEC })

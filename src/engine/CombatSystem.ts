@@ -29,6 +29,7 @@ import {
   FIELD_WIDTH,
   FLOAT_TEXT_TICKS,
   HIT_FLASH_TICKS,
+  MATCH_TIME_SEC,
   MAX_EFFECTS,
   MAX_PROJECTILES,
   SEC_PER_TICK,
@@ -40,10 +41,13 @@ import { createUnit } from "@/entities/createUnit";
 import {
   abilityCastTimeTicks,
   abilityCooldownTicks,
+  applyCurse,
   applyLifesteal,
+  applyTerrify,
   fireCastAbility,
   onProjectileHit,
   tryCastAbility,
+  wantsToCast,
   type AbilityContext,
 } from "./AbilitySystem";
 import { stepMovement } from "./MovementSystem";
@@ -489,6 +493,125 @@ function tryBlink(state: SimState, unit: Unit, enemies: Unit[]): boolean {
   return true;
 }
 
+// Trickster tuning. Shadow Step is a reactive interrupt: a large reaction radius
+// so it polices casts across most of the board, a short interrupting stun, light
+// damage (its value is denial, not burst), and a cooldown so casters can bait it.
+const TRICKSTER_REACH = 400;
+const TRICKSTER_KICK_DAMAGE = 20;
+const TRICKSTER_STUN_SEC = 0.75;
+const TRICKSTER_COOLDOWN_SEC = 6;
+const TRICKSTER_RECLOAK_SEC = 1.5;
+
+// Trickster: Shadow Step. When an enemy within reach begins a cast, blink to it and
+// kick — the stun interrupts the cast (the cast-fizzle rule handles the actual
+// cancel when the stunned victim is processed). Reactive, on its own cooldown.
+function tryShadowStep(
+  state: SimState,
+  unit: Unit,
+  enemies: Unit[],
+  dealDamage: (t: Unit, amt: number, s: Unit) => void
+): boolean {
+  let victim: Unit | null = null;
+  let bestD = Infinity;
+  for (const e of enemies) {
+    if (e.state === "dead" || e.castTicks <= 0) continue; // only mid-cast foes
+    if (isStealthed(e)) continue; // can't react to an unseen caster
+    const d = dist(unit.pos, e.pos);
+    if (d <= TRICKSTER_REACH && d < bestD) {
+      bestD = d;
+      victim = e;
+    }
+  }
+  if (!victim) return false;
+
+  // Land just short of the victim, along the line of approach.
+  let toward = dir(unit.pos, victim.pos);
+  if (toward.x === 0 && toward.y === 0) {
+    toward = { x: 0, y: unit.team === "player" ? -1 : 1 };
+  }
+  const standoff = unit.radius + victim.radius - 4;
+  unit.pos.x = clamp(victim.pos.x - toward.x * standoff, unit.radius, FIELD_WIDTH - unit.radius);
+  unit.pos.y = clamp(victim.pos.y - toward.y * standoff, unit.radius, FIELD_HEIGHT - unit.radius);
+  unit.facing = victim.pos.x >= unit.pos.x ? 1 : -1;
+
+  // Kick: light damage + a short stun (the stun fizzles the in-flight cast).
+  dealDamage(victim, TRICKSTER_KICK_DAMAGE, unit);
+  applyEffect(victim, makeEffect("stun", { source: unit.uid, durationSec: TRICKSTER_STUN_SEC }));
+
+  // Revealed by the strike; start the re-cloak countdown so it vanishes again.
+  unit.effects = unit.effects.filter((e) => e.type !== "stealth");
+  unit.recloakTimer = secToTicks(TRICKSTER_RECLOAK_SEC);
+
+  spawnVfx(state, {
+    kind: "slam",
+    pos: { x: victim.pos.x, y: victim.pos.y },
+    life: secToTicks(0.4),
+    maxLife: secToTicks(0.4),
+    color: getUnitDef(unit.defId).accent,
+  });
+  return true;
+}
+
+// Necromancer casting. It juggles two casts on one cast bar, so it's handled
+// here instead of the shared mage pipeline: its big Curse (long cooldown) when
+// ready, otherwise Terrify. Raise Dead is a separate passive (periodic spawn).
+const NECRO_CURSE_CAST_SEC = 1.5;
+const NECRO_CURSE_CD_SEC = 14; // the "big cooldown"
+const NECRO_TERRIFY_CAST_SEC = 1.2;
+const NECRO_TERRIFY_CD_SEC = 7;
+const NECRO_FEAR_REACH = 210; // a foe must be roughly within Terrify's range to bother
+
+function necroHasFearTarget(unit: Unit, enemies: Unit[]): boolean {
+  return enemies.some(
+    (e) =>
+      e.state !== "dead" &&
+      !isStealthed(e) &&
+      dist(unit.pos, e.pos) <= NECRO_FEAR_REACH
+  );
+}
+
+/** Returns true while the Necromancer is busy casting (caller should skip the
+ *  rest of its tick). A finished cast fires Curse (castTargetUid set → DoT a
+ *  target) or Terrify (castTargetUid null → AoE fear). */
+function stepNecromancerCast(state: SimState, ctx: AbilityContext): boolean {
+  const unit = ctx.unit;
+
+  if (unit.castTicks > 0) {
+    unit.castTicks--;
+    if (unit.castTicks <= 0) {
+      if (unit.castTargetUid) applyCurse(ctx);
+      else applyTerrify(ctx);
+      unit.castTicksMax = 0;
+      unit.castTargetUid = null;
+      return false; // free to basic-attack the rest of the tick
+    }
+    transitionTo(unit, "casting");
+    return true;
+  }
+
+  if (isStunned(unit) || isSilenced(unit)) return false;
+  const target = unit.targetUid ? ctx.unitsByUid.get(unit.targetUid) : null;
+
+  // Curse first (saved for its long cooldown), then Terrify.
+  if (unit.curseCooldown <= 0 && target && target.state !== "dead") {
+    unit.castTicks = secToTicks(NECRO_CURSE_CAST_SEC);
+    unit.castTicksMax = unit.castTicks;
+    unit.castTargetUid = target.uid;
+    unit.curseCooldown = secToTicks(NECRO_CURSE_CD_SEC);
+    transitionTo(unit, "casting");
+    return true;
+  }
+  if (unit.abilityCooldown <= 0 && necroHasFearTarget(unit, ctx.enemies)) {
+    unit.castTicks = secToTicks(NECRO_TERRIFY_CAST_SEC);
+    unit.castTicksMax = unit.castTicks;
+    unit.castTargetUid = null; // AoE → Terrify on completion
+    unit.abilityCooldown = secToTicks(NECRO_TERRIFY_CD_SEC);
+    transitionTo(unit, "casting");
+    return true;
+  }
+  return false;
+}
+
 // ---------------------------------------------------------------------------
 // Main tick
 // ---------------------------------------------------------------------------
@@ -544,6 +667,20 @@ export function stepSimulation(state: SimState): void {
     if (unit.attackCooldown > 0) unit.attackCooldown--;
     if (unit.abilityCooldown > 0) unit.abilityCooldown--;
     if (unit.blinkCooldown > 0) unit.blinkCooldown--;
+    if (unit.shadowCooldown > 0) unit.shadowCooldown--;
+    if (unit.curseCooldown > 0) unit.curseCooldown--;
+
+    // Trickster re-cloak: a beat after it last struck, it melts back into stealth.
+    // (Only the Trickster ever sets recloakTimer, so no defId gate is needed.)
+    if (unit.recloakTimer > 0) {
+      unit.recloakTimer--;
+      if (unit.recloakTimer === 0 && !isStealthed(unit)) {
+        applyEffect(
+          unit,
+          makeEffect("stealth", { source: unit.uid, durationSec: MATCH_TIME_SEC })
+        );
+      }
+    }
 
     // Engineer Field Repairs: every 2s, repair itself and nearby turrets,
     // keeping its emplacements alive longer than their raw HP suggests.
@@ -557,6 +694,17 @@ export function stepSimulation(state: SimState): void {
           heal(ally, REPAIR);
         }
       }
+    }
+
+    // Necromancer Raise Dead: a passive that continuously raises a skeleton every
+    // 3s (no corpse needed). The summon cap is enforced when spawns flush, so it
+    // can't flood the board.
+    if (unit.defId === "necromancer" && state.tick % secToTicks(3) === 0) {
+      pendingSpawns.push({
+        defId: "skeleton",
+        team: unit.team,
+        pos: { x: unit.pos.x, y: unit.pos.y + (unit.team === "player" ? -24 : 24) },
+      });
     }
 
     // A spell cast in progress (the cast bar) is interrupted by a stun or fear —
@@ -643,6 +791,15 @@ export function stepSimulation(state: SimState): void {
       }
     }
 
+    // Trickster: Shadow Step to an enemy that just started casting and kick it,
+    // interrupting the cast. Reactive, on its own cooldown — independent of its
+    // basic attacks (it still brawls normally when nothing is casting).
+    if (unit.defId === "trickster" && unit.shadowCooldown <= 0) {
+      if (tryShadowStep(state, unit, enemies, dealDamage)) {
+        unit.shadowCooldown = secToTicks(TRICKSTER_COOLDOWN_SEC);
+      }
+    }
+
     const target = unit.targetUid ? byUid.get(unit.targetUid) : null;
 
     // A casting unit keeps going even if its target died — the spell still fires
@@ -690,7 +847,10 @@ export function stepSimulation(state: SimState): void {
     // spell on completion, locking the mage meanwhile. Otherwise, begin a
     // cast-time ability (the mages) or fire an instant one (taunt, mend, charge,
     // kiting leap, summon, …) — kiting leap can interrupt the approach.
-    if (unit.castTicks > 0) {
+    if (unit.defId === "necromancer") {
+      // Necromancer runs its own cast logic (Curse / Terrify) — see above.
+      if (stepNecromancerCast(state, abilityCtx)) continue;
+    } else if (unit.castTicks > 0) {
       unit.castTicks--;
       if (unit.castTicks <= 0) {
         fireCastAbility(abilityCtx); // the spell goes off
@@ -703,8 +863,10 @@ export function stepSimulation(state: SimState): void {
     } else if (unit.abilityCooldown <= 0) {
       const castTime = abilityCastTimeTicks(unit.ability);
       if (castTime > 0) {
-        // Begin a cast. Target is valid here; a stun/silence blocks the start.
-        if (!isStunned(unit) && !isSilenced(unit)) {
+        // Begin a cast. A stun/silence blocks the start, and some casts (Mend)
+        // only begin when they have a reason to — so the Cleric doesn't freeze
+        // mid-field winding up a heal with no wounded ally to land it on.
+        if (!isStunned(unit) && !isSilenced(unit) && wantsToCast(abilityCtx)) {
           unit.castTicks = castTime;
           unit.castTicksMax = castTime;
           unit.castTargetUid = target ? target.uid : null;
@@ -810,6 +972,14 @@ function performBasicAttack(
     });
   }
 
+  // Rogue & Trickster reveal on a strike (stripping is a no-op once revealed). The
+  // Trickster also (re)starts its re-cloak timer, so it slips back into stealth a
+  // beat after it stops swinging.
+  if (unit.defId === "rogue" || unit.defId === "trickster") {
+    unit.effects = unit.effects.filter((e) => e.type !== "stealth");
+    if (unit.defId === "trickster") unit.recloakTimer = secToTicks(TRICKSTER_RECLOAK_SEC);
+  }
+
   unit.attackCount += 1;
   // Ice Mage: every second basic attack freezes the target (2s stun).
   const freezeThisHit =
@@ -857,6 +1027,21 @@ function performBasicAttack(
   } else {
     dealDamage(target, unit.damage, unit);
     applyLifesteal(unit, unit.damage, heal);
+
+    // Rogue Venom: every strike envenoms the target. A short, fast-ticking poison
+    // (refreshed each hit via applyEffect, never stacked) so it keeps damaging even
+    // between the Rogue's quick swings.
+    if (unit.defId === "rogue") {
+      applyEffect(
+        target,
+        makeEffect("poison", {
+          source: unit.uid,
+          durationSec: 3,
+          damagePerTick: 3,
+          tickIntervalSec: 0.5,
+        })
+      );
+    }
 
     // Berserker Cleave: the same swing also strikes every other enemy within
     // melee reach, so it carves through a crowd.

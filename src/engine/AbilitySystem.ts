@@ -44,7 +44,10 @@ export interface AbilityContext {
 }
 
 /** Abilities that are passive (no active cast). Everything else is cast-gated. */
-const PASSIVE_ABILITIES = new Set<Unit["ability"]>(["lifesteal", "bloodrage", "slime_split", "momentum", "ambush", "aegis"]);
+// "Passive" here means "not driven by the standard active-cast pipeline" — the
+// effect runs elsewhere. shadow_step is reactive (handled in CombatSystem like
+// Blink), so it lives here even though the UI shows it as an active (cooldown > 0).
+const PASSIVE_ABILITIES = new Set<Unit["ability"]>(["lifesteal", "bloodrage", "slime_split", "momentum", "ambush", "aegis", "venom", "shadow_step"]);
 
 /** True if this ability is an active (cooldown-gated) cast. */
 function isActiveAbility(unit: Unit): boolean {
@@ -116,6 +119,15 @@ export function tryCastAbility(ctx: AbilityContext): boolean {
  *  paid at cast start; a stun/fear interrupts earlier, so there's no re-check). */
 export function fireCastAbility(ctx: AbilityContext): boolean {
   return dispatchAbility(ctx);
+}
+
+/** Whether a cast-time ability has a reason to BEGIN its cast this tick. Most
+ *  casts always do (there's always an enemy to hit); the Cleric's Mend only
+ *  commits to its long wind-up when an ally actually needs healing — otherwise
+ *  the Cleric would lock itself in place casting into nothing. */
+export function wantsToCast(ctx: AbilityContext): boolean {
+  if (ctx.unit.ability === "mend") return mendTarget(ctx) != null;
+  return true;
 }
 
 // --- OGRE: Crushing Slam -----------------------------------------------------
@@ -323,14 +335,15 @@ function castCharge(ctx: AbilityContext): boolean {
 }
 
 // --- CLERIC: Mend ------------------------------------------------------------
-// Heals the most-wounded ally within range (including self). Only fires if
-// someone actually needs healing, so the cooldown isn't wasted at full HP.
-function castMend(ctx: AbilityContext): boolean {
+// The most-wounded ally within heal range (including self), or null if no one
+// needs healing. Shared by castMend (the effect) and wantsToCast (so the Cleric
+// doesn't begin its 2.5s cast at full HP and freeze in place healing no one).
+function mendTarget(ctx: AbilityContext): Unit | null {
   const { unit, allies } = ctx;
   const candidates = [unit, ...allies].filter(
     (u) => u.state !== "dead" && u.hp < u.maxHp
   );
-  if (candidates.length === 0) return false;
+  if (candidates.length === 0) return null;
 
   const healRange = unit.range + unit.radius;
   const inRange = candidates.filter((u) => dist(unit.pos, u.pos) <= healRange);
@@ -346,7 +359,12 @@ function castMend(ctx: AbilityContext): boolean {
       bestMissing = missing;
     }
   }
-  if (bestMissing <= 0) return false;
+  return bestMissing > 0 ? best : null;
+}
+
+function castMend(ctx: AbilityContext): boolean {
+  const best = mendTarget(ctx);
+  if (!best) return false;
 
   ctx.heal(best, 32);
   ctx.spawnVfx({
@@ -354,7 +372,7 @@ function castMend(ctx: AbilityContext): boolean {
     pos: { x: best.pos.x, y: best.pos.y - 4 },
     life: secToTicks(0.5),
     maxLife: secToTicks(0.5),
-    color: getUnitDef(unit.defId).accent,
+    color: getUnitDef(ctx.unit.defId).accent,
   });
   return true;
 }
@@ -548,6 +566,42 @@ function castFear(ctx: AbilityContext): boolean {
     color: getUnitDef(unit.defId).accent,
   });
   return true;
+}
+
+// Necromancer Curse: a heavy single-target damage-over-time on the cast target
+// (42 over 6s). Its own `curse` status so it never merges with poison/venom and
+// isn't stopped by the Aegis Knight's burn/slow/poison ward. The Necromancer's
+// custom cast handler (CombatSystem) calls this on cast completion.
+const CURSE_DURATION_SEC = 6;
+const CURSE_DAMAGE_PER_TICK = 7; // every 1s → 6 ticks → 42 total
+
+export function applyCurse(ctx: AbilityContext): boolean {
+  const target = ctx.unit.castTargetUid
+    ? ctx.unitsByUid.get(ctx.unit.castTargetUid)
+    : null;
+  if (!target || target.state === "dead") return false;
+  applyEffect(
+    target,
+    makeEffect("curse", {
+      source: ctx.unit.uid,
+      durationSec: CURSE_DURATION_SEC,
+      damagePerTick: CURSE_DAMAGE_PER_TICK,
+      tickIntervalSec: 1,
+    })
+  );
+  ctx.spawnVfx({
+    kind: "death",
+    pos: { x: target.pos.x, y: target.pos.y - 4 },
+    life: secToTicks(0.5),
+    maxLife: secToTicks(0.5),
+    color: getUnitDef(ctx.unit.defId).accent,
+  });
+  return true;
+}
+
+/** Terrify's AoE-fear effect, reused by the Necromancer's custom cast handler. */
+export function applyTerrify(ctx: AbilityContext): boolean {
+  return castFear(ctx);
 }
 
 // --- Projectile impact resolution (called by CombatSystem) -------------------
