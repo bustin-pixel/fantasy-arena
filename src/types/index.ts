@@ -25,6 +25,7 @@ export type StatusEffectType =
   | "shield"
   | "haste"
   | "poison"
+  | "curse"
   | "silence"
   | "stealth"
   | "death_immune"
@@ -53,6 +54,9 @@ export type AbilityId =
   | "deploy_turret"
   | "chain_lightning"
   | "mend"
+  | "venom"
+  | "shadow_step"
+  | "curse"
   | "summon_wolves";
 
 export interface Vec2 {
@@ -169,6 +173,12 @@ export interface Unit {
   darkStacks: number;
   /** Arcane Mage: ticks until Blink (defensive teleport) is ready again. */
   blinkCooldown: number;
+  /** Trickster: ticks until Shadow Step (reactive interrupt-blink) is ready. */
+  shadowCooldown: number;
+  /** Trickster: ticks until it melts back into stealth after acting (0 = idle). */
+  recloakTimer: number;
+  /** Necromancer: ticks until its big Curse (DoT) cast is ready again. */
+  curseCooldown: number;
   /** Arcane Mage: missiles left to fire in the current Arcane Barrage volley
    *  (0 = not firing). The volley streams out one missile at a time. */
   barrageShots: number;

@@ -150,6 +150,28 @@ export const UNITS: Record<string, UnitDef> = {
       },
     ],
   },
+  arcane_mage: {
+    id: "arcane_mage",
+    name: "Arcane Mage",
+    rarity: "epic",
+    role: "Arcane Artillery",
+    hp: 100,
+    damage: 9, // light basic shot; the burst comes from the Arcane Barrage active
+    attackSpeed: 1.2, // basic-attack cadence
+    moveSpeed: 64,
+    range: FIELD_WIDTH * 0.33, // medium-long
+    ability: "arcane_barrage",
+    school: "magic",
+    color: "#6d28d9",
+    accent: "#c084fc",
+    traits: [
+      {
+        name: "Blink",
+        description:
+          "Roughly every 5s, when a melee attacker closes in, the mage blinks a safe distance away.",
+      },
+    ],
+  },
   assassin: {
     id: "assassin",
     name: "Assassin",
@@ -168,6 +190,48 @@ export const UNITS: Record<string, UnitDef> = {
         name: "Vanish",
         description:
           "The first lethal blow leaves it at 1 HP — stealthed and unable to die for 2.5s.",
+      },
+    ],
+  },
+  rogue: {
+    id: "rogue",
+    name: "Rogue",
+    rarity: "epic",
+    role: "Stealth Skirmisher",
+    hp: 95,
+    damage: 13,
+    attackSpeed: 0.85, // fast
+    moveSpeed: 98, // quick flanker (just under the Assassin)
+    range: MELEE,
+    ability: "venom",
+    color: "#1e3a2f", // dark poison-green cloak
+    accent: "#84cc16", // venom lime
+    traits: [
+      {
+        name: "Ambusher",
+        description:
+          "Deploys hidden — stealthed and untargetable — and stays unseen until its first strike reveals it.",
+      },
+    ],
+  },
+  trickster: {
+    id: "trickster",
+    name: "Trickster",
+    rarity: "epic",
+    role: "Anti-Caster Disruptor",
+    hp: 100,
+    damage: 16,
+    attackSpeed: 0.9,
+    moveSpeed: 95,
+    range: MELEE,
+    ability: "shadow_step",
+    color: "#241b33", // shadowed violet
+    accent: "#5eead4", // trickster teal shimmer
+    traits: [
+      {
+        name: "Cloak",
+        description:
+          "Deploys hidden and melts back into stealth ~1.5s after it stops acting — untargetable while it lurks, revealed only when it strikes.",
       },
     ],
   },
@@ -252,15 +316,20 @@ export const UNITS: Record<string, UnitDef> = {
     attackSpeed: 2.0,
     moveSpeed: 55,
     range: FIELD_WIDTH * 0.32,
-    ability: "raise_dead", // primary; fear is a second ability handled in logic
+    ability: "curse", // signature active; Terrify + Raise Dead handled in logic
     school: "magic",
     color: "#3b2a52",
     accent: "#a78bfa",
     traits: [
       {
+        name: "Raise Dead",
+        description:
+          "Passive: continuously raises a skeleton to fight for it every 3s, up to the battlefield's summon cap.",
+      },
+      {
         name: "Terrify",
         description:
-          "When no corpse is available to raise, nearby enemies flee in terror for 2s instead.",
+          "Active cast: channels a terrifying wail that sends nearby enemies fleeing in fear for 2s. Cast when Curse is on cooldown.",
       },
     ],
   },
@@ -317,28 +386,6 @@ export const UNITS: Record<string, UnitDef> = {
         name: "Dark Form",
         description:
           "Area. Arrows chain to all nearby foes, marking each with Dark; 3 marks on any of them detonates and shifts the Archer back to Light.",
-      },
-    ],
-  },
-  arcane_mage: {
-    id: "arcane_mage",
-    name: "Arcane Mage",
-    rarity: "epic",
-    role: "Arcane Artillery",
-    hp: 100,
-    damage: 9, // light basic shot; the burst comes from the Arcane Barrage active
-    attackSpeed: 1.2, // basic-attack cadence
-    moveSpeed: 64,
-    range: FIELD_WIDTH * 0.33, // medium-long
-    ability: "arcane_barrage",
-    school: "magic",
-    color: "#6d28d9",
-    accent: "#c084fc",
-    traits: [
-      {
-        name: "Blink",
-        description:
-          "Roughly every 5s, when a melee attacker closes in, the mage blinks a safe distance away.",
       },
     ],
   },

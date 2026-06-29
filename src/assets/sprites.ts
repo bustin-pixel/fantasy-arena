@@ -140,6 +140,12 @@ export function drawUnitSprite(
     case "assassin":
       drawAssassin(ctx, body, dark, light, accent);
       break;
+    case "rogue":
+      drawAssassin(ctx, body, dark, light, accent);
+      break;
+    case "trickster":
+      drawAssassin(ctx, body, dark, light, accent);
+      break;
     case "healer":
       drawHealer(ctx, body, dark, light, accent);
       break;
