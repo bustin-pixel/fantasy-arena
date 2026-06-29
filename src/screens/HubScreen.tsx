@@ -1,9 +1,12 @@
 import { useMemo, useState } from "react";
 import { DECKABLE_UNIT_IDS, getUnitDef } from "@/data/units";
-import { RARITIES, rarityRank } from "@/data/rarities";
-import { CardPortrait } from "@/components/CardPortrait";
+import { rarityRank } from "@/data/rarities";
+import { CardPortrait, type CardAddState } from "@/components/CardPortrait";
+import { DeckStrip } from "@/components/DeckStrip";
 import { UnitDetail } from "@/components/UnitDetail";
+import { generateRandomDeck } from "@/engine/AIDeck";
 import { MAX_DECK } from "@/utils/constants";
+import { generateSeed } from "@/utils/rng";
 import { useGameState } from "@/state/GameStateContext";
 
 interface Props {
@@ -32,6 +35,15 @@ export function HubScreen({ onBattle }: Props) {
     if (getUnitDef(id).rarity === "legendary" && hasLegendary) return;
     setDeck([...deck, id]);
   };
+
+  // Fresh, non-sim seed per click — these are meta actions, so it's fine to
+  // draw randomness outside the deterministic battle (like generateSeed itself).
+  const autoFill = () => {
+    if (deck.length >= MAX_DECK) return;
+    setDeck(generateRandomDeck(generateSeed(), MAX_DECK, deck));
+  };
+  const randomize = () => setDeck(generateRandomDeck(generateSeed(), MAX_DECK));
+  const clearDeck = () => setDeck([]);
 
   const winRate = useMemo(() => {
     const total = save.wins + save.losses;
@@ -78,37 +90,31 @@ export function HubScreen({ onBattle }: Props) {
           </span>
         </div>
 
-        {/* Current deck, in deploy order (front-to-back). Tap a slot to remove. */}
-        <div className="deck-strip" aria-label="Current deck">
-          {Array.from({ length: MAX_DECK }).map((_, slot) => {
-            const id = deck[slot];
-            if (!id) {
-              return (
-                <div key={`empty-${slot}`} className="deck-slot empty">
-                  <span className="deck-slot-num">{slot + 1}</span>
-                  <span className="deck-slot-name">Empty</span>
-                </div>
-              );
-            }
-            const def = getUnitDef(id);
-            const rarity = RARITIES[def.rarity];
-            return (
-              <button
-                key={id}
-                type="button"
-                className="deck-slot filled"
-                style={{ borderColor: rarity.color }}
-                onClick={() => toggle(id)}
-                title={`Remove ${def.name}`}
-              >
-                <span className="deck-slot-num">{slot + 1}</span>
-                <span className="deck-slot-name">{def.name}</span>
-                <span className="deck-slot-rarity" style={{ color: rarity.color }}>
-                  {rarity.label}
-                </span>
-              </button>
-            );
-          })}
+        {/* Current deck, in deploy order (front-to-back). Drag to reorder; tap
+            a slot to remove. */}
+        <DeckStrip deck={deck} onReorder={setDeck} onRemove={toggle} />
+
+        {/* Quick deck-building shortcuts. */}
+        <div className="deck-actions" role="group" aria-label="Deck shortcuts">
+          <button
+            type="button"
+            className="deck-action-btn"
+            onClick={autoFill}
+            disabled={deck.length >= MAX_DECK}
+          >
+            Auto-fill
+          </button>
+          <button type="button" className="deck-action-btn" onClick={randomize}>
+            Randomize
+          </button>
+          <button
+            type="button"
+            className="deck-action-btn"
+            onClick={clearDeck}
+            disabled={deck.length === 0}
+          >
+            Clear
+          </button>
         </div>
 
         <div className="roster-head">
@@ -137,15 +143,20 @@ export function HubScreen({ onBattle }: Props) {
           {rosterIds.map((id) => {
             const isLegendary = getUnitDef(id).rarity === "legendary";
             const selected = deck.includes(id);
-            // A legendary the player can't add because they already have one.
-            const locked = isLegendary && hasLegendary && !selected;
+            // Mirror the add-button rules from the detail panel: in-deck toggles
+            // off; otherwise a full deck or a second legendary blocks the add.
+            let addState: CardAddState;
+            if (selected) addState = "in-deck";
+            else if (deck.length >= MAX_DECK) addState = "deck-full";
+            else if (isLegendary && hasLegendary) addState = "legendary-max";
+            else addState = "add";
             return (
               <CardPortrait
                 key={id}
                 defId={id}
-                selected={selected}
-                locked={locked}
-                onClick={() => setDetailId(id)}
+                addState={addState}
+                onToggle={() => toggle(id)}
+                onInfo={() => setDetailId(id)}
               />
             );
           })}
