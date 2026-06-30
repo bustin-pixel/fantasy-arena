@@ -260,13 +260,14 @@ export const UNITS: Record<string, UnitDef> = {
     moveSpeed: 52,
     range: FIELD_WIDTH * 0.28,
     ability: "summon_wolves",
+    abilities: ["rejuvenation"], // a second active cast
     color: "#5c4326",
     accent: "#a3e635",
     traits: [
       {
         name: "Bear Form",
         description:
-          "At 30% HP it transforms into a bear: a melee bruiser that takes 80% less damage. One-way, and it stops summoning.",
+          "At 30% HP it transforms into a bear: a melee bruiser that takes 80% less damage for 5s, then normal toughness. One-way. It keeps summoning and Rejuvenating, and receives 50% more healing while a bear.",
       },
     ],
   },
@@ -304,6 +305,11 @@ export const UNITS: Record<string, UnitDef> = {
         description:
           "Each swing also strikes every other enemy in melee range, not just its target.",
       },
+      {
+        name: "Last Stand",
+        description:
+          "Once per life, a blow that would kill it instead leaves it at 1 HP and unkillable for 5s — long enough to rage back from the brink.",
+      },
     ],
   },
   necromancer: {
@@ -316,7 +322,8 @@ export const UNITS: Record<string, UnitDef> = {
     attackSpeed: 2.0,
     moveSpeed: 55,
     range: FIELD_WIDTH * 0.32,
-    ability: "curse", // signature active; Terrify + Raise Dead handled in logic
+    ability: "curse", // signature active
+    abilities: ["fear_aura"], // Terrify — its second active cast
     school: "magic",
     color: "#3b2a52",
     accent: "#a78bfa",
@@ -324,12 +331,7 @@ export const UNITS: Record<string, UnitDef> = {
       {
         name: "Raise Dead",
         description:
-          "Passive: continuously raises a skeleton to fight for it every 3s, up to the battlefield's summon cap.",
-      },
-      {
-        name: "Terrify",
-        description:
-          "Active cast: channels a terrifying wail that sends nearby enemies fleeing in fear for 2s. Cast when Curse is on cooldown.",
+          "Continuously raises a skeleton to fight for it every 5s, up to the battlefield's summon cap.",
       },
     ],
   },
@@ -462,7 +464,7 @@ export const UNITS: Record<string, UnitDef> = {
     ],
   },
   // Turret — built by the Engineer, never in a deck. Stationary
-  // (moveSpeed 0) ranged emplacement; destructible, leaves no raisable corpse.
+  // (moveSpeed 0) ranged emplacement; destructible.
   turret: {
     id: "turret",
     name: "Turret",

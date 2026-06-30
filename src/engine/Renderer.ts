@@ -144,6 +144,7 @@ function drawStatusIcons(ctx: Ctx, u: Unit): void {
     haste: "»",
     poison: "☠",
     curse: "💀",
+    regen: "💚",
     silence: "∅",
     stealth: "👁",
     death_immune: "✝",

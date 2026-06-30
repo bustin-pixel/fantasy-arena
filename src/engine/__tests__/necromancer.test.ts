@@ -15,7 +15,7 @@ describe("Necromancer — Raise Dead (passive summon)", () => {
     makeDummy(place(s, "skeleton", "enemy", 240, 80)); // far, unkillable target
     expect(playerSkeletons(s)).toBe(0);
 
-    for (let i = 0; i < 130; i++) stepSimulation(s); // ~6.5s → two 3s ticks
+    for (let i = 0; i < 230; i++) stepSimulation(s); // ~11.5s → two 5s ticks
     expect(playerSkeletons(s)).toBeGreaterThanOrEqual(2);
   });
 });

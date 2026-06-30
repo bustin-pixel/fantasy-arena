@@ -23,8 +23,8 @@ clear signature mechanic. Lean on systems that **already exist** so it stays
 low-risk and deterministic:
 - `shieldHp` / `shieldHpMax` (absorb shield), the `heal()` funnel, the Cleric's
   scan-allies-in-range, the Knight's AoE-over-a-radius, the status-effect
-  framework (burn/slow/stun/haste/poison/silence/stealth/taunt/fear), summoning,
-  corpse tracking.
+  framework (burn/slow/stun/haste/poison/silence/stealth/taunt/fear/curse),
+  summoning.
 
 > Holy Knight: **Blessing** — pulse an absorb shield + small heal to nearby
 > allies, reusing the Cleric's ally scan and the Knight's radius pattern.

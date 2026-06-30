@@ -16,6 +16,7 @@ export interface StatusFactoryArgs {
   durationSec: number;
   magnitude?: number;
   damagePerTick?: number;
+  healPerTick?: number;
   tickIntervalSec?: number;
   charges?: number;
 }
@@ -33,6 +34,7 @@ export function makeEffect(
     ticksLeft: ticks,
     magnitude: args.magnitude,
     damagePerTick: args.damagePerTick,
+    healPerTick: args.healPerTick,
     tickInterval,
     tickCountdown: tickInterval,
     charges: args.charges,
@@ -62,6 +64,11 @@ export function applyEffect(unit: Unit, effect: ActiveStatusEffect): void {
     }
     if (effect.damagePerTick != null) {
       existing.damagePerTick = effect.damagePerTick;
+      existing.tickInterval = effect.tickInterval;
+      existing.tickCountdown = effect.tickInterval;
+    }
+    if (effect.healPerTick != null) {
+      existing.healPerTick = effect.healPerTick;
       existing.tickInterval = effect.tickInterval;
       existing.tickCountdown = effect.tickInterval;
     }
@@ -137,30 +144,45 @@ export interface DotResult {
   unit: Unit;
   damage: number;
 }
+export interface HotResult {
+  unit: Unit;
+  amount: number;
+}
+export interface EffectTickResult {
+  dots: DotResult[];
+  hots: HotResult[];
+}
 
 /**
- * Advance all effect timers by one tick. Returns DoT damage to be applied by
- * the CombatSystem (kept separate so all HP changes funnel through one place).
+ * Advance all effect timers by one tick. Returns the DoT damage and HoT healing
+ * to be applied by the CombatSystem (kept separate so all HP changes funnel
+ * through dealDamage / heal in one place).
  */
-export function tickEffects(units: Unit[]): DotResult[] {
+export function tickEffects(units: Unit[]): EffectTickResult {
   const dots: DotResult[] = [];
+  const hots: HotResult[] = [];
   for (const unit of units) {
     if (unit.state === "dead") continue;
     for (const effect of unit.effects) {
       effect.ticksLeft -= 1;
       if (
-        effect.damagePerTick != null &&
+        (effect.damagePerTick != null || effect.healPerTick != null) &&
         effect.tickInterval != null &&
         effect.tickCountdown != null
       ) {
         effect.tickCountdown -= 1;
         if (effect.tickCountdown <= 0) {
-          dots.push({ unit, damage: effect.damagePerTick });
+          if (effect.damagePerTick != null) {
+            dots.push({ unit, damage: effect.damagePerTick });
+          }
+          if (effect.healPerTick != null) {
+            hots.push({ unit, amount: effect.healPerTick });
+          }
           effect.tickCountdown = effect.tickInterval;
         }
       }
     }
     unit.effects = unit.effects.filter((e) => e.ticksLeft > 0);
   }
-  return dots;
+  return { dots, hots };
 }
