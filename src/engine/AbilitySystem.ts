@@ -39,8 +39,6 @@ export interface AbilityContext {
   heal: (target: Unit, amount: number) => void;
   /** Spawn a fresh unit into the live sim (e.g. summoner's wolves). */
   spawnUnit: (defId: string, team: Unit["team"], pos: { x: number; y: number }) => void;
-  /** Claim the nearest recent corpse for raising; returns its position or null. */
-  claimCorpse: () => { x: number; y: number } | null;
 }
 
 /** Abilities that are passive (no active cast). Everything else is cast-gated. */
@@ -93,8 +91,6 @@ function dispatchAbility(ctx: AbilityContext): boolean {
       return castDeployTurret(ctx);
     case "summon_wolves":
       return castSummonWolves(ctx);
-    case "raise_dead":
-      return castNecromancer(ctx);
     case "fear_aura":
       return castFear(ctx);
     default:
@@ -429,6 +425,55 @@ function castSummonWolves(ctx: AbilityContext): boolean {
   return true;
 }
 
+// --- DRUID: Rejuvenation -----------------------------------------------------
+// Instant cast: lays a healing-over-time on the most-wounded ally in range
+// (including itself) — 6 HP every 2s for 8s (24 total). Fired by CombatSystem on
+// the Druid's own cooldown; works in caster and bear form alike.
+const REJUV_RANGE = 160;
+const REJUV_HEAL_PER_TICK = 6;
+const REJUV_TICK_SEC = 2;
+const REJUV_DURATION_SEC = 8;
+
+export function applyRejuvenation(ctx: AbilityContext): boolean {
+  const { unit, allies } = ctx;
+  const candidates = [unit, ...allies].filter(
+    (u) =>
+      u.state !== "dead" &&
+      u.hp < u.maxHp &&
+      dist(unit.pos, u.pos) <= REJUV_RANGE
+  );
+  if (candidates.length === 0) return false; // no one hurt; save the cooldown
+
+  // Most-wounded by missing HP (uid tie-break for determinism).
+  let best = candidates[0];
+  let bestMissing = best.maxHp - best.hp;
+  for (const u of candidates) {
+    const missing = u.maxHp - u.hp;
+    if (missing > bestMissing || (missing === bestMissing && u.uid < best.uid)) {
+      best = u;
+      bestMissing = missing;
+    }
+  }
+
+  applyEffect(
+    best,
+    makeEffect("regen", {
+      source: unit.uid,
+      healPerTick: REJUV_HEAL_PER_TICK,
+      tickIntervalSec: REJUV_TICK_SEC,
+      durationSec: REJUV_DURATION_SEC,
+    })
+  );
+  ctx.spawnVfx({
+    kind: "shield_pop",
+    pos: { x: best.pos.x, y: best.pos.y - 4 },
+    life: secToTicks(0.5),
+    maxLife: secToTicks(0.5),
+    color: "#a3e635",
+  });
+  return true;
+}
+
 // --- ELECTRIC MAGE: Chain Lightning ------------------------------------------
 // Fired when the ~2s cast completes. Arcs from the mage to the cast target (or
 // the nearest enemy if it died during the cast), then jumps to the nearest
@@ -515,33 +560,9 @@ function castDeployTurret(ctx: AbilityContext): boolean {
   return true;
 }
 
-// --- NECROMANCER: Raise Dead + Terrify ---------------------------------------
-// The Necromancer raises a skeleton from the nearest fresh corpse when one is
-// available; if there are no corpses to feed on, it instead terrifies nearby
-// enemies (fear) to buy its team space. One unit, two behaviors driven by the
-// state of the battlefield — it gets stronger the more carnage there is.
-function castNecromancer(ctx: AbilityContext): boolean {
-  const corpse = ctx.claimCorpse();
-  if (corpse) {
-    const { unit } = ctx;
-    ctx.spawnUnit("skeleton", unit.team, {
-      x: clamp(corpse.x, 40, FIELD_WIDTH - 40),
-      y: clamp(corpse.y, 40, FIELD_HEIGHT - 40),
-    });
-    ctx.spawnVfx({
-      kind: "death",
-      pos: { x: corpse.x, y: corpse.y },
-      life: secToTicks(0.5),
-      maxLife: secToTicks(0.5),
-      color: getUnitDef(unit.defId).accent,
-    });
-    return true;
-  }
-  // No corpse to raise — terrify instead.
-  return castFear(ctx);
-}
-
+// --- NECROMANCER: Terrify ----------------------------------------------------
 // Terrify: nearby enemies flee in terror (fear status) and can't attack for 2s.
+// Cast by the Necromancer's custom handler (CombatSystem) via applyTerrify.
 function castFear(ctx: AbilityContext): boolean {
   const { unit, enemies } = ctx;
   const FEAR_RADIUS = 200;
@@ -552,7 +573,7 @@ function castFear(ctx: AbilityContext): boolean {
     if (dist(unit.pos, e.pos) <= FEAR_RADIUS) {
       applyEffect(
         e,
-        makeEffect("fear", { source: unit.uid, durationSec: 2 })
+        makeEffect("fear", { source: unit.uid, durationSec: 1 })
       );
       feared++;
     }
@@ -568,12 +589,13 @@ function castFear(ctx: AbilityContext): boolean {
   return true;
 }
 
-// Necromancer Curse: a heavy single-target damage-over-time on the cast target
-// (42 over 6s). Its own `curse` status so it never merges with poison/venom and
+// Necromancer Curse: a single-target damage-over-time on the cast target
+// (22 over 5.5s). Its own `curse` status so it never merges with poison/venom and
 // isn't stopped by the Aegis Knight's burn/slow/poison ward. The Necromancer's
 // custom cast handler (CombatSystem) calls this on cast completion.
-const CURSE_DURATION_SEC = 6;
-const CURSE_DAMAGE_PER_TICK = 7; // every 1s → 6 ticks → 42 total
+const CURSE_DURATION_SEC = 5.5;
+const CURSE_DAMAGE_PER_TICK = 2; // every 0.5s → 11 ticks → 22 total
+const CURSE_TICK_SEC = 0.5;
 
 export function applyCurse(ctx: AbilityContext): boolean {
   const target = ctx.unit.castTargetUid
@@ -586,7 +608,7 @@ export function applyCurse(ctx: AbilityContext): boolean {
       source: ctx.unit.uid,
       durationSec: CURSE_DURATION_SEC,
       damagePerTick: CURSE_DAMAGE_PER_TICK,
-      tickIntervalSec: 1,
+      tickIntervalSec: CURSE_TICK_SEC,
     })
   );
   ctx.spawnVfx({

@@ -43,6 +43,7 @@ import {
   abilityCooldownTicks,
   applyCurse,
   applyLifesteal,
+  applyRejuvenation,
   applyTerrify,
   fireCastAbility,
   onProjectileHit,
@@ -80,9 +81,6 @@ export interface SimState {
    *  A side only loses when its board is empty AND it has no reserves left. */
   playerReserves: number;
   enemyReserves: number;
-  /** Recent corpses (death position + tick), for Necromancer's Raise Dead.
-   *  Pruned after a few seconds so only fresh corpses can be raised. */
-  corpses: { x: number; y: number; tick: number }[];
   /** Units queued to spawn from inside dealDamage (slime splits/clones).
    *  Flushed each tick alongside ability-driven summons. */
   damageSpawns: { defId: string; team: Team; pos: Vec2 }[];
@@ -101,7 +99,6 @@ export function createSimState(seed: number, clockSec: number): SimState {
     idCounter: 0,
     playerReserves: 0,
     enemyReserves: 0,
-    corpses: [],
     damageSpawns: [],
   };
 }
@@ -240,21 +237,45 @@ function makeDamageDealer(state: SimState) {
           maxLife: secToTicks(0.5),
           color: getUnitDef(target.defId).accent,
         });
+      } else if (target.defId === "berserker" && !target.lastStandUsed) {
+        // Berserker Last Stand: once per life, a killing blow leaves it at 1 HP and
+        // unkillable for 5s. Unlike Vanish it does NOT stealth — it stays in the
+        // fight, and its kill-heal can claw HP back before the window closes.
+        target.lastStandUsed = true;
+        target.hp = 1;
+        applyEffect(
+          target,
+          makeEffect("death_immune", { source: target.uid, durationSec: 5 })
+        );
+        spawnFloatingText(state, target, "Last Stand!", "heal");
+        spawnVfx(state, {
+          kind: "slam",
+          pos: { x: target.pos.x, y: target.pos.y },
+          life: secToTicks(0.5),
+          maxLife: secToTicks(0.5),
+          color: getUnitDef(target.defId).accent,
+        });
       } else {
         transitionTo(target, "dead");
         target.targetUid = null;
-        // Record a corpse (skeletons/wolves don't leave raisable corpses).
+
+        // Berserker Bloodthirst: landing a killing blow restores 5% of its max
+        // HP. Fires per kill (a Cleave that drops several foes heals several
+        // times), feeding the Last Stand comeback.
         if (
-          target.defId !== "skeleton" &&
-          target.defId !== "wolf" &&
-          target.defId !== "turret"
+          source.defId === "berserker" &&
+          source !== target &&
+          source.state !== "dead"
         ) {
-          state.corpses.push({
-            x: target.pos.x,
-            y: target.pos.y,
-            tick: state.tick,
-          });
+          const before = source.hp;
+          source.hp = Math.min(
+            source.maxHp,
+            source.hp + Math.round(source.maxHp * 0.05)
+          );
+          const gained = source.hp - before;
+          if (gained > 0) spawnFloatingText(state, source, `+${gained}`, "heal");
         }
+
         spawnVfx(state, {
           kind: "death",
           pos: { x: target.pos.x, y: target.pos.y },
@@ -291,8 +312,11 @@ function makeDamageDealer(state: SimState) {
 function makeHealer(state: SimState) {
   return function heal(target: Unit, amount: number): void {
     if (target.state === "dead" || amount <= 0) return;
+    // Bear Form: the Druid receives 50% more healing while transformed.
+    const amt =
+      target.defId === "summoner" && target.transformed ? amount * 1.5 : amount;
     const before = target.hp;
-    target.hp = Math.min(target.maxHp, target.hp + Math.round(amount));
+    target.hp = Math.min(target.maxHp, target.hp + Math.round(amt));
     const gained = target.hp - before;
     if (gained > 0) spawnFloatingText(state, target, `+${gained}`, "heal");
   };
@@ -336,16 +360,18 @@ function transitionTo(unit: Unit, next: Unit["state"]): void {
   unit.state = next;
 }
 
-// Druid -> Bear. One-way shapeshift: melee bruiser that takes only 20% damage
-// (80% reduction — intentionally dominant per design choice).
+// Druid -> Bear. One-way shapeshift into a melee bruiser. Its thick hide gives
+// 80% damage reduction, but only for the first 5s (then it's a normal-toughness
+// brawler). It keeps its caster kit — still summons wolves and Rejuvenates.
 function transformDruid(state: SimState, unit: Unit): void {
   unit.transformed = true;
   unit.range = 48; // melee
   unit.damage = 26; // bigger claws
   unit.attackSpeed = 1.1; // faster than caster form
   unit.moveSpeed = 78; // charges in
-  unit.damageTakenMult = 0.2; // thick hide — takes only 20% damage (80% reduction)
-  unit.abilityCooldown = 99999; // stop summoning while a bear
+  unit.damageTakenMult = 0.2; // thick hide — takes only 20% damage…
+  unit.bearGuardTimer = secToTicks(5); // …for 5s, then reverts to normal
+  unit.abilityCooldown = 0; // keeps summoning as a bear
   unit.attackCooldown = 0;
   // Burst of leaves/spirit energy on transform.
   spawnVfx(state, {
@@ -555,10 +581,8 @@ function tryShadowStep(
 // Necromancer casting. It juggles two casts on one cast bar, so it's handled
 // here instead of the shared mage pipeline: its big Curse (long cooldown) when
 // ready, otherwise Terrify. Raise Dead is a separate passive (periodic spawn).
-const NECRO_CURSE_CAST_SEC = 1.5;
-const NECRO_CURSE_CD_SEC = 14; // the "big cooldown"
-const NECRO_TERRIFY_CAST_SEC = 1.2;
-const NECRO_TERRIFY_CD_SEC = 7;
+// Cast times + cooldowns come from the ability data (curse / fear_aura) so the
+// engine and the detail panel never drift.
 const NECRO_FEAR_REACH = 210; // a foe must be roughly within Terrify's range to bother
 
 function necroHasFearTarget(unit: Unit, enemies: Unit[]): boolean {
@@ -594,18 +618,18 @@ function stepNecromancerCast(state: SimState, ctx: AbilityContext): boolean {
 
   // Curse first (saved for its long cooldown), then Terrify.
   if (unit.curseCooldown <= 0 && target && target.state !== "dead") {
-    unit.castTicks = secToTicks(NECRO_CURSE_CAST_SEC);
+    unit.castTicks = abilityCastTimeTicks("curse");
     unit.castTicksMax = unit.castTicks;
     unit.castTargetUid = target.uid;
-    unit.curseCooldown = secToTicks(NECRO_CURSE_CD_SEC);
+    unit.curseCooldown = abilityCooldownTicks("curse");
     transitionTo(unit, "casting");
     return true;
   }
   if (unit.abilityCooldown <= 0 && necroHasFearTarget(unit, ctx.enemies)) {
-    unit.castTicks = secToTicks(NECRO_TERRIFY_CAST_SEC);
+    unit.castTicks = abilityCastTimeTicks("fear_aura");
     unit.castTicksMax = unit.castTicks;
     unit.castTargetUid = null; // AoE → Terrify on completion
-    unit.abilityCooldown = secToTicks(NECRO_TERRIFY_CD_SEC);
+    unit.abilityCooldown = abilityCooldownTicks("fear_aura");
     transitionTo(unit, "casting");
     return true;
   }
@@ -627,13 +651,14 @@ export function stepSimulation(state: SimState): void {
   const dealDamage = makeDamageDealer(state);
   const heal = makeHealer(state);
 
-  // 1. Status effect timers + DoT.
-  const dots = tickEffects(living);
+  // 1. Status effect timers + DoT / HoT.
+  const { dots, hots } = tickEffects(living);
   for (const { unit, damage } of dots) {
     const src = unit.effects.find((e) => e.type === "burn" || e.type === "poison");
     const source = src ? byUid.get(src.source) ?? unit : unit;
     dealDamage(unit, damage, source);
   }
+  for (const { unit, amount } of hots) heal(unit, amount);
 
   // Recompute living after DoT (some may have died).
   const alive = state.units.filter((u) => u.state !== "dead");
@@ -669,6 +694,14 @@ export function stepSimulation(state: SimState): void {
     if (unit.blinkCooldown > 0) unit.blinkCooldown--;
     if (unit.shadowCooldown > 0) unit.shadowCooldown--;
     if (unit.curseCooldown > 0) unit.curseCooldown--;
+    if (unit.rejuvCooldown > 0) unit.rejuvCooldown--;
+
+    // Bear Form's 80% damage reduction lasts 5s, then the bear reverts to normal
+    // toughness. (Only the transformed Druid ever sets bearGuardTimer.)
+    if (unit.bearGuardTimer > 0) {
+      unit.bearGuardTimer--;
+      if (unit.bearGuardTimer === 0) unit.damageTakenMult = 1;
+    }
 
     // Trickster re-cloak: a beat after it last struck, it melts back into stealth.
     // (Only the Trickster ever sets recloakTimer, so no defId gate is needed.)
@@ -697,9 +730,8 @@ export function stepSimulation(state: SimState): void {
     }
 
     // Necromancer Raise Dead: a passive that continuously raises a skeleton every
-    // 3s (no corpse needed). The summon cap is enforced when spawns flush, so it
-    // can't flood the board.
-    if (unit.defId === "necromancer" && state.tick % secToTicks(3) === 0) {
+    // 5s. The summon cap is enforced when spawns flush, so it can't flood the board.
+    if (unit.defId === "necromancer" && state.tick % secToTicks(5) === 0) {
       pendingSpawns.push({
         defId: "skeleton",
         team: unit.team,
@@ -823,25 +855,22 @@ export function stepSimulation(state: SimState): void {
       spawnProjectile: (p) => spawnProjectile(state, p),
       spawnVfx: (v) => spawnVfx(state, v),
       spawnUnit: (defId, team, pos) => pendingSpawns.push({ defId, team, pos }),
-      claimCorpse: () => {
-        // Nearest recent corpse to the caster; remove it so it's used once.
-        if (state.corpses.length === 0) return null;
-        let bestIdx = -1;
-        let bestD = Infinity;
-        for (let i = 0; i < state.corpses.length; i++) {
-          const c = state.corpses[i];
-          const d = (c.x - unit.pos.x) ** 2 + (c.y - unit.pos.y) ** 2;
-          if (d < bestD) {
-            bestD = d;
-            bestIdx = i;
-          }
-        }
-        if (bestIdx < 0) return null;
-        const c = state.corpses[bestIdx];
-        state.corpses.splice(bestIdx, 1);
-        return { x: c.x, y: c.y };
-      },
     };
+
+    // Druid Rejuvenation: an instant HoT on the most-wounded nearby ally (incl.
+    // itself), on its own cooldown. Works in bear form too. Instant, so it never
+    // uses the cast bar — but it won't fire mid-summon-cast.
+    if (
+      unit.defId === "summoner" &&
+      unit.castTicks <= 0 &&
+      unit.rejuvCooldown <= 0 &&
+      !isStunned(unit) &&
+      !isSilenced(unit)
+    ) {
+      if (applyRejuvenation(abilityCtx)) {
+        unit.rejuvCooldown = abilityCooldownTicks("rejuvenation");
+      }
+    }
 
     // Cast handling. An in-flight cast (the cast bar) ticks down and fires its
     // spell on completion, locking the mage meanwhile. Otherwise, begin a
@@ -934,10 +963,6 @@ export function stepSimulation(state: SimState): void {
   for (const v of state.vfx) v.life--;
   state.vfx = state.vfx.filter((v) => v.life > 0);
 
-  // Prune corpses older than ~8s so only fresh ones can be raised.
-  const corpseTtl = secToTicks(8);
-  state.corpses = state.corpses.filter((c) => state.tick - c.tick <= corpseTtl);
-
   // 6. Animation (presentation only).
   stepAnimation(state.units);
 
@@ -954,7 +979,9 @@ function performBasicAttack(
   heal: (t: Unit, amt: number) => void
 ): void {
   const def = getUnitDef(unit.defId);
-  const ranged = def.range > 80;
+  // Use the LIVE range, not the static def — the Druid's bear form drops its range
+  // to melee, so it should swing, not fire a projectile.
+  const ranged = unit.range > 80;
 
   // Assassin Ambush: the first strike out of opening stealth stuns the victim for
   // 3s and reveals the assassin. One-time (ambushReady) so a later re-stealth

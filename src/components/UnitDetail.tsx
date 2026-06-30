@@ -57,8 +57,7 @@ function StatBar({
 export function UnitDetail({ defId, deck, onToggle, onClose }: Props) {
   const def = getUnitDef(defId);
   const rarity = RARITIES[def.rarity];
-  const ability = ABILITIES[def.ability];
-  const abilityKind = ability.cooldown > 0 ? "Active" : "Passive";
+  const abilityIds = [def.ability, ...(def.abilities ?? [])];
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -144,29 +143,35 @@ export function UnitDetail({ defId, deck, onToggle, onClose }: Props) {
             />
           </div>
 
-          <div className="detail-section">
-            <div className="detail-skill-head">
-              <span className="detail-skill-name">{ability.name}</span>
-              <span className={`detail-tag ${abilityKind === "Active" ? "active" : "passive"}`}>
-                {abilityKind}
-              </span>
-              {(ability.castTimeSec || ability.cooldown > 0) && (
-                <span className="detail-skill-meta">
-                  {ability.castTimeSec ? (
-                    <span className="detail-cd" title="Cast time">
-                      ⏲ Cast {ability.castTimeSec}s
+          {abilityIds.map((id) => {
+            const ab = ABILITIES[id];
+            const kind = ab.cooldown > 0 ? "Active" : "Passive";
+            return (
+              <div className="detail-section" key={id}>
+                <div className="detail-skill-head">
+                  <span className="detail-skill-name">{ab.name}</span>
+                  <span className={`detail-tag ${kind === "Active" ? "active" : "passive"}`}>
+                    {kind}
+                  </span>
+                  {(ab.castTimeSec || ab.cooldown > 0) && (
+                    <span className="detail-skill-meta">
+                      {ab.castTimeSec ? (
+                        <span className="detail-cd" title="Cast time">
+                          ⏲ Cast {ab.castTimeSec}s
+                        </span>
+                      ) : null}
+                      {ab.cooldown > 0 ? (
+                        <span className="detail-cd" title="Cooldown">
+                          ⟳ {ab.cooldown}s
+                        </span>
+                      ) : null}
                     </span>
-                  ) : null}
-                  {ability.cooldown > 0 ? (
-                    <span className="detail-cd" title="Cooldown">
-                      ⟳ {ability.cooldown}s
-                    </span>
-                  ) : null}
-                </span>
-              )}
-            </div>
-            <div className="detail-skill-text">{ability.description}</div>
-          </div>
+                  )}
+                </div>
+                <div className="detail-skill-text">{ab.description}</div>
+              </div>
+            );
+          })}
 
           {def.traits?.map((trait) => (
             <div className="detail-section" key={trait.name}>

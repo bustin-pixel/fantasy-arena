@@ -77,7 +77,7 @@ export const ABILITIES: Record<AbilityId, AbilityDef> = {
     name: "Mend",
     description: "Heals the most-wounded ally in range for 32.",
     cooldown: 5,
-    castTimeSec: 2.5,
+    castTimeSec: 1.5,
   },
   venom: {
     id: "venom",
@@ -97,7 +97,7 @@ export const ABILITIES: Record<AbilityId, AbilityDef> = {
     id: "curse",
     name: "Curse",
     description:
-      "Afflicts an enemy with a withering curse — heavy damage over time (42 over 6s). Long cooldown.",
+      "Afflicts an enemy with a withering curse — damage over time (22 over 5.5s). Long cooldown.",
     cooldown: 14,
     castTimeSec: 1.5,
   },
@@ -105,25 +105,29 @@ export const ABILITIES: Record<AbilityId, AbilityDef> = {
     id: "summon_wolves",
     name: "Summon Wolves",
     description: "Calls a spirit wolf to fight alongside it.",
-    cooldown: 12,
+    cooldown: 10,
+    castTimeSec: 0.5,
+  },
+  rejuvenation: {
+    id: "rejuvenation",
+    name: "Rejuvenation",
+    description:
+      "Instant: lays a healing-over-time on an injured ally — 6 HP every 2s for 8s (24 total).",
+    cooldown: 16,
   },
   bloodrage: {
     id: "bloodrage",
     name: "Bloodrage",
-    description: "Passive: the lower its health, the more damage and speed it gains.",
+    description:
+      "Passive: the lower its health, the more damage and attack speed it gains. Each kill restores 5% of its maximum health.",
     cooldown: 0,
   },
   fear_aura: {
     id: "fear_aura",
     name: "Terrify",
-    description: "Nearby enemies flee in terror for 2s, unable to attack.",
-    cooldown: 8,
-  },
-  raise_dead: {
-    id: "raise_dead",
-    name: "Raise Dead",
-    description: "Raises a skeleton from a recent corpse to fight for it.",
-    cooldown: 4,
+    description: "Channels a terrifying wail — nearby enemies flee in terror for 1s, unable to attack.",
+    cooldown: 7,
+    castTimeSec: 1.2,
   },
   slime_split: {
     id: "slime_split",

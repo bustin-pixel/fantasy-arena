@@ -26,6 +26,7 @@ export type StatusEffectType =
   | "haste"
   | "poison"
   | "curse"
+  | "regen"
   | "silence"
   | "stealth"
   | "death_immune"
@@ -45,7 +46,6 @@ export type AbilityId =
   | "charge"
   | "bloodrage"
   | "fear_aura"
-  | "raise_dead"
   | "slime_split"
   | "mystic_shift"
   | "momentum"
@@ -57,6 +57,7 @@ export type AbilityId =
   | "venom"
   | "shadow_step"
   | "curse"
+  | "rejuvenation"
   | "summon_wolves";
 
 export interface Vec2 {
@@ -92,6 +93,10 @@ export interface UnitDef {
   /** Attack range in pixels. */
   range: number;
   ability: AbilityId;
+  /** Secondary abilities beyond the primary `ability`, for multi-ability units
+   *  (e.g. the Necromancer's Terrify alongside Curse). Shown in the detail panel
+   *  with their own Active/Passive tag + cast/cooldown, same as the primary. */
+  abilities?: AbilityId[];
   /** Fraction of basic-attack damage healed back (0..1). Passive; independent
    *  of the ability slot, so a unit can have both lifesteal and an active. */
   lifesteal?: number;
@@ -120,6 +125,8 @@ export interface ActiveStatusEffect {
   tickCountdown?: number;
   /** Damage per DoT application. */
   damagePerTick?: number;
+  /** Heal per HoT application (e.g. the Druid's Rejuvenation). */
+  healPerTick?: number;
   /** Multiplier (e.g. 0.5 for 50% slow). */
   magnitude?: number;
   /** Charges remaining (e.g. shield blocks). */
@@ -161,6 +168,8 @@ export interface Unit {
   ambushReady: boolean;
   /** True once the Ogre's Second Wind full-heal has triggered this match. */
   secondWindUsed: boolean;
+  /** True once the Berserker's Last Stand death-cheat has been spent this life. */
+  lastStandUsed: boolean;
   /** Number of split-clones the slime has already spawned (caps splitting). */
   splitsSpawned: number;
   /** Mystic Archer's stance: "light" (single-target) or "dark" (chain AoE). */
@@ -179,6 +188,10 @@ export interface Unit {
   recloakTimer: number;
   /** Necromancer: ticks until its big Curse (DoT) cast is ready again. */
   curseCooldown: number;
+  /** Druid: ticks until Rejuvenation (instant HoT) is ready again. */
+  rejuvCooldown: number;
+  /** Druid: ticks of Bear Form's 80% damage reduction left (0 = expired). */
+  bearGuardTimer: number;
   /** Arcane Mage: missiles left to fire in the current Arcane Barrage volley
    *  (0 = not firing). The volley streams out one missile at a time. */
   barrageShots: number;

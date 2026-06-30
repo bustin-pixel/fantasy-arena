@@ -54,7 +54,13 @@ Special mechanics are gated by `defId` string literals in `CombatSystem.ts`:
   field (the casters) — see `isMagicSource` in CombatSystem.
 - `"engineer"` → Field Repairs (defId-gated periodic heal of itself + nearby
   turrets). `"turret"` → stationary (moveSpeed 0) ranged construct, summoned via
-  Deploy Turret; leaves no raisable corpse (like `skeleton`/`wolf`).
+  Deploy Turret (a non-deck summon, like `skeleton`/`wolf`).
+- `"necromancer"` → custom cast handler (Curse DoT / Terrify fear on one cast bar,
+  see `stepNecromancerCast`) + Raise Dead, a periodic passive that summons a
+  skeleton every 5s.
+- `"rogue"` / `"trickster"` → opening stealth that reveals on first strike; the
+  Rogue's Venom poison-on-hit, the Trickster's Shadow Step (reactive cast-interrupt
+  blink) + re-cloak.
 - `"mystic_archer"` → Light/Dark form-tagged shots + on-hit stack/detonate
   resolution (`resolveMysticHit`), plus the Momentum passive: each form shift
   adds a `momentumStacks` (capped at 5) that ramps attack speed +15%/shift up to
@@ -124,7 +130,6 @@ targets 8 active units / 60fps on mobile.
   wolves, skeletons, slime clones.
 - **Absorb shield / overhealth** (shieldHp / shieldHpMax) — silver health-bar
   segment, soaks before HP. Currently only the Knight uses it; any unit can.
-- **Corpse tracking** (state.corpses) — for raise-from-the-dead style effects.
 - **Forced targeting** (tauntedByUid) and **flee behavior** (fear) — reusable
   crowd control.
 - **One-time passives** (vanishUsed, secondWindUsed, splitsSpawned, transformed)
