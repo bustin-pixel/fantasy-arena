@@ -47,7 +47,7 @@ export function SwarmIcon() {
         <ellipse cx="-5.4" cy="-4" rx="4.2" ry="5" fill="#12100d" />
         <ellipse cx="5.4" cy="-4" rx="4.2" ry="5" fill="#12100d" />
         <path d="M0 -0.5 C-1.4 2 -2.6 2.6 -2 5 L0 3.6 L2 5 C2.6 2.6 1.4 2 0 -0.5 Z" fill="#12100d" />
-        <g stroke="#6b6552" stroke-width="0.5">
+        <g stroke="#6b6552" strokeWidth="0.5">
           <rect x="-7.5" y="8" width="2.4" height="4.5" rx="0.8" />
           <rect x="-4.4" y="8" width="2.4" height="5" rx="0.8" />
           <rect x="-1.2" y="8" width="2.4" height="5" rx="0.8" />
