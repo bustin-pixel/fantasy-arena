@@ -325,6 +325,19 @@ body {
   overflow: hidden;
   pointer-events: none;
 }
+/* Viewport-fixed vignette over the brick — stays put as pages scroll (so the
+   framing is consistent top-to-bottom, not tied to a page's scroll height). */
+.shell-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    82% 70% at 50% 40%,
+    transparent 48%,
+    rgba(2, 4, 10, 0.76) 100%
+  );
+}
 /* The corridor: 3 pages wide, panned 1:1 with the pager via JS transform. */
 .hall {
   position: absolute;
@@ -376,20 +389,7 @@ body {
   scroll-snap-align: start;
   scroll-snap-stop: always;
 }
-/* A soft vignette per page frames the content over the brick hall. */
-.pager-page::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  background: radial-gradient(
-    78% 66% at 50% 42%,
-    transparent 46%,
-    rgba(2, 4, 10, 0.76) 100%
-  );
-}
-/* Page content rides above the vignette and the brick hall. */
+/* Page content rides above the brick hall. */
 .pager-page > .screen {
   position: relative;
   z-index: 1;
