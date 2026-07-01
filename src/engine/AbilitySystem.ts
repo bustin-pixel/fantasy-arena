@@ -11,7 +11,7 @@
 
 import type { Projectile, Unit, Vfx } from "@/types";
 import { ABILITIES } from "@/data/abilities";
-import { getUnitDef } from "@/data/units";
+import { getUnitDef, NON_DECK_UNITS } from "@/data/units";
 import {
   FIELD_HEIGHT,
   FIELD_WIDTH,
@@ -20,6 +20,7 @@ import {
 import { clamp, dist, dir } from "@/utils/math";
 import {
   applyEffect,
+  isPolymorphed,
   isSilenced,
   isStealthed,
   isStunned,
@@ -91,6 +92,10 @@ function dispatchAbility(ctx: AbilityContext): boolean {
       return castDeployTurret(ctx);
     case "summon_wolves":
       return castSummonWolves(ctx);
+    case "polymorph":
+      return castPolymorph(ctx);
+    case "mend_beast":
+      return castMendBeast(ctx);
     case "fear_aura":
       return castFear(ctx);
     default:
@@ -123,6 +128,8 @@ export function fireCastAbility(ctx: AbilityContext): boolean {
  *  the Cleric would lock itself in place casting into nothing. */
 export function wantsToCast(ctx: AbilityContext): boolean {
   if (ctx.unit.ability === "mend") return mendTarget(ctx) != null;
+  if (ctx.unit.ability === "polymorph")
+    return polymorphTarget(ctx.unit, ctx.enemies) != null;
   return true;
 }
 
@@ -467,6 +474,86 @@ export function applyRejuvenation(ctx: AbilityContext): boolean {
   ctx.spawnVfx({
     kind: "shield_pop",
     pos: { x: best.pos.x, y: best.pos.y - 4 },
+    life: secToTicks(0.5),
+    maxLife: secToTicks(0.5),
+    color: "#a3e635",
+  });
+  return true;
+}
+
+// --- MAGE: Polymorph ---------------------------------------------------------
+// Turns the nearest non-summoned enemy into a harmless sheep for 7s. Only real
+// (deckable) units can be sheeped — summons (wolves, skeletons, slime clones,
+// turrets) are immune. Skips already-sheeped and stealthed foes.
+const POLYMORPH_DURATION_SEC = 7;
+
+function polymorphTarget(unit: Unit, enemies: Unit[]): Unit | null {
+  let best: Unit | null = null;
+  let bestD = Infinity;
+  for (const e of enemies) {
+    if (e.state === "dead") continue;
+    if (NON_DECK_UNITS.has(e.defId)) continue; // not summoned units
+    if (isPolymorphed(e) || isStealthed(e)) continue;
+    const d = dist(unit.pos, e.pos);
+    if (d < bestD || (d === bestD && best != null && e.uid < best.uid)) {
+      bestD = d;
+      best = e;
+    }
+  }
+  return best;
+}
+
+function castPolymorph(ctx: AbilityContext): boolean {
+  const target = polymorphTarget(ctx.unit, ctx.enemies);
+  if (!target) return false;
+  applyEffect(
+    target,
+    makeEffect("polymorph", {
+      source: ctx.unit.uid,
+      durationSec: POLYMORPH_DURATION_SEC,
+    })
+  );
+  // It can't keep acting on whatever it was doing.
+  target.targetUid = null;
+  target.castTicks = 0;
+  target.castTicksMax = 0;
+  ctx.spawnVfx({
+    kind: "frost",
+    pos: { x: target.pos.x, y: target.pos.y - 4 },
+    life: secToTicks(0.5),
+    maxLife: secToTicks(0.5),
+    color: "#f0abfc", // magic pink poof
+  });
+  return true;
+}
+
+// --- HUNTER: Mend Beast ------------------------------------------------------
+// Instant: lays a heal-over-time on the Hunter's boar (5 HP/s for 6s = 30).
+// Only fires when the boar is actually wounded, so the cooldown isn't wasted.
+function castMendBeast(ctx: AbilityContext): boolean {
+  let boar: Unit | null = null;
+  let bestMissing = 0;
+  for (const a of ctx.allies) {
+    if (a.defId !== "boar" || a.state === "dead") continue;
+    const missing = a.maxHp - a.hp;
+    if (missing > bestMissing) {
+      boar = a;
+      bestMissing = missing;
+    }
+  }
+  if (!boar) return false;
+  applyEffect(
+    boar,
+    makeEffect("regen", {
+      source: ctx.unit.uid,
+      healPerTick: 5,
+      tickIntervalSec: 1,
+      durationSec: 6,
+    })
+  );
+  ctx.spawnVfx({
+    kind: "shield_pop",
+    pos: { x: boar.pos.x, y: boar.pos.y - 4 },
     life: secToTicks(0.5),
     maxLife: secToTicks(0.5),
     color: "#a3e635",

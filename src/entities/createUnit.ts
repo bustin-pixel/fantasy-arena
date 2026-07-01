@@ -45,6 +45,8 @@ export function createUnit(defId: string, team: Team, pos: Vec2): Unit {
     curseCooldown: 0,
     rejuvCooldown: 0,
     bearGuardTimer: 0,
+    boarCooldown: 0,
+    trapCooldown: 0,
     barrageShots: 0,
     barrageTimer: 0,
     barrageTargetUid: null,

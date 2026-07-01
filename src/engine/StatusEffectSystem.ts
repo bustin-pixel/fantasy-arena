@@ -96,6 +96,11 @@ export function isFeared(unit: Unit): boolean {
   return hasEffect(unit, "fear");
 }
 
+/** Turned into a harmless sheep — fully incapacitated (can't move, attack, cast). */
+export function isPolymorphed(unit: Unit): boolean {
+  return hasEffect(unit, "polymorph");
+}
+
 export function isSilenced(unit: Unit): boolean {
   return hasEffect(unit, "silence");
 }
