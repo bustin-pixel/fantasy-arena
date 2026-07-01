@@ -19,6 +19,9 @@
 * {
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
+  /* Game UI — never let taps/drags select text. */
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 html,
@@ -377,7 +380,6 @@ body {
   cursor: grabbing !important;
 }
 .pager.dragging {
-  user-select: none;
   scroll-behavior: auto;
 }
 .pager-page {
