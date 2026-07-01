@@ -9,11 +9,7 @@ import { MAX_DECK } from "@/utils/constants";
 import { generateSeed } from "@/utils/rng";
 import { useGameState } from "@/state/GameStateContext";
 
-interface Props {
-  onBattle: () => void;
-}
-
-export function HubScreen({ onBattle }: Props) {
+export function HubScreen() {
   const { save, setDeck, setSortMode } = useGameState();
   const deck = save.deck;
   const sortMode = save.sortMode;
@@ -45,11 +41,6 @@ export function HubScreen({ onBattle }: Props) {
   const randomize = () => setDeck(generateRandomDeck(generateSeed(), MAX_DECK));
   const clearDeck = () => setDeck([]);
 
-  const winRate = useMemo(() => {
-    const total = save.wins + save.losses;
-    return total === 0 ? 0 : Math.round((save.wins / total) * 100);
-  }, [save.wins, save.losses]);
-
   // Roster order for the card grid. "rarity" groups rarest-first; ties keep
   // their original (stable) order so the grid stays predictable.
   const rosterIds = useMemo(() => {
@@ -63,22 +54,8 @@ export function HubScreen({ onBattle }: Props) {
     <div className="screen hub">
       <header className="hub-header">
         <div>
-          <h1 className="title">Fantasy Arena</h1>
-          <p className="subtitle">Deploy. Watch. Conquer.</p>
-        </div>
-        <div className="stat-block">
-          <div className="stat">
-            <span className="stat-val">{save.wins}</span>
-            <span className="stat-lbl">Wins</span>
-          </div>
-          <div className="stat">
-            <span className="stat-val">{save.losses}</span>
-            <span className="stat-lbl">Losses</span>
-          </div>
-          <div className="stat">
-            <span className="stat-val">{winRate}%</span>
-            <span className="stat-lbl">Win Rate</span>
-          </div>
+          <h1 className="title">Collection</h1>
+          <p className="subtitle">Build your warband</p>
         </div>
       </header>
 
@@ -167,16 +144,6 @@ export function HubScreen({ onBattle }: Props) {
           at once.
         </p>
       </section>
-
-      <div className="hub-footer">
-        <button
-          className="btn btn-battle"
-          disabled={deck.length < 2}
-          onClick={onBattle}
-        >
-          {deck.length < 2 ? "Pick at least 2 units" : "Battle"}
-        </button>
-      </div>
 
       {detailId && (
         <UnitDetail

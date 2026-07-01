@@ -1,26 +1,31 @@
 import { useState } from "react";
 import { GameStateProvider, useGameState } from "@/state/GameStateContext";
-import { HubScreen } from "@/screens/HubScreen";
+import { AppShell } from "@/screens/AppShell";
 import { BattleScreen } from "@/screens/BattleScreen";
-
-type Screen = "hub" | "battle";
+import type { BattleMode } from "@/hooks/useBattleEngine";
 
 function Shell() {
-  const [screen, setScreen] = useState<Screen>("hub");
+  const [view, setView] = useState<"shell" | "battle">("shell");
+  const [battleMode, setBattleMode] = useState<BattleMode>("solo");
   const { save } = useGameState();
   // Snapshot the deck at battle start so mid-battle edits can't mutate it.
   const [activeDeck, setActiveDeck] = useState<string[]>([]);
 
-  if (screen === "battle") {
+  if (view === "battle") {
     return (
-      <BattleScreen deck={activeDeck} onExit={() => setScreen("hub")} />
+      <BattleScreen
+        deck={activeDeck}
+        mode={battleMode}
+        onExit={() => setView("shell")}
+      />
     );
   }
   return (
-    <HubScreen
-      onBattle={() => {
+    <AppShell
+      onBattle={(mode) => {
         setActiveDeck(save.deck.slice(0, 4));
-        setScreen("battle");
+        setBattleMode(mode);
+        setView("battle");
       }}
     />
   );
