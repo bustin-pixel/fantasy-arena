@@ -24,7 +24,7 @@ export function HomeScreen({ onBattle }: Props) {
     <div className="screen home">
       <header className="home-header">
         <h1 className="title home-title">Fantasy Arena</h1>
-        <p className="subtitle">Deploy. Watch. Conquer.</p>
+        <p className="subtitle">Deploy &amp; Conquer.</p>
       </header>
 
       <div className="stat-block home-stats">
