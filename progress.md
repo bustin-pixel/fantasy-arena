@@ -4,9 +4,10 @@ Forward-looking only — what's planned, deferred, and open. For what's already
 **done** and why, read the git history (`git log --oneline`, `gh pr list`) — that's
 the source of truth, so this file deliberately doesn't duplicate it.
 
-**Current state:** deterministic 4v4 auto-battler, 18 deckable units, hub deck-builder
-with a click-to-inspect detail panel, in-battle unit tooltips, and a 2v2 + countdown
-start. Solo battles only. Deployed to Netlify (auto-deploys on merge to `master`).
+**Current state:** deterministic 4v4 auto-battler, 20 deckable units, a swipeable
+3-page app shell (Collection / Home / Compendium) over a scrolling dungeon-crypt
+background, click-to-inspect detail panel, in-battle tooltips, 2v2 + countdown start.
+Solo ("Arena") battles only. Deployed to Netlify (auto-deploys on merge to `master`).
 
 ---
 
@@ -49,9 +50,11 @@ New piece: a seeded **`WaveController`** (meta layer) that trickles spawns into
 creep in). Free wins already in the engine: `MAX_MELEE_SURROUND = 3` stops the horde
 dogpiling one hero (extras queue → looks like swarming *and* bounds collision cost).
 
-#### PvE monster bestiary (brainstormed, non-deckable — add ids to `NON_DECK_UNITS`)
-Reuse shipped systems so each stays deterministic; several can recolor existing sprites
-(skeleton/wolf/slime). Fodder stat band ≈ Skeleton `45hp/8dmg` … Boar `140hp`.
+#### PvE monster bestiary — APPROVED (build ALL of these for Swarm mode)
+User greenlit the full list below (2026-07-01). Non-deckable — add ids to
+`NON_DECK_UNITS`. Reuse shipped systems so each stays deterministic; several can
+recolor existing sprites (skeleton/wolf/slime). Fodder stat band ≈ Skeleton
+`45hp/8dmg` … Boar `140hp`.
 - **Fodder:** Zombie Shambler (slow-on-bite), Giant Rat (tiny/fast/swarm), Skeleton (exists).
 - **Runners:** Ghoul (haste on ally death), Bat Swarm.
 - **Ranged:** Skeleton Archer (plain arrows), Spider (poison glob), Imp (burn bolts).
@@ -74,64 +77,26 @@ for exactly this.
 
 ## Systems
 
-### App shell — swipeable pages + Compendium (design locked)
-Turn the app into a mobile-style **pager of three pages** with battle as a full-screen
-overlay. All UI/meta — **zero engine changes**; the sim stays pure.
-
-- **Shell state:** replace [App.tsx](src/App.tsx)'s `screen: "hub" | "battle"` enum with
-  two concepts: `page: "collection" | "home" | "compendium"` (pager position; persist as
-  `lastPage`) and `view: "shell" | "battle"` + `battleMode: "pve" | "pvp"`.
-  **Battle is an overlay, NOT a swipe page** (keeps the canvas isolated, stops the pager
-  fighting the finger mid-fight).
-- **Layout (Clash-Royale style):** `[Collection] ← [Home/Modes] → [Compendium]`, **Home is
-  the landing/center.** Tab-dots indicator.
-- **Swipe = CSS scroll-snap:** horizontal `overflow-x` track, `scroll-snap-type: x
-  mandatory`; each page `width:100vw; scroll-snap-align:start`. Programmatic nav via
-  `scrollIntoView`; active page from scroll position / IntersectionObserver. Native mobile
-  momentum, near-zero JS.
-- **Home page:** two mode cards — **PvE (Swarm)** (not built → "Coming Soon"/prototype) and
-  **Arena/PvP** (scaffolded, not server-ready → local-AI now or "Coming Soon") — plus W/L +
-  username (already in the save). Today's "BATTLE" maps to a mode.
-- **Collection page:** today's `HubScreen` (deck builder), unchanged.
-- **Compendium page:** **all units**, **3-tier reveal** — Undiscovered (dark silhouette +
-  `???`) → Encountered (name + silhouette, seen in battle) → Defeated (full info, killed
-  one). Reuse [UnitDetail.tsx](src/components/UnitDetail.tsx) for unlocked entries;
-  silhouette = `drawUnitSprite` tinted dark. Has real content NOW via AI hero opponents;
-  monsters slot in when PvE ships.
-- **Persistence (save → v2):** add `bestiary: Record<defId, { encountered: boolean;
-  defeated: boolean }>` (+ optional `lastPage`). Bump `version` to 2; `loadSave` already
-  merges defaults (backward-safe) — sanitize drops unknown ids.
-- **Recording (sim stays pure):** on **battle exit**, the Shell reads the final snapshot's
-  enemy units and calls new `recordEncounter(defIds)` / `recordDefeated(defIds)` on
-  `GameStateContext` (sibling to `recordResult`). Present → encountered; died → defeated.
-  The engine never learns about the bestiary.
-
-#### Dungeon-crypt page backgrounds (design locked, not built)
-Give the pager a themed backdrop, all vector SVG (matches the drawn aesthetic —
-no image assets), themeable + crisp + animatable.
-- **Look:** cold damp crypt — grey-blue brick, heavy green moss, draping vines,
-  dim **flickering torches** (flame wobble + glow pulse via CSS `@keyframes`,
-  disabled under `prefers-reduced-motion`).
-- **Vines:** drape from the top corners + over the arch only. No wall moss, no
-  ground-climbing vines, no floor debris (skulls/weapons were tried and cut).
-- **Home slice:** the arched gate with iron portcullis + pitch-black interior,
-  flanked by the two torches; the Home UI composites on top — title + stat pill up
-  high, the two mode cards centered over the gate mouth ("at the threshold"), tab
-  bar at the bottom. Card backgrounds darkened (~90% opaque) for contrast against
-  the dark gate. (Optional: swap the mode-card emoji for the vector crossed-swords
-  / skull icons from the mockup.)
-- **Collection / Compendium slices:** the same crypt wall + vines (shared base so
-  it flows seamlessly across swipes), no gate/torches — plain enough not to fight
-  the deck grid / bestiary content.
-- **Build shape (built):** a continuous "hall" behind the pager — a 3-page-wide
-  layer (`.hall`) panned **1:1 with the pager scroll via JS transform** so swiping
-  feels like walking down the corridor (brick is one seamless surface; the
-  `DungeonGate` lives in the middle/Home third; `DungeonVines` per third). The gate
-  is **bottom-anchored and height-driven** (`svg { height: 88% }`) so it reaches
-  the floor and scales to viewport *height* — which also keeps it from ballooning
-  on wide desktops (no forced column). Per-page vignette via `.pager-page::before`.
-  TODO: torches sit at the gate's outer edges and crop a little on narrow phones;
-  a dedicated desktop layout is still open.
+### Compendium — slice 2 (the shell + dungeon background SHIPPED in #35)
+Built & merged (#35): the swipeable pager (`AppShell.tsx`; Collection ← Home →
+Compendium, Home landing), desktop click-drag to swipe, vector mode icons
+(`ModeIcons.tsx`), and the scrolling dungeon-crypt **hall** — one seamless brick
+surface + `DungeonGate` with flickering torches, panned 1:1 with the pager so swiping
+feels like walking down a corridor. Home has Arena (playable vs AI) + Swarm·PvE
+("Coming soon"). The **Compendium page is still a placeholder** — slice 2 fills it in:
+- **Save v2:** add `bestiary: Record<defId, { encountered: boolean; defeated: boolean }>`
+  (+ optional `lastPage`). Bump `version` to 2; `loadSave` already merges defaults.
+- **Recording (sim stays pure):** on battle exit the Shell reads the final snapshot's
+  enemy units → new `recordEncounter(defIds)` / `recordDefeated(defIds)` on
+  `GameStateContext`. Present → encountered; died → defeated. The engine never learns
+  about the bestiary.
+- **The page:** all units, **3-tier reveal** — Undiscovered (dark silhouette + `???`) →
+  Encountered (name + silhouette) → Defeated (full info via `UnitDetail`). Silhouette =
+  `drawUnitSprite` tinted dark. Real content now via AI hero opponents; monsters slot in
+  when PvE ships.
+- Still open: a **dedicated desktop battle/layout** — the shell is phone-first (gate
+  tuned so torches flank on narrow screens; the battle canvas is capped at 480px, safe
+  to scale up on desktop since the 480×720 sim is display-independent).
 
 ### Items / equipment for units (planned)
 Gear that modifies a unit's stats or kit (weapon → +damage, armor → +HP / damage
