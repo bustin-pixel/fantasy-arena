@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { HubScreen } from "@/screens/HubScreen";
 import { HomeScreen } from "@/screens/HomeScreen";
 import { CompendiumScreen } from "@/screens/CompendiumScreen";
+import { DungeonWall } from "@/components/DungeonWall";
+import { DungeonVines } from "@/components/DungeonVines";
+import { DungeonGate } from "@/components/DungeonGate";
 import type { BattleMode } from "@/hooks/useBattleEngine";
 
 interface Props {
@@ -137,6 +140,9 @@ export function AppShell({ onBattle }: Props) {
 
   return (
     <div className="app-shell">
+      <div className="shell-bg" aria-hidden="true">
+        <DungeonWall />
+      </div>
       <div
         className="pager"
         ref={trackRef}
@@ -148,12 +154,16 @@ export function AppShell({ onBattle }: Props) {
         onClickCapture={onClickCapture}
       >
         <section className="pager-page" aria-label="Collection">
+          <DungeonVines />
           <HubScreen />
         </section>
         <section className="pager-page" aria-label="Home">
+          <DungeonVines />
+          <DungeonGate />
           <HomeScreen onBattle={onBattle} />
         </section>
         <section className="pager-page" aria-label="Compendium">
+          <DungeonVines />
           <CompendiumScreen />
         </section>
       </div>
