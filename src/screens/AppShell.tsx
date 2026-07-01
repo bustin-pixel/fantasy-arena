@@ -25,7 +25,13 @@ export function AppShell({ onBattle }: Props) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [page, setPage] = useState(1); // land on Home (center)
   // Live drag state in a ref so pointer handlers never trigger re-renders.
-  const drag = useRef({ active: false, startX: 0, startLeft: 0, moved: false });
+  const drag = useRef({
+    pending: false,
+    active: false,
+    startX: 0,
+    startLeft: 0,
+    moved: false,
+  });
 
   // Jump to Home on mount without animating (direct scrollLeft, not scrollTo).
   useEffect(() => {
@@ -50,40 +56,51 @@ export function AppShell({ onBattle }: Props) {
   // --- Desktop click-and-drag to swipe. Touch/pen keep native scroll-snap. ---
   const onPointerDown = (e: React.PointerEvent) => {
     if (e.pointerType !== "mouse") return; // touch/pen: let native scroll handle it
-    drag.current.moved = false;
+    const d = drag.current;
+    d.moved = false;
+    d.active = false;
+    d.pending = false;
     const track = trackRef.current;
     if (!track) return;
     // Elements with their own horizontal drag (deck reorder) or a modal own the
     // gesture — don't hijack it for a page swipe.
     if ((e.target as HTMLElement).closest(".deck-slot, .detail-overlay")) return;
-    drag.current = {
-      active: true,
-      startX: e.clientX,
-      startLeft: track.scrollLeft,
-      moved: false,
-    };
-    track.classList.add("dragging");
-    track.style.scrollSnapType = "none"; // free drag; we snap on release
-    try {
-      track.setPointerCapture(e.pointerId);
-    } catch {
-      /* capture unsupported — drag still works locally */
-    }
+    // Arm a *potential* drag only — do NOT capture the pointer or disable snap
+    // yet. Capturing on press redirects the trailing click to the pager and
+    // steals it from buttons/cards. We commit to a drag in onPointerMove, once
+    // the pointer actually travels past the threshold.
+    d.pending = true;
+    d.startX = e.clientX;
+    d.startLeft = track.scrollLeft;
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
     const d = drag.current;
-    if (!d.active) return;
+    if (!d.pending && !d.active) return;
     const track = trackRef.current;
     if (!track) return;
     const dx = e.clientX - d.startX;
-    if (Math.abs(dx) > 4) d.moved = true;
+    if (!d.active) {
+      if (Math.abs(dx) < 6) return; // still might be a click — leave it alone
+      // Past the threshold: commit to a drag. Now it's safe to capture + free
+      // the scroll (a real swipe, not a click).
+      d.active = true;
+      d.moved = true;
+      track.classList.add("dragging");
+      track.style.scrollSnapType = "none";
+      try {
+        track.setPointerCapture(e.pointerId);
+      } catch {
+        /* capture unsupported — drag still works locally */
+      }
+    }
     track.scrollLeft = d.startLeft - dx;
   };
 
   const endDrag = (e: React.PointerEvent) => {
     const d = drag.current;
-    if (!d.active) return;
+    d.pending = false;
+    if (!d.active) return; // never became a drag — a plain click; leave it alone
     d.active = false;
     const track = trackRef.current;
     if (!track) return;
