@@ -123,9 +123,15 @@ no image assets), themeable + crisp + animatable.
 - **Collection / Compendium slices:** the same crypt wall + vines (shared base so
   it flows seamlessly across swipes), no gate/torches — plain enough not to fight
   the deck grid / bestiary content.
-- **Build shape:** a shared `DungeonWall` SVG layer (brick + vines) behind every
-  page + a `DungeonGate` SVG (arch + portcullis + torches) behind Home's content
-  only.
+- **Build shape (built):** a continuous "hall" behind the pager — a 3-page-wide
+  layer (`.hall`) panned **1:1 with the pager scroll via JS transform** so swiping
+  feels like walking down the corridor (brick is one seamless surface; the
+  `DungeonGate` lives in the middle/Home third; `DungeonVines` per third). The gate
+  is **bottom-anchored and height-driven** (`svg { height: 88% }`) so it reaches
+  the floor and scales to viewport *height* — which also keeps it from ballooning
+  on wide desktops (no forced column). Per-page vignette via `.pager-page::before`.
+  TODO: torches sit at the gate's outer edges and crop a little on narrow phones;
+  a dedicated desktop layout is still open.
 
 ### Items / equipment for units (planned)
 Gear that modifies a unit's stats or kit (weapon → +damage, armor → +HP / damage

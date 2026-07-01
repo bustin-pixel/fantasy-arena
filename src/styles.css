@@ -322,10 +322,27 @@ body {
   position: absolute;
   inset: 0;
   z-index: 0;
+  overflow: hidden;
   pointer-events: none;
 }
+/* The corridor: 3 pages wide, panned 1:1 with the pager via JS transform. */
+.hall {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 300%;
+  will-change: transform;
+}
+.hall-third {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 33.3333%;
+}
 .dungeon-wall {
-  display: block;
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
 }
@@ -359,7 +376,20 @@ body {
   scroll-snap-align: start;
   scroll-snap-stop: always;
 }
-/* Page content rides above the per-page dungeon decor (vines / gate). */
+/* A soft vignette per page frames the content over the brick hall. */
+.pager-page::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    78% 66% at 50% 42%,
+    transparent 46%,
+    rgba(2, 4, 10, 0.76) 100%
+  );
+}
+/* Page content rides above the vignette and the brick hall. */
 .pager-page > .screen {
   position: relative;
   z-index: 1;
@@ -389,12 +419,13 @@ body {
   pointer-events: none;
   overflow: hidden;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
 }
 .dungeon-gate > svg {
-  width: 120%;
-  height: auto;
+  height: 88%;
+  width: auto;
+  flex-shrink: 0;
 }
 /* Torch flicker (globally disabled by the prefers-reduced-motion rule below). */
 @keyframes dgate-flick {

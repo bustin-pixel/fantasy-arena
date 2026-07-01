@@ -5,7 +5,7 @@
 export function DungeonGate() {
   return (
     <div className="dungeon-gate" aria-hidden="true">
-      <svg viewBox="60 210 560 610" preserveAspectRatio="xMidYMax meet">
+      <svg viewBox="60 170 560 764" preserveAspectRatio="xMidYMax meet">
         <defs>
           <radialGradient id="dg-depth" cx="0.5" cy="0.6" r="0.8">
             <stop offset="0" stopColor="#05070a" />
@@ -17,12 +17,12 @@ export function DungeonGate() {
             <stop offset="1" stopColor="#c85a1e" stopOpacity="0" />
           </radialGradient>
           <clipPath id="dg-clip">
-            <path d="M212,806 L212,412 A128,128 0 0 1 468,412 L468,806 Z" />
+            <path d="M212,934 L212,412 A128,128 0 0 1 468,412 L468,934 Z" />
           </clipPath>
         </defs>
 
         <path
-          d="M182,806 L182,400 A158,158 0 0 1 498,400 L498,806 Z"
+          d="M182,934 L182,400 A158,158 0 0 1 498,400 L498,934 Z"
           fill="#454d55"
           stroke="#1c2228"
           strokeWidth="3"
@@ -36,30 +36,38 @@ export function DungeonGate() {
           <line x1="468" y1="545" x2="498" y2="545" />
           <line x1="468" y1="620" x2="498" y2="620" />
           <line x1="468" y1="695" x2="498" y2="695" />
+          <line x1="182" y1="770" x2="212" y2="770" />
+          <line x1="182" y1="845" x2="212" y2="845" />
+          <line x1="182" y1="920" x2="212" y2="920" />
+          <line x1="468" y1="770" x2="498" y2="770" />
+          <line x1="468" y1="845" x2="498" y2="845" />
+          <line x1="468" y1="920" x2="498" y2="920" />
         </g>
 
         <path
-          d="M212,806 L212,412 A128,128 0 0 1 468,412 L468,806 Z"
+          d="M212,934 L212,412 A128,128 0 0 1 468,412 L468,934 Z"
           fill="url(#dg-depth)"
         />
 
         <g clipPath="url(#dg-clip)" stroke="#363b41" strokeWidth="5">
-          <line x1="238" y1="300" x2="238" y2="806" />
-          <line x1="267" y1="300" x2="267" y2="806" />
-          <line x1="296" y1="290" x2="296" y2="806" />
-          <line x1="325" y1="288" x2="325" y2="806" />
-          <line x1="354" y1="288" x2="354" y2="806" />
-          <line x1="383" y1="290" x2="383" y2="806" />
-          <line x1="412" y1="300" x2="412" y2="806" />
-          <line x1="441" y1="300" x2="441" y2="806" />
+          <line x1="238" y1="300" x2="238" y2="934" />
+          <line x1="267" y1="300" x2="267" y2="934" />
+          <line x1="296" y1="290" x2="296" y2="934" />
+          <line x1="325" y1="288" x2="325" y2="934" />
+          <line x1="354" y1="288" x2="354" y2="934" />
+          <line x1="383" y1="290" x2="383" y2="934" />
+          <line x1="412" y1="300" x2="412" y2="934" />
+          <line x1="441" y1="300" x2="441" y2="934" />
           <line x1="212" y1="470" x2="468" y2="470" strokeWidth="6" />
           <line x1="212" y1="620" x2="468" y2="620" strokeWidth="6" />
+          <line x1="212" y1="770" x2="468" y2="770" strokeWidth="6" />
+          <line x1="212" y1="900" x2="468" y2="900" strokeWidth="6" />
         </g>
         <g clipPath="url(#dg-clip)" stroke="#4c525a" strokeWidth="1.3" opacity="0.8">
-          <line x1="238" y1="300" x2="238" y2="806" />
-          <line x1="296" y1="290" x2="296" y2="806" />
-          <line x1="354" y1="288" x2="354" y2="806" />
-          <line x1="412" y1="300" x2="412" y2="806" />
+          <line x1="238" y1="300" x2="238" y2="934" />
+          <line x1="296" y1="290" x2="296" y2="934" />
+          <line x1="354" y1="288" x2="354" y2="934" />
+          <line x1="412" y1="300" x2="412" y2="934" />
         </g>
 
         <path

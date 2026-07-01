@@ -26,6 +26,7 @@ const PAGES = ["Collection", "Home", "Compendium"] as const;
  */
 export function AppShell({ onBattle }: Props) {
   const trackRef = useRef<HTMLDivElement>(null);
+  const hallRef = useRef<HTMLDivElement>(null);
   const [page, setPage] = useState(1); // land on Home (center)
   // Live drag state in a ref so pointer handlers never trigger re-renders.
   const drag = useRef({
@@ -36,16 +37,27 @@ export function AppShell({ onBattle }: Props) {
     moved: false,
   });
 
+  // Pan the dungeon "hall" 1:1 with the pager so swiping feels like walking down
+  // the corridor — the gate lives at the Home position; swipe away to plain brick.
+  const syncHall = (scrollLeft: number) => {
+    if (hallRef.current)
+      hallRef.current.style.transform = `translate3d(${-scrollLeft}px,0,0)`;
+  };
+
   // Jump to Home on mount without animating (direct scrollLeft, not scrollTo).
   useEffect(() => {
     const track = trackRef.current;
-    if (track) track.scrollLeft = track.clientWidth;
+    if (!track) return;
+    track.scrollLeft = track.clientWidth;
+    syncHall(track.scrollLeft);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Derive the active page from scroll position for the tab bar.
+  // Derive the active page from scroll position for the tab bar, and pan the hall.
   const onScroll = () => {
     const track = trackRef.current;
     if (!track) return;
+    syncHall(track.scrollLeft);
     const idx = Math.round(track.scrollLeft / (track.clientWidth || 1));
     setPage((p) => (p === idx ? p : idx));
   };
@@ -141,7 +153,21 @@ export function AppShell({ onBattle }: Props) {
   return (
     <div className="app-shell">
       <div className="shell-bg" aria-hidden="true">
-        <DungeonWall />
+        {/* One continuous hall (3 pages wide) panned 1:1 with the pager. Brick
+            spans it all; the gate lives in the middle (Home) third. */}
+        <div className="hall" ref={hallRef}>
+          <DungeonWall />
+          <div className="hall-third" style={{ left: "0%" }}>
+            <DungeonVines />
+          </div>
+          <div className="hall-third" style={{ left: "33.3333%" }}>
+            <DungeonVines />
+            <DungeonGate />
+          </div>
+          <div className="hall-third" style={{ left: "66.6667%" }}>
+            <DungeonVines />
+          </div>
+        </div>
       </div>
       <div
         className="pager"
@@ -154,16 +180,12 @@ export function AppShell({ onBattle }: Props) {
         onClickCapture={onClickCapture}
       >
         <section className="pager-page" aria-label="Collection">
-          <DungeonVines />
           <HubScreen />
         </section>
         <section className="pager-page" aria-label="Home">
-          <DungeonVines />
-          <DungeonGate />
           <HomeScreen onBattle={onBattle} />
         </section>
         <section className="pager-page" aria-label="Compendium">
-          <DungeonVines />
           <CompendiumScreen />
         </section>
       </div>
