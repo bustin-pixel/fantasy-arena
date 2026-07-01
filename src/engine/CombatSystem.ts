@@ -19,6 +19,7 @@ import type {
   MatchPhase,
   Projectile,
   Team,
+  Trap,
   Unit,
   Vec2,
   Vfx,
@@ -58,6 +59,7 @@ import {
   attackDelayMultiplier,
   hasEffect,
   isFeared,
+  isPolymorphed,
   isSilenced,
   isStealthed,
   isStunned,
@@ -74,6 +76,7 @@ export interface SimState {
   projectiles: Projectile[];
   floatingTexts: FloatingText[];
   vfx: Vfx[];
+  traps: Trap[];
   clockTicks: number;
   rng: RNG;
   idCounter: number;
@@ -94,6 +97,7 @@ export function createSimState(seed: number, clockSec: number): SimState {
     projectiles: [],
     floatingTexts: [],
     vfx: [],
+    traps: [],
     clockTicks: secToTicks(clockSec),
     rng: new RNG(seed),
     idCounter: 0,
@@ -388,6 +392,11 @@ function transformDruid(state: SimState, unit: Unit): void {
 // a fast lunge that quickly closes the gap, without being an instant teleport.
 const CHARGE_SPEED = 340; // px/sec
 
+// Hunter Scatter Trap tuning.
+const SCATTER_TRAP_CD_SEC = 12; // between trap sets
+const TRAP_STUN_SEC = 7; // how long a caught unit is held
+const TRAP_RADIUS = 26; // how close a foe must step to trigger it
+
 // Advance an in-progress Orc charge by one tick. The orc dashes toward its locked
 // target at CHARGE_SPEED and slams on contact (bonus damage + brief stun). This
 // owns the unit's movement for the duration (MovementSystem skips charging units)
@@ -408,16 +417,29 @@ function stepCharge(
     return;
   }
 
-  const contact = unit.radius + target.radius - 6;
+  // Slightly beyond the two radii: collision resolution parks units exactly at
+  // radius-sum apart, so a smaller threshold would never register against a
+  // stationary target (the charge would oscillate at the collision boundary).
+  const contact = unit.radius + target.radius + 4;
   const d = dist(unit.pos, target.pos);
 
   if (d <= contact) {
-    // Arrived — slam for bonus damage and a short stagger.
-    dealDamage(target, 22, unit);
-    applyEffect(
-      target,
-      makeEffect("stun", { source: unit.uid, durationSec: 0.8 })
-    );
+    if (unit.defId === "boar") {
+      // Boar guard: on contact, taunt the target onto itself (charge, then taunt).
+      applyEffect(
+        target,
+        makeEffect("taunt", { source: unit.uid, durationSec: 2.5 })
+      );
+      target.tauntedByUid = unit.uid;
+      target.targetUid = unit.uid;
+    } else {
+      // Orc: slam for bonus damage and a short stagger.
+      dealDamage(target, 22, unit);
+      applyEffect(
+        target,
+        makeEffect("stun", { source: unit.uid, durationSec: 0.8 })
+      );
+    }
     spawnVfx(state, {
       kind: "slam",
       pos: { x: target.pos.x, y: target.pos.y },
@@ -739,10 +761,54 @@ export function stepSimulation(state: SimState): void {
       });
     }
 
+    // Hunter Boar Companion: keep a pet boar alive beside the Hunter. Summons one
+    // immediately at deploy (boarCooldown 0), and after the boar dies the timer
+    // (frozen while a boar lives) counts down to re-summon ~8s later.
+    if (unit.defId === "hunter") {
+      const hasBoar = state.units.some(
+        (u) => u.defId === "boar" && u.team === unit.team && u.state !== "dead"
+      );
+      if (!hasBoar) {
+        if (unit.boarCooldown > 0) unit.boarCooldown--;
+        if (unit.boarCooldown <= 0) {
+          pendingSpawns.push({
+            defId: "boar",
+            team: unit.team,
+            pos: {
+              x: unit.pos.x + (unit.team === "player" ? -30 : 30),
+              y: unit.pos.y + 12,
+            },
+          });
+          unit.boarCooldown = secToTicks(8);
+        }
+      }
+    }
+
+    // Hunter Scatter Trap: on its cooldown, lay a spread of traps on the ground
+    // ahead of it (toward the enemy). Any enemy that later steps on one is caught
+    // (stunned) and the trap is spent. First set is laid at deploy.
+    if (unit.defId === "hunter") {
+      if (unit.trapCooldown > 0) unit.trapCooldown--;
+      if (unit.trapCooldown <= 0) {
+        const forward = unit.team === "player" ? -1 : 1;
+        for (const dx of [-70, 0, 70]) {
+          state.traps.push({
+            x: clamp(unit.pos.x + dx, 20, FIELD_WIDTH - 20),
+            y: clamp(unit.pos.y + forward * 120, 20, FIELD_HEIGHT - 20),
+            team: unit.team,
+          });
+        }
+        unit.trapCooldown = secToTicks(SCATTER_TRAP_CD_SEC);
+      }
+    }
+
     // A spell cast in progress (the cast bar) is interrupted by a stun or fear —
     // the spell fizzles. Runs before the stun check so the stun can cancel it;
     // the cast's tick-down + release happens after targeting (see below).
-    if (unit.castTicks > 0 && (isStunned(unit) || isFeared(unit))) {
+    if (
+      unit.castTicks > 0 &&
+      (isStunned(unit) || isFeared(unit) || isPolymorphed(unit))
+    ) {
       unit.castTicks = 0;
       unit.castTicksMax = 0;
       unit.castTargetUid = null;
@@ -791,6 +857,11 @@ export function stepSimulation(state: SimState): void {
       if (unit.state !== "dead") transitionTo(unit, "stunned");
       continue;
     }
+    // Polymorph: a harmless sheep — can't move, attack, or cast (stands frozen).
+    if (isPolymorphed(unit)) {
+      if (unit.state !== "dead") transitionTo(unit, "stunned");
+      continue;
+    }
     if (unit.state === "stunned") transitionTo(unit, "idle");
 
     // Fear: the unit can't attack or cast — it flees. Movement handles the
@@ -805,7 +876,31 @@ export function stepSimulation(state: SimState): void {
     // Non-blocking — the mage still moves/attacks normally during the volley.
     if (unit.barrageShots > 0) stepArcaneBarrage(state, unit, byUid);
 
-    // Orc Charge: while a rush is in progress it owns movement until contact.
+    // Boar guard: when its Hunter is attacked, charge that attacker (Orc-charge
+    // dash) and, on contact, taunt it off the Hunter — so it works even when the
+    // boar is far away. Re-charges each time the 2.5s taunt lapses. Runs before
+    // the charge-step below so the rush kicks off the same tick.
+    if (unit.defId === "boar" && unit.chargeTicks <= 0) {
+      const hunter = alive.find(
+        (u) => u.defId === "hunter" && u.team === unit.team
+      );
+      const attacker = hunter?.attackedByUid
+        ? byUid.get(hunter.attackedByUid)
+        : null;
+      if (
+        attacker &&
+        attacker.state !== "dead" &&
+        attacker.team !== unit.team &&
+        attacker.tauntedByUid !== unit.uid
+      ) {
+        unit.chargeTargetUid = attacker.uid;
+        unit.chargeTicks = secToTicks(1.5);
+        unit.facing = attacker.pos.x >= unit.pos.x ? 1 : -1;
+      }
+    }
+
+    // Orc Charge (and Boar guard-charge): while a rush is in progress it owns
+    // movement until contact.
     if (unit.chargeTicks > 0) {
       stepCharge(state, unit, byUid, dealDamage);
       continue;
@@ -953,6 +1048,33 @@ export function stepSimulation(state: SimState): void {
 
   // 5a. Movement + collisions.
   stepMovement({ units: state.units, unitsByUid: byUid });
+
+  // 5a-ii. Scatter Traps: an enemy of the trap's owner that has stepped onto it is
+  // caught (stunned) and the trap is spent. Checked after movement so it fires the
+  // moment a foe walks in.
+  if (state.traps.length > 0) {
+    for (let i = state.traps.length - 1; i >= 0; i--) {
+      const trap = state.traps[i];
+      for (const u of state.units) {
+        if (u.state === "dead" || u.team === trap.team) continue;
+        if (dist(u.pos, trap) <= TRAP_RADIUS) {
+          applyEffect(
+            u,
+            makeEffect("stun", { source: "trap", durationSec: TRAP_STUN_SEC })
+          );
+          spawnVfx(state, {
+            kind: "slam",
+            pos: { x: trap.x, y: trap.y },
+            life: secToTicks(0.4),
+            maxLife: secToTicks(0.4),
+            color: "#9ca3af",
+          });
+          state.traps.splice(i, 1);
+          break; // trap consumed
+        }
+      }
+    }
+  }
 
   // 5b. Projectiles.
   stepProjectiles(state, byUid, dealDamage);
@@ -1326,6 +1448,7 @@ export function snapshot(state: SimState): BattleSnapshot {
     projectiles: state.projectiles,
     floatingTexts: state.floatingTexts,
     vfx: state.vfx,
+    traps: state.traps,
     clockTicks: state.clockTicks,
   };
 }

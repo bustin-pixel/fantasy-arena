@@ -93,6 +93,14 @@ export function drawUnitSprite(
     ctx.restore();
   }
 
+  // A polymorphed unit draws as a harmless sheep regardless of its def id.
+  // (The hub portrait passes a minimal stub with no effects — hence the `?.`.)
+  if (unit.effects?.some((e) => e.type === "polymorph")) {
+    drawSheep(ctx);
+    ctx.restore();
+    return;
+  }
+
   // Druid in bear form draws as a bear regardless of its def id.
   if (def.id === "summoner" && unit.transformed) {
     drawBear(ctx, "#6b4a2a", "#3f2c18", "#8a6240", accent);
@@ -109,6 +117,12 @@ export function drawUnitSprite(
       break;
     case "archer":
       drawArcher(ctx, body, dark, light, accent);
+      break;
+    case "hunter":
+      drawEngineer(ctx, body, dark, light, accent);
+      break;
+    case "boar":
+      drawBoar(ctx, body, dark, light, accent);
       break;
     case "knight":
       drawKnight(ctx, body, dark, light, accent);
@@ -132,6 +146,9 @@ export function drawUnitSprite(
       drawMage(ctx, body, dark, light, accent, cast);
       break;
     case "arcane_mage":
+      drawMage(ctx, body, dark, light, accent, cast);
+      break;
+    case "mage":
       drawMage(ctx, body, dark, light, accent, cast);
       break;
     case "electric_mage":
@@ -478,6 +495,42 @@ function drawMage(
   ctx.shadowBlur = 0;
 }
 
+// A harmless sheep — drawn in place of any polymorphed unit.
+function drawSheep(ctx: Ctx) {
+  // Woolly white body with bumpy fleece.
+  ctx.fillStyle = "#eceae3";
+  ctx.beginPath();
+  ctx.ellipse(-2, 8, 15, 11, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#ffffff";
+  for (const [bx, by] of [
+    [-12, 2],
+    [-4, -3],
+    [5, -2],
+    [-8, 12],
+    [3, 12],
+  ]) {
+    ctx.beginPath();
+    ctx.arc(bx, by, 6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Dark face + ears.
+  ctx.fillStyle = "#3a3530";
+  ctx.beginPath();
+  ctx.ellipse(11, 2, 6, 7, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(7, -4, 3, 2, -0.5, 0, Math.PI * 2);
+  ctx.fill();
+  // Eye.
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(12, 0, 2, 2);
+  // Stick legs.
+  ctx.fillStyle = "#2a2622";
+  ctx.fillRect(-9, 17, 3, 7);
+  ctx.fillRect(5, 17, 3, 7);
+}
+
 function drawAssassin(ctx: Ctx, body: string, dark: string, light: string, accent: string) {
   // slim hooded figure
   roundedBody(ctx, 14, 22, -2, body);
@@ -654,6 +707,52 @@ function drawWolf(ctx: Ctx, body: string, dark: string, light: string, accent: s
   // tail
   ctx.beginPath();
   ctx.moveTo(13, 6); ctx.lineTo(20, 0);
+  ctx.stroke();
+}
+
+function drawBoar(ctx: Ctx, body: string, dark: string, light: string, accent: string) {
+  // bulky low quadruped with a snout and tusks
+  ctx.fillStyle = body;
+  ctx.beginPath();
+  ctx.ellipse(0, 8, 16, 9, 0, 0, Math.PI * 2);
+  ctx.fill(); // body
+  ctx.fillStyle = dark;
+  ctx.beginPath();
+  ctx.ellipse(0, 13, 14, 5, 0, 0, Math.PI * 2);
+  ctx.fill(); // belly shading
+  // bristly back ridge
+  ctx.strokeStyle = dark;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-8, 0); ctx.lineTo(-7, -4);
+  ctx.moveTo(-3, -1); ctx.lineTo(-2, -5);
+  ctx.moveTo(2, -1); ctx.lineTo(3, -5);
+  ctx.stroke();
+  // head + snout
+  ctx.fillStyle = light;
+  ctx.beginPath();
+  ctx.arc(-13, 4, 7, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = dark;
+  ctx.beginPath();
+  ctx.ellipse(-19, 6, 4, 3, 0, 0, Math.PI * 2);
+  ctx.fill(); // snout
+  // tusks
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-19, 8); ctx.lineTo(-22, 4);
+  ctx.moveTo(-17, 9); ctx.lineTo(-19, 5);
+  ctx.stroke();
+  // eye
+  ctx.fillStyle = "#1a1a1a";
+  ctx.fillRect(-13, 1, 2, 2);
+  // legs
+  ctx.strokeStyle = dark;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(-7, 15); ctx.lineTo(-7, 21);
+  ctx.moveTo(7, 15); ctx.lineTo(7, 21);
   ctx.stroke();
 }
 

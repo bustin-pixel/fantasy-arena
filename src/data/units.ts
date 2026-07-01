@@ -172,6 +172,21 @@ export const UNITS: Record<string, UnitDef> = {
       },
     ],
   },
+  mage: {
+    id: "mage",
+    name: "Mage",
+    rarity: "rare",
+    role: "Crowd Control",
+    hp: 90,
+    damage: 10,
+    attackSpeed: 1.6,
+    moveSpeed: 60,
+    range: FIELD_WIDTH * 0.3, // medium-long ranged
+    ability: "polymorph",
+    school: "magic",
+    color: "#cbd5e1", // pale grey robe — set apart from the colored mages
+    accent: "#c4b5fd", // soft lavender orb
+  },
   assassin: {
     id: "assassin",
     name: "Assassin",
@@ -285,6 +300,43 @@ export const UNITS: Record<string, UnitDef> = {
     ability: "lifesteal", // passive, harmless filler
     color: "#6b7280",
     accent: "#a3e635",
+  },
+  hunter: {
+    id: "hunter",
+    name: "Hunter",
+    rarity: "legendary",
+    role: "Beastmaster Ranged",
+    hp: 120,
+    damage: 14,
+    attackSpeed: 1.0,
+    moveSpeed: 70,
+    range: FIELD_WIDTH * 0.34, // long range
+    ability: "mend_beast",
+    abilities: ["scatter_trap"], // a second active
+    color: "#4d7c0f", // hunter green
+    accent: "#d9a441", // tan leather
+    traits: [
+      {
+        name: "Boar Companion",
+        description:
+          "Fights with a pet boar. When the Hunter is attacked, the boar charges the attacker and taunts it off the Hunter — even from across the field. If the boar falls, the Hunter calls a new one after 8s.",
+      },
+    ],
+  },
+  // Boar — the Hunter's pet, never in a deck. A sturdy melee guard.
+  boar: {
+    id: "boar",
+    name: "Boar",
+    rarity: "rare",
+    role: "Summoned",
+    hp: 140,
+    damage: 14,
+    attackSpeed: 1.2,
+    moveSpeed: 85,
+    range: MELEE,
+    ability: "lifesteal", // passive, harmless filler
+    color: "#6b4423", // boar brown
+    accent: "#d6d3d1", // tusks
   },
   berserker: {
     id: "berserker",
@@ -500,7 +552,7 @@ export const UNITS: Record<string, UnitDef> = {
 export const UNIT_IDS = Object.keys(UNITS);
 
 /** Unit ids that are NOT selectable cards (summoned at runtime only). */
-export const NON_DECK_UNITS = new Set<string>(["wolf", "skeleton", "slime_clone", "turret"]);
+export const NON_DECK_UNITS = new Set<string>(["wolf", "skeleton", "slime_clone", "turret", "boar"]);
 
 /** Units that can appear in a player/AI deck or the hub card grid. */
 export const DECKABLE_UNIT_IDS = UNIT_IDS.filter(

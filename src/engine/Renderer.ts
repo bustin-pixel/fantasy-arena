@@ -345,10 +345,40 @@ function drawFloatingText(ctx: Ctx, ft: BattleSnapshot["floatingTexts"][number])
 }
 
 /** Paint a full frame. */
+function drawTrap(ctx: Ctx, t: BattleSnapshot["traps"][number]): void {
+  ctx.save();
+  ctx.translate(t.x, t.y);
+  // steel jaw ring
+  ctx.strokeStyle = "#9ca3af";
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.arc(0, 0, 9, 0, Math.PI * 2);
+  ctx.stroke();
+  // teeth around the ring
+  ctx.fillStyle = "#d1d5db";
+  for (let a = 0; a < Math.PI * 2 - 0.01; a += Math.PI / 4) {
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * 7, Math.sin(a) * 7);
+    ctx.lineTo(Math.cos(a + 0.2) * 13, Math.sin(a + 0.2) * 13);
+    ctx.lineTo(Math.cos(a + 0.4) * 7, Math.sin(a + 0.4) * 7);
+    ctx.closePath();
+    ctx.fill();
+  }
+  // pressure plate
+  ctx.fillStyle = "#6b4423";
+  ctx.beginPath();
+  ctx.arc(0, 0, 4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
 export function renderBattle(ctx: Ctx, snap: BattleSnapshot): void {
   if (!bgPattern) bgPattern = buildBackground();
   ctx.drawImage(bgPattern, 0, 0);
   drawZones(ctx);
+
+  // Ground-level markers under the units.
+  for (const t of snap.traps) drawTrap(ctx, t);
 
   // Draw units sorted by y for simple depth ordering.
   const sorted = [...snap.units].sort((a, b) => a.pos.y - b.pos.y);

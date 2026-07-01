@@ -115,6 +115,28 @@ export const ABILITIES: Record<AbilityId, AbilityDef> = {
       "Instant: lays a healing-over-time on an injured ally — 6 HP every 2s for 8s (24 total).",
     cooldown: 16,
   },
+  polymorph: {
+    id: "polymorph",
+    name: "Polymorph",
+    description:
+      "Transforms a non-summoned enemy into a harmless sheep for 7s — it can't act until it reverts. Long cooldown.",
+    cooldown: 20,
+    castTimeSec: 1,
+  },
+  mend_beast: {
+    id: "mend_beast",
+    name: "Mend Beast",
+    description:
+      "Instant: heals its boar over time — 5 HP every 1s for 6s (30 total).",
+    cooldown: 10,
+  },
+  scatter_trap: {
+    id: "scatter_trap",
+    name: "Scatter Trap",
+    description:
+      "Scatters traps on the ground ahead of it. The first enemy to step on a trap is caught and stunned for 7s.",
+    cooldown: 12,
+  },
   bloodrage: {
     id: "bloodrage",
     name: "Bloodrage",

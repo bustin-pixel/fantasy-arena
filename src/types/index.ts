@@ -27,6 +27,7 @@ export type StatusEffectType =
   | "poison"
   | "curse"
   | "regen"
+  | "polymorph"
   | "silence"
   | "stealth"
   | "death_immune"
@@ -58,6 +59,9 @@ export type AbilityId =
   | "shadow_step"
   | "curse"
   | "rejuvenation"
+  | "polymorph"
+  | "mend_beast"
+  | "scatter_trap"
   | "summon_wolves";
 
 export interface Vec2 {
@@ -192,6 +196,10 @@ export interface Unit {
   rejuvCooldown: number;
   /** Druid: ticks of Bear Form's 80% damage reduction left (0 = expired). */
   bearGuardTimer: number;
+  /** Hunter: ticks until it can re-summon its boar after the boar dies. */
+  boarCooldown: number;
+  /** Hunter: ticks until it can lay another set of Scatter Traps. */
+  trapCooldown: number;
   /** Arcane Mage: missiles left to fire in the current Arcane Barrage volley
    *  (0 = not firing). The volley streams out one missile at a time. */
   barrageShots: number;
@@ -297,6 +305,14 @@ export interface Vfx {
 
 export type MatchPhase = "deployment" | "battle" | "victory" | "defeat" | "draw";
 
+/** A Hunter's Scatter Trap sitting on the ground until an enemy steps on it. */
+export interface Trap {
+  x: number;
+  y: number;
+  /** Owner's team; the trap catches units of the OTHER team. */
+  team: Team;
+}
+
 export interface BattleSnapshot {
   tick: number;
   phase: MatchPhase;
@@ -304,6 +320,7 @@ export interface BattleSnapshot {
   projectiles: Projectile[];
   floatingTexts: FloatingText[];
   vfx: Vfx[];
+  traps: Trap[];
   /** ticks remaining on the 2:00 match clock */
   clockTicks: number;
 }
