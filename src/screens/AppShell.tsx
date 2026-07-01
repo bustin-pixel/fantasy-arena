@@ -27,6 +27,8 @@ const PAGES = ["Collection", "Home", "Compendium"] as const;
 export function AppShell({ onBattle }: Props) {
   const trackRef = useRef<HTMLDivElement>(null);
   const hallRef = useRef<HTMLDivElement>(null);
+  // Pending "restore scroll-snap" timeout from the last drag (see endDrag).
+  const snapTimer = useRef<number | null>(null);
   const [page, setPage] = useState(1); // land on Home (center)
   // Live drag state in a ref so pointer handlers never trigger re-renders.
   const drag = useRef({
@@ -102,6 +104,12 @@ export function AppShell({ onBattle }: Props) {
       d.active = true;
       d.moved = true;
       track.classList.add("dragging");
+      // Cancel a pending snap-restore from a previous drag so it can't fire
+      // mid-drag and yank the scroll back (the edge "hiccup").
+      if (snapTimer.current !== null) {
+        clearTimeout(snapTimer.current);
+        snapTimer.current = null;
+      }
       track.style.scrollSnapType = "none";
       try {
         track.setPointerCapture(e.pointerId);
@@ -109,7 +117,10 @@ export function AppShell({ onBattle }: Props) {
         /* capture unsupported — drag still works locally */
       }
     }
-    track.scrollLeft = d.startLeft - dx;
+    // Clamp to the valid range so overscrolling past the first/last page doesn't
+    // fight the browser's own clamp.
+    const max = track.scrollWidth - track.clientWidth;
+    track.scrollLeft = Math.max(0, Math.min(max, d.startLeft - dx));
   };
 
   const endDrag = (e: React.PointerEvent) => {
@@ -135,9 +146,11 @@ export function AppShell({ onBattle }: Props) {
     else if (dragged < -w * 0.25) target = startPage - 1;
     target = Math.max(0, Math.min(PAGES.length - 1, target));
     track.scrollTo({ left: w * target, behavior: "smooth" });
-    // Restore mandatory snap once the settle animation finishes.
-    window.setTimeout(() => {
+    // Restore mandatory snap once the settle animation finishes — tracked so the
+    // next drag can cancel it before it fires mid-gesture.
+    snapTimer.current = window.setTimeout(() => {
       if (trackRef.current) trackRef.current.style.scrollSnapType = "";
+      snapTimer.current = null;
     }, 400);
   };
 
