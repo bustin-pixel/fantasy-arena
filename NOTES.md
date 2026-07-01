@@ -61,6 +61,14 @@ Special mechanics are gated by `defId` string literals in `CombatSystem.ts`:
 - `"rogue"` / `"trickster"` → opening stealth that reveals on first strike; the
   Rogue's Venom poison-on-hit, the Trickster's Shadow Step (reactive cast-interrupt
   blink) + re-cloak.
+- `"warrior"` → Whirlwind: its melee swing is replaced by an AoE spin — hits every
+  enemy within melee reach (`range + radius`) for its damage and applies a
+  refreshing bleed (poison-type DoT, non-stacking). No lifesteal. `ability` slot is
+  the passive `whirlwind`.
+- `"ranger"` → Multishot: every second basic attack looses three arrows at once,
+  each locked onto a different enemy in range (committed target + the two nearest
+  others, nearest-first with a uid tiebreak). Against a lone foe only one arrow
+  spawns, so it's an anti-swarm spread. `ability` slot is the passive `multishot`.
 - `"mystic_archer"` → Light/Dark form-tagged shots + on-hit stack/detonate
   resolution (`resolveMysticHit`), plus the Momentum passive: each form shift
   adds a `momentumStacks` (capped at 5) that ramps attack speed +15%/shift up to

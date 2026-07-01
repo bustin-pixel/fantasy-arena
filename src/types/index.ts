@@ -50,6 +50,8 @@ export type AbilityId =
   | "slime_split"
   | "mystic_shift"
   | "momentum"
+  | "multishot"
+  | "whirlwind"
   | "arcane_barrage"
   | "blessing"
   | "deploy_turret"

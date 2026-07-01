@@ -46,7 +46,7 @@ export interface AbilityContext {
 // "Passive" here means "not driven by the standard active-cast pipeline" — the
 // effect runs elsewhere. shadow_step is reactive (handled in CombatSystem like
 // Blink), so it lives here even though the UI shows it as an active (cooldown > 0).
-const PASSIVE_ABILITIES = new Set<Unit["ability"]>(["lifesteal", "bloodrage", "slime_split", "momentum", "ambush", "aegis", "venom", "shadow_step"]);
+const PASSIVE_ABILITIES = new Set<Unit["ability"]>(["lifesteal", "bloodrage", "slime_split", "momentum", "multishot", "whirlwind", "ambush", "aegis", "venom", "shadow_step"]);
 
 /** True if this ability is an active (cooldown-gated) cast. */
 function isActiveAbility(unit: Unit): boolean {
