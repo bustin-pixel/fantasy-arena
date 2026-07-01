@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { DECKABLE_UNIT_IDS, getUnitDef } from "@/data/units";
-import { rarityRank } from "@/data/rarities";
+import { rarityRank, RARITY_ORDER, RARITIES } from "@/data/rarities";
+import type { Rarity } from "@/types";
 import { CardPortrait, type CardAddState } from "@/components/CardPortrait";
 import { DeckStrip } from "@/components/DeckStrip";
 import { UnitDetail } from "@/components/UnitDetail";
@@ -14,6 +15,7 @@ export function HubScreen() {
   const deck = save.deck;
   const sortMode = save.sortMode;
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [rarityFilter, setRarityFilter] = useState<Rarity | "all">("all");
 
   // Does the current deck already contain a legendary?
   const hasLegendary = useMemo(
@@ -41,14 +43,21 @@ export function HubScreen() {
   const randomize = () => setDeck(generateRandomDeck(generateSeed(), MAX_DECK));
   const clearDeck = () => setDeck([]);
 
-  // Roster order for the card grid. "rarity" groups rarest-first; ties keep
-  // their original (stable) order so the grid stays predictable.
+  // Roster for the card grid: sort ("rarity" groups rarest-first; ties keep their
+  // original stable order), then narrow to the selected rarity filter.
   const rosterIds = useMemo(() => {
-    if (sortMode === "default") return DECKABLE_UNIT_IDS;
-    return [...DECKABLE_UNIT_IDS].sort(
-      (a, b) => rarityRank(getUnitDef(b).rarity) - rarityRank(getUnitDef(a).rarity)
-    );
-  }, [sortMode]);
+    let ids =
+      sortMode === "default"
+        ? DECKABLE_UNIT_IDS
+        : [...DECKABLE_UNIT_IDS].sort(
+            (a, b) =>
+              rarityRank(getUnitDef(b).rarity) - rarityRank(getUnitDef(a).rarity)
+          );
+    if (rarityFilter !== "all") {
+      ids = ids.filter((id) => getUnitDef(id).rarity === rarityFilter);
+    }
+    return ids;
+  }, [sortMode, rarityFilter]);
 
   return (
     <div className="screen hub">
@@ -95,7 +104,9 @@ export function HubScreen() {
         </div>
 
         <div className="roster-head">
-          <h3>All Units</h3>
+          <h3>
+            All Units <span className="roster-count">{rosterIds.length}</span>
+          </h3>
           <div className="sort-control" role="group" aria-label="Sort units">
             <button
               type="button"
@@ -114,6 +125,29 @@ export function HubScreen() {
               Rarity
             </button>
           </div>
+        </div>
+
+        <div className="roster-filter" role="group" aria-label="Filter by rarity">
+          <button
+            type="button"
+            className={`filter-chip${rarityFilter === "all" ? " active" : ""}`}
+            onClick={() => setRarityFilter("all")}
+            aria-pressed={rarityFilter === "all"}
+          >
+            All
+          </button>
+          {RARITY_ORDER.map((r) => (
+            <button
+              key={r}
+              type="button"
+              className={`filter-chip${rarityFilter === r ? " active" : ""}`}
+              style={{ "--chip": RARITIES[r].color } as React.CSSProperties}
+              onClick={() => setRarityFilter(r)}
+              aria-pressed={rarityFilter === r}
+            >
+              {RARITIES[r].label}
+            </button>
+          ))}
         </div>
 
         <div className="card-grid">
