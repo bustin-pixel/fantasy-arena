@@ -703,6 +703,11 @@ body {
 }
 
 /* ---- Unit detail modal --------------------------------------------------- */
+/* Freeze the pager (vertical + horizontal) while a detail panel is open. */
+body.modal-open .pager,
+body.modal-open .pager-page {
+  overflow: hidden;
+}
 .detail-overlay {
   position: fixed;
   inset: 0;

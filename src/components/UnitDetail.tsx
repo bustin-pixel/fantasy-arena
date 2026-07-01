@@ -74,6 +74,13 @@ export function UnitDetail({ defId, deck, onToggle, onClose }: Props) {
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  // Freeze the background scroll while the panel is open (it scrolls internally
+  // if its content overflows). Prevents the page behind from scrolling under it.
+  useEffect(() => {
+    document.body.classList.add("modal-open");
+    return () => document.body.classList.remove("modal-open");
+  }, []);
+
   const inDeck = deck.includes(defId);
   const isLegendary = def.rarity === "legendary";
   const hasLegendary = deck.some((id) => getUnitDef(id).rarity === "legendary");
