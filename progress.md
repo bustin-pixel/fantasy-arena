@@ -22,6 +22,47 @@ campaign / an endless ladder), earn rewards, and unlock units or items between f
   deterministic.
 - Natural home for the items system below (items as fight rewards).
 
+#### Swarm mode — the rolling-window horde (design locked)
+Enemies creep in from the **top edge** and march down; as they die, more trickle in
+from an off-screen queue. Key realization: this is the **existing deployment loop**
+with the numbers turned up — the sim already refills freed field slots as units die
+([MatchController.ts:462](src/engine/MatchController.ts)) and the win-condition already
+treats a momentarily-empty field as *not* a win while reserves remain
+(`enemyOut = enemies.length === 0 && enemyReserves <= 0`,
+[CombatSystem.ts:1479](src/engine/CombatSystem.ts:1479)). So the *simultaneous* unit
+count (the perf lever) stays bounded no matter how big the total wave is.
+
+Three caps to make **mode-aware** (only the first touches the frame budget):
+1. **Concurrent on-field, per side** — `MAX_ACTIVE_UNITS_PER_SIDE` (today a shared `2`).
+   **Locked target: enemy 8, player 4** (player deploys the whole warband at once in
+   PvE). Start at the proven ~8-unit/60fps-mobile ceiling; profile and push enemy to
+   **10–12** only if mobile holds.
+2. **Summon safety-net** — the hard `cap = 5/7` in the CombatSystem spawn flush
+   ([CombatSystem.ts:1039](src/engine/CombatSystem.ts:1039)); raise it for the enemy in
+   PvE or it clamps the horde below the concurrent cap. (Also: change overflow from
+   *drop* to *hold* so no queued monster is lost.)
+3. **Reserve pool** — `enemyReserves` becomes the **wave queue** (30+/endless) instead
+   of a 4-card deck.
+
+New piece: a seeded **`WaveController`** (meta layer) that trickles spawns into
+`pendingSpawns` at the top edge (nudge spawn `y` slightly off-screen so they visibly
+creep in). Free wins already in the engine: `MAX_MELEE_SURROUND = 3` stops the horde
+dogpiling one hero (extras queue → looks like swarming *and* bounds collision cost).
+
+#### PvE monster bestiary (brainstormed, non-deckable — add ids to `NON_DECK_UNITS`)
+Reuse shipped systems so each stays deterministic; several can recolor existing sprites
+(skeleton/wolf/slime). Fodder stat band ≈ Skeleton `45hp/8dmg` … Boar `140hp`.
+- **Fodder:** Zombie Shambler (slow-on-bite), Giant Rat (tiny/fast/swarm), Skeleton (exists).
+- **Runners:** Ghoul (haste on ally death), Bat Swarm.
+- **Ranged:** Skeleton Archer (plain arrows), Spider (poison glob), Imp (burn bolts).
+- **Exploders/splitters:** Bloater (poison cloud on death — slime death-burst + poison),
+  Ooze (splits, exists), Spore Pod (spawns sporelings on death).
+- **Support (priority kills):** Bonecaller (raises skeletons — Necro's Raise Dead),
+  Banshee (fear-wail + stealth), Plague Shaman (heal + haste the horde).
+- **Elites/bosses:** Abomination (huge HP, slam, one revive — Ogre slam + Second Wind),
+  Gargoyle (heavy damage reduction), Lich (curse DoT + raise dead).
+Good home for the dormant statuses PvE should wake: `fear`, `haste`, `poison`, `stealth`.
+
 ### PvP mode (scaffolded)
 Real-time 1v1. `BattleMode "pvp"` already exists (hides fast-forward, locks the sim to
 1×). Remaining work is the server-authoritative model in README "Path to multiplayer":
@@ -32,6 +73,38 @@ for exactly this.
 ---
 
 ## Systems
+
+### App shell — swipeable pages + Compendium (design locked)
+Turn the app into a mobile-style **pager of three pages** with battle as a full-screen
+overlay. All UI/meta — **zero engine changes**; the sim stays pure.
+
+- **Shell state:** replace [App.tsx](src/App.tsx)'s `screen: "hub" | "battle"` enum with
+  two concepts: `page: "collection" | "home" | "compendium"` (pager position; persist as
+  `lastPage`) and `view: "shell" | "battle"` + `battleMode: "pve" | "pvp"`.
+  **Battle is an overlay, NOT a swipe page** (keeps the canvas isolated, stops the pager
+  fighting the finger mid-fight).
+- **Layout (Clash-Royale style):** `[Collection] ← [Home/Modes] → [Compendium]`, **Home is
+  the landing/center.** Tab-dots indicator.
+- **Swipe = CSS scroll-snap:** horizontal `overflow-x` track, `scroll-snap-type: x
+  mandatory`; each page `width:100vw; scroll-snap-align:start`. Programmatic nav via
+  `scrollIntoView`; active page from scroll position / IntersectionObserver. Native mobile
+  momentum, near-zero JS.
+- **Home page:** two mode cards — **PvE (Swarm)** (not built → "Coming Soon"/prototype) and
+  **Arena/PvP** (scaffolded, not server-ready → local-AI now or "Coming Soon") — plus W/L +
+  username (already in the save). Today's "BATTLE" maps to a mode.
+- **Collection page:** today's `HubScreen` (deck builder), unchanged.
+- **Compendium page:** **all units**, **3-tier reveal** — Undiscovered (dark silhouette +
+  `???`) → Encountered (name + silhouette, seen in battle) → Defeated (full info, killed
+  one). Reuse [UnitDetail.tsx](src/components/UnitDetail.tsx) for unlocked entries;
+  silhouette = `drawUnitSprite` tinted dark. Has real content NOW via AI hero opponents;
+  monsters slot in when PvE ships.
+- **Persistence (save → v2):** add `bestiary: Record<defId, { encountered: boolean;
+  defeated: boolean }>` (+ optional `lastPage`). Bump `version` to 2; `loadSave` already
+  merges defaults (backward-safe) — sanitize drops unknown ids.
+- **Recording (sim stays pure):** on **battle exit**, the Shell reads the final snapshot's
+  enemy units and calls new `recordEncounter(defIds)` / `recordDefeated(defIds)` on
+  `GameStateContext` (sibling to `recordResult`). Present → encountered; died → defeated.
+  The engine never learns about the bestiary.
 
 ### Items / equipment for units (planned)
 Gear that modifies a unit's stats or kit (weapon → +damage, armor → +HP / damage
