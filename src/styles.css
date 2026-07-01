@@ -324,6 +324,19 @@ body {
   overflow-y: hidden;
   scroll-snap-type: x mandatory;
 }
+/* Desktop affordance: click-and-drag to swipe (see AppShell pointer handlers). */
+@media (hover: hover) and (pointer: fine) {
+  .pager {
+    cursor: grab;
+  }
+  .pager.dragging {
+    cursor: grabbing;
+  }
+}
+.pager.dragging {
+  user-select: none;
+  scroll-behavior: auto;
+}
 .pager-page {
   flex: 0 0 100%;
   width: 100%;

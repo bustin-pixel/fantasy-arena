@@ -13,13 +13,19 @@ interface Props {
 const PAGES = ["Collection", "Home", "Compendium"] as const;
 
 /**
- * Horizontal swipe pager built on native CSS scroll-snap (buttery on mobile,
- * near-zero JS). Battle is NOT a page here — it's a full-screen overlay owned by
- * App, so the pager never fights the finger mid-fight.
+ * Horizontal swipe pager built on native CSS scroll-snap (buttery touch on
+ * mobile, near-zero JS). On desktop, native scroll only responds to trackpad /
+ * tabs, so we add mouse click-and-drag to swipe: snap is disabled during the
+ * drag and restored on release, snapping to the nearest page.
+ *
+ * Battle is NOT a page here — it's a full-screen overlay owned by App, so the
+ * pager never fights the finger mid-fight.
  */
 export function AppShell({ onBattle }: Props) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [page, setPage] = useState(1); // land on Home (center)
+  // Live drag state in a ref so pointer handlers never trigger re-renders.
+  const drag = useRef({ active: false, startX: 0, startLeft: 0, moved: false });
 
   // Jump to Home on mount without animating (direct scrollLeft, not scrollTo).
   useEffect(() => {
@@ -41,9 +47,89 @@ export function AppShell({ onBattle }: Props) {
       track.scrollTo({ left: track.clientWidth * idx, behavior: "smooth" });
   };
 
+  // --- Desktop click-and-drag to swipe. Touch/pen keep native scroll-snap. ---
+  const onPointerDown = (e: React.PointerEvent) => {
+    if (e.pointerType !== "mouse") return; // touch/pen: let native scroll handle it
+    drag.current.moved = false;
+    const track = trackRef.current;
+    if (!track) return;
+    // Elements with their own horizontal drag (deck reorder) or a modal own the
+    // gesture — don't hijack it for a page swipe.
+    if ((e.target as HTMLElement).closest(".deck-slot, .detail-overlay")) return;
+    drag.current = {
+      active: true,
+      startX: e.clientX,
+      startLeft: track.scrollLeft,
+      moved: false,
+    };
+    track.classList.add("dragging");
+    track.style.scrollSnapType = "none"; // free drag; we snap on release
+    try {
+      track.setPointerCapture(e.pointerId);
+    } catch {
+      /* capture unsupported — drag still works locally */
+    }
+  };
+
+  const onPointerMove = (e: React.PointerEvent) => {
+    const d = drag.current;
+    if (!d.active) return;
+    const track = trackRef.current;
+    if (!track) return;
+    const dx = e.clientX - d.startX;
+    if (Math.abs(dx) > 4) d.moved = true;
+    track.scrollLeft = d.startLeft - dx;
+  };
+
+  const endDrag = (e: React.PointerEvent) => {
+    const d = drag.current;
+    if (!d.active) return;
+    d.active = false;
+    const track = trackRef.current;
+    if (!track) return;
+    try {
+      track.releasePointerCapture(e.pointerId);
+    } catch {
+      /* ignore */
+    }
+    track.classList.remove("dragging");
+    // Snap to a page: a quarter-page drag flips to the neighbour, else it settles
+    // back to where it started.
+    const w = track.clientWidth || 1;
+    const startPage = Math.round(d.startLeft / w);
+    const dragged = track.scrollLeft - d.startLeft;
+    let target = startPage;
+    if (dragged > w * 0.25) target = startPage + 1;
+    else if (dragged < -w * 0.25) target = startPage - 1;
+    target = Math.max(0, Math.min(PAGES.length - 1, target));
+    track.scrollTo({ left: w * target, behavior: "smooth" });
+    // Restore mandatory snap once the settle animation finishes.
+    window.setTimeout(() => {
+      if (trackRef.current) trackRef.current.style.scrollSnapType = "";
+    }, 400);
+  };
+
+  // Suppress the click that trails a real drag, so a swipe never activates a card.
+  const onClickCapture = (e: React.MouseEvent) => {
+    if (drag.current.moved) {
+      e.preventDefault();
+      e.stopPropagation();
+      drag.current.moved = false;
+    }
+  };
+
   return (
     <div className="app-shell">
-      <div className="pager" ref={trackRef} onScroll={onScroll}>
+      <div
+        className="pager"
+        ref={trackRef}
+        onScroll={onScroll}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        onClickCapture={onClickCapture}
+      >
         <section className="pager-page" aria-label="Collection">
           <HubScreen />
         </section>
