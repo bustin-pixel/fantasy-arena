@@ -106,6 +106,27 @@ overlay. All UI/meta — **zero engine changes**; the sim stays pure.
   `GameStateContext` (sibling to `recordResult`). Present → encountered; died → defeated.
   The engine never learns about the bestiary.
 
+#### Dungeon-crypt page backgrounds (design locked, not built)
+Give the pager a themed backdrop, all vector SVG (matches the drawn aesthetic —
+no image assets), themeable + crisp + animatable.
+- **Look:** cold damp crypt — grey-blue brick, heavy green moss, draping vines,
+  dim **flickering torches** (flame wobble + glow pulse via CSS `@keyframes`,
+  disabled under `prefers-reduced-motion`).
+- **Vines:** drape from the top corners + over the arch only. No wall moss, no
+  ground-climbing vines, no floor debris (skulls/weapons were tried and cut).
+- **Home slice:** the arched gate with iron portcullis + pitch-black interior,
+  flanked by the two torches; the Home UI composites on top — title + stat pill up
+  high, the two mode cards centered over the gate mouth ("at the threshold"), tab
+  bar at the bottom. Card backgrounds darkened (~90% opaque) for contrast against
+  the dark gate. (Optional: swap the mode-card emoji for the vector crossed-swords
+  / skull icons from the mockup.)
+- **Collection / Compendium slices:** the same crypt wall + vines (shared base so
+  it flows seamlessly across swipes), no gate/torches — plain enough not to fight
+  the deck grid / bestiary content.
+- **Build shape:** a shared `DungeonWall` SVG layer (brick + vines) behind every
+  page + a `DungeonGate` SVG (arch + portcullis + torches) behind Home's content
+  only.
+
 ### Items / equipment for units (planned)
 Gear that modifies a unit's stats or kit (weapon → +damage, armor → +HP / damage
 reduction, trinket → a small effect or extra trait). Design notes:
