@@ -324,14 +324,12 @@ body {
   overflow-y: hidden;
   scroll-snap-type: x mandatory;
 }
-/* Desktop affordance: click-and-drag to swipe (see AppShell pointer handlers). */
-@media (hover: hover) and (pointer: fine) {
-  .pager {
-    cursor: grab;
-  }
-  .pager.dragging {
-    cursor: grabbing;
-  }
+/* Click-and-drag to swipe (see AppShell pointer handlers). No hover affordance —
+   the grabbing cursor shows only while an actual drag is in progress, over the
+   whole pager (children included). */
+.pager.dragging,
+.pager.dragging * {
+  cursor: grabbing !important;
 }
 .pager.dragging {
   user-select: none;
