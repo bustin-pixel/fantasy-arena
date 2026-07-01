@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useGameState } from "@/state/GameStateContext";
+import { ArenaIcon, SwarmIcon } from "@/components/ModeIcons";
 import type { BattleMode } from "@/hooks/useBattleEngine";
 
 interface Props {
@@ -48,9 +49,7 @@ export function HomeScreen({ onBattle }: Props) {
           disabled={!ready}
           onClick={() => onBattle("solo")}
         >
-          <span className="mode-card-icon" aria-hidden>
-            ⚔️
-          </span>
+          <ArenaIcon />
           <span className="mode-card-title">Arena</span>
           <span className="mode-card-sub">
             {ready ? "Battle a rival warband" : "Build a deck to play"}
@@ -58,9 +57,7 @@ export function HomeScreen({ onBattle }: Props) {
         </button>
 
         <button type="button" className="mode-card swarm" disabled>
-          <span className="mode-card-icon" aria-hidden>
-            ☠️
-          </span>
+          <SwarmIcon />
           <span className="mode-card-title">Swarm · PvE</span>
           <span className="mode-card-sub">Coming soon</span>
         </button>
