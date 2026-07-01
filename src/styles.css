@@ -425,8 +425,12 @@ body {
   justify-content: center;
 }
 .dungeon-gate > svg {
-  height: 88%;
-  width: auto;
+  /* Width-driven so the torches sit at a consistent ~12% from each edge on any
+     screen width (height-driven made the gate too wide on narrow phones and
+     cropped the torches). Capped so it doesn't balloon on desktop. */
+  width: 112%;
+  max-width: 560px;
+  height: auto;
   flex-shrink: 0;
 }
 /* Torch flicker (globally disabled by the prefers-reduced-motion rule below). */

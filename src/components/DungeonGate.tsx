@@ -86,7 +86,7 @@ export function DungeonGate() {
           <ellipse cx="378" cy="294" rx="9" ry="4.5" transform="rotate(-30 378 294)" />
         </g>
 
-        <g transform="translate(-18 -58)">
+        <g transform="translate(-18 -84)">
           <circle className="dgate-glow" cx="150" cy="360" r="120" fill="url(#dg-glow)" />
           <rect x="132" y="398" width="36" height="9" rx="2" fill="#2c2c32" />
           <rect x="145" y="376" width="10" height="52" rx="3" fill="#241a12" />
@@ -96,7 +96,7 @@ export function DungeonGate() {
             <path d="M150,345 C155,355 156,362 150,373 C144,362 145,355 150,345 Z" fill="#ffdd57" />
           </g>
         </g>
-        <g transform="translate(18 -58)">
+        <g transform="translate(18 -84)">
           <circle className="dgate-glow b" cx="530" cy="360" r="120" fill="url(#dg-glow)" />
           <rect x="512" y="398" width="36" height="9" rx="2" fill="#2c2c32" />
           <rect x="525" y="376" width="10" height="52" rx="3" fill="#241a12" />
