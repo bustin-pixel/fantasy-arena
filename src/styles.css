@@ -106,8 +106,6 @@ body {
 .hub {
   padding: 18px 16px calc(16px + env(safe-area-inset-bottom));
   gap: 18px;
-  height: 100dvh;
-  overflow-y: auto;
 }
 .hub-header {
   display: flex;
@@ -311,10 +309,154 @@ body {
   color: var(--ink);
 }
 
-.hub-footer {
-  position: sticky;
-  bottom: 0;
-  padding-top: 8px;
+/* ---- App shell / swipe pager --------------------------------------------- */
+.app-shell {
+  width: 100%;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+.pager {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+}
+.pager-page {
+  flex: 0 0 100%;
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+.pager-nav {
+  flex: 0 0 auto;
+  display: flex;
+  background: linear-gradient(180deg, #1a140d, #0f0b06);
+  border-top: 1px solid var(--brown);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.pager-tab {
+  flex: 1;
+  font-family: inherit;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--stone);
+  background: transparent;
+  border: none;
+  border-top: 2px solid transparent;
+  padding: 12px 4px;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+.pager-tab.active {
+  color: var(--gold);
+  border-top-color: var(--gold);
+}
+
+/* ---- Home page ----------------------------------------------------------- */
+.home {
+  padding: 22px 18px calc(18px + env(safe-area-inset-bottom));
+  gap: 20px;
+  align-items: center;
+  text-align: center;
+}
+.home-header {
+  margin-top: 6vh;
+}
+.home-title {
+  font-size: 2.4rem;
+}
+.mode-cards {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 8px;
+}
+.mode-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 22px 16px;
+  border-radius: 16px;
+  border: 2px solid var(--stone-dark);
+  background: linear-gradient(180deg, #2c2118, #1a140d);
+  color: var(--parchment);
+  font-family: inherit;
+  cursor: pointer;
+  transition: transform 0.08s ease, filter 0.15s ease, border-color 0.15s ease;
+}
+.mode-card:active {
+  transform: translateY(1px) scale(0.99);
+}
+.mode-card.arena {
+  border-color: var(--gold);
+  box-shadow: 0 0 22px rgba(245, 179, 1, 0.18);
+}
+.mode-card:disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.7) brightness(0.7);
+}
+.mode-card-icon {
+  font-size: 2rem;
+  line-height: 1;
+}
+.mode-card-title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--gold);
+  letter-spacing: 0.03em;
+}
+.mode-card-sub {
+  font-size: 0.8rem;
+  color: var(--stone);
+}
+.home-hint {
+  font-size: 0.8rem;
+  color: var(--stone);
+  margin: 4px 0 0;
+}
+
+/* ---- Compendium (placeholder) -------------------------------------------- */
+.compendium {
+  padding: 18px 16px calc(16px + env(safe-area-inset-bottom));
+  gap: 18px;
+}
+.coming-soon {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 12px;
+  color: var(--stone);
+  padding: 10vh 20px;
+}
+.coming-soon-icon {
+  font-size: 3rem;
+}
+.coming-soon p {
+  margin: 0;
+  max-width: 280px;
+  line-height: 1.5;
+}
+.coming-soon-tag {
+  margin-top: 8px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--gold-soft);
+  border: 1px solid var(--gold-soft);
+  border-radius: 999px;
+  padding: 4px 12px;
 }
 
 /* ---- Card portrait ------------------------------------------------------- */
