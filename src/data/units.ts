@@ -71,6 +71,20 @@ export const UNITS: Record<string, UnitDef> = {
     color: "#a9763d",
     accent: "#facc15",
   },
+  ranger: {
+    id: "ranger",
+    name: "Ranger",
+    rarity: "rare",
+    role: "Volley Ranger",
+    hp: 110,
+    damage: 11,
+    attackSpeed: 1.0,
+    moveSpeed: 76,
+    range: FIELD_THIRD, // one-third battlefield width, like the Archer
+    ability: "multishot", // passive headline: Multishot (every 2nd shot → 3 arrows)
+    color: "#3b82f6",
+    accent: "#fcd34d",
+  },
   knight: {
     id: "knight",
     name: "Knight",
@@ -84,6 +98,20 @@ export const UNITS: Record<string, UnitDef> = {
     ability: "taunt_roar",
     color: "#9aa3ad",
     accent: "#e2e8f0",
+  },
+  warrior: {
+    id: "warrior",
+    name: "Warrior",
+    rarity: "rare",
+    role: "Whirlwind Bruiser",
+    hp: 250,
+    damage: 10,
+    attackSpeed: 1.4,
+    moveSpeed: 58,
+    range: MELEE,
+    ability: "whirlwind", // passive: melee swing becomes an AoE spin + bleed
+    color: "#4b5563",
+    accent: "#dc2626",
   },
   fire_mage: {
     id: "fire_mage",

@@ -169,6 +169,20 @@ export const ABILITIES: Record<AbilityId, AbilityDef> = {
       "Passive: shifts between two forms. Each shot marks its target; at 3 marks the foe detonates and the Archer flips to its other form.",
     cooldown: 0,
   },
+  whirlwind: {
+    id: "whirlwind",
+    name: "Whirlwind",
+    description:
+      "In melee it spins its claymore in a full circle — striking every enemy in reach for its damage and leaving them bleeding for 12 more over 2s (3 every 0.5s, refreshes each spin).",
+    cooldown: 0,
+  },
+  multishot: {
+    id: "multishot",
+    name: "Multishot",
+    description:
+      "Passive: every second shot looses three arrows at once, striking up to three different enemies.",
+    cooldown: 0,
+  },
   momentum: {
     id: "momentum",
     name: "Momentum",

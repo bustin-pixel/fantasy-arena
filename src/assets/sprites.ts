@@ -118,6 +118,9 @@ export function drawUnitSprite(
     case "archer":
       drawArcher(ctx, body, dark, light, accent);
       break;
+    case "ranger":
+      drawArcher(ctx, body, dark, light, accent);
+      break;
     case "hunter":
       drawEngineer(ctx, body, dark, light, accent);
       break;
@@ -126,6 +129,9 @@ export function drawUnitSprite(
       break;
     case "knight":
       drawKnight(ctx, body, dark, light, accent);
+      break;
+    case "warrior":
+      drawWarrior(ctx, body, dark, light, accent);
       break;
     case "aegis_knight":
       drawAegisKnight(ctx, body, dark, light, accent);
@@ -386,6 +392,65 @@ function drawKnight(ctx: Ctx, body: string, dark: string, light: string, accent:
   ctx.moveTo(-0.7, -2);
   ctx.lineTo(0.7, -2);
   ctx.lineTo(0, -19);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawWarrior(ctx: Ctx, body: string, dark: string, light: string, accent: string) {
+  // broad-shouldered fighter hefting a two-handed claymore
+  roundedBody(ctx, 24, 26, -2, body);
+  // waist belt
+  ctx.fillStyle = dark;
+  ctx.fillRect(-12, 12, 24, 5);
+  // chest strap
+  ctx.strokeStyle = dark;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-10, -2);
+  ctx.lineTo(8, 12);
+  ctx.stroke();
+  // helm
+  ctx.fillStyle = light;
+  ctx.beginPath();
+  ctx.arc(0, -12, 8, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#111";
+  ctx.fillRect(-5, -13, 10, 3); // visor slit
+  // crimson crest plume
+  ctx.fillStyle = accent;
+  ctx.beginPath();
+  ctx.moveTo(0, -19);
+  ctx.lineTo(3, -27);
+  ctx.lineTo(-2, -26);
+  ctx.closePath();
+  ctx.fill();
+  // two-handed claymore, held across the body and tilted up (flips with facing)
+  ctx.save();
+  ctx.translate(6, 2);
+  ctx.rotate(-0.35);
+  // long grip for two hands
+  ctx.fillStyle = "#3a2a18";
+  ctx.fillRect(-1.6, 4, 3.2, 15);
+  ctx.fillStyle = "#c9a24a";
+  ctx.fillRect(-2.4, 18, 4.8, 2.4); // pommel
+  // wide crossguard
+  ctx.fillStyle = "#9aa0a8";
+  ctx.fillRect(-8, 2, 16, 3);
+  // long steel blade
+  ctx.fillStyle = "#d6d9de";
+  ctx.beginPath();
+  ctx.moveTo(-3.5, 2);
+  ctx.lineTo(3.5, 2);
+  ctx.lineTo(0, -32);
+  ctx.closePath();
+  ctx.fill();
+  // central fuller highlight
+  ctx.fillStyle = "rgba(255,255,255,0.55)";
+  ctx.beginPath();
+  ctx.moveTo(-1, 0);
+  ctx.lineTo(1, 0);
+  ctx.lineTo(0, -28);
   ctx.closePath();
   ctx.fill();
   ctx.restore();
@@ -667,6 +732,15 @@ function drawSummoner(ctx: Ctx, body: string, dark: string, light: string, accen
   ctx.beginPath();
   ctx.arc(0, -12, 7, 0, Math.PI * 2);
   ctx.fill();
+  // glowing nature eyes
+  ctx.fillStyle = accent;
+  ctx.shadowColor = accent;
+  ctx.shadowBlur = 4;
+  ctx.beginPath();
+  ctx.arc(-2.6, -12, 1.4, 0, Math.PI * 2);
+  ctx.arc(2.6, -12, 1.4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
   // antler/horn headpiece
   ctx.strokeStyle = accent;
   ctx.lineWidth = 2;
@@ -674,6 +748,35 @@ function drawSummoner(ctx: Ctx, body: string, dark: string, light: string, accen
   ctx.moveTo(-4, -17); ctx.lineTo(-8, -24); ctx.moveTo(-6, -20); ctx.lineTo(-11, -21);
   ctx.moveTo(4, -17); ctx.lineTo(8, -24); ctx.moveTo(6, -20); ctx.lineTo(11, -21);
   ctx.stroke();
+  // gnarled tree-branch staff (flips with facing)
+  ctx.strokeStyle = "#6b4a2a"; // living wood
+  ctx.lineWidth = 2.5;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(13, 18);
+  ctx.lineTo(12, 8);
+  ctx.lineTo(14, -2);
+  ctx.lineTo(12, -12);
+  ctx.lineTo(13, -19);
+  ctx.stroke();
+  // twig offshoots
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(14, -2); ctx.lineTo(19, -6);
+  ctx.moveTo(12, 8); ctx.lineTo(8, 5);
+  ctx.stroke();
+  ctx.lineCap = "butt";
+  // leaf cluster crowning the branch
+  ctx.fillStyle = accent;
+  ctx.shadowColor = accent;
+  ctx.shadowBlur = 5;
+  ctx.beginPath();
+  ctx.ellipse(13, -21, 4, 2.5, -0.5, 0, Math.PI * 2);
+  ctx.ellipse(16, -19, 3, 2, 0.4, 0, Math.PI * 2);
+  ctx.ellipse(10, -19, 3, 2, -0.4, 0, Math.PI * 2);
+  ctx.ellipse(20, -7, 2.5, 1.6, 0.3, 0, Math.PI * 2); // leaf on the twig
+  ctx.fill();
+  ctx.shadowBlur = 0;
 }
 
 function drawWolf(ctx: Ctx, body: string, dark: string, light: string, accent: string) {
