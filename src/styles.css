@@ -703,10 +703,14 @@ body {
 }
 
 /* ---- Unit detail modal --------------------------------------------------- */
-/* Freeze the pager (vertical + horizontal) while a detail panel is open. */
+/* Freeze the pager (vertical + horizontal) while a detail panel is open, and make
+   the tab bar inert so a tab tap can't scroll the pager behind the panel. */
 body.modal-open .pager,
 body.modal-open .pager-page {
   overflow: hidden;
+}
+body.modal-open .pager-nav {
+  pointer-events: none;
 }
 .detail-overlay {
   position: fixed;
