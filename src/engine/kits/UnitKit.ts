@@ -20,6 +20,7 @@
 
 import type { Unit } from "@/types";
 import type { AbilityContext } from "../AbilitySystem";
+import { assassinKit } from "./assassin";
 import { knightKit } from "./knight";
 import { ogreKit } from "./ogre";
 import { slimeKit, slimeCloneKit } from "./slime";
@@ -36,10 +37,11 @@ export interface UnitKit {
   roleClass?: "melee" | "ranged" | "support" | "assassin";
 
   // --- lifecycle ---
-  /** Fired when the unit enters the field (opening stealth, deploy-time summons).
-   *  NOTE: its only site today is MatchController.deploy — wired when the first
-   *  onSpawn unit (the opening-stealth trio) migrates, not during scaffolding. */
-  onSpawn?(unit: Unit, ctx: KitCtx): void;
+  /** Fired when the unit enters the field, from BOTH deploy (MatchController) and
+   *  the summon flush (CombatSystem). It gets no KitCtx: deploy runs outside the
+   *  combat funnel (no dealDamage/heal), and the only spawn behavior — opening
+   *  stealth — just needs the unit + the directly-imported applyEffect. */
+  onSpawn?(unit: Unit): void;
   /** Fired the tick the unit dies — may re-enter dealDamage (Bloater / Slime
    *  death burst). Runs inside the HP funnel's death branch. */
   onDeath?(unit: Unit, ctx: KitCtx): void;
@@ -98,6 +100,7 @@ export type UnitKitRegistry = Record<string /* defId */, UnitKit>;
  *  units getKit returns undefined and the engine falls back to the old hardcoded
  *  path, so behavior — and digest() — is unchanged until a unit's kit is born. */
 export const UNIT_KITS: UnitKitRegistry = {
+  assassin: assassinKit,
   knight: knightKit,
   ogre: ogreKit,
   slime: slimeKit,

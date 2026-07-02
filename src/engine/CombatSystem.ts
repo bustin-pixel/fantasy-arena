@@ -204,31 +204,9 @@ function makeDamageDealer(
         return;
       }
       // Death-immunity window (e.g. Assassin's Vanish): clamp to 1 HP and survive.
+      // (Vanish itself now lives in kits/assassin.ts onWouldDie, above.)
       if (hasEffect(target, "death_immune")) {
         target.hp = 1;
-      } else if (target.defId === "assassin" && !target.vanishUsed) {
-        // Vanish: the first lethal blow doesn't kill. The assassin survives at
-        // 1 HP and becomes untargetable (stealth) + immune to death for 2.5s so
-        // it can slip away.
-        target.vanishUsed = true;
-        target.hp = 1;
-        applyEffect(
-          target,
-          makeEffect("death_immune", { source: target.uid, durationSec: 2.5 })
-        );
-        applyEffect(
-          target,
-          makeEffect("stealth", { source: target.uid, durationSec: 2.5 })
-        );
-        target.attackedByUid = null;
-        spawnFloatingText(state, target, "Vanish!", "heal");
-        spawnVfx(state, {
-          kind: "death",
-          pos: { x: target.pos.x, y: target.pos.y },
-          life: secToTicks(0.5),
-          maxLife: secToTicks(0.5),
-          color: getUnitDef(target.defId).accent,
-        });
       } else if (target.defId === "berserker" && !target.lastStandUsed) {
         // Berserker Last Stand: once per life, a killing blow leaves it at 1 HP and
         // unkillable for 5s. Unlike Vanish it does NOT stealth — it stays in the
@@ -1137,6 +1115,7 @@ export function stepSimulation(state: SimState): void {
     const summoned = createUnit(spawn.defId, spawn.team, spawn.pos);
     state.units.push(summoned);
     byUid.set(summoned.uid, summoned);
+    getKit(summoned.defId)?.onSpawn?.(summoned); // [seam] spawn hook (both spawn paths)
   }
 
   // 5a. Movement + collisions.
@@ -1200,24 +1179,9 @@ function performBasicAttack(
   // to melee, so it should swing, not fire a projectile.
   const ranged = unit.range > 80;
 
-  // [seam] before the swing resolves (open contract 2 — Assassin Ambush).
+  // [seam] before the swing resolves (open contract 2). Assassin Ambush (opening
+  // stun + reveal) now lives in its kit (kits/assassin.ts onBeforeAttack).
   if (kit?.onBeforeAttack) kit.onBeforeAttack(unit, target, ctx);
-
-  // Assassin Ambush: the first strike out of opening stealth stuns the victim for
-  // 3s and reveals the assassin. One-time (ambushReady) so a later re-stealth
-  // (e.g. Vanish) never re-triggers it.
-  if (unit.ambushReady) {
-    unit.ambushReady = false;
-    unit.effects = unit.effects.filter((e) => e.type !== "stealth");
-    applyEffect(target, makeEffect("stun", { source: unit.uid, durationSec: 3 }));
-    spawnVfx(state, {
-      kind: "slam",
-      pos: { x: target.pos.x, y: target.pos.y },
-      life: secToTicks(0.4),
-      maxLife: secToTicks(0.4),
-      color: def.accent,
-    });
-  }
 
   // Rogue & Trickster reveal on a strike (stripping is a no-op once revealed). The
   // Trickster also (re)starts its re-cloak timer, so it slips back into stealth a
