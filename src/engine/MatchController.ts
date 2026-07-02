@@ -21,6 +21,7 @@ import {
   MATCH_TIME_SEC,
   MAX_ACTIVE_UNITS_PER_SIDE,
   PLAYER_ZONE,
+  REINFORCE_GRACE_SEC,
   TICK_RATE,
   UNIT_RADIUS,
   secToTicks,
@@ -271,10 +272,11 @@ export class MatchController {
       this.autoDeployCountdown = 0;
       return;
     }
-    // Only the LAST slot triggers urgency: if the player has units on the field
-    // they can choose freely. If the board is empty, deploy promptly.
+    // If the board is empty, deploy promptly; otherwise wait the same shared
+    // reinforcement grace the AI uses, so neither side gets a pacing edge.
     const active = this.countActive("player");
-    const grace = active === 0 ? secToTicks(0.4) : secToTicks(2.5);
+    const grace =
+      active === 0 ? secToTicks(0.4) : secToTicks(REINFORCE_GRACE_SEC);
 
     this.autoDeployCountdown++;
     if (this.autoDeployCountdown < grace) return;
@@ -341,7 +343,8 @@ export class MatchController {
     }
 
     this.deploy("enemy", card, { x, y });
-    this.aiCooldown = 14;
+    // Same shared reinforcement pacing as the player's auto-deploy grace.
+    this.aiCooldown = secToTicks(REINFORCE_GRACE_SEC);
   }
 
   private clampX(x: number): number {
