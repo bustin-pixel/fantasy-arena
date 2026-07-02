@@ -35,6 +35,7 @@ import {
   type SimState,
 } from "./CombatSystem";
 import { applyEffect, makeEffect } from "./StatusEffectSystem";
+import { getKit } from "./kits/UnitKit";
 import { WaveController } from "./WaveController";
 import { isMelee, getUnitDef } from "@/data/units";
 
@@ -418,6 +419,10 @@ export class MatchController {
     | "ranged"
     | "support"
     | "assassin" {
+    // [seam] a migrated unit declares its tactical class on its kit; else fall
+    // back to the ability/hp heuristic below (the AI's *opinions* stay here).
+    const kitRole = getKit(def.id)?.roleClass;
+    if (kitRole) return kitRole;
     if (def.ability === "mend") return "support";
     if (def.ability === "ambush") return "assassin";
     if (isMelee(def)) return "melee";

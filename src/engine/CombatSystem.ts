@@ -53,6 +53,7 @@ import {
   wantsToCast,
   type AbilityContext,
 } from "./AbilitySystem";
+import { getKit, type KitCtx } from "./kits/UnitKit";
 import { stepMovement } from "./MovementSystem";
 import { updateTarget } from "./TargetingSystem";
 import {
@@ -132,9 +133,14 @@ function isMagicSource(source: Unit): boolean {
 /** Cap on the Aegis Knight's banked magic shield; also its Backlash threshold. */
 const AEGIS_SHIELD_CAP = 120;
 
-function makeDamageDealer(state: SimState) {
+function makeDamageDealer(
+  state: SimState,
+  makeKitCtx: (subject: Unit, damageContext?: boolean) => KitCtx
+) {
   return function dealDamage(target: Unit, amount: number, source: Unit): void {
     if (target.state === "dead") return;
+
+    const kit = getKit(target.defId);
 
     // Shield fully blocks a single hit.
     if (tryConsumeShield(target)) {
@@ -143,10 +149,16 @@ function makeDamageDealer(state: SimState) {
       return;
     }
 
+    // [seam] kit incoming-damage modifier (open contract 1): reduce the hit before
+    // HP is applied. Identity while un-migrated; the post-hit bank rides onDamaged.
+    let effAmount = amount;
+    if (amount > 0 && kit?.modifyIncomingDamage) {
+      effAmount = kit.modifyIncomingDamage(target, effAmount, source, makeKitCtx(target, true));
+    }
+
     // Aegis Knight soaks magic: most of a magic hit is banked as overhealth
     // shield (applied after, so it doesn't absorb this same hit) — only a sliver
     // leaks through as HP damage.
-    let effAmount = amount;
     let aegisBank = 0;
     if (amount > 0 && target.defId === "aegis_knight" && isMagicSource(source)) {
       effAmount = amount * 0.25;
@@ -172,6 +184,11 @@ function makeDamageDealer(state: SimState) {
     if (aegisBank > 0 && target.hp > 0) {
       target.shieldHpMax = AEGIS_SHIELD_CAP;
       target.shieldHp = Math.min(AEGIS_SHIELD_CAP, target.shieldHp + aegisBank);
+    }
+
+    // [seam] kit post-hit reaction on a surviving target (Slime split; Aegis bank).
+    if (kit?.onDamaged && target.hp > 0) {
+      kit.onDamaged(target, dmg, source, makeKitCtx(target, true));
     }
 
     // Slime Split: the ORIGINAL slime spawns a weaker clone each time its health
@@ -224,6 +241,12 @@ function makeDamageDealer(state: SimState) {
     }
 
     if (target.hp <= 0) {
+      // [seam] kit death veto (open contract 3): runs BEFORE the generic
+      // death_immune check, matching today's order. If the kit kept the unit
+      // alive (Ogre Second Wind / Vanish / Last Stand), the hit is fully handled.
+      if (kit?.onWouldDie && kit.onWouldDie(target, source, makeKitCtx(target, true))) {
+        return;
+      }
       // Death-immunity window (e.g. Assassin's Vanish): clamp to 1 HP and survive.
       if (hasEffect(target, "death_immune")) {
         target.hp = 1;
@@ -272,6 +295,12 @@ function makeDamageDealer(state: SimState) {
         transitionTo(target, "dead");
         target.targetUid = null;
 
+        // [seam] kit on-kill reaction on the KILLER (Berserker Bloodthirst).
+        const srcKit = getKit(source.defId);
+        if (srcKit?.onKill && source !== target && source.state !== "dead") {
+          srcKit.onKill(source, target, makeKitCtx(source, true));
+        }
+
         // Berserker Bloodthirst: landing a killing blow restores 5% of its max
         // HP. Fires per kill (a Cleave that drops several foes heals several
         // times), feeding the Last Stand comeback.
@@ -296,6 +325,11 @@ function makeDamageDealer(state: SimState) {
           maxLife: secToTicks(0.5),
           color: getUnitDef(target.defId).color,
         });
+
+        // [seam] kit on-death reaction on the victim (Bloater / Slime burst —
+        // may re-enter dealDamage; the makeKitCtx(damageContext) summon queue
+        // keeps any spawned clones on the same-tick flush).
+        if (kit?.onDeath) kit.onDeath(target, makeKitCtx(target, true));
 
         // Bloater Putrid Burst: on death it ruptures — AoE damage plus a
         // lingering poison on every nearby enemy. Same one-shot safety as the
@@ -352,12 +386,21 @@ function makeDamageDealer(state: SimState) {
   };
 }
 
-function makeHealer(state: SimState) {
+function makeHealer(
+  state: SimState,
+  makeKitCtx: (subject: Unit, damageContext?: boolean) => KitCtx
+) {
   return function heal(target: Unit, amount: number): void {
     if (target.state === "dead" || amount <= 0) return;
+    const kit = getKit(target.defId);
+    // [seam] kit incoming-heal modifier (Druid bear form 1.5x). Identity while
+    // un-migrated.
+    let amt = amount;
+    if (kit?.modifyIncomingHeal) {
+      amt = kit.modifyIncomingHeal(target, amount, makeKitCtx(target, true));
+    }
     // Bear Form: the Druid receives 50% more healing while transformed.
-    const amt =
-      target.defId === "summoner" && target.transformed ? amount * 1.5 : amount;
+    if (target.defId === "summoner" && target.transformed) amt = amount * 1.5;
     const before = target.hp;
     target.hp = Math.min(target.maxHp, target.hp + Math.round(amt));
     const gained = target.hp - before;
@@ -709,8 +752,51 @@ export function stepSimulation(state: SimState): void {
   const living = state.units.filter((u) => u.state !== "dead");
   const byUid = new Map(state.units.map((u) => [u.uid, u]));
 
-  const dealDamage = makeDamageDealer(state);
-  const heal = makeHealer(state);
+  // Units summoned this tick are queued here and flushed after the AI loop, so we
+  // never mutate the array we're iterating. Hoisted above the funnel so the kit
+  // context builder can route a kit's ability-driven summons into this queue.
+  const pendingSpawns: {
+    defId: string;
+    team: Unit["team"];
+    pos: { x: number; y: number };
+  }[] = [];
+
+  // The single HP funnel, forward-declared so makeKitCtx (which a kit hook fired
+  // from *inside* dealDamage/heal captures) can reference them. Both are assigned
+  // immediately below, before any tick logic — and thus any hook — runs.
+  let dealDamage!: (target: Unit, amount: number, source: Unit) => void;
+  let heal!: (target: Unit, amount: number) => void;
+
+  // Build the context a kit hook receives. `damageContext` routes a kit's summons
+  // to the same-tick damageSpawns queue (on-damage / on-death hooks re-enter the
+  // funnel); otherwise they join pendingSpawns like ability-driven summons. Only
+  // ever invoked from a guarded call site, so it costs nothing while no unit is
+  // migrated (the registry is empty).
+  const makeKitCtx = (subject: Unit, damageContext = false): KitCtx => {
+    const liveNow = state.units.filter((u) => u.state !== "dead");
+    return {
+      unit: subject,
+      unitsByUid: byUid,
+      enemies: liveNow.filter((e) => e.team !== subject.team),
+      allies: liveNow.filter(
+        (a) => a.team === subject.team && a.uid !== subject.uid
+      ),
+      dealDamage,
+      heal,
+      spawnProjectile: (p) => spawnProjectile(state, p),
+      spawnVfx: (v) => spawnVfx(state, v),
+      spawnUnit: (defId, team, pos) =>
+        (damageContext ? state.damageSpawns : pendingSpawns).push({
+          defId,
+          team,
+          pos,
+        }),
+      spawnFloatingText: (u, v, k) => spawnFloatingText(state, u, v, k),
+    };
+  };
+
+  dealDamage = makeDamageDealer(state, makeKitCtx);
+  heal = makeHealer(state, makeKitCtx);
 
   // 1. Status effect timers + DoT / HoT.
   const { dots, hots } = tickEffects(living);
@@ -740,14 +826,8 @@ export function stepSimulation(state: SimState): void {
     }
   }
 
-  // 2 & 3 & 4. Per-unit AI / state machine.
-  // Units summoned this tick are queued and added after the loop, so we never
-  // mutate the array we're iterating.
-  const pendingSpawns: {
-    defId: string;
-    team: Unit["team"];
-    pos: { x: number; y: number };
-  }[] = [];
+  // 2 & 3 & 4. Per-unit AI / state machine. (pendingSpawns is declared above the
+  // funnel so the kit context builder can queue ability-driven summons into it.)
   for (const unit of alive) {
     // Cooldowns always tick down.
     if (unit.attackCooldown > 0) unit.attackCooldown--;
@@ -774,6 +854,16 @@ export function stepSimulation(state: SimState): void {
           makeEffect("stealth", { source: unit.uid, durationSec: MATCH_TIME_SEC })
         );
       }
+    }
+
+    // [seam] kit pre-gate maintenance slot — runs every tick, even while stunned
+    // (periodic passives, per-tick stat recompute, threshold transforms). This is
+    // where Field Repairs / Raise Dead / boar+trap / bloodrage / momentum / bear
+    // transform migrate. Placement is behavior-defining once units move here, so
+    // each migration re-verifies digest().
+    {
+      const kit = getKit(unit.defId);
+      if (kit?.onTick) kit.onTick(unit, makeKitCtx(unit));
     }
 
     // Engineer Field Repairs: every 2s, repair itself and nearby turrets,
@@ -948,6 +1038,16 @@ export function stepSimulation(state: SimState): void {
     const enemies = alive.filter((e) => e.team !== unit.team);
     updateTarget(unit, byUid, enemies);
 
+    // [seam] kit post-target act slot — the unit has a target (or none) and is
+    // un-stunned/un-feared here. This is where Blink / Shadow Step / Rejuvenation
+    // / the Necromancer's custom cast migrate. Timing among those varies (some run
+    // before the "no target" idle-out below, some after), so each migration
+    // re-verifies digest() and relocates this call if its unit needs it.
+    {
+      const kit = getKit(unit.defId);
+      if (kit?.onActTick) kit.onActTick(unit, makeKitCtx(unit));
+    }
+
     // Arcane Mage: Blink away from a closing melee threat (own cooldown, so it's
     // independent of the passive ability slot). Just repositions; the rest of the
     // tick (movement/kiting) resumes from the new spot.
@@ -989,7 +1089,9 @@ export function stepSimulation(state: SimState): void {
       spawnProjectile: (p) => spawnProjectile(state, p),
       spawnVfx: (v) => spawnVfx(state, v),
       spawnUnit: (defId, team, pos) => pendingSpawns.push({ defId, team, pos }),
+      spawnFloatingText: (u, v, k) => spawnFloatingText(state, u, v, k),
     };
+    const abilityKit = getKit(unit.defId);
 
     // Druid Rejuvenation: an instant HoT on the most-wounded nearby ally (incl.
     // itself), on its own cooldown. Works in bear form too. Instant, so it never
@@ -1016,7 +1118,9 @@ export function stepSimulation(state: SimState): void {
     } else if (unit.castTicks > 0) {
       unit.castTicks--;
       if (unit.castTicks <= 0) {
-        fireCastAbility(abilityCtx); // the spell goes off
+        // [seam] kit fires the completed cast's effect; else the old dispatch.
+        if (abilityKit?.fireAbility) abilityKit.fireAbility(abilityCtx);
+        else fireCastAbility(abilityCtx); // the spell goes off
         unit.castTicksMax = 0;
         unit.castTargetUid = null;
       } else {
@@ -1029,7 +1133,11 @@ export function stepSimulation(state: SimState): void {
         // Begin a cast. A stun/silence blocks the start, and some casts (Mend)
         // only begin when they have a reason to — so the Cleric doesn't freeze
         // mid-field winding up a heal with no wounded ally to land it on.
-        if (!isStunned(unit) && !isSilenced(unit) && wantsToCast(abilityCtx)) {
+        // [seam] the kit's wantsToCast overrides the old one when present.
+        const wants = abilityKit?.wantsToCast
+          ? abilityKit.wantsToCast(abilityCtx)
+          : wantsToCast(abilityCtx);
+        if (!isStunned(unit) && !isSilenced(unit) && wants) {
           unit.castTicks = castTime;
           unit.castTicksMax = castTime;
           unit.castTargetUid = target ? target.uid : null;
@@ -1038,7 +1146,12 @@ export function stepSimulation(state: SimState): void {
           continue;
         }
       } else {
-        const fired = tryCastAbility(abilityCtx);
+        // [seam] instant cast: the kit fires the effect (has-an-active-cast <=>
+        // fireAbility defined), gated on stun/silence like tryCastAbility; else
+        // the old dispatch handles gating internally.
+        const fired = abilityKit?.fireAbility
+          ? !isStunned(unit) && !isSilenced(unit) && abilityKit.fireAbility(abilityCtx)
+          : tryCastAbility(abilityCtx);
         if (fired) unit.abilityCooldown = abilityCooldownTicks(unit.ability);
       }
     }
@@ -1058,7 +1171,7 @@ export function stepSimulation(state: SimState): void {
       transitionTo(unit, "attacking");
       unit.facing = target.pos.x >= unit.pos.x ? 1 : -1;
       if (unit.attackCooldown <= 0) {
-        performBasicAttack(state, unit, target, byUid, dealDamage, heal);
+        performBasicAttack(state, unit, target, byUid, dealDamage, heal, abilityCtx);
         const delay = unit.attackSpeed * attackDelayMultiplier(unit);
         unit.attackCooldown = secToTicks(delay);
       }
@@ -1140,12 +1253,17 @@ function performBasicAttack(
   target: Unit,
   _byUid: Map<string, Unit>,
   dealDamage: (t: Unit, amt: number, s: Unit) => void,
-  heal: (t: Unit, amt: number) => void
+  heal: (t: Unit, amt: number) => void,
+  ctx: KitCtx
 ): void {
   const def = getUnitDef(unit.defId);
+  const kit = getKit(unit.defId);
   // Use the LIVE range, not the static def — the Druid's bear form drops its range
   // to melee, so it should swing, not fire a projectile.
   const ranged = unit.range > 80;
+
+  // [seam] before the swing resolves (open contract 2 — Assassin Ambush).
+  if (kit?.onBeforeAttack) kit.onBeforeAttack(unit, target, ctx);
 
   // Assassin Ambush: the first strike out of opening stealth stuns the victim for
   // 3s and reveals the assassin. One-time (ambushReady) so a later re-stealth
@@ -1178,6 +1296,10 @@ function performBasicAttack(
   // Fire Mage: every third basic attack sets the target ablaze (Burn).
   const burnThisHit =
     unit.defId === "fire_mage" && unit.attackCount % 3 === 0;
+
+  // [seam] replace the default swing entirely (open contract 2 — Mystic / Ranger /
+  // Warrior do their own thing). attackCount is already bumped, matching today.
+  if (kit?.onBasicAttack && kit.onBasicAttack(unit, target, ctx)) return;
 
   // Mystic Archer fires a form-tagged shot; stacking/detonation resolves on hit.
   if (unit.defId === "mystic_archer") {
@@ -1286,6 +1408,10 @@ function performBasicAttack(
   } else {
     dealDamage(target, unit.damage, unit);
     applyLifesteal(unit, unit.damage, heal);
+
+    // [seam] after the default melee swing lands (open contract 2 — Numbing slow /
+    // Venom / Cleave / Backlash migrate here).
+    if (kit?.onAfterAttack) kit.onAfterAttack(unit, target, ctx);
 
     // Zombie Shambler's Numbing Bite: every bite slows the victim's movement
     // and attacks by 30% for 2s (refreshed, never stacked). The horde's threat

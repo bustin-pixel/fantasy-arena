@@ -9,7 +9,7 @@
 // shields, and floating numbers stay centralized and deterministic.
 // ============================================================================
 
-import type { Projectile, Unit, Vfx } from "@/types";
+import type { FloatingText, Projectile, Unit, Vfx } from "@/types";
 import { ABILITIES } from "@/data/abilities";
 import { getUnitDef, NON_DECK_UNITS } from "@/data/units";
 import {
@@ -40,6 +40,13 @@ export interface AbilityContext {
   heal: (target: Unit, amount: number) => void;
   /** Spawn a fresh unit into the live sim (e.g. summoner's wolves). */
   spawnUnit: (defId: string, team: Unit["team"], pos: { x: number; y: number }) => void;
+  /** Spawn a floating combat number/label over a unit (kit hooks: "Vanish!",
+   *  "Second Wind!", heal ticks). Presentation-only; never affects the digest. */
+  spawnFloatingText: (
+    unit: Unit,
+    value: string,
+    kind: FloatingText["kind"]
+  ) => void;
 }
 
 /** Abilities that are passive (no active cast). Everything else is cast-gated. */
