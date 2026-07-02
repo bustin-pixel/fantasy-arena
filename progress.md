@@ -13,15 +13,48 @@ Solo ("Arena") battles only. Deployed to Netlify (auto-deploys on merge to `mast
 
 ## Game modes
 
-### PvE mode (planned)
-A single-player progression mode: fight a series of AI encounters (waves / a short
-campaign / an endless ladder), earn rewards, and unlock units or items between fights.
-- Reuses the existing solo battle loop + `engine/AIDeck.ts` for opponents; difficulty
-  scales by giving the AI stronger/larger decks per stage.
-- Needs a **meta/run layer outside the battle sim** (encounter list, rewards, run state)
-  persisted via `state/persistence.ts`. Keep the battle sim itself unchanged and
-  deterministic.
-- Natural home for the items system below (items as fight rewards).
+### PvE mode — "The Depths" (design locked 2026-07-01)
+A floor-based descent through the dungeon — the Home screen's gate is literally the
+entrance. Each floor is a **Swarm encounter** (rolling-window horde, below); every
+**5th floor is a boss floor**. Deeper = bigger **wave budget**, reusing the AIDeck
+cost model (rare 1 / epic 2 / legendary 4 in `rarities.ts`; give monsters costs too —
+`generateEnemyDeck`'s `budget` param is the difficulty-dial precedent). Floor themes
+roll out the approved bestiary in tiers:
+- **1–5** fodder: Giant Rats, Zombie Shamblers, Skeletons → boss **Bloater**
+- **6–10** undead: Skeleton Archers, Ghouls, Bonecaller → boss **Abomination**
+- **11–15** deep crypt: Spiders, Imps, Banshee, Plague Shaman → boss **Gargoyle**
+- **16–20** the throne: elite mixes, Spore Pods, Bat Swarms → boss **Lich**
+Extras: **3-star floors** (clear without losing a unit → bonus gold) for cheap replay
+depth; **boss first-kills unlock their Compendium page**; **Endless mode** comes after
+the campaign works (personal-best waves shown on Home). First-clear rewards ≫ replay
+rewards so farming is possible but descent is always optimal. Home's "Swarm · PvE"
+card becomes "The Depths" with a floor picker.
+
+### Progression & economy (design locked 2026-07-01)
+The loop: battle (any mode) → **chest + gold** → unlock units / equip items → stronger
+warband → deeper floors & better Arena. All meta-layer — the sim never learns about
+rewards; chest contents roll from a **seed stored at drop time** (deterministic,
+server-verifiable later).
+- **Gold** (straw-man numbers): PvE first clear `50 + 10×floor` **+ chest** (boss
+  floors drop a better tier); floor replays ~15, no chest; **PvP win 40 + chest**;
+  PvP loss 10 (never zero).
+- **Chests:** **instant-open** at the results screen (a quick reveal ceremony — no
+  timers, no queue). Tiers wooden/silver/gold: gold + 1–2 items + a small chance of a
+  unit unlock; **duplicate unit drops convert to gold**.
+- **Unit unlocks:** new players start with the **starter deck 4** (Ogre, Archer,
+  Knight, Fire Mage); key units unlock **free at floor milestones** (designer-controlled
+  curve); the rest are **gold purchases** (straw-man: rare 400 / epic 1200 / legendary
+  4000). **Existing saves are grandfathered** — a save from an older version keeps every
+  unit (migration: version < N ⇒ all current units unlocked). `sanitizeDeck` must also
+  enforce deck ⊆ unlocked.
+- **Items (v1 small):** 3 slots — weapon (+dmg) / armor (+HP) / trinket (special) —
+  × 3 tiers, from chests only; modifiers applied at `createUnit` per the items design
+  below; surfaced in the (data-driven) detail panel + a loadout UI.
+- **Save growth:** `gold`, `unlockedUnits`, `items` inventory, per-unit `loadouts`,
+  `depths` progress (highest floor, stars) — versioned-merge pattern in
+  `persistence.ts`, same as the Compendium save-v2 plan.
+- **Arena tie-in:** once trophies/ranks exist, Arena's enemy-deck budget scales with
+  player progress via the existing `budget` param.
 
 #### Swarm mode — the rolling-window horde (design locked)
 Enemies creep in from the **top edge** and march down; as they die, more trickle in
