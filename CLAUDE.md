@@ -68,3 +68,19 @@ The defining decision: **the simulation is a pure, deterministic, React-free eng
 ## Path to multiplayer
 
 `engine/` imports nothing from React or the DOM (except the read-only `Renderer`). To go server-authoritative: run `MatchController` + `CombatSystem` on Node, send deploy inputs to the server, broadcast snapshots, and keep `Renderer` client-side. Swap `state/persistence.ts`'s backend. Never trust client values — the deterministic core lets the server re-simulate from the seed to validate any outcome.
+
+## Agent skills
+
+Per-repo config for the `mattpocock/skills` engineering flow (installed globally). Set up via `setup-matt-pocock-skills`.
+
+### Issue tracker
+
+Issues and PRDs live in this repo's **GitHub Issues**, via the `gh` CLI. External PRs are **not** a triage surface (solo repo). See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five canonical roles map 1:1 to their default label strings (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+**Single-context**: `CONTEXT.md` + `docs/adr/` at the repo root, created lazily by `/domain-modeling`. See `docs/agents/domain.md`.
