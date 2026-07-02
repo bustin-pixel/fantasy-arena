@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { DECKABLE_UNIT_IDS, getUnitDef } from "@/data/units";
-import { RARITY_ORDER, RARITIES } from "@/data/rarities";
+import { rarityRank, RARITY_ORDER, RARITIES } from "@/data/rarities";
 import type { Rarity } from "@/types";
 import { CardPortrait, type CardAddState } from "@/components/CardPortrait";
 import { DeckStrip } from "@/components/DeckStrip";
@@ -42,10 +42,15 @@ export function HubScreen() {
   const randomize = () => setDeck(generateRandomDeck(generateSeed(), MAX_DECK));
   const clearDeck = () => setDeck([]);
 
-  // Roster for the card grid: the roster's natural (data) order, narrowed to the
-  // selected rarity filter.
+  // Roster for the card grid: "All" shows rarest-first (Legendary > Epic > Rare;
+  // ties keep their stable data order), a rarity chip narrows to that rarity.
   const rosterIds = useMemo(() => {
-    if (rarityFilter === "all") return DECKABLE_UNIT_IDS;
+    if (rarityFilter === "all") {
+      return [...DECKABLE_UNIT_IDS].sort(
+        (a, b) =>
+          rarityRank(getUnitDef(b).rarity) - rarityRank(getUnitDef(a).rarity)
+      );
+    }
     return DECKABLE_UNIT_IDS.filter(
       (id) => getUnitDef(id).rarity === rarityFilter
     );
