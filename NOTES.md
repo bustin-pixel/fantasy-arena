@@ -103,6 +103,14 @@ Mage is an example of a unit with two abilities: an *active* ability slot —
 Arcane Barrage — plus a *second* ability, Blink, that runs off its own cooldown
 field.)
 
+**The `lifesteal` filler convention is display-load-bearing:** summons and Depths
+monsters use `ability: "lifesteal"` as a "never casts" placeholder, and
+`UnitDetail` HIDES that slot unless the unit actually sets `def.lifesteal` (only
+the Orc does). So a monster's real kit must live in `traits` — which the
+Compendium's lore page shows — and giving a unit the lifesteal slot without
+`def.lifesteal` means it displays no ability at all (correct for monsters,
+a bug for a deckable hero).
+
 ### 4. Summon caps protect the frame-budget ceiling
 `CombatSystem` enforces a per-team live-unit cap when flushing spawns, derived
 from `state.activeCaps` (the per-side concurrent caps): `activeCaps[team] + 3`,

@@ -585,40 +585,72 @@ body {
   margin: 4px 0 0;
 }
 
-/* ---- Compendium (placeholder) -------------------------------------------- */
+/* ---- Compendium (bestiary) ------------------------------------------------ */
 .compendium {
   padding: 18px 16px calc(16px + env(safe-area-inset-bottom));
   gap: 18px;
+  overflow-y: auto;
 }
-.coming-soon {
-  flex: 1;
+.comp-section {
+  margin-bottom: 6px;
+}
+.comp-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.comp-section-title {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  color: var(--gold);
+  margin: 0;
+}
+.comp-section-count {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--gold-soft);
+  white-space: nowrap;
+}
+.comp-section-sub {
+  margin: 2px 0 10px;
+  font-size: 0.78rem;
+  color: var(--stone);
+}
+/* A compendium entry — same card silhouette as the hub grid, tier-styled. */
+.comp-card {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  text-align: center;
-  gap: 12px;
+  background: linear-gradient(180deg, #2c2118, #1a140d);
+  border: 2px solid;
+  border-radius: 12px;
+  padding: 6px 6px 8px;
+  font-family: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.comp-card:disabled {
+  cursor: default;
+}
+.comp-card.undiscovered {
+  opacity: 0.6;
+}
+.comp-card.undiscovered .card-name {
   color: var(--stone);
-  padding: 10vh 20px;
+  letter-spacing: 0.2em;
 }
-.coming-soon-icon {
-  font-size: 3rem;
+.comp-card.encountered .card-name {
+  color: #b8ae99;
 }
-.coming-soon p {
-  margin: 0;
-  max-width: 280px;
-  line-height: 1.5;
+.comp-card.defeated:hover {
+  filter: brightness(1.12);
 }
-.coming-soon-tag {
-  margin-top: 8px;
-  font-size: 0.7rem;
-  font-weight: 700;
+.comp-hint-tag {
+  font-size: 0.62rem;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--gold-soft);
-  border: 1px solid var(--gold-soft);
-  border-radius: 999px;
-  padding: 4px 12px;
+  letter-spacing: 0.06em;
+  color: var(--stone);
 }
 
 /* ---- Card portrait ------------------------------------------------------- */

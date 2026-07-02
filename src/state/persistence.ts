@@ -9,6 +9,13 @@
 
 import { UNITS } from "@/data/units";
 
+/** Compendium knowledge of one unit/monster. Encountered = faced it in battle
+ *  (silhouette + name); defeated = it died to you at least once (full page). */
+export interface BestiaryEntry {
+  encountered: boolean;
+  defeated: boolean;
+}
+
 export interface PlayerSave {
   version: number;
   username: string;
@@ -17,16 +24,20 @@ export interface PlayerSave {
   /** Local battle stats (wins/losses) — display only for now. */
   wins: number;
   losses: number;
+  /** Compendium reveal state, keyed by defId. Recorded by the meta layer on
+   *  battle end — the sim never learns about it. (Save v2.) */
+  bestiary: Record<string, BestiaryEntry>;
 }
 
 const KEY = "fantasy-arena/save/v1";
 
 export const DEFAULT_SAVE: PlayerSave = {
-  version: 1,
+  version: 2,
   username: "Champion",
   deck: ["ogre", "archer", "knight", "fire_mage"],
   wins: 0,
   losses: 0,
+  bestiary: {},
 };
 
 export function loadSave(): PlayerSave {
@@ -34,7 +45,11 @@ export function loadSave(): PlayerSave {
     const raw = localStorage.getItem(KEY);
     if (!raw) return { ...DEFAULT_SAVE };
     const parsed = JSON.parse(raw) as Partial<PlayerSave>;
+    // Versioned merge: defaults fill any fields an older save lacks (a v1 save
+    // simply gains an empty bestiary), then the version is stamped current.
     const merged = { ...DEFAULT_SAVE, ...parsed };
+    merged.version = DEFAULT_SAVE.version;
+    merged.bestiary = { ...(parsed.bestiary ?? {}) };
     merged.deck = sanitizeDeck(merged.deck);
     return merged;
   } catch {

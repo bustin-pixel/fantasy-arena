@@ -80,6 +80,9 @@ export interface UseBattleEngine {
   pickUnitAt: (pos: Vec2) => string | null;
   /** Live stats for a unit by uid, or null if it's gone/dead. */
   inspectUnit: (uid: string) => InspectedUnit | null;
+  /** The enemy roster this match actually fielded, for the Compendium: every
+   *  enemy defId that appeared (`seen`) and the subset that died (`slain`). */
+  enemyLedger: () => { seen: string[]; slain: string[] };
 }
 
 export function useBattleEngine(
@@ -261,6 +264,20 @@ export function useBattleEngine(
     };
   }, []);
 
+  const enemyLedger = useCallback((): { seen: string[]; slain: string[] } => {
+    const c = controllerRef.current;
+    const seen = new Set<string>();
+    const slain = new Set<string>();
+    if (c) {
+      for (const u of c.state.units) {
+        if (u.team !== "enemy") continue;
+        seen.add(u.defId);
+        if (u.state === "dead") slain.add(u.defId);
+      }
+    }
+    return { seen: [...seen], slain: [...slain] };
+  }, []);
+
   return {
     canvasRef,
     ui,
@@ -270,6 +287,7 @@ export function useBattleEngine(
     setSpeed,
     pickUnitAt,
     inspectUnit,
+    enemyLedger,
   };
 }
 

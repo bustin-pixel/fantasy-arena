@@ -18,9 +18,9 @@ interface Props {
 }
 
 export function BattleScreen({ deck, onExit, mode = "solo" }: Props) {
-  const { canvasRef, ui, deployAt, selectCard, speed, setSpeed, pickUnitAt, inspectUnit } =
+  const { canvasRef, ui, deployAt, selectCard, speed, setSpeed, pickUnitAt, inspectUnit, enemyLedger } =
     useBattleEngine(deck, mode);
-  const { recordResult } = useGameState();
+  const { recordResult, recordBestiary } = useGameState();
   const wrapRef = useRef<HTMLDivElement>(null);
   const recordedRef = useRef(false);
   // Timestamp of the last touch, to suppress the synthetic click a touchscreen
@@ -34,7 +34,8 @@ export function BattleScreen({ deck, onExit, mode = "solo" }: Props) {
   // the unit's position stay current; clears itself when the unit dies.
   const inspected = inspectedUid ? inspectUnit(inspectedUid) : null;
 
-  // Record win/loss once when the match resolves.
+  // Record win/loss + Compendium reveals once when the match resolves. The
+  // bestiary reads the final field from the meta layer — the sim never knows.
   useEffect(() => {
     const over =
       ui.phase === "victory" || ui.phase === "defeat" || ui.phase === "draw";
@@ -42,9 +43,11 @@ export function BattleScreen({ deck, onExit, mode = "solo" }: Props) {
       recordedRef.current = true;
       if (ui.phase === "victory") recordResult(true);
       else if (ui.phase === "defeat") recordResult(false);
+      const { seen, slain } = enemyLedger();
+      recordBestiary(seen, slain);
       setTimeout(() => setShowResult(true), 700);
     }
-  }, [ui.phase, recordResult]);
+  }, [ui.phase, recordResult, recordBestiary, enemyLedger]);
 
   // A tap inspects a tapped unit (either team); on empty space it dismisses any
   // tooltip and deploys a reinforcement if a slot is open in the player zone.

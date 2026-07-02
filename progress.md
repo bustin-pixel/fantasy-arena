@@ -8,8 +8,9 @@ the source of truth, so this file deliberately doesn't duplicate it.
 3-page app shell (Collection / Home / Compendium) over a scrolling dungeon-crypt
 background, click-to-inspect detail panel, in-battle tooltips, 2v2 + countdown start.
 Arena (vs AI deck) + The Depths slice 1 (PvE floor 1 via the Home card — seeded
-WaveController horde, fodder-tier monsters, Bloater boss on floor 5). Deployed to
-Netlify (auto-deploys on merge to `master`).
+WaveController horde, fodder-tier monsters, Bloater boss on floor 5) + a live
+Compendium (3-tier bestiary reveal, save v2). Deployed to Netlify (auto-deploys
+on merge to `master`).
 
 ---
 
@@ -113,23 +114,16 @@ for exactly this.
 
 ## Systems
 
-### Compendium — slice 2 (the shell + dungeon background SHIPPED in #35)
-Built & merged (#35): the swipeable pager (`AppShell.tsx`; Collection ← Home →
-Compendium, Home landing), desktop click-drag to swipe, vector mode icons
-(`ModeIcons.tsx`), and the scrolling dungeon-crypt **hall** — one seamless brick
-surface + `DungeonGate` with flickering torches, panned 1:1 with the pager so swiping
-feels like walking down a corridor. Home has Arena (playable vs AI) + Swarm·PvE
-("Coming soon"). The **Compendium page is still a placeholder** — slice 2 fills it in:
-- **Save v2:** add `bestiary: Record<defId, { encountered: boolean; defeated: boolean }>`
-  (+ optional `lastPage`). Bump `version` to 2; `loadSave` already merges defaults.
-- **Recording (sim stays pure):** on battle exit the Shell reads the final snapshot's
-  enemy units → new `recordEncounter(defIds)` / `recordDefeated(defIds)` on
-  `GameStateContext`. Present → encountered; died → defeated. The engine never learns
-  about the bestiary.
-- **The page:** all units, **3-tier reveal** — Undiscovered (dark silhouette + `???`) →
-  Encountered (name + silhouette) → Defeated (full info via `UnitDetail`). Silhouette =
-  `drawUnitSprite` tinted dark. Real content now via AI hero opponents; monsters slot in
-  when PvE ships.
+### Compendium — slice 2 BUILT (with the Depths batch; shell shipped in #35)
+The bestiary page is real now: save v2 (`bestiary` map, versioned merge in
+`persistence.ts`), meta-layer recording on battle end (`enemyLedger` in
+`useBattleEngine` → `recordBestiary` on `GameStateContext`; the sim never learns),
+and the 3-tier reveal (Undiscovered `???` silhouette → Encountered/Sighted named
+silhouette → Defeated full lore via read-only `UnitDetail`). Two sections:
+Monsters of the Depths (roster derives from `data/depths.ts` tiers, so it grows
+automatically) and Heroes of the Arena (all deckables).
+- Still open: **per-monster kill counters** (v2 idea, parked with the bestiary
+  rewards), and Compendium `lastPage` persistence if it ever gets sub-pages.
 - Still open: a **dedicated desktop battle/layout** — the shell is phone-first (gate
   tuned so torches flank on narrow screens; the battle canvas is capped at 480px, safe
   to scale up on desktop since the 480×720 sim is display-independent).
