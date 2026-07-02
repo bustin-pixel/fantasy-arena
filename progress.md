@@ -128,6 +128,23 @@ automatically) and Heroes of the Arena (all deckables).
   tuned so torches flank on narrow screens; the battle canvas is capped at 480px, safe
   to scale up on desktop since the 480×720 sim is display-independent).
 
+### Engine architecture — UnitKit seam (designed 2026-07-02, not built)
+Collapse the ~38 `defId`/`ability` branches in `CombatSystem`, the `AbilityId`
+`dispatchAbility` switch + `PASSIVE_ABILITIES` in `AbilitySystem`, and the role
+heuristics in `MatchController` into **one stateless kit per `defId`** behind a
+`UnitKit` seam. Full design (8 locked decisions, the interface, 3 open hook
+contracts, migration order) in **`docs/adr/0001-unitkit-seam.md`**.
+- **Guardrail:** behavior-identical — `digest()` byte-identical at every commit.
+- **Shape:** engine owns the tick skeleton (gate/targeting/cast pipeline); kit gets
+  `onTick`/`onActTick` + event/modifier/override hooks + `fireAbility`/`wantsToCast`;
+  private state moves to a flat typed `unit.kit` (opportunistically, per-unit).
+- **Migration:** strangler-fig (kit-preferred, old-path fallback) — scaffolding commit
+  → Zombie Shambler + Knight (PR 1) → escalating clusters → Necromancer last → cleanup.
+- **First balance dividend after the refactor** (separate commit, own spec): stun
+  suppresses Raise Dead / Engineer repair / Hunter traps (move the hook past the gate).
+- Retires the `NOTES.md §2` "consider a per-unit traits field" note and the §3
+  `PASSIVE_ABILITIES` footgun.
+
 ### Items / equipment for units (planned)
 Gear that modifies a unit's stats or kit (weapon → +damage, armor → +HP / damage
 reduction, trinket → a small effect or extra trait). Design notes:
