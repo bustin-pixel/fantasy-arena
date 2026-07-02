@@ -1409,19 +1409,10 @@ function performBasicAttack(
     dealDamage(target, unit.damage, unit);
     applyLifesteal(unit, unit.damage, heal);
 
-    // [seam] after the default melee swing lands (open contract 2 — Numbing slow /
-    // Venom / Cleave / Backlash migrate here).
+    // [seam] after the default melee swing lands (open contract 2). Zombie
+    // Shambler's Numbing Bite now lives in its kit (kits/zombieShambler.ts);
+    // Venom / Cleave / Backlash migrate here next.
     if (kit?.onAfterAttack) kit.onAfterAttack(unit, target, ctx);
-
-    // Zombie Shambler's Numbing Bite: every bite slows the victim's movement
-    // and attacks by 30% for 2s (refreshed, never stacked). The horde's threat
-    // is being mired in it, not the bite itself.
-    if (unit.defId === "zombie_shambler") {
-      applyEffect(
-        target,
-        makeEffect("slow", { source: unit.uid, durationSec: 2, magnitude: 0.3 })
-      );
-    }
 
     // Rogue Venom: every strike envenoms the target. A short, fast-ticking poison
     // (refreshed each hit via applyEffect, never stacked) so it keeps damaging even

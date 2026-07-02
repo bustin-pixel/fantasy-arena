@@ -20,6 +20,7 @@
 
 import type { Unit } from "@/types";
 import type { AbilityContext } from "../AbilitySystem";
+import { zombieShamblerKit } from "./zombieShambler";
 
 /** The context every kit hook receives (the engine's AbilityContext). For the
  *  HP-funnel hooks the subject (`ctx.unit`) is the victim/killer; for the acting
@@ -90,10 +91,12 @@ export interface UnitKit {
 
 export type UnitKitRegistry = Record<string /* defId */, UnitKit>;
 
-/** The kit registry. Empty until units are migrated one at a time (strangler
- *  fig). While empty, every seam call in the engine short-circuits to the old
- *  hardcoded path, so behavior — and digest() — is unchanged. */
-export const UNIT_KITS: UnitKitRegistry = {};
+/** The kit registry. Grows one unit at a time (strangler fig); for un-migrated
+ *  units getKit returns undefined and the engine falls back to the old hardcoded
+ *  path, so behavior — and digest() — is unchanged until a unit's kit is born. */
+export const UNIT_KITS: UnitKitRegistry = {
+  zombie_shambler: zombieShamblerKit,
+};
 
 /** The kit for a defId, or undefined if the unit hasn't been migrated yet. */
 export function getKit(defId: string): UnitKit | undefined {

@@ -43,7 +43,13 @@ the id literal (e.g. `unit.defId === "summoner"` triggers the bear transform).
 If you ever add a unit, make the id match the name to avoid extending this trap.
 
 ### 2. Hardcoded unit-id checks in CombatSystem
-Special mechanics are gated by `defId` string literals in `CombatSystem.ts`:
+**Being migrated to the UnitKit seam** (`docs/adr/0001-unitkit-seam.md`): each
+unit's mechanics move into one kit under `src/engine/kits/`, and its `defId`
+branches below are deleted from `CombatSystem` in the same commit (digest stays
+byte-identical). Migrated units are struck from this list; when it's empty the
+`dispatchAbility` switch, `PASSIVE_ABILITIES`, and `unitRoleClass` internals go too.
+
+Still gated by `defId` string literals in `CombatSystem.ts`:
 - `"summoner"` → Druid bear transform at 30% HP
 - `"ogre"` → Second Wind full-heal at 25% HP
 - `"berserker"` → Bloodrage damage/speed scaling + melee Cleave (AoE swing)
@@ -76,8 +82,8 @@ Special mechanics are gated by `defId` string literals in `CombatSystem.ts`:
   UI); the Light/Dark mechanic is driven by `defId` + the `mystic_shift` projectile
   tag, and is explained by the Light Form / Dark Form *traits* — there is no longer
   a "Light & Dark" header in the UI.
-- `"zombie_shambler"` → Numbing Bite: every melee hit applies a 30% slow
-  (move + attack) for 2s. Depths monster, never in a deck.
+- ~~`"zombie_shambler"` → Numbing Bite~~ — **migrated** to `kits/zombieShambler.ts`
+  (onAfterAttack: 30% move+attack slow for 2s). First UnitKit migration.
 - `"bloater"` → Putrid Burst: on death it ruptures — 30 AoE damage + a poison
   DoT to every enemy within 110px (same one-shot safety as the slime burst).
   Depths tier-1 boss, never in a deck. (The Giant Rat is pure stats — no gate.)
@@ -88,9 +94,9 @@ Special mechanics are gated by `defId` string literals in `CombatSystem.ts`:
   the `barrageShots`/`barrageTimer`/`barrageTargetUid` fields. Basic attack is the
   default ranged shot.
 
-This works but isn't data-driven. If the roster grows a lot, consider moving
-these into a per-unit "passive traits" field in the unit data so the engine
-loops over traits instead of hardcoding ids. Not urgent at current scale.
+This worked but wasn't data-driven — hence the UnitKit migration above (ADR
+0001), which replaces the "consider a per-unit passive-traits field" idea with
+one stateless kit per `defId` behind a seam.
 
 ### 3. Ability slot vs. passive properties
 `lifesteal` started as an *ability* but is now also a unit *property*
