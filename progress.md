@@ -128,6 +128,38 @@ automatically) and Heroes of the Arena (all deckables).
   tuned so torches flank on narrow screens; the battle canvas is capped at 480px, safe
   to scale up on desktop since the 480×720 sim is display-independent).
 
+### Engine architecture — UnitKit seam (in progress; PR 1 on `refactor/unitkit-seam`)
+Collapse the ~38 `defId`/`ability` branches in `CombatSystem`, the `AbilityId`
+`dispatchAbility` switch + `PASSIVE_ABILITIES` in `AbilitySystem`, and the role
+heuristics in `MatchController` into **one stateless kit per `defId`** behind a
+`UnitKit` seam. Full design (8 locked decisions, the interface, 3 open hook
+contracts, migration order) in **`docs/adr/0001-unitkit-seam.md`**.
+- **Guardrail:** behavior-identical — `digest()` byte-identical at every commit.
+- **Shape:** engine owns the tick skeleton (gate/targeting/cast pipeline); kit gets
+  `onTick`/`onActTick` + event/modifier/override hooks + `fireAbility`/`wantsToCast`;
+  private state moves to a flat typed `unit.kit` (opportunistically, per-unit).
+- **Migration:** strangler-fig (kit-preferred, old-path fallback). Each kit lives in
+  `src/engine/kits/`; the registry is `kits/UnitKit.ts` (`getKit`).
+- **Done (on `refactor/unitkit-seam`, PR #41), all digest-byte-identical:** scaffolding
+  (every seam call site, empty registry) → **Zombie Shambler** (`onAfterAttack`) →
+  **Knight** (`fireAbility`+`roleClass`) → **Slime + Slimeling** (`onDamaged` split +
+  `onDeath` burst) → **Ogre** (`onDamaged`+`onWouldDie` Second Wind; `fireAbility`
+  Crushing Slam) → **Assassin** (`onSpawn` stealth + `onBeforeAttack` Ambush +
+  `onWouldDie` Vanish — wired `onSpawn` into deploy + summon flush) → **Berserker**
+  (`onTick` Bloodrage + `onWouldDie` Last Stand + `onKill` Bloodthirst + `onAfterAttack`
+  Cleave) → **Rogue** (`onSpawn`+`onBeforeAttack`+`onAfterAttack`).
+- **Remaining:** Aegis Knight (two-phase `modifyIncomingDamage`+`onDamaged` bank +
+  `onAfterAttack` Backlash + Warded) → Druid (`onTick` transform + `modifyIncomingHeal` +
+  `onActTick` Rejuv + `fireAbility` Summon Wolves) → Mystic/Hunter → Trickster (Shadow
+  Step `onActTick`) → **Necromancer last** (custom dual-cast) → cleanup (delete
+  `dispatchAbility`, `PASSIVE_ABILITIES`, `isActiveAbility`, `unitRoleClass` internals,
+  all fallbacks). **Ice/Fire Mage** freeze/burn riders ride the projectile — deferred to
+  the candidate-3 projectile on-hit descriptor (ADR consequence); migrate them together.
+- **First balance dividend after the refactor** (separate commit, own spec): stun
+  suppresses Raise Dead / Engineer repair / Hunter traps (move the hook past the gate).
+- Retires the `NOTES.md §2` "consider a per-unit traits field" note and the §3
+  `PASSIVE_ABILITIES` footgun.
+
 ### Items / equipment for units (planned)
 Gear that modifies a unit's stats or kit (weapon → +damage, armor → +HP / damage
 reduction, trinket → a small effect or extra trait). Design notes:

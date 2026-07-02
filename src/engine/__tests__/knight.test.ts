@@ -19,4 +19,16 @@ describe("Knight — Taunting Roar shield", () => {
 
     expect(knight.shieldHp).toBe(65); // 45 + 2 × 10
   });
+
+  it("taunts nearby foes onto itself (fireAbility via the kit)", () => {
+    const s = battleState(2);
+    const knight = place(s, "knight", "player", 240, 600);
+    const foe = makeDummy(place(s, "skeleton", "enemy", 240, 520)); // in radius
+
+    for (let i = 0; i < 4; i++) stepSimulation(s);
+
+    expect(foe.effects.some((e) => e.type === "taunt")).toBe(true);
+    expect(foe.tauntedByUid).toBe(knight.uid);
+    expect(foe.targetUid).toBe(knight.uid); // aggro yanked onto the Knight
+  });
 });

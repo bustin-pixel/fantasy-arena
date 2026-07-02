@@ -35,6 +35,7 @@ import {
   type SimState,
 } from "./CombatSystem";
 import { applyEffect, makeEffect } from "./StatusEffectSystem";
+import { getKit } from "./kits/UnitKit";
 import { WaveController } from "./WaveController";
 import { isMelee, getUnitDef } from "@/data/units";
 
@@ -177,10 +178,12 @@ export class MatchController {
     });
     this.state.units.push(unit);
 
-    // Opening stealth: the Assassin (Ambush), the Rogue, and the Trickster all enter
-    // the field stealthed (untargetable) until their first strike reveals them.
-    // Deploy is the only path onto the field, so apply it here.
-    if (unit.ability === "ambush" || unit.defId === "rogue" || unit.defId === "trickster") {
+    // [seam] kit spawn hook (the Assassin's opening stealth rides its kit here).
+    getKit(defId)?.onSpawn?.(unit);
+
+    // Opening stealth for the still-un-migrated Trickster (Rogue rides its kit's
+    // onSpawn): it enters untargetable until its first strike reveals it.
+    if (unit.defId === "trickster") {
       applyEffect(
         unit,
         makeEffect("stealth", { source: unit.uid, durationSec: MATCH_TIME_SEC })
@@ -418,6 +421,10 @@ export class MatchController {
     | "ranged"
     | "support"
     | "assassin" {
+    // [seam] a migrated unit declares its tactical class on its kit; else fall
+    // back to the ability/hp heuristic below (the AI's *opinions* stay here).
+    const kitRole = getKit(def.id)?.roleClass;
+    if (kitRole) return kitRole;
     if (def.ability === "mend") return "support";
     if (def.ability === "ambush") return "assassin";
     if (isMelee(def)) return "melee";

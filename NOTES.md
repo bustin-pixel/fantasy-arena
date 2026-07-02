@@ -43,12 +43,24 @@ the id literal (e.g. `unit.defId === "summoner"` triggers the bear transform).
 If you ever add a unit, make the id match the name to avoid extending this trap.
 
 ### 2. Hardcoded unit-id checks in CombatSystem
-Special mechanics are gated by `defId` string literals in `CombatSystem.ts`:
+**Being migrated to the UnitKit seam** (`docs/adr/0001-unitkit-seam.md`): each
+unit's mechanics move into one kit under `src/engine/kits/`, and its `defId`
+branches below are deleted from `CombatSystem` in the same commit (digest stays
+byte-identical). Migrated units are struck from this list; when it's empty the
+`dispatchAbility` switch, `PASSIVE_ABILITIES`, and `unitRoleClass` internals go too.
+
+Still gated by `defId` string literals in `CombatSystem.ts`:
 - `"summoner"` → Druid bear transform at 30% HP
-- `"ogre"` → Second Wind full-heal at 25% HP
-- `"berserker"` → Bloodrage damage/speed scaling + melee Cleave (AoE swing)
-- `"assassin"` → Vanish death-cheat
-- `"slime"` / `"slime_clone"` → split-on-damage and death explosion
+- ~~`"ogre"` → Second Wind full-heal at 25% HP~~ — **migrated** to `kits/ogre.ts`
+  (onDamaged + onWouldDie; Crushing Slam → fireAbility)
+- ~~`"berserker"` → Bloodrage damage/speed scaling + melee Cleave (AoE swing)~~ —
+  **migrated** to `kits/berserker.ts` (onTick Bloodrage, onWouldDie Last Stand,
+  onKill Bloodthirst, onAfterAttack Cleave)
+- ~~`"assassin"` → Vanish death-cheat~~ — **migrated** to `kits/assassin.ts`
+  (onSpawn opening stealth + onBeforeAttack Ambush + onWouldDie Vanish). First
+  `onSpawn` user — the hook is now wired in `MatchController.deploy` + the summon flush.
+- ~~`"slime"` / `"slime_clone"` → split-on-damage and death explosion~~ —
+  **migrated** to `kits/slime.ts` (onDamaged split → damageSpawns; onDeath burst)
 - `"aegis_knight"` → soaks magic into a shield, Backlash AoE, Warded (immune
   to burn/slow/poison). Magic is identified by the source unit's `school: "magic"`
   field (the casters) — see `isMagicSource` in CombatSystem.
@@ -58,9 +70,11 @@ Special mechanics are gated by `defId` string literals in `CombatSystem.ts`:
 - `"necromancer"` → custom cast handler (Curse DoT / Terrify fear on one cast bar,
   see `stepNecromancerCast`) + Raise Dead, a periodic passive that summons a
   skeleton every 5s.
-- `"rogue"` / `"trickster"` → opening stealth that reveals on first strike; the
-  Rogue's Venom poison-on-hit, the Trickster's Shadow Step (reactive cast-interrupt
-  blink) + re-cloak.
+- ~~`"rogue"`~~ — **migrated** to `kits/rogue.ts` (onSpawn stealth + onBeforeAttack
+  reveal + onAfterAttack Venom).
+- `"trickster"` → opening stealth that reveals on first strike; Shadow Step
+  (reactive cast-interrupt blink) + re-cloak. (Shares the deploy stealth + reveal
+  paths, now trickster-only until it migrates.)
 - `"warrior"` → Whirlwind: its melee swing is replaced by an AoE spin — hits every
   enemy within melee reach (`range + radius`) for its damage and applies a
   refreshing bleed (poison-type DoT, non-stacking). No lifesteal. `ability` slot is
@@ -76,8 +90,8 @@ Special mechanics are gated by `defId` string literals in `CombatSystem.ts`:
   UI); the Light/Dark mechanic is driven by `defId` + the `mystic_shift` projectile
   tag, and is explained by the Light Form / Dark Form *traits* — there is no longer
   a "Light & Dark" header in the UI.
-- `"zombie_shambler"` → Numbing Bite: every melee hit applies a 30% slow
-  (move + attack) for 2s. Depths monster, never in a deck.
+- ~~`"zombie_shambler"` → Numbing Bite~~ — **migrated** to `kits/zombieShambler.ts`
+  (onAfterAttack: 30% move+attack slow for 2s). First UnitKit migration.
 - `"bloater"` → Putrid Burst: on death it ruptures — 30 AoE damage + a poison
   DoT to every enemy within 110px (same one-shot safety as the slime burst).
   Depths tier-1 boss, never in a deck. (The Giant Rat is pure stats — no gate.)
@@ -88,9 +102,9 @@ Special mechanics are gated by `defId` string literals in `CombatSystem.ts`:
   the `barrageShots`/`barrageTimer`/`barrageTargetUid` fields. Basic attack is the
   default ranged shot.
 
-This works but isn't data-driven. If the roster grows a lot, consider moving
-these into a per-unit "passive traits" field in the unit data so the engine
-loops over traits instead of hardcoding ids. Not urgent at current scale.
+This worked but wasn't data-driven — hence the UnitKit migration above (ADR
+0001), which replaces the "consider a per-unit passive-traits field" idea with
+one stateless kit per `defId` behind a seam.
 
 ### 3. Ability slot vs. passive properties
 `lifesteal` started as an *ability* but is now also a unit *property*
