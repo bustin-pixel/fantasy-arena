@@ -53,7 +53,9 @@ Still gated by `defId` string literals in `CombatSystem.ts`:
 - `"summoner"` → Druid bear transform at 30% HP
 - ~~`"ogre"` → Second Wind full-heal at 25% HP~~ — **migrated** to `kits/ogre.ts`
   (onDamaged + onWouldDie; Crushing Slam → fireAbility)
-- `"berserker"` → Bloodrage damage/speed scaling + melee Cleave (AoE swing)
+- ~~`"berserker"` → Bloodrage damage/speed scaling + melee Cleave (AoE swing)~~ —
+  **migrated** to `kits/berserker.ts` (onTick Bloodrage, onWouldDie Last Stand,
+  onKill Bloodthirst, onAfterAttack Cleave)
 - ~~`"assassin"` → Vanish death-cheat~~ — **migrated** to `kits/assassin.ts`
   (onSpawn opening stealth + onBeforeAttack Ambush + onWouldDie Vanish). First
   `onSpawn` user — the hook is now wired in `MatchController.deploy` + the summon flush.

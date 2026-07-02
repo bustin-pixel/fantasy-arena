@@ -204,52 +204,18 @@ function makeDamageDealer(
         return;
       }
       // Death-immunity window (e.g. Assassin's Vanish): clamp to 1 HP and survive.
-      // (Vanish itself now lives in kits/assassin.ts onWouldDie, above.)
+      // (Vanish + Berserker Last Stand now live in their kits' onWouldDie, above.)
       if (hasEffect(target, "death_immune")) {
         target.hp = 1;
-      } else if (target.defId === "berserker" && !target.lastStandUsed) {
-        // Berserker Last Stand: once per life, a killing blow leaves it at 1 HP and
-        // unkillable for 5s. Unlike Vanish it does NOT stealth — it stays in the
-        // fight, and its kill-heal can claw HP back before the window closes.
-        target.lastStandUsed = true;
-        target.hp = 1;
-        applyEffect(
-          target,
-          makeEffect("death_immune", { source: target.uid, durationSec: 5 })
-        );
-        spawnFloatingText(state, target, "Last Stand!", "heal");
-        spawnVfx(state, {
-          kind: "slam",
-          pos: { x: target.pos.x, y: target.pos.y },
-          life: secToTicks(0.5),
-          maxLife: secToTicks(0.5),
-          color: getUnitDef(target.defId).accent,
-        });
       } else {
         transitionTo(target, "dead");
         target.targetUid = null;
 
-        // [seam] kit on-kill reaction on the KILLER (Berserker Bloodthirst).
+        // [seam] kit on-kill reaction on the KILLER (Berserker Bloodthirst now
+        // lives in kits/berserker.ts onKill, healing through the funnel).
         const srcKit = getKit(source.defId);
         if (srcKit?.onKill && source !== target && source.state !== "dead") {
           srcKit.onKill(source, target, makeKitCtx(source, true));
-        }
-
-        // Berserker Bloodthirst: landing a killing blow restores 5% of its max
-        // HP. Fires per kill (a Cleave that drops several foes heals several
-        // times), feeding the Last Stand comeback.
-        if (
-          source.defId === "berserker" &&
-          source !== target &&
-          source.state !== "dead"
-        ) {
-          const before = source.hp;
-          source.hp = Math.min(
-            source.maxHp,
-            source.hp + Math.round(source.maxHp * 0.05)
-          );
-          const gained = source.hp - before;
-          if (gained > 0) spawnFloatingText(state, source, `+${gained}`, "heal");
         }
 
         spawnVfx(state, {
@@ -877,17 +843,8 @@ export function stepSimulation(state: SimState): void {
       transformDruid(state, unit);
     }
 
-    // Berserker Bloodrage: damage and attack speed scale up as HP drops. At full
-    // HP it's baseline; near death it hits much harder and faster. Recomputed
-    // each tick from the unit's data-defined base stats.
-    if (unit.defId === "berserker") {
-      const def = getUnitDef(unit.defId);
-      const missing = 1 - unit.hp / unit.maxHp; // 0 at full, ~1 near death
-      const dmgBonus = 1 + missing * 0.9; // up to +90% damage
-      const spdBonus = 1 - missing * 0.4; // up to 40% faster attacks
-      unit.damage = Math.round(def.damage * dmgBonus);
-      unit.attackSpeed = def.attackSpeed * spdBonus;
-    }
+    // (Berserker Bloodrage now lives in kits/berserker.ts onTick — the pre-gate
+    // maintenance slot, recomputed each tick from base stats.)
 
     // Mystic Archer Momentum: each Light/Dark form shift permanently ramps its
     // attack speed by 15% (capped at +75%). Recomputed from base each tick.
@@ -1331,24 +1288,8 @@ function performBasicAttack(
       );
     }
 
-    // Berserker Cleave: the same swing also strikes every other enemy within
-    // melee reach, so it carves through a crowd.
-    if (unit.defId === "berserker") {
-      const reach = unit.range + unit.radius;
-      for (const e of state.units) {
-        if (e === target || e.team === unit.team || e.state === "dead") continue;
-        if (dist(unit.pos, e.pos) <= reach) {
-          dealDamage(e, unit.damage, unit);
-        }
-      }
-      spawnVfx(state, {
-        kind: "slam",
-        pos: { x: unit.pos.x, y: unit.pos.y },
-        life: secToTicks(0.3),
-        maxLife: secToTicks(0.3),
-        color: def.accent,
-      });
-    }
+    // (Berserker Cleave now lives in kits/berserker.ts onAfterAttack, fired by
+    // the onAfterAttack seam above.)
 
     // Aegis Knight Backlash: a full magic shield discharges as an area burst on
     // the next swing, spending the shield.
