@@ -51,7 +51,8 @@ byte-identical). Migrated units are struck from this list; when it's empty the
 
 Still gated by `defId` string literals in `CombatSystem.ts`:
 - `"summoner"` → Druid bear transform at 30% HP
-- `"ogre"` → Second Wind full-heal at 25% HP
+- ~~`"ogre"` → Second Wind full-heal at 25% HP~~ — **migrated** to `kits/ogre.ts`
+  (onDamaged + onWouldDie; Crushing Slam → fireAbility)
 - `"berserker"` → Bloodrage damage/speed scaling + melee Cleave (AoE swing)
 - `"assassin"` → Vanish death-cheat
 - ~~`"slime"` / `"slime_clone"` → split-on-damage and death explosion~~ —

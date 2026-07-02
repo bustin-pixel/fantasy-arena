@@ -21,6 +21,7 @@
 import type { Unit } from "@/types";
 import type { AbilityContext } from "../AbilitySystem";
 import { knightKit } from "./knight";
+import { ogreKit } from "./ogre";
 import { slimeKit, slimeCloneKit } from "./slime";
 import { zombieShamblerKit } from "./zombieShambler";
 
@@ -98,6 +99,7 @@ export type UnitKitRegistry = Record<string /* defId */, UnitKit>;
  *  path, so behavior — and digest() — is unchanged until a unit's kit is born. */
 export const UNIT_KITS: UnitKitRegistry = {
   knight: knightKit,
+  ogre: ogreKit,
   slime: slimeKit,
   slime_clone: slimeCloneKit,
   zombie_shambler: zombieShamblerKit,

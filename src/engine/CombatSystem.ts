@@ -193,26 +193,8 @@ function makeDamageDealer(
       kit.onDamaged(target, dmg, source, makeKitCtx(target, true));
     }
 
-    // Ogre Second Wind: the first time a hit drops it to/below 25% HP (even a
-    // lethal one), it surges back to full instead. Once per match. A tank that
-    // refuses to fall the first time.
-    if (
-      target.defId === "ogre" &&
-      !target.secondWindUsed &&
-      target.hp <= target.maxHp * 0.25
-    ) {
-      target.secondWindUsed = true;
-      target.hp = target.maxHp;
-      spawnFloatingText(state, target, "Second Wind!", "heal");
-      spawnVfx(state, {
-        kind: "shield_pop",
-        pos: { x: target.pos.x, y: target.pos.y - 4 },
-        life: secToTicks(0.7),
-        maxLife: secToTicks(0.7),
-        color: "#fbbf24",
-      });
-      return; // survived this blow at full HP
-    }
+    // (Ogre Second Wind now lives in its kit — kits/ogre.ts. onDamaged catches a
+    // non-lethal hit that crosses 25%; onWouldDie below catches the lethal one.)
 
     if (target.hp <= 0) {
       // [seam] kit death veto (open contract 3): runs BEFORE the generic

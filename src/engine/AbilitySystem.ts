@@ -73,8 +73,6 @@ export function abilityCastTimeTicks(abilityId: Unit["ability"]): number {
 /** Dispatch an ability's EFFECT (no cooldown/stun gating). */
 function dispatchAbility(ctx: AbilityContext): boolean {
   switch (ctx.unit.ability) {
-    case "crushing_slam":
-      return castCrushingSlam(ctx);
     case "kiting_leap":
       return castKitingLeap(ctx);
     case "shield_block":
@@ -139,26 +137,7 @@ export function wantsToCast(ctx: AbilityContext): boolean {
 }
 
 // --- OGRE: Crushing Slam -----------------------------------------------------
-function castCrushingSlam(ctx: AbilityContext): boolean {
-  const { unit, unitsByUid } = ctx;
-  const target = unit.targetUid ? unitsByUid.get(unit.targetUid) : null;
-  if (!target || target.state === "dead") return false;
-  if (dist(unit.pos, target.pos) > unit.range + unit.radius) return false;
-
-  ctx.dealDamage(target, 25, unit);
-  applyEffect(
-    target,
-    makeEffect("stun", { source: unit.uid, durationSec: 1.5 })
-  );
-  ctx.spawnVfx({
-    kind: "slam",
-    pos: { x: target.pos.x, y: target.pos.y },
-    life: secToTicks(0.4),
-    maxLife: secToTicks(0.4),
-    color: getUnitDef(unit.defId).accent,
-  });
-  return true;
-}
+// Migrated to kits/ogre.ts (fireAbility), together with Second Wind.
 
 // --- ARCHER: Kiting Leap -----------------------------------------------------
 function castKitingLeap(ctx: AbilityContext): boolean {
