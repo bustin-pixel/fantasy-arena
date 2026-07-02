@@ -50,8 +50,26 @@ server-verifiable later).
 - **Items (v1 small):** 3 slots — weapon (+dmg) / armor (+HP) / trinket (special) —
   × 3 tiers, from chests only; modifiers applied at `createUnit` per the items design
   below; surfaced in the (data-driven) detail panel + a loadout UI.
-- **Save growth:** `gold`, `unlockedUnits`, `items` inventory, per-unit `loadouts`,
-  `depths` progress (highest floor, stars) — versioned-merge pattern in
+- **Bestiary rewards** (one-time, granted on the tier-upgrade write into the
+  `bestiary` save map — inherently unfarmable): first **encounter** 10–15 gold; first
+  **defeat** 40–60 gold (bosses/legendaries also drop Soul Shards); **section
+  complete** (all monsters of a floor tier) → Soul Shards + gold; **full Compendium**
+  → big Soul payout + a ceremonial title. (v2 idea, parked: per-monster kill-counter
+  crests, hunting-log style.)
+- **Premium currency — Soul Shards** ("bind the souls of the fallen"; ghost-flame
+  wisp icon, matches the game's flame art). **Scarce by design**: earned only from
+  boss **first**-kills, bestiary section/full completions, every 10th floor
+  first-clear, later achievements — never from replays/farming. **The Soul Shop
+  sells distinction, never battle power** (no stat boosts, no revives, no timers):
+  - **Unit skins** — palette swaps (cheap: `drawUnitSprite` derives everything from
+    `color`/`accent`, so a skin is an alternate color pair in data)
+  - **Legendary unit unlocks** — alt path alongside gold
+  - **Premium chest** (guaranteed epic+ item, better unlock odds) + **chest reroll
+    token** (reroll one item slot)
+  - **Titles/flair** under the username ("Lichslayer" — pairs with boss first-kills)
+- **Save growth:** `gold`, `soulShards`, `unlockedUnits`, `items` inventory, per-unit
+  `loadouts`, owned `skins`/`titles`, `depths` progress (highest floor, stars), and
+  reward flags folded into the `bestiary` map — versioned-merge pattern in
   `persistence.ts`, same as the Compendium save-v2 plan.
 - **Arena tie-in:** once trophies/ranks exist, Arena's enemy-deck budget scales with
   player progress via the existing `budget` param.
