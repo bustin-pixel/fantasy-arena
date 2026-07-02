@@ -8,8 +8,9 @@ interface Props {
 }
 
 /**
- * The landing page — pick a game mode. Arena is playable now (a battle against an
- * AI-generated warband, mode "solo"); Swarm/PvE is stubbed until that mode ships.
+ * The landing page — pick a game mode. Arena battles an AI-generated warband
+ * (mode "solo"); The Depths is the PvE descent (mode "depths" — floor 1 for
+ * now, until the floor picker + progression land).
  */
 export function HomeScreen({ onBattle }: Props) {
   const { save } = useGameState();
@@ -56,10 +57,17 @@ export function HomeScreen({ onBattle }: Props) {
           </span>
         </button>
 
-        <button type="button" className="mode-card swarm" disabled>
+        <button
+          type="button"
+          className="mode-card swarm"
+          disabled={!ready}
+          onClick={() => onBattle("depths")}
+        >
           <SwarmIcon />
-          <span className="mode-card-title">Swarm · PvE</span>
-          <span className="mode-card-sub">Coming soon</span>
+          <span className="mode-card-title">The Depths</span>
+          <span className="mode-card-sub">
+            {ready ? "Descend — Floor 1" : "Build a warband to play"}
+          </span>
         </button>
       </div>
 

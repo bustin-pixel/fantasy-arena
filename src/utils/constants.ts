@@ -25,6 +25,11 @@ export const PLAYER_ZONE = { top: FIELD_HEIGHT * 0.6, bottom: FIELD_HEIGHT - 40 
 // Match rules.
 export const MATCH_TIME_SEC = 120; // 2:00
 export const MAX_ACTIVE_UNITS_PER_SIDE = 2;
+/** The Depths (PvE): the player fields the whole warband at once; the horde
+ *  runs at the proven ~8-unit/60fps-mobile ceiling. Profile before pushing
+ *  the enemy cap to 10–12. */
+export const DEPTHS_PLAYER_ACTIVE = 4;
+export const DEPTHS_ENEMY_ACTIVE = 8;
 export const MAX_DECK = 4;
 export const DEPLOY_TIME_SEC = 20; // placement timer before units auto-deploy
 /** Mid-battle pause before EITHER side's next reinforcement deploys. One shared

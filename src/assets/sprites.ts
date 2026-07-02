@@ -178,6 +178,17 @@ export function drawUnitSprite(
     case "wolf":
       drawWolf(ctx, body, dark, light, accent);
       break;
+    // Depths monsters — recolors of existing bodies (per the locked design).
+    case "giant_rat":
+      ctx.scale(0.7, 0.7); // tiny vermin — a shrunken, mangy wolf
+      drawWolf(ctx, body, dark, light, accent);
+      break;
+    case "zombie_shambler":
+      drawOrc(ctx, body, dark, light, accent); // hulking humanoid, rot palette
+      break;
+    case "bloater":
+      drawSlime(ctx, body, dark, light, accent, 1.2); // swollen pus-green blob
+      break;
     case "berserker":
       drawBerserker(ctx, body, dark, light, accent);
       break;

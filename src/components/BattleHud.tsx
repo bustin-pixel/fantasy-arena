@@ -55,8 +55,9 @@ export function BattleHud({ ui, speed, onSpeed, mode }: Props) {
             {/* Mid-battle "Slot open — tap to deploy" hint intentionally omitted
                 for now. Planned to return as part of a first-time-player tutorial
                 / onboarding flow rather than always-on chrome. */}
-            {/* Fast-forward is solo-only; PVP is server-paced at 1×. */}
-            {mode === "solo" && (
+            {/* Fast-forward for client-side sims (solo + depths); PVP is
+                server-paced at 1×. */}
+            {mode !== "pvp" && (
               <div className="speed-controls">
                 {[1, 2, 3].map((s) => (
                   <button

@@ -16,10 +16,11 @@ import type {
 } from "@/types";
 import {
   DEPLOY_TIME_SEC,
+  DEPTHS_ENEMY_ACTIVE,
+  DEPTHS_PLAYER_ACTIVE,
   ENEMY_ZONE,
   FIELD_WIDTH,
   MATCH_TIME_SEC,
-  MAX_ACTIVE_UNITS_PER_SIDE,
   PLAYER_ZONE,
   REINFORCE_GRACE_SEC,
   TICK_RATE,
@@ -34,7 +35,19 @@ import {
   type SimState,
 } from "./CombatSystem";
 import { applyEffect, makeEffect } from "./StatusEffectSystem";
+import { WaveController } from "./WaveController";
 import { isMelee, getUnitDef } from "@/data/units";
+
+/** Match ruleset. Arena is the symmetric 2-concurrent card battle; Depths is
+ *  the PvE descent — the player fields the whole warband while a seeded
+ *  WaveController trickles the floor's horde in from the top edge. */
+export type MatchMode = "arena" | "depths";
+
+export interface MatchOptions {
+  mode?: MatchMode;
+  /** Depths floor number (drives wave budget/tier). Ignored in arena. */
+  floor?: number;
+}
 
 export class MatchController {
   state: SimState;
@@ -55,13 +68,29 @@ export class MatchController {
   /** Ticks an empty player slot waits before the engine auto-deploys a reserve. */
   private autoDeployCountdown = 0;
   readonly seed: number;
+  readonly mode: MatchMode;
+  /** The Depths' horde director (null in arena). */
+  private wave: WaveController | null = null;
 
-  constructor(seed: number, playerDeck: string[], enemyDeck: string[]) {
+  constructor(
+    seed: number,
+    playerDeck: string[],
+    enemyDeck: string[],
+    opts: MatchOptions = {}
+  ) {
     this.seed = seed;
+    this.mode = opts.mode ?? "arena";
     this.playerDeck = playerDeck;
     this.enemyDeck = enemyDeck;
     resetUidCounter();
     this.state = createSimState(seed, MATCH_TIME_SEC);
+    if (this.mode === "depths") {
+      this.state.activeCaps = {
+        player: DEPTHS_PLAYER_ACTIVE,
+        enemy: DEPTHS_ENEMY_ACTIVE,
+      };
+      this.wave = new WaveController(seed, opts.floor ?? 1);
+    }
   }
 
   get phase(): MatchPhase {
@@ -88,7 +117,7 @@ export class MatchController {
     if (this.state.phase !== "deployment" && this.state.phase !== "battle")
       return false;
     return (
-      this.countActive(team) < MAX_ACTIVE_UNITS_PER_SIDE &&
+      this.countActive(team) < this.state.activeCaps[team] &&
       this.deckRemaining(team) > 0
     );
   }
@@ -185,11 +214,16 @@ export class MatchController {
     return unit;
   }
 
-  /** True once both sides have their full opening of 2 units down. */
+  /** True once each side has its full opening down. Arena: both sides at the
+   *  shared cap. Depths: the player's whole warband (the horde only starts
+   *  creeping in once the battle begins, so enemy readiness never gates). */
   private bothSidesReady(): boolean {
+    const playerReady =
+      this.countActive("player") >=
+      Math.min(this.playerDeck.length, this.state.activeCaps.player);
+    if (this.mode === "depths") return playerReady;
     return (
-      this.countActive("player") >= MAX_ACTIVE_UNITS_PER_SIDE &&
-      this.countActive("enemy") >= MAX_ACTIVE_UNITS_PER_SIDE
+      playerReady && this.countActive("enemy") >= this.state.activeCaps.enemy
     );
   }
 
@@ -215,7 +249,7 @@ export class MatchController {
   private autoFillPlayerDeployment(): void {
     if (this.state.phase !== "deployment") return;
     while (
-      this.countActive("player") < MAX_ACTIVE_UNITS_PER_SIDE &&
+      this.countActive("player") < this.state.activeCaps.player &&
       this.deckRemaining("player") > 0
     ) {
       const card = this.nextCard("player");
@@ -443,6 +477,8 @@ export class MatchController {
   /** Advance one simulation tick (after deployment phase begins). */
   tick(): void {
     if (this.state.phase === "deployment") {
+      // Arena's AI places its opening hand; the Depths horde only arrives once
+      // the battle starts (nothing to do here in depths — its deck is empty).
       this.runAI();
       // Placement timer: while it runs the player sets units down manually; when
       // it expires, auto-place whatever's left (spread out, never stacked).
@@ -462,7 +498,19 @@ export class MatchController {
       return;
     }
     if (this.state.phase === "battle") {
-      // Keep refilling slots mid-battle as units die.
+      if (this.mode === "depths") {
+        // The horde: the WaveController trickles the floor's queue in from the
+        // top edge whenever the enemy side has room. Its queue doubles as the
+        // enemy reserve count, so clearing the board only wins once the whole
+        // wave is spent.
+        this.wave!.step(this.state);
+        this.autoDeployPlayer();
+        this.state.playerReserves = this.deckRemaining("player");
+        this.state.enemyReserves = this.wave!.remaining;
+        stepSimulation(this.state);
+        return;
+      }
+      // Arena: keep refilling slots mid-battle as units die.
       this.runAI();
       this.autoDeployPlayer();
       // Tell the simulation how many reserves each side still has so it doesn't

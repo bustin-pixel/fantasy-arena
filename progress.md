@@ -4,31 +4,41 @@ Forward-looking only — what's planned, deferred, and open. For what's already
 **done** and why, read the git history (`git log --oneline`, `gh pr list`) — that's
 the source of truth, so this file deliberately doesn't duplicate it.
 
-**Current state:** deterministic 4v4 auto-battler, 20 deckable units, a swipeable
+**Current state:** deterministic 4v4 auto-battler, 24 deckable units, a swipeable
 3-page app shell (Collection / Home / Compendium) over a scrolling dungeon-crypt
 background, click-to-inspect detail panel, in-battle tooltips, 2v2 + countdown start.
-Solo ("Arena") battles only. Deployed to Netlify (auto-deploys on merge to `master`).
+Arena (vs AI deck) + The Depths slice 1 (PvE floor 1 via the Home card — seeded
+WaveController horde, fodder-tier monsters, Bloater boss on floor 5). Deployed to
+Netlify (auto-deploys on merge to `master`).
 
 ---
 
 ## Game modes
 
-### PvE mode — "The Depths" (design locked 2026-07-01)
+### PvE mode — "The Depths" (design locked 2026-07-01; slice 1 BUILT)
 A floor-based descent through the dungeon — the Home screen's gate is literally the
-entrance. Each floor is a **Swarm encounter** (rolling-window horde, below); every
-**5th floor is a boss floor**. Deeper = bigger **wave budget**, reusing the AIDeck
-cost model (rare 1 / epic 2 / legendary 4 in `rarities.ts`; give monsters costs too —
-`generateEnemyDeck`'s `budget` param is the difficulty-dial precedent). Floor themes
-roll out the approved bestiary in tiers:
-- **1–5** fodder: Giant Rats, Zombie Shamblers, Skeletons → boss **Bloater**
-- **6–10** undead: Skeleton Archers, Ghouls, Bonecaller → boss **Abomination**
-- **11–15** deep crypt: Spiders, Imps, Banshee, Plague Shaman → boss **Gargoyle**
-- **16–20** the throne: elite mixes, Spore Pods, Bat Swarms → boss **Lich**
-Extras: **3-star floors** (clear without losing a unit → bonus gold) for cheap replay
-depth; **boss first-kills unlock their Compendium page**; **Endless mode** comes after
-the campaign works (personal-best waves shown on Home). First-clear rewards ≫ replay
-rewards so farming is possible but descent is always optimal. Home's "Swarm · PvE"
-card becomes "The Depths" with a floor picker.
+entrance. Each floor is a Swarm encounter; every **5th floor is a boss floor**.
+
+**Slice 1 shipped** (see the PR / git log): seeded `WaveController` + `"depths"`
+`MatchMode` (per-side `activeCaps`: player 4 / enemy 8), `data/depths.ts` tier +
+budget tables, the fodder tier (Giant Rat, Zombie Shambler, + existing Skeleton;
+boss **Bloater** with Putrid Burst), and the Home card launching **floor 1**.
+
+**Still to build:**
+- **Floor picker + progress** (highest floor cleared, persisted — save-v2 growth);
+  the Home card is hardcoded to floor 1 until then. Floor replays / rewards below.
+- **Remaining bestiary tiers** (each needs its monsters built first):
+  - **6–10** undead: Skeleton Archers, Ghouls, Bonecaller → boss **Abomination**
+  - **11–15** deep crypt: Spiders, Imps, Banshee, Plague Shaman → boss **Gargoyle**
+  - **16–20** the throne: elite mixes, Spore Pods, Bat Swarms → boss **Lich**
+- **Difficulty pass** once floors 2+ are reachable: floor 1 clears in ~15s for a
+  full warband (fine for the opener, but tune `waveBudget` / spawn interval /
+  monster costs in `data/depths.ts` as the curve extends). Profile before pushing
+  the enemy cap to 10–12 (`DEPTHS_ENEMY_ACTIVE`).
+- Extras: **3-star floors** (clear without losing a unit → bonus gold); **boss
+  first-kills unlock their Compendium page**; **Endless mode** after the campaign
+  works (personal-best waves on Home). First-clear rewards ≫ replay rewards so
+  farming is possible but descent is always optimal.
 
 ### Progression & economy (design locked 2026-07-01)
 The loop: battle (any mode) → **chest + gold** → unlock units / equip items → stronger
@@ -74,48 +84,23 @@ server-verifiable later).
 - **Arena tie-in:** once trophies/ranks exist, Arena's enemy-deck budget scales with
   player progress via the existing `budget` param.
 
-#### Swarm mode — the rolling-window horde (design locked)
-Enemies creep in from the **top edge** and march down; as they die, more trickle in
-from an off-screen queue. Key realization: this is the **existing deployment loop**
-with the numbers turned up — the sim already refills freed field slots as units die
-([MatchController.ts:462](src/engine/MatchController.ts)) and the win-condition already
-treats a momentarily-empty field as *not* a win while reserves remain
-(`enemyOut = enemies.length === 0 && enemyReserves <= 0`,
-[CombatSystem.ts:1479](src/engine/CombatSystem.ts:1479)). So the *simultaneous* unit
-count (the perf lever) stays bounded no matter how big the total wave is.
-
-Three caps to make **mode-aware** (only the first touches the frame budget):
-1. **Concurrent on-field, per side** — `MAX_ACTIVE_UNITS_PER_SIDE` (today a shared `2`).
-   **Locked target: enemy 8, player 4** (player deploys the whole warband at once in
-   PvE). Start at the proven ~8-unit/60fps-mobile ceiling; profile and push enemy to
-   **10–12** only if mobile holds.
-2. **Summon safety-net** — the hard `cap = 5/7` in the CombatSystem spawn flush
-   ([CombatSystem.ts:1039](src/engine/CombatSystem.ts:1039)); raise it for the enemy in
-   PvE or it clamps the horde below the concurrent cap. (Also: change overflow from
-   *drop* to *hold* so no queued monster is lost.)
-3. **Reserve pool** — `enemyReserves` becomes the **wave queue** (30+/endless) instead
-   of a 4-card deck.
-
-New piece: a seeded **`WaveController`** (meta layer) that trickles spawns into
-`pendingSpawns` at the top edge (nudge spawn `y` slightly off-screen so they visibly
-creep in). Free wins already in the engine: `MAX_MELEE_SURROUND = 3` stops the horde
-dogpiling one hero (extras queue → looks like swarming *and* bounds collision cost).
-
-#### PvE monster bestiary — APPROVED (build ALL of these for Swarm mode)
-User greenlit the full list below (2026-07-01). Non-deckable — add ids to
+#### PvE monster bestiary — APPROVED (fodder tier BUILT; build the rest)
+User greenlit the full list (2026-07-01). Non-deckable — add ids to
 `NON_DECK_UNITS`. Reuse shipped systems so each stays deterministic; several can
-recolor existing sprites (skeleton/wolf/slime). Fodder stat band ≈ Skeleton
-`45hp/8dmg` … Boar `140hp`.
-- **Fodder:** Zombie Shambler (slow-on-bite), Giant Rat (tiny/fast/swarm), Skeleton (exists).
+recolor existing sprites (skeleton/wolf/slime — the fodder tier did exactly this).
+Fodder stat band ≈ Skeleton `45hp/8dmg` … Boar `140hp`. ~~Struck~~ = shipped:
+- **Fodder:** ~~Zombie Shambler~~, ~~Giant Rat~~, ~~Skeleton~~ (all in).
 - **Runners:** Ghoul (haste on ally death), Bat Swarm.
 - **Ranged:** Skeleton Archer (plain arrows), Spider (poison glob), Imp (burn bolts).
-- **Exploders/splitters:** Bloater (poison cloud on death — slime death-burst + poison),
-  Ooze (splits, exists), Spore Pod (spawns sporelings on death).
-- **Support (priority kills):** Bonecaller (raises skeletons — Necro's Raise Dead),
+- **Exploders/splitters:** ~~Bloater~~ (in — tier-1 boss), Ooze (splits, exists),
+  Spore Pod (spawns sporelings on death).
+- **Support (priority kills):** Bonecaller (raises skeletons — Necro's Raise Dead;
+  the summon-flush cap already scales with the Depths caps, so it won't be starved),
   Banshee (fear-wail + stealth), Plague Shaman (heal + haste the horde).
 - **Elites/bosses:** Abomination (huge HP, slam, one revive — Ogre slam + Second Wind),
   Gargoyle (heavy damage reduction), Lich (curse DoT + raise dead).
-Good home for the dormant statuses PvE should wake: `fear`, `haste`, `poison`, `stealth`.
+Good home for the dormant statuses PvE should wake: `fear`, `haste`, `stealth`
+(`poison` woke up with the Bloater/fodder slice).
 
 ### PvP mode (scaffolded)
 Real-time 1v1. `BattleMode "pvp"` already exists (hides fast-forward, locks the sim to
