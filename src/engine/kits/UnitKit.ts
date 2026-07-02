@@ -20,6 +20,7 @@
 
 import type { Unit } from "@/types";
 import type { AbilityContext } from "../AbilitySystem";
+import { knightKit } from "./knight";
 import { zombieShamblerKit } from "./zombieShambler";
 
 /** The context every kit hook receives (the engine's AbilityContext). For the
@@ -95,6 +96,7 @@ export type UnitKitRegistry = Record<string /* defId */, UnitKit>;
  *  units getKit returns undefined and the engine falls back to the old hardcoded
  *  path, so behavior — and digest() — is unchanged until a unit's kit is born. */
 export const UNIT_KITS: UnitKitRegistry = {
+  knight: knightKit,
   zombie_shambler: zombieShamblerKit,
 };
 

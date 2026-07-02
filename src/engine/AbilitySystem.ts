@@ -79,8 +79,6 @@ function dispatchAbility(ctx: AbilityContext): boolean {
       return castKitingLeap(ctx);
     case "shield_block":
       return castShieldBlock(ctx);
-    case "taunt_roar":
-      return castTauntRoar(ctx);
     case "fireball":
       return castFireball(ctx);
     case "frost_blast":
@@ -213,45 +211,9 @@ function castShieldBlock(ctx: AbilityContext): boolean {
 }
 
 // --- KNIGHT: Taunting Roar ---------------------------------------------------
-// Forces nearby enemies to attack the Knight for a few seconds (overriding their
-// normal target priority) and grants the Knight an absorb shield so it can soak
-// the incoming fire. The protector tank: it pulls aggro off your backline.
-function castTauntRoar(ctx: AbilityContext): boolean {
-  const { unit, enemies } = ctx;
-  const TAUNT_RADIUS = 200;
-  const TAUNT_SEC = 2.5;
-
-  let taunted = 0;
-  for (const e of enemies) {
-    if (e.state === "dead") continue;
-    if (isStealthed(e)) continue; // can't taunt an enemy it can't see
-    if (dist(unit.pos, e.pos) <= TAUNT_RADIUS) {
-      applyEffect(
-        e,
-        makeEffect("taunt", { source: unit.uid, durationSec: TAUNT_SEC })
-      );
-      e.tauntedByUid = unit.uid;
-      e.targetUid = unit.uid; // immediately yank their target
-      taunted++;
-    }
-  }
-
-  // Grant the Knight an absorb shield (overhealth) — scales a bit with how many
-  // it pulled, so a big group taunt is rewarded with more protection. (Kept in
-  // sync with the absorb numbers in the taunt_roar description in abilities.ts.)
-  const bubble = 45 + taunted * 10;
-  unit.shieldHp = Math.max(unit.shieldHp, bubble);
-  unit.shieldHpMax = Math.max(unit.shieldHpMax, unit.shieldHp);
-
-  ctx.spawnVfx({
-    kind: "shield_pop",
-    pos: { x: unit.pos.x, y: unit.pos.y - 4 },
-    life: secToTicks(0.6),
-    maxLife: secToTicks(0.6),
-    color: "#cbd5e1",
-  });
-  return true;
-}
+// Migrated to kits/knight.ts (fireAbility). The Knight now drives Taunting Roar
+// through the UnitKit seam; the engine keeps the cast pipeline (cooldown from
+// ABILITIES["taunt_roar"], the stun/silence gate).
 
 // --- FIRE MAGE: Fireball -----------------------------------------------------
 function castFireball(ctx: AbilityContext): boolean {
