@@ -9,9 +9,6 @@
 
 import { UNITS } from "@/data/units";
 
-/** How the hub's unit roster is ordered. Persisted as a player preference. */
-export type SortMode = "default" | "rarity";
-
 export interface PlayerSave {
   version: number;
   username: string;
@@ -20,8 +17,6 @@ export interface PlayerSave {
   /** Local battle stats (wins/losses) — display only for now. */
   wins: number;
   losses: number;
-  /** Hub roster sort preference. */
-  sortMode: SortMode;
 }
 
 const KEY = "fantasy-arena/save/v1";
@@ -32,7 +27,6 @@ export const DEFAULT_SAVE: PlayerSave = {
   deck: ["ogre", "archer", "knight", "fire_mage"],
   wins: 0,
   losses: 0,
-  sortMode: "default",
 };
 
 export function loadSave(): PlayerSave {
@@ -42,8 +36,6 @@ export function loadSave(): PlayerSave {
     const parsed = JSON.parse(raw) as Partial<PlayerSave>;
     const merged = { ...DEFAULT_SAVE, ...parsed };
     merged.deck = sanitizeDeck(merged.deck);
-    // Coerce any unknown/corrupt stored value back to a valid mode.
-    merged.sortMode = merged.sortMode === "rarity" ? "rarity" : "default";
     return merged;
   } catch {
     return { ...DEFAULT_SAVE };

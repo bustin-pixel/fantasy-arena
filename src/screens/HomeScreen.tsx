@@ -52,7 +52,7 @@ export function HomeScreen({ onBattle }: Props) {
           <ArenaIcon />
           <span className="mode-card-title">Arena</span>
           <span className="mode-card-sub">
-            {ready ? "Battle a rival warband" : "Build a deck to play"}
+            {ready ? "Battle a rival warband" : "Build a warband to play"}
           </span>
         </button>
 
