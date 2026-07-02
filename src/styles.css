@@ -280,7 +280,7 @@ body {
   cursor: not-allowed;
 }
 
-/* ---- Roster sort control ------------------------------------------------- */
+/* ---- Roster head + rarity filter ----------------------------------------- */
 .roster-head {
   display: flex;
   align-items: center;
@@ -291,29 +291,6 @@ body {
   margin: 0;
   font-size: 0.9rem;
   color: var(--parchment);
-}
-.sort-control {
-  display: inline-flex;
-  border: 1px solid var(--stone-dark);
-  border-radius: 8px;
-  overflow: hidden;
-}
-.sort-btn {
-  font-family: inherit;
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: var(--stone);
-  background: transparent;
-  border: none;
-  padding: 6px 12px;
-  cursor: pointer;
-}
-.sort-btn + .sort-btn {
-  border-left: 1px solid var(--stone-dark);
-}
-.sort-btn.active {
-  background: var(--gold);
-  color: var(--ink);
 }
 .roster-count {
   font-size: 0.72rem;

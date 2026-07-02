@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { DECKABLE_UNIT_IDS, getUnitDef } from "@/data/units";
-import { rarityRank, RARITY_ORDER, RARITIES } from "@/data/rarities";
+import { RARITY_ORDER, RARITIES } from "@/data/rarities";
 import type { Rarity } from "@/types";
 import { CardPortrait, type CardAddState } from "@/components/CardPortrait";
 import { DeckStrip } from "@/components/DeckStrip";
@@ -11,9 +11,8 @@ import { generateSeed } from "@/utils/rng";
 import { useGameState } from "@/state/GameStateContext";
 
 export function HubScreen() {
-  const { save, setDeck, setSortMode } = useGameState();
+  const { save, setDeck } = useGameState();
   const deck = save.deck;
-  const sortMode = save.sortMode;
   const [detailId, setDetailId] = useState<string | null>(null);
   const [rarityFilter, setRarityFilter] = useState<Rarity | "all">("all");
 
@@ -43,21 +42,14 @@ export function HubScreen() {
   const randomize = () => setDeck(generateRandomDeck(generateSeed(), MAX_DECK));
   const clearDeck = () => setDeck([]);
 
-  // Roster for the card grid: sort ("rarity" groups rarest-first; ties keep their
-  // original stable order), then narrow to the selected rarity filter.
+  // Roster for the card grid: the roster's natural (data) order, narrowed to the
+  // selected rarity filter.
   const rosterIds = useMemo(() => {
-    let ids =
-      sortMode === "default"
-        ? DECKABLE_UNIT_IDS
-        : [...DECKABLE_UNIT_IDS].sort(
-            (a, b) =>
-              rarityRank(getUnitDef(b).rarity) - rarityRank(getUnitDef(a).rarity)
-          );
-    if (rarityFilter !== "all") {
-      ids = ids.filter((id) => getUnitDef(id).rarity === rarityFilter);
-    }
-    return ids;
-  }, [sortMode, rarityFilter]);
+    if (rarityFilter === "all") return DECKABLE_UNIT_IDS;
+    return DECKABLE_UNIT_IDS.filter(
+      (id) => getUnitDef(id).rarity === rarityFilter
+    );
+  }, [rarityFilter]);
 
   return (
     <div className="screen hub">
@@ -107,24 +99,6 @@ export function HubScreen() {
           <h3>
             All Units <span className="roster-count">{rosterIds.length}</span>
           </h3>
-          <div className="sort-control" role="group" aria-label="Sort units">
-            <button
-              type="button"
-              className={`sort-btn${sortMode === "default" ? " active" : ""}`}
-              onClick={() => setSortMode("default")}
-              aria-pressed={sortMode === "default"}
-            >
-              Default
-            </button>
-            <button
-              type="button"
-              className={`sort-btn${sortMode === "rarity" ? " active" : ""}`}
-              onClick={() => setSortMode("rarity")}
-              aria-pressed={sortMode === "rarity"}
-            >
-              Rarity
-            </button>
-          </div>
         </div>
 
         <div className="roster-filter" role="group" aria-label="Filter by rarity">
