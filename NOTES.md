@@ -170,6 +170,25 @@ scaling/situational units that the quick-resolution audits tend to *under*-rate;
 they perform better in long, messy fights than 1v1 numbers suggest. Re-audit
 2v2 after any balance change — it's closer to real play than 1v1.
 
+### Arena pacing + AI decks (full-match audit, 2026-07)
+Measured with the (skipped) `balanceAudit.test.ts` harness — 300 auto-played
+matches per experiment; re-run it after any tuning:
+- **Reinforcement pacing is symmetric** via `REINFORCE_GRACE_SEC` (1.2s): both the
+  player's mid-battle auto-deploy grace and the AI's redeploy cooldown. The old
+  split (player 2.5s / AI 0.7s) let the AI snowball every player death 2-v-1 —
+  mirror matches (identical decks) were 29% player win; symmetric 1.2s → 36%,
+  0.7s → 41%. The residual gap is AI counter-picking + tactical positioning.
+- **AI decks are budget-generated** (`generateEnemyDeck`): rare 1 / epic 2 /
+  legendary 4 (`cost` in rarities.ts), budget band 5/6/7 weighted toward 6 (the
+  starter deck's cost). Legendaries only fit at budget 7 escorted by three rares
+  (~9% of decks, down from 32% unbounded); the **Druid is priced out** (cost 5 in
+  `UNIT_COST_OVERRIDES`) until a progression layer passes bigger budgets.
+  Starter-deck win rate vs AI went 72.7% → 88% with the boss-fight lottery gone
+  (vs-legendary bucket: 43% → 82%).
+- Ranger/Warrior are structurally Arena-weak (anti-swarm kits capped by the
+  2-concurrent-enemy field): their deck audits 40% vs AI post-fix (was 25%).
+  Accepted as PvE-swarm specialists — their kits pay off at Swarm's enemy-8 cap.
+
 ## Testing approach
 The engine is tested with **Vitest** — run `npm test`. Specs live in
 `src/engine/__tests__/` (`invariants.test.ts`, `arcaneMage.test.ts`, plus shared
