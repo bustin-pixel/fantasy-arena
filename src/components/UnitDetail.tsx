@@ -11,6 +11,9 @@ interface Props {
   deck: string[];
   onToggle: (id: string) => void;
   onClose: () => void;
+  /** Compendium mode: pure lore page — hides the deck count and the
+   *  add/remove footer (monsters can't join a warband anyway). */
+  readonly?: boolean;
 }
 
 const ART_SIZE = 120;
@@ -54,10 +57,15 @@ function StatBar({
   );
 }
 
-export function UnitDetail({ defId, deck, onToggle, onClose }: Props) {
+export function UnitDetail({ defId, deck, onToggle, onClose, readonly }: Props) {
   const def = getUnitDef(defId);
   const rarity = RARITIES[def.rarity];
-  const abilityIds = [def.ability, ...(def.abilities ?? [])];
+  // Skip the "lifesteal" filler slot (the never-casts convention for summons
+  // and Depths monsters) unless the unit actually lifesteals (the Orc pairs
+  // `def.lifesteal` with a real ability, so it's unaffected).
+  const abilityIds = [def.ability, ...(def.abilities ?? [])].filter(
+    (id) => !(id === "lifesteal" && def.lifesteal == null)
+  );
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -126,9 +134,11 @@ export function UnitDetail({ defId, deck, onToggle, onClose }: Props) {
             >
               {rarity.label}
             </span>
-            <span className="detail-deckcount">
-              {deck.length}/{MAX_DECK} in deck
-            </span>
+            {!readonly && (
+              <span className="detail-deckcount">
+                {deck.length}/{MAX_DECK} in deck
+              </span>
+            )}
           </div>
           <div className="detail-role">{def.role}</div>
 
@@ -195,16 +205,18 @@ export function UnitDetail({ defId, deck, onToggle, onClose }: Props) {
           <button className="btn btn-close-ghost" onClick={onClose}>
             Close
           </button>
-          <button
-            className={addClass}
-            disabled={addDisabled}
-            onClick={() => {
-              onToggle(defId);
-              onClose();
-            }}
-          >
-            {addLabel}
-          </button>
+          {!readonly && (
+            <button
+              className={addClass}
+              disabled={addDisabled}
+              onClick={() => {
+                onToggle(defId);
+                onClose();
+              }}
+            >
+              {addLabel}
+            </button>
+          )}
         </div>
       </div>
     </div>

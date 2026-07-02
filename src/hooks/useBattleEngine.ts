@@ -23,8 +23,9 @@ import { DEPLOY_TIME_SEC, TICK_MS, TICK_RATE, UNIT_RADIUS } from "@/utils/consta
 import { generateSeed } from "@/utils/rng";
 
 /** Battle mode. Solo allows client-side fast-forward; PVP is server-paced at 1×
- *  (a real-time match can't let one client run the sim faster than the other). */
-export type BattleMode = "solo" | "pvp";
+ *  (a real-time match can't let one client run the sim faster than the other).
+ *  Depths is the PvE descent — a WaveController horde instead of an AI deck. */
+export type BattleMode = "solo" | "pvp" | "depths";
 
 export interface HandCard {
   index: number;
@@ -79,12 +80,17 @@ export interface UseBattleEngine {
   pickUnitAt: (pos: Vec2) => string | null;
   /** Live stats for a unit by uid, or null if it's gone/dead. */
   inspectUnit: (uid: string) => InspectedUnit | null;
+  /** The enemy roster this match actually fielded, for the Compendium: every
+   *  enemy defId that appeared (`seen`) and the subset that died (`slain`). */
+  enemyLedger: () => { seen: string[]; slain: string[] };
 }
 
 export function useBattleEngine(
   playerDeck: string[],
   mode: BattleMode = "solo",
-  seedOverride?: number
+  seedOverride?: number,
+  /** Depths floor to descend to (ignored outside "depths" mode). */
+  floor: number = 1
 ): UseBattleEngine {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const controllerRef = useRef<MatchController | null>(null);
@@ -121,15 +127,24 @@ export function useBattleEngine(
     [mode]
   );
 
-  // (Re)initialize a match whenever the deck or seed changes.
+  // (Re)initialize a match whenever the deck, seed or mode changes.
   useEffect(() => {
     const seed = seedOverride ?? generateSeed();
-    const enemyDeck = generateEnemyDeck(seed);
-    controllerRef.current = new MatchController(seed, playerDeck.slice(0, 4), enemyDeck);
+    if (mode === "depths") {
+      // No enemy deck — the WaveController inside the controller builds the
+      // floor's horde from the seed.
+      controllerRef.current = new MatchController(seed, playerDeck.slice(0, 4), [], {
+        mode: "depths",
+        floor,
+      });
+    } else {
+      const enemyDeck = generateEnemyDeck(seed);
+      controllerRef.current = new MatchController(seed, playerDeck.slice(0, 4), enemyDeck);
+    }
     accRef.current = 0;
     lastRef.current = performance.now();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playerDeck.join(","), seedOverride]);
+  }, [playerDeck.join(","), seedOverride, mode, floor]);
 
   // The combined loop.
   useEffect(() => {
@@ -184,7 +199,7 @@ export function useBattleEngine(
     rafRef.current = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(rafRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playerDeck.join(","), seedOverride]);
+  }, [playerDeck.join(","), seedOverride, mode, floor]);
 
   const deployAt = useCallback((pos: Vec2) => {
     const c = controllerRef.current;
@@ -249,6 +264,20 @@ export function useBattleEngine(
     };
   }, []);
 
+  const enemyLedger = useCallback((): { seen: string[]; slain: string[] } => {
+    const c = controllerRef.current;
+    const seen = new Set<string>();
+    const slain = new Set<string>();
+    if (c) {
+      for (const u of c.state.units) {
+        if (u.team !== "enemy") continue;
+        seen.add(u.defId);
+        if (u.state === "dead") slain.add(u.defId);
+      }
+    }
+    return { seen: [...seen], slain: [...slain] };
+  }, []);
+
   return {
     canvasRef,
     ui,
@@ -258,6 +287,7 @@ export function useBattleEngine(
     setSpeed,
     pickUnitAt,
     inspectUnit,
+    enemyLedger,
   };
 }
 

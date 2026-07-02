@@ -559,6 +559,67 @@ export const UNITS: Record<string, UnitDef> = {
     color: "#8a6a3d",
     accent: "#f59e0b",
   },
+  // -------------------------------------------------------------------------
+  // The Depths — PvE monsters (never in a deck; spawned by the WaveController).
+  // Fodder tier, floors 1–5. Stat band ≈ Skeleton 45hp/8dmg … Boar 140hp,
+  // except the Bloater, which is the tier's boss.
+  // -------------------------------------------------------------------------
+  giant_rat: {
+    id: "giant_rat",
+    name: "Giant Rat",
+    rarity: "rare",
+    role: "Swarming Vermin",
+    hp: 30,
+    damage: 5,
+    attackSpeed: 0.65, // frantic nibbling
+    moveSpeed: 105, // fastest thing in the dungeon
+    range: MELEE,
+    ability: "lifesteal", // passive filler — never casts
+    color: "#6d5c4d", // mangy brown-grey
+    accent: "#f4a8a8", // pink ears/tail
+  },
+  zombie_shambler: {
+    id: "zombie_shambler",
+    name: "Zombie Shambler",
+    rarity: "rare",
+    role: "Shambling Dead",
+    hp: 85,
+    damage: 10,
+    attackSpeed: 1.9, // slow, heavy bites
+    moveSpeed: 32, // shambles
+    range: MELEE,
+    ability: "lifesteal", // passive filler — never casts
+    color: "#7a8f6a", // rot green
+    accent: "#c9d1c0", // pallid flesh
+    traits: [
+      {
+        name: "Numbing Bite",
+        description:
+          "Its bite numbs the victim — 30% slower movement and attacks for 2s.",
+      },
+    ],
+  },
+  bloater: {
+    id: "bloater",
+    name: "Bloater",
+    rarity: "epic",
+    role: "Bloated Horror",
+    hp: 380,
+    damage: 16,
+    attackSpeed: 2.2,
+    moveSpeed: 30, // lumbering
+    range: MELEE,
+    ability: "lifesteal", // passive filler — never casts
+    color: "#8a9a3b", // pus green
+    accent: "#d4e157",
+    traits: [
+      {
+        name: "Putrid Burst",
+        description:
+          "When it dies it ruptures — dealing 30 damage and poisoning every enemy nearby. Back away when it swells low.",
+      },
+    ],
+  },
   // Slime clone — spawned when the original splits. Never in a deck. Doesn't
   // split further (terminal), but still bursts on death.
   slime_clone: {
@@ -579,8 +640,18 @@ export const UNITS: Record<string, UnitDef> = {
 
 export const UNIT_IDS = Object.keys(UNITS);
 
-/** Unit ids that are NOT selectable cards (summoned at runtime only). */
-export const NON_DECK_UNITS = new Set<string>(["wolf", "skeleton", "slime_clone", "turret", "boar"]);
+/** Unit ids that are NOT selectable cards (summoned at runtime only, or
+ *  Depths monsters spawned by the WaveController). */
+export const NON_DECK_UNITS = new Set<string>([
+  "wolf",
+  "skeleton",
+  "slime_clone",
+  "turret",
+  "boar",
+  "giant_rat",
+  "zombie_shambler",
+  "bloater",
+]);
 
 /** Units that can appear in a player/AI deck or the hub card grid. */
 export const DECKABLE_UNIT_IDS = UNIT_IDS.filter(

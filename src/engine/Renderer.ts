@@ -389,11 +389,14 @@ export function renderBattle(ctx: Ctx, snap: BattleSnapshot): void {
   for (const ft of snap.floatingTexts) drawFloatingText(ctx, ft);
 }
 
-/** Draw a single unit portrait into a small canvas context (for card art). */
+/** Draw a single unit portrait into a small canvas context (for card art).
+ *  `silhouette` blacks the sprite out to the given fill — the Compendium's
+ *  undiscovered/encountered reveal tiers. */
 export function renderPortrait(
   ctx: Ctx,
   defId: string,
-  size: number
+  size: number,
+  opts?: { silhouette?: string }
 ): void {
   const def = getUnitDef(defId);
   ctx.clearRect(0, 0, size, size);
@@ -411,6 +414,26 @@ export function renderPortrait(
     attackSpeed: def.attackSpeed,
     state: "idle" as const,
   } as unknown as Unit;
+
+  if (opts?.silhouette) {
+    // Draw the sprite on an offscreen canvas, then flood its opaque pixels
+    // with the silhouette color and blit the shadow over the background.
+    const off = document.createElement("canvas");
+    off.width = size;
+    off.height = size;
+    const octx = off.getContext("2d");
+    if (!octx) return;
+    drawUnitSprite(octx, fake, size / 2, size / 2 + 14, {
+      scale: size / 70,
+      staticPose: true,
+    });
+    octx.globalCompositeOperation = "source-in";
+    octx.fillStyle = opts.silhouette;
+    octx.fillRect(0, 0, size, size);
+    ctx.drawImage(off, 0, 0);
+    return;
+  }
+
   drawUnitSprite(ctx, fake, size / 2, size / 2 + 14, {
     scale: size / 70,
     staticPose: true,

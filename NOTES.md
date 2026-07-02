@@ -76,6 +76,11 @@ Special mechanics are gated by `defId` string literals in `CombatSystem.ts`:
   UI); the Light/Dark mechanic is driven by `defId` + the `mystic_shift` projectile
   tag, and is explained by the Light Form / Dark Form *traits* — there is no longer
   a "Light & Dark" header in the UI.
+- `"zombie_shambler"` → Numbing Bite: every melee hit applies a 30% slow
+  (move + attack) for 2s. Depths monster, never in a deck.
+- `"bloater"` → Putrid Burst: on death it ruptures — 30 AoE damage + a poison
+  DoT to every enemy within 110px (same one-shot safety as the slime burst).
+  Depths tier-1 boss, never in a deck. (The Giant Rat is pure stats — no gate.)
 - `"arcane_mage"` → the Blink defensive teleport (own `blinkCooldown` field, 5s),
   plus the Arcane Barrage volley streamer (`stepArcaneBarrage`): the active cast
   (`castArcaneBarrage` in AbilitySystem) only *arms* a 3-shot burst locked onto one
@@ -98,11 +103,31 @@ Mage is an example of a unit with two abilities: an *active* ability slot —
 Arcane Barrage — plus a *second* ability, Blink, that runs off its own cooldown
 field.)
 
-### 4. Summon caps protect the 8-unit ceiling
-`CombatSystem` enforces a per-team live-unit cap (5 normal, 7 for slime clones)
-when flushing spawns. Audit confirmed peak simultaneous units stays at 8 even in
-summon-heavy matches. If you add more summoners, re-check this peak — the spec
-targets 8 active units / 60fps on mobile.
+**The `lifesteal` filler convention is display-load-bearing:** summons and Depths
+monsters use `ability: "lifesteal"` as a "never casts" placeholder, and
+`UnitDetail` HIDES that slot unless the unit actually sets `def.lifesteal` (only
+the Orc does). So a monster's real kit must live in `traits` — which the
+Compendium's lore page shows — and giving a unit the lifesteal slot without
+`def.lifesteal` means it displays no ability at all (correct for monsters,
+a bug for a deckable hero).
+
+### 4. Summon caps protect the frame-budget ceiling
+`CombatSystem` enforces a per-team live-unit cap when flushing spawns, derived
+from `state.activeCaps` (the per-side concurrent caps): `activeCaps[team] + 3`,
+or `+ 5` for slime clones. Arena (caps 2/2) keeps its proven 5/7 ceiling; The
+Depths (player 4 / enemy 8, set by MatchController in `"depths"` mode) scales
+to 7/11. Audit confirmed Arena peak simultaneous units stays at 8 in
+summon-heavy matches. If you add more summoners or raise the Depths enemy cap
+(10–12 is the stretch goal), re-profile — the spec targets ~8 active units /
+60fps on mobile, and Depths already runs right at it.
+
+### 5. The Depths spawns bypass the deploy() path
+`WaveController` (the PvE horde director) pushes monsters into `state.units`
+directly — no deck bookkeeping, no deployment records (waves rebuild
+deterministically from seed + floor, so replays don't need them). Its queue
+doubles as `enemyReserves`, which is what keeps a momentarily-cleared board
+from counting as victory while monsters are still waiting off-screen. It owns
+a private RNG stream, so Depths never perturbs Arena determinism.
 
 ---
 

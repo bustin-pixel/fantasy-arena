@@ -31,6 +31,7 @@ import {
   FLOAT_TEXT_TICKS,
   HIT_FLASH_TICKS,
   MATCH_TIME_SEC,
+  MAX_ACTIVE_UNITS_PER_SIDE,
   MAX_EFFECTS,
   MAX_PROJECTILES,
   SEC_PER_TICK,
@@ -84,6 +85,10 @@ export interface SimState {
    *  A side only loses when its board is empty AND it has no reserves left. */
   playerReserves: number;
   enemyReserves: number;
+  /** Per-side concurrent-unit caps. Arena keeps the shared 2; The Depths raises
+   *  them (player 4, enemy 8). MatchController sets these at match creation;
+   *  the summon flush derives its ceiling from them. */
+  activeCaps: { player: number; enemy: number };
   /** Units queued to spawn from inside dealDamage (slime splits/clones).
    *  Flushed each tick alongside ability-driven summons. */
   damageSpawns: { defId: string; team: Team; pos: Vec2 }[];
@@ -103,6 +108,10 @@ export function createSimState(seed: number, clockSec: number): SimState {
     idCounter: 0,
     playerReserves: 0,
     enemyReserves: 0,
+    activeCaps: {
+      player: MAX_ACTIVE_UNITS_PER_SIDE,
+      enemy: MAX_ACTIVE_UNITS_PER_SIDE,
+    },
     damageSpawns: [],
   };
 }
@@ -287,6 +296,36 @@ function makeDamageDealer(state: SimState) {
           maxLife: secToTicks(0.5),
           color: getUnitDef(target.defId).color,
         });
+
+        // Bloater Putrid Burst: on death it ruptures — AoE damage plus a
+        // lingering poison on every nearby enemy. Same one-shot safety as the
+        // slime burst (a unit only dies once).
+        if (target.defId === "bloater") {
+          const CLOUD_RADIUS = 110;
+          const CLOUD_DMG = 30;
+          for (const u of state.units) {
+            if (u.state === "dead" || u.team === target.team) continue;
+            if (dist(target.pos, u.pos) <= CLOUD_RADIUS) {
+              dealDamage(u, CLOUD_DMG, target);
+              applyEffect(
+                u,
+                makeEffect("poison", {
+                  source: target.uid,
+                  durationSec: 4,
+                  damagePerTick: 4,
+                  tickIntervalSec: 0.5,
+                })
+              );
+            }
+          }
+          spawnVfx(state, {
+            kind: "slam",
+            pos: { x: target.pos.x, y: target.pos.y },
+            life: secToTicks(0.6),
+            maxLife: secToTicks(0.6),
+            color: getUnitDef(target.defId).accent,
+          });
+        }
 
         // Slime death-burst: any slime (original or clone) explodes on death,
         // dealing AoE damage to nearby ENEMIES. Chain reactions are intentional
@@ -1035,8 +1074,11 @@ export function stepSimulation(state: SimState): void {
   const allSpawns = [...pendingSpawns, ...state.damageSpawns];
   state.damageSpawns = [];
   for (const spawn of allSpawns) {
+    // Summon headroom rides on the side's concurrent cap: Arena (cap 2) keeps
+    // its proven 5/7 ceiling; The Depths' bigger caps scale it up so summoners
+    // aren't starved on a fuller field.
     const isClone = spawn.defId === "slime_clone";
-    const cap = isClone ? 7 : 5;
+    const cap = state.activeCaps[spawn.team] + (isClone ? 5 : 3);
     const teamCount = state.units.filter(
       (u) => u.team === spawn.team && u.state !== "dead"
     ).length;
@@ -1244,6 +1286,16 @@ function performBasicAttack(
   } else {
     dealDamage(target, unit.damage, unit);
     applyLifesteal(unit, unit.damage, heal);
+
+    // Zombie Shambler's Numbing Bite: every bite slows the victim's movement
+    // and attacks by 30% for 2s (refreshed, never stacked). The horde's threat
+    // is being mired in it, not the bite itself.
+    if (unit.defId === "zombie_shambler") {
+      applyEffect(
+        target,
+        makeEffect("slow", { source: unit.uid, durationSec: 2, magnitude: 0.3 })
+      );
+    }
 
     // Rogue Venom: every strike envenoms the target. A short, fast-ticking poison
     // (refreshed each hit via applyEffect, never stacked) so it keeps damaging even
