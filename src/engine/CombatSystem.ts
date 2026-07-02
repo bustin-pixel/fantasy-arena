@@ -1140,12 +1140,11 @@ function performBasicAttack(
   // stun + reveal) now lives in its kit (kits/assassin.ts onBeforeAttack).
   if (kit?.onBeforeAttack) kit.onBeforeAttack(unit, target, ctx);
 
-  // Rogue & Trickster reveal on a strike (stripping is a no-op once revealed). The
-  // Trickster also (re)starts its re-cloak timer, so it slips back into stealth a
-  // beat after it stops swinging.
-  if (unit.defId === "rogue" || unit.defId === "trickster") {
+  // Trickster reveals on a strike and (re)starts its re-cloak timer, slipping back
+  // into stealth a beat after it stops swinging. (Rogue's reveal is in its kit.)
+  if (unit.defId === "trickster") {
     unit.effects = unit.effects.filter((e) => e.type !== "stealth");
-    if (unit.defId === "trickster") unit.recloakTimer = secToTicks(TRICKSTER_RECLOAK_SEC);
+    unit.recloakTimer = secToTicks(TRICKSTER_RECLOAK_SEC);
   }
 
   unit.attackCount += 1;
@@ -1273,20 +1272,7 @@ function performBasicAttack(
     // Venom / Cleave / Backlash migrate here next.
     if (kit?.onAfterAttack) kit.onAfterAttack(unit, target, ctx);
 
-    // Rogue Venom: every strike envenoms the target. A short, fast-ticking poison
-    // (refreshed each hit via applyEffect, never stacked) so it keeps damaging even
-    // between the Rogue's quick swings.
-    if (unit.defId === "rogue") {
-      applyEffect(
-        target,
-        makeEffect("poison", {
-          source: unit.uid,
-          durationSec: 3,
-          damagePerTick: 3,
-          tickIntervalSec: 0.5,
-        })
-      );
-    }
+    // (Rogue Venom now lives in kits/rogue.ts onAfterAttack, fired by the seam.)
 
     // (Berserker Cleave now lives in kits/berserker.ts onAfterAttack, fired by
     // the onAfterAttack seam above.)

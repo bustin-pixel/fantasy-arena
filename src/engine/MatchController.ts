@@ -181,9 +181,9 @@ export class MatchController {
     // [seam] kit spawn hook (the Assassin's opening stealth rides its kit here).
     getKit(defId)?.onSpawn?.(unit);
 
-    // Opening stealth for the still-un-migrated stealthers (Rogue, Trickster):
-    // they enter untargetable until their first strike reveals them.
-    if (unit.defId === "rogue" || unit.defId === "trickster") {
+    // Opening stealth for the still-un-migrated Trickster (Rogue rides its kit's
+    // onSpawn): it enters untargetable until its first strike reveals it.
+    if (unit.defId === "trickster") {
       applyEffect(
         unit,
         makeEffect("stealth", { source: unit.uid, durationSec: MATCH_TIME_SEC })

@@ -24,6 +24,7 @@ import { assassinKit } from "./assassin";
 import { berserkerKit } from "./berserker";
 import { knightKit } from "./knight";
 import { ogreKit } from "./ogre";
+import { rogueKit } from "./rogue";
 import { slimeKit, slimeCloneKit } from "./slime";
 import { zombieShamblerKit } from "./zombieShambler";
 
@@ -105,6 +106,7 @@ export const UNIT_KITS: UnitKitRegistry = {
   berserker: berserkerKit,
   knight: knightKit,
   ogre: ogreKit,
+  rogue: rogueKit,
   slime: slimeKit,
   slime_clone: slimeCloneKit,
   zombie_shambler: zombieShamblerKit,

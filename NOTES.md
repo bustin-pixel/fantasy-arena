@@ -70,9 +70,11 @@ Still gated by `defId` string literals in `CombatSystem.ts`:
 - `"necromancer"` → custom cast handler (Curse DoT / Terrify fear on one cast bar,
   see `stepNecromancerCast`) + Raise Dead, a periodic passive that summons a
   skeleton every 5s.
-- `"rogue"` / `"trickster"` → opening stealth that reveals on first strike; the
-  Rogue's Venom poison-on-hit, the Trickster's Shadow Step (reactive cast-interrupt
-  blink) + re-cloak.
+- ~~`"rogue"`~~ — **migrated** to `kits/rogue.ts` (onSpawn stealth + onBeforeAttack
+  reveal + onAfterAttack Venom).
+- `"trickster"` → opening stealth that reveals on first strike; Shadow Step
+  (reactive cast-interrupt blink) + re-cloak. (Shares the deploy stealth + reveal
+  paths, now trickster-only until it migrates.)
 - `"warrior"` → Whirlwind: its melee swing is replaced by an AoE spin — hits every
   enemy within melee reach (`range + radius`) for its damage and applies a
   refreshing bleed (poison-type DoT, non-stacking). No lifesteal. `ability` slot is
