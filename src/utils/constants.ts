@@ -27,6 +27,10 @@ export const MATCH_TIME_SEC = 120; // 2:00
 export const MAX_ACTIVE_UNITS_PER_SIDE = 2;
 export const MAX_DECK = 4;
 export const DEPLOY_TIME_SEC = 20; // placement timer before units auto-deploy
+/** Mid-battle pause before EITHER side's next reinforcement deploys. One shared
+ *  value keeps the pacing symmetric — the balance audit showed the old split
+ *  (player 2.5s vs AI 0.7s) gave the enemy a ~15-point edge in mirror matches. */
+export const REINFORCE_GRACE_SEC = 1.2;
 
 // Collision / melee.
 export const UNIT_RADIUS = 32;
