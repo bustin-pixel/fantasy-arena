@@ -54,7 +54,8 @@ Still gated by `defId` string literals in `CombatSystem.ts`:
 - `"ogre"` → Second Wind full-heal at 25% HP
 - `"berserker"` → Bloodrage damage/speed scaling + melee Cleave (AoE swing)
 - `"assassin"` → Vanish death-cheat
-- `"slime"` / `"slime_clone"` → split-on-damage and death explosion
+- ~~`"slime"` / `"slime_clone"` → split-on-damage and death explosion~~ —
+  **migrated** to `kits/slime.ts` (onDamaged split → damageSpawns; onDeath burst)
 - `"aegis_knight"` → soaks magic into a shield, Backlash AoE, Warded (immune
   to burn/slow/poison). Magic is identified by the source unit's `school: "magic"`
   field (the casters) — see `isMagicSource` in CombatSystem.

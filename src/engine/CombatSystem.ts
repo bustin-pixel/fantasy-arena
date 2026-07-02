@@ -186,37 +186,11 @@ function makeDamageDealer(
       target.shieldHp = Math.min(AEGIS_SHIELD_CAP, target.shieldHp + aegisBank);
     }
 
-    // [seam] kit post-hit reaction on a surviving target (Slime split; Aegis bank).
+    // [seam] kit post-hit reaction on a surviving target. Slime split now lives
+    // in its kit (kits/slime.ts onDamaged, routing clones to damageSpawns);
+    // Aegis bank migrates here next.
     if (kit?.onDamaged && target.hp > 0) {
       kit.onDamaged(target, dmg, source, makeKitCtx(target, true));
-    }
-
-    // Slime Split: the ORIGINAL slime spawns a weaker clone each time its health
-    // crosses a 25% threshold (at 75%, 50%, 25% remaining → up to 3 clones).
-    // Clones (defId "slime_clone") are terminal and never split.
-    if (target.defId === "slime" && target.hp > 0) {
-      // How many 25% thresholds have been crossed so far.
-      const thresholdsCrossed = Math.floor((1 - target.hp / target.maxHp) / 0.25);
-      const wantSplits = Math.min(3, thresholdsCrossed);
-      while (target.splitsSpawned < wantSplits) {
-        target.splitsSpawned++;
-        const side = target.splitsSpawned % 2 === 0 ? 1 : -1;
-        state.damageSpawns.push({
-          defId: "slime_clone",
-          team: target.team,
-          pos: {
-            x: target.pos.x + side * 30,
-            y: target.pos.y + 20,
-          },
-        });
-        spawnVfx(state, {
-          kind: "frost",
-          pos: { x: target.pos.x, y: target.pos.y },
-          life: secToTicks(0.3),
-          maxLife: secToTicks(0.3),
-          color: getUnitDef(target.defId).accent,
-        });
-      }
     }
 
     // Ogre Second Wind: the first time a hit drops it to/below 25% HP (even a
@@ -361,26 +335,8 @@ function makeDamageDealer(
           });
         }
 
-        // Slime death-burst: any slime (original or clone) explodes on death,
-        // dealing AoE damage to nearby ENEMIES. Chain reactions are intentional
-        // and safe — a unit only dies (and thus explodes) once.
-        if (target.defId === "slime" || target.defId === "slime_clone") {
-          const BURST_RADIUS = 90;
-          const BURST_DMG = target.defId === "slime" ? 40 : 20;
-          for (const u of state.units) {
-            if (u.state === "dead" || u.team === target.team) continue;
-            if (dist(target.pos, u.pos) <= BURST_RADIUS) {
-              dealDamage(u, BURST_DMG, target);
-            }
-          }
-          spawnVfx(state, {
-            kind: "slam",
-            pos: { x: target.pos.x, y: target.pos.y },
-            life: secToTicks(0.45),
-            maxLife: secToTicks(0.45),
-            color: getUnitDef(target.defId).accent,
-          });
-        }
+        // (Slime death-burst now lives in its kit — kits/slime.ts onDeath, fired
+        // by the onDeath seam above; it re-enters dealDamage via ctx.dealDamage.)
       }
     }
   };
