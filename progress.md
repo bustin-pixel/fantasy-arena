@@ -140,12 +140,17 @@ contracts, migration order) in **`docs/adr/0001-unitkit-seam.md`**.
   private state moves to a flat typed `unit.kit` (opportunistically, per-unit).
 - **Migration:** strangler-fig (kit-preferred, old-path fallback). Each kit lives in
   `src/engine/kits/`; the registry is `kits/UnitKit.ts` (`getKit`).
-- **Done (PR 1):** scaffolding (every seam call site, empty registry ⇒ byte-identical)
-  → **Zombie Shambler** (`onAfterAttack`) → **Knight** (`fireAbility` + `roleClass`).
-- **Remaining:** Ice/Fire Mage → Rogue → Slime (`onDamaged`+`onDeath`) → Ogre/Assassin/
-  Berserker (`onWouldDie` trio) → Aegis Knight/Druid → Mystic/Hunter → Necromancer last
-  → cleanup (delete `dispatchAbility`, `PASSIVE_ABILITIES`, `isActiveAbility`,
-  `unitRoleClass` internals, all fallbacks). `onSpawn` gets wired at the stealth trio.
+- **Done (on `refactor/unitkit-seam`, PR #41):** scaffolding (every seam call site, empty
+  registry ⇒ byte-identical) → **Zombie Shambler** (`onAfterAttack`) → **Knight**
+  (`fireAbility` + `roleClass`) → **Slime + Slimeling** (`onDamaged` split + `onDeath`
+  burst) → **Ogre** (`onDamaged`+`onWouldDie` Second Wind; `fireAbility` Crushing Slam).
+- **Remaining:** Assassin + Berserker (rest of the `onWouldDie` trio; Berserker also
+  `onKill`+`onTick` bloodrage + `onAfterAttack` cleave) → Rogue → Aegis Knight/Druid →
+  Mystic/Hunter → Necromancer last → cleanup (delete `dispatchAbility`,
+  `PASSIVE_ABILITIES`, `isActiveAbility`, `unitRoleClass` internals, all fallbacks).
+  `onSpawn` gets wired in `MatchController.deploy` at the stealth trio (Assassin/Rogue/
+  Trickster). **Ice/Fire Mage** basic-attack riders (freeze/burn) are deferred to the
+  candidate-3 projectile on-hit descriptor (ADR consequence) — migrate them together.
 - **First balance dividend after the refactor** (separate commit, own spec): stun
   suppresses Raise Dead / Engineer repair / Hunter traps (move the hook past the gate).
 - Retires the `NOTES.md §2` "consider a per-unit traits field" note and the §3
