@@ -169,15 +169,28 @@ contracts, migration order) in **`docs/adr/0001-unitkit-seam.md`**.
   (`fireAbility` Mend + **`wantsToCast`** begin-cast gate — **first `wantsToCast` user**;
   its `mendTarget` helper moved into the kit). Dropped the `blessing` + `mend` cases from the
   `dispatchAbility` switch (12 → 10 live cases).
+- **Done (next easy tier — same recipe, all digest-safe):** **Archer** (`fireAbility` Kiting
+  Leap, instant) → **Bloater** (`onDeath` Putrid Burst) → **Mage** (`fireAbility` Polymorph +
+  `wantsToCast`) → **Engineer** (`onTick` Field Repairs + `fireAbility` Deploy Turret). Dropped
+  `kiting_leap`/`polymorph`/`deploy_turret` (switch 10 → 7). Guard covers Archer (seed 20260626)
+  + Engineer (777/999); Bloater/Mage aren't in the guard's decks so `bloater.test.ts` (added) and
+  `mage.test.ts` are their nets. `AbilitySystem.wantsToCast` collapsed to the `return true`
+  fallback; trimmed the imports the deleted casts left unused.
 - **Remaining: the cleanup commit** — delete `dispatchAbility`, `PASSIVE_ABILITIES`,
   `isActiveAbility`, `unitRoleClass` internals, and the `?? old-path` fallbacks (only once
-  nothing needs them). Out-of-ADR-scope units still `defId`-gated: Engineer (Field Repairs),
-  Arcane Mage (Blink + Barrage — Blink slots into the `onReactTick` seam), Bloater (death
-  burst), Boar (guard-charge, with the Orc); plus the `dispatchAbility` switch's remaining
-  cast-ability cases (Archer `kiting_leap`, the mages, Orc `charge`, Engineer `deploy_turret`,
-  Mage `polymorph`, Necromancer `fear_aura`). **Ice/Fire Mage** freeze/burn riders ride the
-  projectile — deferred to the candidate-3 projectile on-hit *data-descriptor* (complements
-  the Mystic's `onProjectileHit` code-hook); migrate them together.
+  nothing needs them). Still `defId`-gated / on the switch:
+  - **Electric Mage** (`chain_lightning`) — a pure cast, **no projectile rider**, so it's an easy
+    `fireAbility` migration (the quick next win).
+  - **Fire / Ice Mage** — the `fireball`/`frost_blast` casts are easy, but their every-Nth-attack
+    burn/freeze **ride the projectile** (`onHitBurn`/`onHitStunSec`), still deferred to the
+    candidate-3 projectile on-hit *data-descriptor* (complements the Mystic's `onProjectileHit`
+    code-hook); migrate the cast + rider together.
+  - **Arcane Mage** — Blink (`defId`-gated, slots into `onReactTick`) + the Arcane Barrage
+    streamer (`stepArcaneBarrage`) + the `arcane_barrage` cast.
+  - **Orc + Boar** — the `charge`/`stepCharge`/guard-charge shared system; migrate together via a
+    charge-system refactor.
+  - Switch leftovers not tied to an un-migrated unit: `shield_block` (no owning unit — likely dead)
+    and `fear_aura` (invoked internally by the already-migrated Necromancer).
 - **✓ onActTick split (RESOLVED, now fully wired):** two distinct post-target slots ended up
   needed. **`onActTick`** fires **POST-idle** (needs a live target): Druid Rejuv (instant →
   returns void → falls through to the standard cast chain) and the Necromancer's dual cast
