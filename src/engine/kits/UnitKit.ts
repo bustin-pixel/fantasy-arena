@@ -21,6 +21,7 @@
 import type { Projectile, Unit } from "@/types";
 import type { AbilityContext } from "../AbilitySystem";
 import { aegisKnightKit } from "./aegisKnight";
+import { archerKit } from "./archer";
 import { assassinKit } from "./assassin";
 import { berserkerKit } from "./berserker";
 import { clericKit } from "./cleric";
@@ -132,6 +133,7 @@ export type UnitKitRegistry = Record<string /* defId */, UnitKit>;
  *  path, so behavior — and digest() — is unchanged until a unit's kit is born. */
 export const UNIT_KITS: UnitKitRegistry = {
   aegis_knight: aegisKnightKit,
+  archer: archerKit,
   assassin: assassinKit,
   berserker: berserkerKit,
   healer: clericKit,

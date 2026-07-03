@@ -17,7 +17,7 @@ import {
   FIELD_WIDTH,
   secToTicks,
 } from "@/utils/constants";
-import { clamp, dist, dir } from "@/utils/math";
+import { clamp, dist } from "@/utils/math";
 import {
   applyEffect,
   isPolymorphed,
@@ -78,8 +78,6 @@ export function abilityCastTimeTicks(abilityId: Unit["ability"]): number {
 /** Dispatch an ability's EFFECT (no cooldown/stun gating). */
 function dispatchAbility(ctx: AbilityContext): boolean {
   switch (ctx.unit.ability) {
-    case "kiting_leap":
-      return castKitingLeap(ctx);
     case "shield_block":
       return castShieldBlock(ctx);
     case "fireball":
@@ -136,34 +134,9 @@ export function wantsToCast(ctx: AbilityContext): boolean {
 // --- OGRE: Crushing Slam -----------------------------------------------------
 // Migrated to kits/ogre.ts (fireAbility), together with Second Wind.
 
-// --- ARCHER: Kiting Leap -----------------------------------------------------
-function castKitingLeap(ctx: AbilityContext): boolean {
-  const { unit, enemies } = ctx;
-  // Only leap if a melee enemy is closing in.
-  const threatRange = unit.radius * 2.4;
-  const threat = enemies.find(
-    (e) =>
-      e.state !== "dead" &&
-      !isStealthed(e) && // can't leap away from an unseen attacker
-      getUnitDef(e.defId).range <= 80 &&
-      dist(unit.pos, e.pos) <= threatRange
-  );
-  if (!threat) return false;
-
-  // Leap away from the threat (~2 tiles ≈ 130px), clamped to field.
-  const away = dir(threat.pos, unit.pos);
-  const leap = 130;
-  unit.pos.x = clamp(unit.pos.x + away.x * leap, unit.radius, FIELD_WIDTH - unit.radius);
-  unit.pos.y = clamp(unit.pos.y + away.y * leap, unit.radius, FIELD_HEIGHT - unit.radius);
-  ctx.spawnVfx({
-    kind: "frost",
-    pos: { x: unit.pos.x, y: unit.pos.y },
-    life: secToTicks(0.25),
-    maxLife: secToTicks(0.25),
-    color: "#fde68a",
-  });
-  return true;
-}
+// (ARCHER: Kiting Leap now lives in kits/archer.ts — an instant fireAbility that
+// hops away from a closing melee threat, or returns false so the cooldown isn't
+// spent when there's nothing to kite.)
 
 // --- KNIGHT: Shield Block ----------------------------------------------------
 // NOTE: shield_block is currently UNUSED by any unit — the Knight switched to
