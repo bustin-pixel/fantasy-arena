@@ -23,6 +23,7 @@ import type { AbilityContext } from "../AbilitySystem";
 import { aegisKnightKit } from "./aegisKnight";
 import { assassinKit } from "./assassin";
 import { berserkerKit } from "./berserker";
+import { clericKit } from "./cleric";
 import { druidKit } from "./druid";
 import { holyKnightKit } from "./holyKnight";
 import { hunterKit } from "./hunter";
@@ -133,6 +134,7 @@ export const UNIT_KITS: UnitKitRegistry = {
   aegis_knight: aegisKnightKit,
   assassin: assassinKit,
   berserker: berserkerKit,
+  healer: clericKit,
   holy_knight: holyKnightKit,
   hunter: hunterKit,
   knight: knightKit,

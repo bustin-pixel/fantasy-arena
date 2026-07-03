@@ -92,8 +92,6 @@ function dispatchAbility(ctx: AbilityContext): boolean {
       return castChainLightning(ctx);
     case "charge":
       return castCharge(ctx);
-    case "mend":
-      return castMend(ctx);
     case "deploy_turret":
       return castDeployTurret(ctx);
     case "polymorph":
@@ -125,11 +123,11 @@ export function fireCastAbility(ctx: AbilityContext): boolean {
 }
 
 /** Whether a cast-time ability has a reason to BEGIN its cast this tick. Most
- *  casts always do (there's always an enemy to hit); the Cleric's Mend only
- *  commits to its long wind-up when an ally actually needs healing — otherwise
- *  the Cleric would lock itself in place casting into nothing. */
+ *  casts always do (there's always an enemy to hit); the Mage's Polymorph only
+ *  commits when there's a valid non-summoned target to sheep — otherwise it would
+ *  lock itself in place casting into nothing. (The Cleric's Mend gate now lives in
+ *  kits/cleric.ts wantsToCast; a migrated unit's kit gate overrides this fallback.) */
 export function wantsToCast(ctx: AbilityContext): boolean {
-  if (ctx.unit.ability === "mend") return mendTarget(ctx) != null;
   if (ctx.unit.ability === "polymorph")
     return polymorphTarget(ctx.unit, ctx.enemies) != null;
   return true;
@@ -284,48 +282,10 @@ function castCharge(ctx: AbilityContext): boolean {
   return true;
 }
 
-// --- CLERIC: Mend ------------------------------------------------------------
-// The most-wounded ally within heal range (including self), or null if no one
-// needs healing. Shared by castMend (the effect) and wantsToCast (so the Cleric
-// doesn't begin its 2.5s cast at full HP and freeze in place healing no one).
-function mendTarget(ctx: AbilityContext): Unit | null {
-  const { unit, allies } = ctx;
-  const candidates = [unit, ...allies].filter(
-    (u) => u.state !== "dead" && u.hp < u.maxHp
-  );
-  if (candidates.length === 0) return null;
-
-  const healRange = unit.range + unit.radius;
-  const inRange = candidates.filter((u) => dist(unit.pos, u.pos) <= healRange);
-  const pool = inRange.length > 0 ? inRange : [unit];
-
-  // Most-wounded by missing HP.
-  let best = pool[0];
-  let bestMissing = best.maxHp - best.hp;
-  for (const u of pool) {
-    const missing = u.maxHp - u.hp;
-    if (missing > bestMissing || (missing === bestMissing && u.uid < best.uid)) {
-      best = u;
-      bestMissing = missing;
-    }
-  }
-  return bestMissing > 0 ? best : null;
-}
-
-function castMend(ctx: AbilityContext): boolean {
-  const best = mendTarget(ctx);
-  if (!best) return false;
-
-  ctx.heal(best, 32);
-  ctx.spawnVfx({
-    kind: "shield_pop",
-    pos: { x: best.pos.x, y: best.pos.y - 4 },
-    life: secToTicks(0.5),
-    maxLife: secToTicks(0.5),
-    color: getUnitDef(ctx.unit.defId).accent,
-  });
-  return true;
-}
+// (CLERIC: Mend now lives in kits/cleric.ts — a cast-time fireAbility that heals
+// the most-wounded ally in range on completion, gated by wantsToCast so the Cleric
+// won't begin its wind-up with no wounded ally to land it on. Its mendTarget helper
+// moved into the kit.)
 
 // (HOLY KNIGHT: Blessing now lives in kits/holyKnight.ts — an instant fireAbility
 // that grants a capped, stacking absorb shield + small heal to itself and nearby
