@@ -43,10 +43,7 @@ import {
   abilityCastTimeTicks,
   abilityCooldownTicks,
   applyLifesteal,
-  fireCastAbility,
   onProjectileHit,
-  tryCastAbility,
-  wantsToCast,
   type AbilityContext,
 } from "./AbilitySystem";
 import { getKit, type KitCtx } from "./kits/UnitKit";
@@ -644,9 +641,8 @@ export function stepSimulation(state: SimState): void {
     } else if (unit.castTicks > 0) {
       unit.castTicks--;
       if (unit.castTicks <= 0) {
-        // [seam] kit fires the completed cast's effect; else the old dispatch.
-        if (abilityKit?.fireAbility) abilityKit.fireAbility(abilityCtx);
-        else fireCastAbility(abilityCtx); // the spell goes off
+        // The kit fires the completed cast's effect (every cast unit has one).
+        abilityKit?.fireAbility?.(abilityCtx); // the spell goes off
         unit.castTicksMax = 0;
         unit.castTargetUid = null;
       } else {
@@ -659,10 +655,12 @@ export function stepSimulation(state: SimState): void {
         // Begin a cast. A stun/silence blocks the start, and some casts (Mend)
         // only begin when they have a reason to — so the Cleric doesn't freeze
         // mid-field winding up a heal with no wounded ally to land it on.
-        // [seam] the kit's wantsToCast overrides the old one when present.
+        // A kit may gate its begin-cast (Cleric Mend / Mage Polymorph won't wind
+        // up with no valid target); every other cast always wants to (there's an
+        // enemy to hit).
         const wants = abilityKit?.wantsToCast
           ? abilityKit.wantsToCast(abilityCtx)
-          : wantsToCast(abilityCtx);
+          : true;
         if (!isStunned(unit) && !isSilenced(unit) && wants) {
           unit.castTicks = castTime;
           unit.castTicksMax = castTime;
@@ -672,12 +670,14 @@ export function stepSimulation(state: SimState): void {
           continue;
         }
       } else {
-        // [seam] instant cast: the kit fires the effect (has-an-active-cast <=>
-        // fireAbility defined), gated on stun/silence like tryCastAbility; else
-        // the old dispatch handles gating internally.
-        const fired = abilityKit?.fireAbility
-          ? !isStunned(unit) && !isSilenced(unit) && abilityKit.fireAbility(abilityCtx)
-          : tryCastAbility(abilityCtx);
+        // Instant cast: the kit fires the effect (has-an-active-cast <=>
+        // fireAbility defined), gated on stun/silence. A unit with no active-cast
+        // kit does nothing here — its passive/reactive mechanics run elsewhere.
+        const fired =
+          abilityKit?.fireAbility != null &&
+          !isStunned(unit) &&
+          !isSilenced(unit) &&
+          abilityKit.fireAbility(abilityCtx);
         if (fired) unit.abilityCooldown = abilityCooldownTicks(unit.ability);
       }
     }

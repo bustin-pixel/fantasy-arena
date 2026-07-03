@@ -412,14 +412,10 @@ export class MatchController {
     | "ranged"
     | "support"
     | "assassin" {
-    // [seam] a migrated unit declares its tactical class on its kit; else fall
-    // back to the ability/hp heuristic below (the AI's *opinions* stay here).
-    const kitRole = getKit(def.id)?.roleClass;
-    if (kitRole) return kitRole;
-    if (def.ability === "mend") return "support";
-    if (def.ability === "ambush") return "assassin";
-    if (isMelee(def)) return "melee";
-    return "ranged";
+    // Every unit declares its tactical class on its kit now (support / assassin /
+    // melee / ranged). The geometric default is just a safety net for any kit-less
+    // unit that ever reaches here; the AI's matchup *opinions* stay in chooseEnemyCard.
+    return getKit(def.id)?.roleClass ?? (isMelee(def) ? "melee" : "ranged");
   }
 
   /**

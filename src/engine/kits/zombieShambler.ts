@@ -7,6 +7,8 @@ import type { UnitKit } from "./UnitKit";
 import { applyEffect, makeEffect } from "../StatusEffectSystem";
 
 export const zombieShamblerKit: UnitKit = {
+  roleClass: "melee",
+
   onAfterAttack(unit, target) {
     applyEffect(
       target,

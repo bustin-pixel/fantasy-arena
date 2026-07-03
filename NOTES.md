@@ -43,13 +43,17 @@ the id literal (e.g. the UnitKit registry maps `"summoner"` → the Druid's kit)
 If you ever add a unit, make the id match the name to avoid extending this trap.
 
 ### 2. Hardcoded unit-id checks in CombatSystem
-**Being migrated to the UnitKit seam** (`docs/adr/0001-unitkit-seam.md`): each
-unit's mechanics move into one kit under `src/engine/kits/`, and its `defId`
-branches below are deleted from `CombatSystem` in the same commit (digest stays
-byte-identical). Migrated units are struck from this list; when it's empty the
-`dispatchAbility` switch, `PASSIVE_ABILITIES`, and `unitRoleClass` internals go too.
+**✅ MIGRATION COMPLETE** (`docs/adr/0001-unitkit-seam.md`): every unit's mechanics
+moved into one kit under `src/engine/kits/` (or, for the Fire/Ice riders, into
+`UnitDef` data) — **the whole list below is struck, and the cleanup shipped**: the
+`dispatchAbility` switch, `tryCastAbility`/`fireCastAbility`, `PASSIVE_ABILITIES` /
+`isActiveAbility`, the `AbilitySystem.wantsToCast` fallback, and `unitRoleClass`'s
+ability heuristic are all deleted. Whether a unit has an active cast is now "its kit
+defines `fireAbility`"; each kit declares its `roleClass`. Kept as engine plumbing
+(field-gated, not `defId`): `stepCharge`, `stepArcaneBarrage`, and the free
+`onProjectileHit` projectile resolver. All commits stayed digest-byte-identical.
 
-Still gated by `defId` string literals in `CombatSystem.ts`:
+Formerly gated by `defId` string literals in `CombatSystem.ts` (all now migrated):
 - ~~`"summoner"` → Druid bear transform at 30% HP~~ — **migrated** to
   `kits/druid.ts` (onTick bear transform + guard-timer countdown, onActTick
   Rejuvenation, modifyIncomingHeal bear +50%, fireAbility Summon Wolves). First
@@ -161,14 +165,14 @@ one stateless kit per `defId` behind a seam.
 
 ### 3. Ability slot vs. passive properties
 `lifesteal` started as an *ability* but is now also a unit *property*
-(`def.lifesteal: number`). The Orc has `ability: "charge"` AND
-`lifesteal: 0.4`. The `PASSIVE_ABILITIES` set in `AbilitySystem.ts` lists
-abilities that never "cast" (`lifesteal`, `bloodrage`, `slime_split`,
-`mystic_shift`, `ambush`, `aegis`). When adding a passive ability, remember to add
-it to that set or the unit will waste cycles trying to cast nothing. (The Arcane
-Mage is an example of a unit with two abilities: an *active* ability slot —
-Arcane Barrage — plus a *second* ability, Blink, that runs off its own cooldown
-field.)
+(`def.lifesteal: number`). The Orc has `ability: "charge"` AND `lifesteal: 0.4`.
+**Passive vs. active is now decided by the kit, not an allowlist:** a unit has an
+active cast *iff* its kit defines `fireAbility`. The old `PASSIVE_ABILITIES` set /
+`isActiveAbility` footgun (remember-to-add-your-passive-or-it-wastes-cycles) is
+GONE — a passive unit simply has no `fireAbility`, so the cast seam skips it. (The
+Arcane Mage is an example of a unit with two abilities: an *active* slot — Arcane
+Barrage via `fireAbility` — plus a *second* one, Blink, that runs off its own
+`blinkCooldown` in `onReactTick`.)
 
 **The `lifesteal` filler convention is display-load-bearing:** summons and Depths
 monsters use `ability: "lifesteal"` as a "never casts" placeholder, and

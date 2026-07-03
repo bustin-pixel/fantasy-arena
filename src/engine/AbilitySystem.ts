@@ -14,13 +14,7 @@ import { ABILITIES } from "@/data/abilities";
 import { getUnitDef } from "@/data/units";
 import { secToTicks } from "@/utils/constants";
 import { dist } from "@/utils/math";
-import {
-  applyEffect,
-  isSilenced,
-  isStealthed,
-  isStunned,
-  makeEffect,
-} from "./StatusEffectSystem";
+import { applyEffect, isStealthed, makeEffect } from "./StatusEffectSystem";
 
 export interface AbilityContext {
   unit: Unit;
@@ -49,16 +43,9 @@ export interface AbilityContext {
   ) => void;
 }
 
-/** Abilities that are passive (no active cast). Everything else is cast-gated. */
-// "Passive" here means "not driven by the standard active-cast pipeline" — the
-// effect runs elsewhere. shadow_step is reactive (handled in CombatSystem like
-// Blink), so it lives here even though the UI shows it as an active (cooldown > 0).
-const PASSIVE_ABILITIES = new Set<Unit["ability"]>(["lifesteal", "bloodrage", "slime_split", "momentum", "multishot", "whirlwind", "ambush", "aegis", "venom", "shadow_step"]);
-
-/** True if this ability is an active (cooldown-gated) cast. */
-function isActiveAbility(unit: Unit): boolean {
-  return !PASSIVE_ABILITIES.has(unit.ability);
-}
+// (The PASSIVE_ABILITIES set + isActiveAbility check are retired: whether a unit
+// has an active cast is now "its kit defines fireAbility" — read at the CombatSystem
+// cast seam — so there's no ability-name allowlist to maintain.)
 
 /** Convert seconds to ticks for the given ability cooldown. */
 export function abilityCooldownTicks(abilityId: Unit["ability"]): number {
@@ -70,44 +57,10 @@ export function abilityCastTimeTicks(abilityId: Unit["ability"]): number {
   return secToTicks(ABILITIES[abilityId].castTimeSec ?? 0);
 }
 
-/** Dispatch an ability's EFFECT (no cooldown/stun gating). */
-function dispatchAbility(ctx: AbilityContext): boolean {
-  switch (ctx.unit.ability) {
-    case "shield_block":
-      return castShieldBlock(ctx);
-    case "fear_aura":
-      return castFear(ctx);
-    default:
-      return false;
-  }
-}
-
-/**
- * Attempt to fire `unit`'s ability this tick. For INSTANT abilities the effect
- * fires immediately. Cast-time abilities (the mages) are begun + released by
- * CombatSystem instead; their effect is fired via fireCastAbility on completion.
- */
-export function tryCastAbility(ctx: AbilityContext): boolean {
-  const { unit } = ctx;
-  if (!isActiveAbility(unit)) return false;
-  if (unit.abilityCooldown > 0) return false;
-  if (isStunned(unit) || isSilenced(unit)) return false;
-  return dispatchAbility(ctx);
-}
-
-/** Fire a cast-time ability's effect when its cast completes (the cooldown was
- *  paid at cast start; a stun/fear interrupts earlier, so there's no re-check). */
-export function fireCastAbility(ctx: AbilityContext): boolean {
-  return dispatchAbility(ctx);
-}
-
-/** Whether a cast-time ability has a reason to BEGIN its cast this tick — the
- *  fallback for un-migrated casts, which always do (there's always an enemy to
- *  hit). Units with a conditional begin-gate (the Cleric's Mend, the Mage's
- *  Polymorph) now supply their own kit `wantsToCast`, which the seam prefers. */
-export function wantsToCast(_ctx: AbilityContext): boolean {
-  return true;
-}
+// (The dispatchAbility switch + tryCastAbility/fireCastAbility/wantsToCast are
+// retired: every unit's ability effect now lives in its kit's fireAbility (fired by
+// the CombatSystem cast seam), its begin-cast gate in the kit's wantsToCast, and
+// the Necromancer's Terrify reaches castFear directly via applyTerrify below.)
 
 // --- OGRE: Crushing Slam -----------------------------------------------------
 // Migrated to kits/ogre.ts (fireAbility), together with Second Wind.
@@ -116,26 +69,9 @@ export function wantsToCast(_ctx: AbilityContext): boolean {
 // hops away from a closing melee threat, or returns false so the cooldown isn't
 // spent when there's nothing to kite.)
 
-// --- KNIGHT: Shield Block ----------------------------------------------------
-// NOTE: shield_block is currently UNUSED by any unit — the Knight switched to
-// taunt_roar. Kept because it's clean, reusable logic a future tank could claim.
-// If you remove it, also delete the type entry, the dispatch case, and the
-// ability definition in data/abilities.ts.
-function castShieldBlock(ctx: AbilityContext): boolean {
-  const { unit } = ctx;
-  applyEffect(
-    unit,
-    makeEffect("shield", { source: unit.uid, durationSec: 6, charges: 1 })
-  );
-  ctx.spawnVfx({
-    kind: "shield_pop",
-    pos: { x: unit.pos.x, y: unit.pos.y - 4 },
-    life: secToTicks(0.5),
-    maxLife: secToTicks(0.5),
-    color: getUnitDef(unit.defId).accent,
-  });
-  return true;
-}
+// (KNIGHT: Shield Block removed — it was UNUSED by any unit [the Knight uses
+// taunt_roar] and only reachable via the now-deleted dispatch switch. Recoverable
+// from git history if a future tank wants it.)
 
 // --- KNIGHT: Taunting Roar ---------------------------------------------------
 // Migrated to kits/knight.ts (fireAbility). The Knight now drives Taunting Roar

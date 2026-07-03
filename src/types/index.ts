@@ -38,7 +38,6 @@ export type AbilityId =
   | "crushing_slam"
   | "lifesteal"
   | "kiting_leap"
-  | "shield_block"
   | "taunt_roar"
   | "aegis"
   | "fireball"
