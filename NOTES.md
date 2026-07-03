@@ -8,23 +8,38 @@ type-clean under strict mode, determinism verified across every unit type.
 
 ## ✅ Checklist for adding a new unit
 
-Every playable unit must surface fully in the hub click-to-view detail panel
-(`components/UnitDetail.tsx`), which is data-driven. When adding one:
+Two parts: **data** (stats + what the hub detail panel shows) and **behavior** (a
+*kit*, if the unit does anything beyond attack + move). The hub detail panel
+(`components/UnitDetail.tsx`) is data-driven, so every unit must surface fully there.
 
 1. **Stats** — define it in `data/units.ts` with full stats (hp, damage,
    attackSpeed, moveSpeed, range, role, color, accent). These render in the panel
-   automatically.
+   automatically. *Optional data-driven behavior* (no code): `basicShotRider` (an
+   every-Nth-attack on-hit rider, like the Fire/Ice mages) and `wardedAgainst`
+   (status immunities, like the Aegis Knight).
 2. **Ability** — its `ability` MUST have a matching entry in `data/abilities.ts`
-   (name / description / cooldown). The panel reads `ABILITIES[def.ability]`, so a
-   missing entry crashes it. If the ability is passive (no active cast), also add
-   it to `PASSIVE_ABILITIES` in `engine/AbilitySystem.ts`.
-3. **Traits** — add a `traits: [{ name, description }]` array for any passive or
-   hidden behavior (anything gated by `defId` in `CombatSystem.ts`, e.g. Second
-   Wind, Vanish, Frostbite) so the panel lists it. Pure-stat units can omit it.
-4. **Visibility** — non-summon units appear in the hub automatically via
+   (name / description / cooldown / `castTimeSec`). The panel reads
+   `ABILITIES[def.ability]` (a missing entry crashes it), and the engine reads the
+   cooldown + cast-time from it.
+3. **Behavior — the kit.** If the unit does anything beyond a plain attack + move,
+   write `engine/kits/<unit>.ts` and register it in `kits/UnitKit.ts` (keyed by
+   `defId`). Implement **only** the hooks it needs and declare `roleClass`. The
+   hooks: `onTick` / `onActTick` / `onReactTick`, `fireAbility` / `wantsToCast`, the
+   HP-funnel hooks (`onDamaged` / `onWouldDie` / `onKill` / `modifyIncoming*`), the
+   attack split (`onBeforeAttack` / `onBasicAttack` / `onAfterAttack`),
+   `onProjectileHit`, `onChargeContact`, `onSpawn` / `onDeath`. **Never edit
+   `CombatSystem`/`AbilitySystem` per-unit** — they have no `defId` branches, and
+   there is **no** `PASSIVE_ABILITIES` list: "passive" just means the kit defines no
+   `fireAbility`. A pure-stat unit needs no kit at all. Copy an existing kit as a
+   template; the interface lives in `kits/UnitKit.ts`, the design in `docs/adr/0001`.
+4. **Traits** — add a `traits: [{ name, description }]` array so any passive/hidden
+   behavior shows in the panel (e.g. Second Wind, Vanish, Frostbite). Pure-stat
+   units can omit it.
+5. **Test** — add or extend a spec in `engine/__tests__/<unit>.test.ts`.
+6. **Visibility** — non-summon units appear in the hub automatically via
    `DECKABLE_UNIT_IDS` (everything not in `NON_DECK_UNITS`).
-5. **Verify** — open the unit's card in the hub and confirm stats, ability, and
-   traits all show.
+7. **Verify** — `npm run typecheck` + `npm test`, then open the unit's card in the
+   hub and confirm stats, ability, and traits all show.
 
 ## ⚠️ Maintenance hazards (read before adding code)
 
