@@ -983,34 +983,9 @@ function performBasicAttack(
       onHitStunSec: freezeThisHit ? 2 : undefined,
       onHitBurn: burnThisHit || undefined,
     });
-  } else if (unit.defId === "warrior") {
-    // Whirlwind: the Warrior spins its claymore instead of a single swing —
-    // striking every enemy within melee reach for its damage and leaving a
-    // refreshing bleed (poison-type DoT) on each. Anti-swarm melee; no lifesteal.
-    const reach = unit.range + unit.radius;
-    for (const e of state.units) {
-      if (e.team === unit.team || e.state === "dead") continue;
-      if (dist(unit.pos, e.pos) <= reach) {
-        dealDamage(e, unit.damage, unit);
-        applyEffect(
-          e,
-          makeEffect("poison", {
-            source: unit.uid,
-            durationSec: 2,
-            damagePerTick: 3,
-            tickIntervalSec: 0.5,
-          })
-        );
-      }
-    }
-    spawnVfx(state, {
-      kind: "slam",
-      pos: { x: unit.pos.x, y: unit.pos.y },
-      life: secToTicks(0.4),
-      maxLife: secToTicks(0.4),
-      color: def.accent,
-    });
   } else {
+    // [seam] Warrior Whirlwind (the AoE spin + bleed that replaces the swing) now
+    // lives in kits/warrior.ts onBasicAttack, fired above.
     dealDamage(target, unit.damage, unit);
     applyLifesteal(unit, unit.damage, heal);
 

@@ -92,10 +92,11 @@ Still gated by `defId` string literals in `CombatSystem.ts`:
   slot reserved at the Druid. The Arcane Mage's Blink still uses its hardcoded block in
   that same seam location until it migrates. The Trickster was the last stealther (Rogue
   already migrated), so the deploy-stealth `defId` branch in `MatchController` is now gone.
-- `"warrior"` → Whirlwind: its melee swing is replaced by an AoE spin — hits every
+- ~~`"warrior"` → Whirlwind: its melee swing is replaced by an AoE spin — hits every
   enemy within melee reach (`range + radius`) for its damage and applies a
-  refreshing bleed (poison-type DoT, non-stacking). No lifesteal. `ability` slot is
-  the passive `whirlwind`.
+  refreshing bleed (poison-type DoT, non-stacking)~~ — **migrated** to
+  `kits/warrior.ts` (onBasicAttack → true, replacing the swing with the spin + bleed;
+  no lifesteal). `ability` slot stays the passive `whirlwind`.
 - `"ranger"` → Multishot: every second basic attack looses three arrows at once,
   each locked onto a different enemy in range (committed target + the two nearest
   others, nearest-first with a uid tiebreak). Against a lone foe only one arrow

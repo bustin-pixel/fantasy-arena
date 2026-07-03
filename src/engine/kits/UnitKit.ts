@@ -32,6 +32,7 @@ import { ogreKit } from "./ogre";
 import { rogueKit } from "./rogue";
 import { slimeKit, slimeCloneKit } from "./slime";
 import { tricksterKit } from "./trickster";
+import { warriorKit } from "./warrior";
 import { zombieShamblerKit } from "./zombieShambler";
 
 /** The context every kit hook receives (the engine's AbilityContext). For the
@@ -140,6 +141,7 @@ export const UNIT_KITS: UnitKitRegistry = {
   slime_clone: slimeCloneKit,
   summoner: druidKit,
   trickster: tricksterKit,
+  warrior: warriorKit,
   zombie_shambler: zombieShamblerKit,
 };
 
