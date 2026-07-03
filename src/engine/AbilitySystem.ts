@@ -94,8 +94,6 @@ function dispatchAbility(ctx: AbilityContext): boolean {
       return castCharge(ctx);
     case "mend":
       return castMend(ctx);
-    case "blessing":
-      return castBlessing(ctx);
     case "deploy_turret":
       return castDeployTurret(ctx);
     case "polymorph":
@@ -329,37 +327,9 @@ function castMend(ctx: AbilityContext): boolean {
   return true;
 }
 
-// --- HOLY KNIGHT: Blessing ---------------------------------------------------
-// A frontline support pulse: grants an absorb shield + small heal to itself and
-// every ally within range. The shield STACKS on top of any existing absorb
-// (the Knight's Taunt bubble, the Aegis Knight's banked magic), capped per unit
-// so a stack of shielders is strong, not unkillable. Pure ability — it just
-// writes the shieldHp pool and calls heal(), no defId gating in CombatSystem.
-function castBlessing(ctx: AbilityContext): boolean {
-  const { unit, allies } = ctx;
-  const BLESSING_RADIUS = 180;
-  const SHIELD_GRANT = 40;
-  const SHIELD_CAP = 150;
-  const HEAL = 15;
-
-  const blessed = [unit, ...allies].filter(
-    (u) => u.state !== "dead" && dist(unit.pos, u.pos) <= BLESSING_RADIUS
-  );
-
-  for (const ally of blessed) {
-    ally.shieldHp = Math.min(SHIELD_CAP, ally.shieldHp + SHIELD_GRANT);
-    ally.shieldHpMax = Math.max(ally.shieldHpMax, ally.shieldHp);
-    ctx.heal(ally, HEAL);
-    ctx.spawnVfx({
-      kind: "shield_pop",
-      pos: { x: ally.pos.x, y: ally.pos.y - 4 },
-      life: secToTicks(0.5),
-      maxLife: secToTicks(0.5),
-      color: getUnitDef(unit.defId).accent,
-    });
-  }
-  return true;
-}
+// (HOLY KNIGHT: Blessing now lives in kits/holyKnight.ts — an instant fireAbility
+// that grants a capped, stacking absorb shield + small heal to itself and nearby
+// allies.)
 
 // (DRUID: Summon Wolves + Rejuvenation now live in kits/druid.ts — fireAbility
 // summons the wolf on cast completion; onActTick lays the Rejuvenation HoT.)
