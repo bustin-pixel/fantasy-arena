@@ -156,21 +156,27 @@ contracts, migration order) in **`docs/adr/0001-unitkit-seam.md`**.
   stack+detonate+flip — added that hook; stacks stay flat cross-unit fields) →
   **Hunter** (`onTick` boar re-summon + Scatter Trap laying via new **`ctx.spawnTrap`**,
   `fireAbility` Mend Beast; the boar's guard-charge stays `defId`-gated pending the
-  charge-system refactor with the Orc).
-- **Remaining:** Trickster (Shadow Step `onActTick`, pre-idle reactive slot) →
-  **Necromancer last** (custom dual-cast) → cleanup (delete `dispatchAbility`,
-  `PASSIVE_ABILITIES`, `isActiveAbility`, `unitRoleClass` internals, all fallbacks).
+  charge-system refactor with the Orc) → **Trickster** (onSpawn stealth, onTick re-cloak,
+  onBeforeAttack reveal, **`onReactTick`** Shadow Step — added that hook, the **pre-idle
+  reactive slot** reserved at the Druid; retired the last deploy-stealth branch) →
+  **Necromancer** (onTick Raise Dead via new **`ctx.tick`**; **`onActTick` returns `true`**
+  to OWN its dual Curse/Terrify cast bar and bypass the standard cast chain). **All 14 kits
+  migrated — the per-unit strangler-fig is done.**
+- **Remaining: the cleanup commit** — delete `dispatchAbility`, `PASSIVE_ABILITIES`,
+  `isActiveAbility`, `unitRoleClass` internals, and the `?? old-path` fallbacks (only once
+  nothing needs them). Out-of-ADR-scope units still `defId`-gated: Engineer (Field Repairs),
+  Warrior (Whirlwind), Ranger (Multishot), Arcane Mage (Blink + Barrage — Blink slots into
+  the `onReactTick` seam), Bloater (death burst), Boar (guard-charge, with the Orc).
   **Ice/Fire Mage** freeze/burn riders ride the projectile — deferred to the candidate-3
-  projectile on-hit descriptor (ADR consequence); migrate them together. NB the Mystic's
-  bespoke resolution used the new **`onProjectileHit` code-hook**; candidate 3 adds the
-  complementary **data-descriptor** for the simple Ice/Fire riders.
-- **✓ onActTick placement (RESOLVED at the Druid):** the scaffolded pre-idle `onActTick`
-  seam was relocated to fire **POST-idle** (after the "target-dead → idle" check), where an
-  instant act needs a live target — Druid Rejuv (and later the Necro cast) hook there, and
-  it's passed the loop's `abilityCtx` so allies/enemies match the funnel exactly. The
-  **PRE-idle reactive slot** (Arcane Blink + Trickster Shadow Step, which react even when the
-  committed target just died) is a reserved, clearly-marked call site, wired when those units
-  migrate — a second call site (or hook), as anticipated.
+  projectile on-hit *data-descriptor* (complements the Mystic's `onProjectileHit` code-hook);
+  migrate them together.
+- **✓ onActTick split (RESOLVED, now fully wired):** two distinct post-target slots ended up
+  needed. **`onActTick`** fires **POST-idle** (needs a live target): Druid Rejuv (instant →
+  returns void → falls through to the standard cast chain) and the Necromancer's dual cast
+  (returns **`true`** to OWN the pipeline and bypass the standard chain, locking the unit while
+  `castTicks > 0`). **`onReactTick`** fires **PRE-idle** (reacts even when the committed target
+  just died): the Trickster's Shadow Step wired it first; the Arcane Mage's Blink slots into
+  the same seam when it migrates. Both are passed the loop's `abilityCtx`.
 - **First balance dividend after the refactor** (separate commit, own spec): stun
   suppresses Raise Dead / Engineer repair / Hunter traps (move the hook past the gate).
 - Retires the `NOTES.md §2` "consider a per-unit traits field" note and the §3
