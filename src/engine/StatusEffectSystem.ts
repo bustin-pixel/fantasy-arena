@@ -102,6 +102,14 @@ export function isSilenced(unit: Unit): boolean {
   return hasEffect(unit, "silence");
 }
 
+/** Can't take actions this tick — stunned, feared, or polymorphed. Mirrors the
+ *  main tick loop's stun/fear/polymorph gates (silence only blocks casts, so it's
+ *  excluded). Kits use this to suppress active upkeep (Raise Dead, Field Repairs,
+ *  Hunter traps) while incapacitated, matching that post-gate behavior. */
+export function isIncapacitated(unit: Unit): boolean {
+  return isStunned(unit) || isFeared(unit) || isPolymorphed(unit);
+}
+
 /** Stealthed = invisible to enemies: untargetable AND ignored by reactive AI
  *  (kiting, Blink, taunt, fear). The canonical "you can't react to what you
  *  can't see" check. */

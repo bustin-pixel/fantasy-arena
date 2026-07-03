@@ -3,6 +3,7 @@
 // every 3rd shot is an Arrow Volley that hits every enemy on the field.
 import { describe, it, expect } from "vitest";
 import { stepSimulation } from "@/engine/CombatSystem";
+import { applyEffect, makeEffect } from "@/engine/StatusEffectSystem";
 import { battleState, place, makeDummy } from "./helpers";
 
 const playerBoar = (s: ReturnType<typeof battleState>) =>
@@ -53,5 +54,19 @@ describe("Hunter — Scatter Trap", () => {
 
     for (let i = 0; i < 4; i++) stepSimulation(s);
     expect(prey.effects.some((e) => e.type === "stun")).toBe(true);
+  });
+});
+
+describe("Hunter — stun suppresses upkeep", () => {
+  it("re-summons no boar and lays no traps while stunned", () => {
+    const s = battleState(5);
+    const hunter = place(s, "hunter", "player", 240, 600);
+    // A foe parked where a trap would land (~120px ahead) — it should stay unstunned.
+    const prey = makeDummy(place(s, "skeleton", "enemy", 240, 480));
+    applyEffect(hunter, makeEffect("stun", { source: "x", durationSec: 20 }));
+
+    for (let i = 0; i < 20; i++) stepSimulation(s);
+    expect(playerBoar(s)).toBeFalsy(); // no boar re-summon while stunned
+    expect(prey.effects.some((e) => e.type === "stun")).toBe(false); // no trap laid
   });
 });

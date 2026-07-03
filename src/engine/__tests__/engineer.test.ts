@@ -3,6 +3,7 @@
 // nearby turrets).
 import { describe, it, expect } from "vitest";
 import { stepSimulation, type SimState } from "@/engine/CombatSystem";
+import { applyEffect, makeEffect } from "@/engine/StatusEffectSystem";
 import { battleState, place, makeDummy } from "./helpers";
 
 const turretCount = (s: SimState) =>
@@ -38,6 +39,18 @@ describe("Engineer", () => {
 
     expect(eng.hp).toBeGreaterThan(eng.maxHp - 40); // self-repaired
     expect(turret.hp).toBeGreaterThan(turret.maxHp - 30); // turret repaired
+  });
+
+  it("stops Field Repairs while stunned (stun now punishes the fort)", () => {
+    const s = battleState(4);
+    const eng = place(s, "engineer", "player", 240, 600);
+    makeDummy(place(s, "skeleton", "enemy", 240, 420)); // deals no damage
+    eng.hp = eng.maxHp - 40; // wounded
+    applyEffect(eng, makeEffect("stun", { source: "x", durationSec: 20 }));
+    const hpBefore = eng.hp;
+
+    for (let i = 0; i < 60; i++) stepSimulation(s); // ~3s — would be repair ticks
+    expect(eng.hp).toBe(hpBefore); // no self-repair while stunned
   });
 
   it("respects the 9s Deploy cooldown (one turret per cooldown)", () => {

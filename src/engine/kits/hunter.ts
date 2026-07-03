@@ -1,18 +1,22 @@
 // Hunter (defId "hunter") — a legendary beastmaster ranged unit. Three mechanics:
 //   Boar Companion — keeps a live pet boar beside it; summons one at deploy and
-//                    re-summons ~8s after the boar dies (onTick, pre-gate — so a
-//                    stunned Hunter still keeps its boar, matching today).
+//                    re-summons ~8s after the boar dies (onTick).
 //   Scatter Trap   — lays a spread of ground traps ahead of it on a cooldown; any
 //                    enemy that later steps on one is stunned (onTick). The trap
 //                    TRIGGER stays generic plumbing in CombatSystem (over
 //                    state.traps); the kit only lays them via ctx.spawnTrap.
 //   Mend Beast     — an instant cast that lays a heal-over-time on its most-wounded
 //                    boar (fireAbility). Only fires when a boar is actually hurt.
-// The boar itself (guard-charge) is a summon still gated by defId in CombatSystem,
-// pending the shared charge-system refactor (with the Orc) — not this kit.
+// Its upkeep (boar re-summon + traps) is suppressed while incapacitated
+// (stun/fear/polymorph) — a balance dividend: stun stalls the Hunter's zoning.
+// The boar's own guard-charge lives in kits/boar.ts (migrated with the Orc).
 import type { Unit } from "@/types";
 import type { UnitKit } from "./UnitKit";
-import { applyEffect, makeEffect } from "../StatusEffectSystem";
+import {
+  applyEffect,
+  isIncapacitated,
+  makeEffect,
+} from "../StatusEffectSystem";
 import { FIELD_HEIGHT, FIELD_WIDTH, secToTicks } from "@/utils/constants";
 import { clamp } from "@/utils/math";
 
@@ -21,11 +25,11 @@ const SCATTER_TRAP_CD_SEC = 12; // between trap sets
 export const hunterKit: UnitKit = {
   roleClass: "ranged",
 
-  // Pre-gate maintenance: keep a boar alive, and lay traps on cooldown. Both run
-  // even while stunned (they land in the digest), matching the pre-refactor
-  // placement; the exact pre-gate spot is digest-irrelevant (spawns flush after
-  // the loop, traps trigger after movement).
+  // Upkeep: keep a boar alive, and lay traps on cooldown. Suppressed while
+  // incapacitated — a stunned/feared/sheeped Hunter re-summons no boar and lays no
+  // traps, and its re-summon/trap cooldowns freeze (the stun stalls it, not skips).
   onTick(unit, ctx) {
+    if (isIncapacitated(unit)) return;
     // Boar Companion: re-summon once no live boar remains (timer frozen while one
     // lives, so it starts at 0 and summons immediately at deploy).
     const hasBoar = ctx.allies.some((a) => a.defId === "boar");

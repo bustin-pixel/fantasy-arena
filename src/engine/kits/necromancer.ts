@@ -3,8 +3,9 @@
 // pipeline (onActTick) rather than using the shared one. Raise Dead is a separate
 // pre-gate passive (onTick).
 //   Raise Dead — every 5s it raises a skeleton beside it (onTick, synced to the
-//                GLOBAL tick so every Necromancer raises in lockstep). Pre-gate —
-//                fires even while stunned, matching the pre-refactor placement.
+//                GLOBAL tick so every Necromancer raises in lockstep). Suppressed
+//                while incapacitated (stun/fear/polymorph) — a balance dividend of
+//                the seam: stun is now a real answer to the summon pressure.
 //   Curse      — a heavy single-target DoT, saved for its long cooldown.
 //   Terrify    — an AoE fear when Curse is on cooldown and a foe is in reach.
 // Curse/Terrify share the cast bar. onActTick returns true so the engine bypasses
@@ -18,7 +19,12 @@ import {
   applyCurse,
   applyTerrify,
 } from "../AbilitySystem";
-import { isSilenced, isStealthed, isStunned } from "../StatusEffectSystem";
+import {
+  isIncapacitated,
+  isSilenced,
+  isStealthed,
+  isStunned,
+} from "../StatusEffectSystem";
 import { secToTicks } from "@/utils/constants";
 import { dist } from "@/utils/math";
 
@@ -83,10 +89,12 @@ function necroCast(unit: Unit, ctx: KitCtx): void {
 export const necromancerKit: UnitKit = {
   roleClass: "ranged",
 
-  // Raise Dead: every 5s, raise a skeleton beside the Necromancer. Synced to the
-  // GLOBAL tick (not a per-unit timer) so behavior is byte-identical to the old
-  // passive. Pre-gate — fires even while stunned; the summon cap gates the flush.
+  // Raise Dead: every 5s, raise a skeleton beside the Necromancer, synced to the
+  // GLOBAL tick (not a per-unit timer) so every Necromancer raises in lockstep.
+  // Suppressed while incapacitated — a stunned/feared/sheeped Necromancer stops
+  // raising (the summon cap still gates the flush of any raised this tick).
   onTick(unit, ctx) {
+    if (isIncapacitated(unit)) return;
     if (ctx.tick % secToTicks(RAISE_INTERVAL_SEC) === 0) {
       ctx.spawnUnit("skeleton", unit.team, {
         x: unit.pos.x,

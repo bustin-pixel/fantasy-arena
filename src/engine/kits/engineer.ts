@@ -1,7 +1,8 @@
 // Engineer (defId "engineer") — a legendary fortress-builder. Two mechanics:
 //   Field Repairs — every 2s, repairs itself and nearby friendly turrets, keeping
 //                   its emplacements alive longer than their raw HP suggests
-//                   (onTick, pre-gate — runs even while stunned, matching today).
+//                   (onTick). Suppressed while incapacitated (stun/fear/polymorph)
+//                   — a balance dividend: stun now stops the fort's self-sustain.
 //   Deploy Turret — an instant ability (9s cooldown) that builds a stationary
 //                   ranged turret beside it (a summoned, non-deck unit). Like the
 //                   Druid's wolves it's queued via spawnUnit; the per-team summon
@@ -10,6 +11,7 @@ import type { UnitKit } from "./UnitKit";
 import { getUnitDef } from "@/data/units";
 import { FIELD_HEIGHT, FIELD_WIDTH, secToTicks } from "@/utils/constants";
 import { clamp, dist } from "@/utils/math";
+import { isIncapacitated } from "../StatusEffectSystem";
 
 const REPAIR = 8;
 const REPAIR_RADIUS = 200;
@@ -18,11 +20,10 @@ const REPAIR_INTERVAL_SEC = 2;
 export const engineerKit: UnitKit = {
   roleClass: "ranged",
 
-  // Field Repairs: heal self + nearby turrets on the 2s cadence. Running in the
-  // pre-gate onTick slot (which fires immediately before the block's old spot)
-  // keeps it digest-neutral — nothing between reads the HP it writes; ctx.allies
-  // is the same live same-team set the old state.units scan produced.
+  // Field Repairs: heal self + nearby turrets on the 2s cadence. Suppressed while
+  // incapacitated — a stunned/feared/sheeped Engineer can't keep its fort patched.
   onTick(unit, ctx) {
+    if (isIncapacitated(unit)) return;
     if (ctx.tick % secToTicks(REPAIR_INTERVAL_SEC) !== 0) return;
     ctx.heal(unit, REPAIR);
     for (const ally of ctx.allies) {

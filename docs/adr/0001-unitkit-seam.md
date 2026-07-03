@@ -211,9 +211,11 @@ byte-identical. Hard units (5–8) only after 1–3 prove the pattern.
 - Determinism must be re-verified per commit — the digest is the gate, not a nicety.
 
 **Parked / follow-on (explicitly *not* part of this refactor)**
-- **First balance dividend:** *stun should suppress Raise Dead* (and likely Engineer repair,
-  Hunter traps). Post-refactor this is a one-line hook move (pre-gate `onTick` → post-gate),
-  its own commit + spec, with an intentional digest change. Captured as intent here.
+- **First balance dividend — ✅ SHIPPED:** *stun suppresses Raise Dead, Engineer repair, and
+  Hunter traps/boar re-summon*. Realized as predicted, in its own commit + spec (an intentional
+  behavior change). Rather than move the hooks to a new post-gate slot, each upkeep `onTick`
+  early-returns on a new `isIncapacitated(unit)` (stun/fear/polymorph — the same set the tick
+  loop's gates use) — same effect, less machinery, and matches the Boar guard-arm's guard.
 - `lightStacks`/`darkStacks` are really *stacking status effects* wearing bespoke-field
   clothes; a later refactor could model them as `ActiveStatusEffect`s. Per decision 5's
   opportunistic-flat fallback they stay **flat fields on the victim** (cross-unit state),
