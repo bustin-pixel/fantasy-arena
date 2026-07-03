@@ -2,6 +2,7 @@ import { useState } from "react";
 import { GameStateProvider, useGameState } from "@/state/GameStateContext";
 import { AppShell } from "@/screens/AppShell";
 import { BattleScreen } from "@/screens/BattleScreen";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import type { BattleMode } from "@/hooks/useBattleEngine";
 
 function Shell() {
@@ -33,10 +34,12 @@ function Shell() {
 
 export default function App() {
   return (
-    <GameStateProvider>
-      <div className="app-root">
-        <Shell />
-      </div>
-    </GameStateProvider>
+    <ErrorBoundary>
+      <GameStateProvider>
+        <div className="app-root">
+          <Shell />
+        </div>
+      </GameStateProvider>
+    </ErrorBoundary>
   );
 }
