@@ -55,3 +55,16 @@ describe("Trickster — Shadow Step (cast interrupt)", () => {
     expect(interrupted).toBe(true); // and the kick's stun interrupted the cast
   });
 });
+
+describe("Trickster — reveal on strike (onBeforeAttack)", () => {
+  it("starts the re-cloak timer when it swings at a foe", () => {
+    const s = battleState(3);
+    const trick = place(s, "trickster", "player", 240, 600);
+    makeDummy(place(s, "skeleton", "enemy", 240, 585)); // adjacent → it swings
+    expect(trick.recloakTimer).toBe(0);
+
+    for (let i = 0; i < 20 && trick.recloakTimer === 0; i++) stepSimulation(s);
+
+    expect(trick.recloakTimer).toBeGreaterThan(0); // onBeforeAttack fired on its strike
+  });
+});

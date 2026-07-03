@@ -34,7 +34,7 @@ import {
   stepSimulation,
   type SimState,
 } from "./CombatSystem";
-import { applyEffect, makeEffect } from "./StatusEffectSystem";
+import { getKit } from "./kits/UnitKit";
 import { WaveController } from "./WaveController";
 import { isMelee, getUnitDef } from "@/data/units";
 
@@ -177,15 +177,9 @@ export class MatchController {
     });
     this.state.units.push(unit);
 
-    // Opening stealth: the Assassin (Ambush), the Rogue, and the Trickster all enter
-    // the field stealthed (untargetable) until their first strike reveals them.
-    // Deploy is the only path onto the field, so apply it here.
-    if (unit.ability === "ambush" || unit.defId === "rogue" || unit.defId === "trickster") {
-      applyEffect(
-        unit,
-        makeEffect("stealth", { source: unit.uid, durationSec: MATCH_TIME_SEC })
-      );
-    }
+    // [seam] kit spawn hook (opening stealth for the Assassin/Rogue/Trickster rides
+    // their kits here).
+    getKit(defId)?.onSpawn?.(unit);
 
     // Mark the consumed deck index. For the player, deploy the selected card;
     // otherwise the first undeployed copy matching defId.
@@ -418,10 +412,10 @@ export class MatchController {
     | "ranged"
     | "support"
     | "assassin" {
-    if (def.ability === "mend") return "support";
-    if (def.ability === "ambush") return "assassin";
-    if (isMelee(def)) return "melee";
-    return "ranged";
+    // Every unit declares its tactical class on its kit now (support / assassin /
+    // melee / ranged). The geometric default is just a safety net for any kit-less
+    // unit that ever reaches here; the AI's matchup *opinions* stay in chooseEnemyCard.
+    return getKit(def.id)?.roleClass ?? (isMelee(def) ? "melee" : "ranged");
   }
 
   /**

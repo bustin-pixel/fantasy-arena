@@ -29,14 +29,6 @@ export const ABILITIES: Record<AbilityId, AbilityDef> = {
     description: "Leaps backward when a melee enemy closes in.",
     cooldown: 6,
   },
-  shield_block: {
-    id: "shield_block",
-    // Currently unused — no unit has this ability (Knight uses taunt_roar).
-    // Retained as reusable logic; see castShieldBlock in AbilitySystem.ts.
-    name: "Shield Block",
-    description: "Fully blocks the next incoming attack.",
-    cooldown: 2.5,
-  },
   taunt_roar: {
     id: "taunt_roar",
     name: "Taunting Roar",

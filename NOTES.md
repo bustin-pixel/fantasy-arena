@@ -39,69 +39,140 @@ The internal `id` and the player-facing `name` diverge here:
 These were renamed in the UI but kept their original ids so saved decks
 wouldn't break. **Always reference units by their `id`** (`"summoner"`,
 `"healer"`), never by the display name. Several pieces of engine logic key off
-the id literal (e.g. `unit.defId === "summoner"` triggers the bear transform).
+the id literal (e.g. the UnitKit registry maps `"summoner"` → the Druid's kit).
 If you ever add a unit, make the id match the name to avoid extending this trap.
 
 ### 2. Hardcoded unit-id checks in CombatSystem
-Special mechanics are gated by `defId` string literals in `CombatSystem.ts`:
-- `"summoner"` → Druid bear transform at 30% HP
-- `"ogre"` → Second Wind full-heal at 25% HP
-- `"berserker"` → Bloodrage damage/speed scaling + melee Cleave (AoE swing)
-- `"assassin"` → Vanish death-cheat
-- `"slime"` / `"slime_clone"` → split-on-damage and death explosion
-- `"aegis_knight"` → soaks magic into a shield, Backlash AoE, Warded (immune
-  to burn/slow/poison). Magic is identified by the source unit's `school: "magic"`
-  field (the casters) — see `isMagicSource` in CombatSystem.
-- `"engineer"` → Field Repairs (defId-gated periodic heal of itself + nearby
-  turrets). `"turret"` → stationary (moveSpeed 0) ranged construct, summoned via
-  Deploy Turret (a non-deck summon, like `skeleton`/`wolf`).
-- `"necromancer"` → custom cast handler (Curse DoT / Terrify fear on one cast bar,
-  see `stepNecromancerCast`) + Raise Dead, a periodic passive that summons a
-  skeleton every 5s.
-- `"rogue"` / `"trickster"` → opening stealth that reveals on first strike; the
-  Rogue's Venom poison-on-hit, the Trickster's Shadow Step (reactive cast-interrupt
-  blink) + re-cloak.
-- `"warrior"` → Whirlwind: its melee swing is replaced by an AoE spin — hits every
+**✅ MIGRATION COMPLETE** (`docs/adr/0001-unitkit-seam.md`): every unit's mechanics
+moved into one kit under `src/engine/kits/` (or, for the Fire/Ice riders, into
+`UnitDef` data) — **the whole list below is struck, and the cleanup shipped**: the
+`dispatchAbility` switch, `tryCastAbility`/`fireCastAbility`, `PASSIVE_ABILITIES` /
+`isActiveAbility`, the `AbilitySystem.wantsToCast` fallback, and `unitRoleClass`'s
+ability heuristic are all deleted. Whether a unit has an active cast is now "its kit
+defines `fireAbility`"; each kit declares its `roleClass`. Kept as engine plumbing
+(field-gated, not `defId`): `stepCharge`, `stepArcaneBarrage`, and the free
+`onProjectileHit` projectile resolver. All commits stayed digest-byte-identical.
+
+Formerly gated by `defId` string literals in `CombatSystem.ts` (all now migrated):
+- ~~`"summoner"` → Druid bear transform at 30% HP~~ — **migrated** to
+  `kits/druid.ts` (onTick bear transform + guard-timer countdown, onActTick
+  Rejuvenation, modifyIncomingHeal bear +50%, fireAbility Summon Wolves). First
+  `onActTick` user: the seam now fires **post-idle** (after the target-dead
+  idle-out, where an instant act needs a live target); the reactive **pre-idle**
+  slot (Blink / Shadow Step) is a reserved call site, wired when Arcane/Trickster
+  migrate.
+- ~~`"ogre"` → Second Wind full-heal at 25% HP~~ — **migrated** to `kits/ogre.ts`
+  (onDamaged + onWouldDie; Crushing Slam → fireAbility)
+- ~~`"berserker"` → Bloodrage damage/speed scaling + melee Cleave (AoE swing)~~ —
+  **migrated** to `kits/berserker.ts` (onTick Bloodrage, onWouldDie Last Stand,
+  onKill Bloodthirst, onAfterAttack Cleave)
+- ~~`"assassin"` → Vanish death-cheat~~ — **migrated** to `kits/assassin.ts`
+  (onSpawn opening stealth + onBeforeAttack Ambush + onWouldDie Vanish). First
+  `onSpawn` user — the hook is now wired in `MatchController.deploy` + the summon flush.
+- ~~`"slime"` / `"slime_clone"` → split-on-damage and death explosion~~ —
+  **migrated** to `kits/slime.ts` (onDamaged split → damageSpawns; onDeath burst)
+- ~~`"aegis_knight"` → soaks magic, Backlash AoE, Warded~~ — **migrated** to
+  `kits/aegisKnight.ts` (two-phase `modifyIncomingDamage` soak + `onDamaged` bank +
+  `onAfterAttack` Backlash; `isMagicSource` moved into the kit). **Warded is now
+  data-driven**: `UnitDef.wardedAgainst: StatusEffectType[]`, read in
+  `StatusEffectSystem.applyEffect` — a static resistance, like `school`/`lifesteal`.
+- ~~`"engineer"` → Field Repairs (defId-gated periodic heal of itself + nearby
+  turrets)~~ — **migrated** to `kits/engineer.ts` (onTick Field Repairs on the 2s
+  cadence + fireAbility Deploy Turret; covered by the digest guard via seeds
+  777/999). `"turret"` → stationary (moveSpeed 0) ranged construct, summoned via
+  Deploy Turret (a non-deck summon, like `skeleton`/`wolf`) — no kit of its own.
+- ~~`"necromancer"` → custom dual-cast (Curse DoT / Terrify fear on one cast bar) +
+  Raise Dead~~ — **migrated** to `kits/necromancer.ts` (onTick Raise Dead every 5s;
+  onActTick runs the dual Curse/Terrify cast bar). The Necromancer OWNS its cast
+  pipeline: its `onActTick` returns `true`, so the engine bypasses the standard
+  cast-handling chain (and locks the unit while `castTicks > 0`) — the mechanism
+  that lets `onActTick` serve both an instant act (Druid) and a full custom pipeline.
+  Added `ctx.tick` to the AbilityContext (Raise Dead is synced to the global tick).
+- ~~`"rogue"`~~ — **migrated** to `kits/rogue.ts` (onSpawn stealth + onBeforeAttack
+  reveal + onAfterAttack Venom).
+- ~~`"trickster"` → opening stealth + reveal-on-strike + re-cloak + Shadow Step~~ —
+  **migrated** to `kits/trickster.ts` (onSpawn stealth, onTick re-cloak, onBeforeAttack
+  reveal + re-cloak restart, **onReactTick** Shadow Step). Added the `onReactTick` hook
+  — the **pre-idle reactive act slot** (fires before the target-dead idle-out, so it
+  interrupts any nearby caster even when its own target just died), the first user of the
+  slot reserved at the Druid. (The Arcane Mage's Blink later joined this same seam —
+  `kits/arcaneMage.ts`.) The Trickster was the last stealther (Rogue
+  already migrated), so the deploy-stealth `defId` branch in `MatchController` is now gone.
+- ~~`"warrior"` → Whirlwind: its melee swing is replaced by an AoE spin — hits every
   enemy within melee reach (`range + radius`) for its damage and applies a
-  refreshing bleed (poison-type DoT, non-stacking). No lifesteal. `ability` slot is
-  the passive `whirlwind`.
-- `"ranger"` → Multishot: every second basic attack looses three arrows at once,
+  refreshing bleed (poison-type DoT, non-stacking)~~ — **migrated** to
+  `kits/warrior.ts` (onBasicAttack → true, replacing the swing with the spin + bleed;
+  no lifesteal). `ability` slot stays the passive `whirlwind`.
+- ~~`"ranger"` → Multishot: every second basic attack looses three arrows at once,
   each locked onto a different enemy in range (committed target + the two nearest
   others, nearest-first with a uid tiebreak). Against a lone foe only one arrow
-  spawns, so it's an anti-swarm spread. `ability` slot is the passive `multishot`.
-- `"mystic_archer"` → Light/Dark form-tagged shots + on-hit stack/detonate
-  resolution (`resolveMysticHit`), plus the Momentum passive: each form shift
-  adds a `momentumStacks` (capped at 5) that ramps attack speed +15%/shift up to
-  +75%. NOTE: its `ability` slot is `momentum` (the headline passive shown in the
-  UI); the Light/Dark mechanic is driven by `defId` + the `mystic_shift` projectile
-  tag, and is explained by the Light Form / Dark Form *traits* — there is no longer
-  a "Light & Dark" header in the UI.
-- `"zombie_shambler"` → Numbing Bite: every melee hit applies a 30% slow
-  (move + attack) for 2s. Depths monster, never in a deck.
-- `"bloater"` → Putrid Burst: on death it ruptures — 30 AoE damage + a poison
-  DoT to every enemy within 110px (same one-shot safety as the slime burst).
-  Depths tier-1 boss, never in a deck. (The Giant Rat is pure stats — no gate.)
-- `"arcane_mage"` → the Blink defensive teleport (own `blinkCooldown` field, 5s),
-  plus the Arcane Barrage volley streamer (`stepArcaneBarrage`): the active cast
-  (`castArcaneBarrage` in AbilitySystem) only *arms* a 3-shot burst locked onto one
-  target, and CombatSystem fires the missiles one at a time in quick succession via
-  the `barrageShots`/`barrageTimer`/`barrageTargetUid` fields. Basic attack is the
-  default ranged shot.
+  spawns, so it's an anti-swarm spread~~ — **migrated** to `kits/ranger.ts`
+  (onBasicAttack → true, the every-2nd-shot spread). `ability` slot stays the
+  passive `multishot`.
+- ~~`"mystic_archer"` → Light/Dark form-tagged shots + on-hit stack/detonate
+  resolution (`resolveMysticHit`) + Momentum~~ — **migrated** to
+  `kits/mysticArcher.ts` (onTick Momentum recompute, onBasicAttack form shot,
+  **onProjectileHit** Light/Dark stack+detonate+flip). Introduced the
+  `onProjectileHit` kit hook — the *code-hook* half of projectile-on-hit,
+  dispatched from `stepProjectiles` via the SOURCE unit's kit (keyed on the
+  `mystic_shift` tag; the Ice/Fire *data-descriptor* half stays deferred to
+  ADR-candidate 3). The Light/Dark stacks stay FLAT on the victim
+  (`lightStacks`/`darkStacks`) — cross-unit state kept flat per the ADR's
+  opportunistic fallback, not a `unit.kit` namespace. `ability` slot stays
+  `momentum` (the headline passive in the UI; still explained by the Light Form /
+  Dark Form *traits*).
+- ~~`"hunter"` → Boar Companion (auto-summon) + Scatter Trap laying + Mend Beast~~ —
+  **migrated** to `kits/hunter.ts` (onTick boar re-summon + trap laying via the new
+  `ctx.spawnTrap`; fireAbility Mend Beast). Added `spawnTrap` to the ctx spawn family;
+  the generic trap TRIGGER (stun on step-on) stays plumbing in CombatSystem over
+  `state.traps`. **The Boar is now migrated too** (`kits/boar.ts`, below).
+- ~~`"orc"` → Charge (arm) + `"boar"` → guard-charge (arm) + the `stepCharge`
+  contact effect (Orc slam / Boar taunt)~~ — **migrated** via a charge-system refactor:
+  `stepCharge` is now the shared, **defId-free** dash driver (field-gated on
+  `chargeTicks`, like `stepArcaneBarrage`); the kits arm the rush (`kits/orc.ts`
+  fireAbility / `kits/boar.ts` onTick, guarded to keep its old post-gate spot) and
+  resolve the impact via the new **`onChargeContact`** hook. Orc `castCharge` left the
+  dispatch switch. Guard-covered (Orc seed 20260626, Boar via the Hunter in 777/999);
+  `orc.test.ts` + `boar.test.ts` added.
+- ~~`"zombie_shambler"` → Numbing Bite~~ — **migrated** to `kits/zombieShambler.ts`
+  (onAfterAttack: 30% move+attack slow for 2s). First UnitKit migration.
+- ~~`"bloater"` → Putrid Burst: on death it ruptures — 30 AoE damage + a poison
+  DoT to every enemy within 110px (same one-shot safety as the slime burst)~~ —
+  **migrated** to `kits/bloater.ts` (onDeath, fired by the same seam as the Slime
+  burst; not in the digest guard, so `bloater.test.ts` is its safety net). Depths
+  tier-1 boss, never in a deck. (The Giant Rat is pure stats — no gate.)
+- ~~`"arcane_mage"` → the Blink defensive teleport + the Arcane Barrage arm~~ —
+  **migrated** to `kits/arcaneMage.ts` (onReactTick Blink on its own `blinkCooldown`;
+  fireAbility ARMS the 3-shot volley). The Arcane Barrage **streamer**
+  (`stepArcaneBarrage`, firing the queued missiles via `barrageShots`/`barrageTimer`/
+  `barrageTargetUid`) **stays in CombatSystem** — it's field-gated on `barrageShots`,
+  not `defId`, so like `stepCharge` it's engine plumbing the kit only arms (the same
+  split as the Hunter's traps). Basic attack is the default ranged shot.
+- ~~`"fire_mage"` / `"ice_mage"` → every-Nth-attack burn/freeze riders (the
+  `onHitStunSec`/`onHitBurn` projectile fields set via `defId` in performBasicAttack)~~
+  — **migrated**: the casts (`fireball`/`frost_blast`) moved to `kits/fireMage.ts` /
+  `kits/iceMage.ts` (fireAbility), and the riders became **pure `UnitDef` data**
+  (`basicShotRider: { everyNthAttack, rider }`, like `wardedAgainst`). The projectile now
+  carries a generic `rider: ShotRider` descriptor — the DATA half of projectile-on-hit
+  (the Mystic's `onProjectileHit` kit hook is the CODE half) — applied generically in
+  `stepProjectiles`. The `fireball`/`frost_blast` impacts still resolve in the shared
+  `onProjectileHit` resolver, keyed on the ability tag (like `arcane_barrage`). **This was
+  the last per-unit `defId` branch — the migration is complete.**
 
-This works but isn't data-driven. If the roster grows a lot, consider moving
-these into a per-unit "passive traits" field in the unit data so the engine
-loops over traits instead of hardcoding ids. Not urgent at current scale.
+This worked but wasn't data-driven — hence the UnitKit migration above (ADR
+0001), which replaces the "consider a per-unit passive-traits field" idea with
+one stateless kit per `defId` behind a seam.
 
 ### 3. Ability slot vs. passive properties
 `lifesteal` started as an *ability* but is now also a unit *property*
-(`def.lifesteal: number`). The Orc has `ability: "charge"` AND
-`lifesteal: 0.4`. The `PASSIVE_ABILITIES` set in `AbilitySystem.ts` lists
-abilities that never "cast" (`lifesteal`, `bloodrage`, `slime_split`,
-`mystic_shift`, `ambush`, `aegis`). When adding a passive ability, remember to add
-it to that set or the unit will waste cycles trying to cast nothing. (The Arcane
-Mage is an example of a unit with two abilities: an *active* ability slot —
-Arcane Barrage — plus a *second* ability, Blink, that runs off its own cooldown
-field.)
+(`def.lifesteal: number`). The Orc has `ability: "charge"` AND `lifesteal: 0.4`.
+**Passive vs. active is now decided by the kit, not an allowlist:** a unit has an
+active cast *iff* its kit defines `fireAbility`. The old `PASSIVE_ABILITIES` set /
+`isActiveAbility` footgun (remember-to-add-your-passive-or-it-wastes-cycles) is
+GONE — a passive unit simply has no `fireAbility`, so the cast seam skips it. (The
+Arcane Mage is an example of a unit with two abilities: an *active* slot — Arcane
+Barrage via `fireAbility` — plus a *second* one, Blink, that runs off its own
+`blinkCooldown` in `onReactTick`.)
 
 **The `lifesteal` filler convention is display-load-bearing:** summons and Depths
 monsters use `ability: "lifesteal"` as a "never casts" placeholder, and

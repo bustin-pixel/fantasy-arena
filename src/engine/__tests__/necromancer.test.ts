@@ -3,6 +3,7 @@
 // its long cooldown, otherwise Terrify). Each is exercised in isolation.
 import { describe, it, expect } from "vitest";
 import { stepSimulation } from "@/engine/CombatSystem";
+import { applyEffect, makeEffect } from "@/engine/StatusEffectSystem";
 import { battleState, place, makeDummy } from "./helpers";
 
 const playerSkeletons = (s: ReturnType<typeof battleState>) =>
@@ -17,6 +18,17 @@ describe("Necromancer — Raise Dead (passive summon)", () => {
 
     for (let i = 0; i < 230; i++) stepSimulation(s); // ~11.5s → two 5s ticks
     expect(playerSkeletons(s)).toBeGreaterThanOrEqual(2);
+  });
+
+  it("raises nothing while stunned (stun now answers the summon pressure)", () => {
+    const s = battleState(5);
+    const necro = place(s, "necromancer", "player", 240, 600);
+    makeDummy(place(s, "skeleton", "enemy", 240, 80)); // far, unkillable target
+    // Hold it stunned across the raise-ticks it would otherwise hit.
+    applyEffect(necro, makeEffect("stun", { source: "x", durationSec: 20 }));
+
+    for (let i = 0; i < 230; i++) stepSimulation(s); // ~11.5s — two 5s raise-ticks
+    expect(playerSkeletons(s)).toBe(0); // every raise suppressed by the stun
   });
 });
 

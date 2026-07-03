@@ -30,7 +30,6 @@ import {
   FIELD_WIDTH,
   FLOAT_TEXT_TICKS,
   HIT_FLASH_TICKS,
-  MATCH_TIME_SEC,
   MAX_ACTIVE_UNITS_PER_SIDE,
   MAX_EFFECTS,
   MAX_PROJECTILES,
@@ -43,16 +42,11 @@ import { createUnit } from "@/entities/createUnit";
 import {
   abilityCastTimeTicks,
   abilityCooldownTicks,
-  applyCurse,
   applyLifesteal,
-  applyRejuvenation,
-  applyTerrify,
-  fireCastAbility,
   onProjectileHit,
-  tryCastAbility,
-  wantsToCast,
   type AbilityContext,
 } from "./AbilitySystem";
+import { getKit, type KitCtx } from "./kits/UnitKit";
 import { stepMovement } from "./MovementSystem";
 import { updateTarget } from "./TargetingSystem";
 import {
@@ -62,7 +56,6 @@ import {
   isFeared,
   isPolymorphed,
   isSilenced,
-  isStealthed,
   isStunned,
   makeEffect,
   tickEffects,
@@ -124,17 +117,14 @@ function nextId(state: SimState, prefix: string): string {
 // HP mutation helpers — the ONLY places hp changes.
 // ---------------------------------------------------------------------------
 
-/** True if the damage comes from a magic-school unit (the casters). */
-function isMagicSource(source: Unit): boolean {
-  return getUnitDef(source.defId).school === "magic";
-}
-
-/** Cap on the Aegis Knight's banked magic shield; also its Backlash threshold. */
-const AEGIS_SHIELD_CAP = 120;
-
-function makeDamageDealer(state: SimState) {
+function makeDamageDealer(
+  state: SimState,
+  makeKitCtx: (subject: Unit, damageContext?: boolean) => KitCtx
+) {
   return function dealDamage(target: Unit, amount: number, source: Unit): void {
     if (target.state === "dead") return;
+
+    const kit = getKit(target.defId);
 
     // Shield fully blocks a single hit.
     if (tryConsumeShield(target)) {
@@ -143,14 +133,12 @@ function makeDamageDealer(state: SimState) {
       return;
     }
 
-    // Aegis Knight soaks magic: most of a magic hit is banked as overhealth
-    // shield (applied after, so it doesn't absorb this same hit) — only a sliver
-    // leaks through as HP damage.
+    // [seam] kit incoming-damage modifier (open contract 1): reduce the hit before
+    // HP is applied (Aegis magic soak → 0.25x). Identity while un-migrated; the
+    // post-hit shield bank rides onDamaged below.
     let effAmount = amount;
-    let aegisBank = 0;
-    if (amount > 0 && target.defId === "aegis_knight" && isMagicSource(source)) {
-      effAmount = amount * 0.25;
-      aegisBank = Math.round(amount * 0.6);
+    if (amount > 0 && kit?.modifyIncomingDamage) {
+      effAmount = kit.modifyIncomingDamage(target, effAmount, source, makeKitCtx(target, true));
     }
 
     let dmg = Math.max(0, Math.round(effAmount * target.damageTakenMult));
@@ -168,125 +156,36 @@ function makeDamageDealer(state: SimState) {
     target.attackedByUid = source.uid;
     spawnFloatingText(state, target, `-${Math.round(effAmount * target.damageTakenMult)}`, "damage");
 
-    // Bank the absorbed magic into the Aegis shield (capped), after the hit.
-    if (aegisBank > 0 && target.hp > 0) {
-      target.shieldHpMax = AEGIS_SHIELD_CAP;
-      target.shieldHp = Math.min(AEGIS_SHIELD_CAP, target.shieldHp + aegisBank);
+    // [seam] kit post-hit reaction on a surviving target — gets the ORIGINAL
+    // incoming amount (Slime split reads hp thresholds; the Aegis magic bank needs
+    // the pre-mitigation hit). Slime split → kits/slime.ts; Aegis bank → aegisKnight.ts.
+    if (kit?.onDamaged && target.hp > 0) {
+      kit.onDamaged(target, amount, source, makeKitCtx(target, true));
     }
 
-    // Slime Split: the ORIGINAL slime spawns a weaker clone each time its health
-    // crosses a 25% threshold (at 75%, 50%, 25% remaining → up to 3 clones).
-    // Clones (defId "slime_clone") are terminal and never split.
-    if (target.defId === "slime" && target.hp > 0) {
-      // How many 25% thresholds have been crossed so far.
-      const thresholdsCrossed = Math.floor((1 - target.hp / target.maxHp) / 0.25);
-      const wantSplits = Math.min(3, thresholdsCrossed);
-      while (target.splitsSpawned < wantSplits) {
-        target.splitsSpawned++;
-        const side = target.splitsSpawned % 2 === 0 ? 1 : -1;
-        state.damageSpawns.push({
-          defId: "slime_clone",
-          team: target.team,
-          pos: {
-            x: target.pos.x + side * 30,
-            y: target.pos.y + 20,
-          },
-        });
-        spawnVfx(state, {
-          kind: "frost",
-          pos: { x: target.pos.x, y: target.pos.y },
-          life: secToTicks(0.3),
-          maxLife: secToTicks(0.3),
-          color: getUnitDef(target.defId).accent,
-        });
-      }
-    }
-
-    // Ogre Second Wind: the first time a hit drops it to/below 25% HP (even a
-    // lethal one), it surges back to full instead. Once per match. A tank that
-    // refuses to fall the first time.
-    if (
-      target.defId === "ogre" &&
-      !target.secondWindUsed &&
-      target.hp <= target.maxHp * 0.25
-    ) {
-      target.secondWindUsed = true;
-      target.hp = target.maxHp;
-      spawnFloatingText(state, target, "Second Wind!", "heal");
-      spawnVfx(state, {
-        kind: "shield_pop",
-        pos: { x: target.pos.x, y: target.pos.y - 4 },
-        life: secToTicks(0.7),
-        maxLife: secToTicks(0.7),
-        color: "#fbbf24",
-      });
-      return; // survived this blow at full HP
-    }
+    // (Ogre Second Wind now lives in its kit — kits/ogre.ts. onDamaged catches a
+    // non-lethal hit that crosses 25%; onWouldDie below catches the lethal one.)
 
     if (target.hp <= 0) {
+      // [seam] kit death veto (open contract 3): runs BEFORE the generic
+      // death_immune check, matching today's order. If the kit kept the unit
+      // alive (Ogre Second Wind / Vanish / Last Stand), the hit is fully handled.
+      if (kit?.onWouldDie && kit.onWouldDie(target, source, makeKitCtx(target, true))) {
+        return;
+      }
       // Death-immunity window (e.g. Assassin's Vanish): clamp to 1 HP and survive.
+      // (Vanish + Berserker Last Stand now live in their kits' onWouldDie, above.)
       if (hasEffect(target, "death_immune")) {
         target.hp = 1;
-      } else if (target.defId === "assassin" && !target.vanishUsed) {
-        // Vanish: the first lethal blow doesn't kill. The assassin survives at
-        // 1 HP and becomes untargetable (stealth) + immune to death for 2.5s so
-        // it can slip away.
-        target.vanishUsed = true;
-        target.hp = 1;
-        applyEffect(
-          target,
-          makeEffect("death_immune", { source: target.uid, durationSec: 2.5 })
-        );
-        applyEffect(
-          target,
-          makeEffect("stealth", { source: target.uid, durationSec: 2.5 })
-        );
-        target.attackedByUid = null;
-        spawnFloatingText(state, target, "Vanish!", "heal");
-        spawnVfx(state, {
-          kind: "death",
-          pos: { x: target.pos.x, y: target.pos.y },
-          life: secToTicks(0.5),
-          maxLife: secToTicks(0.5),
-          color: getUnitDef(target.defId).accent,
-        });
-      } else if (target.defId === "berserker" && !target.lastStandUsed) {
-        // Berserker Last Stand: once per life, a killing blow leaves it at 1 HP and
-        // unkillable for 5s. Unlike Vanish it does NOT stealth — it stays in the
-        // fight, and its kill-heal can claw HP back before the window closes.
-        target.lastStandUsed = true;
-        target.hp = 1;
-        applyEffect(
-          target,
-          makeEffect("death_immune", { source: target.uid, durationSec: 5 })
-        );
-        spawnFloatingText(state, target, "Last Stand!", "heal");
-        spawnVfx(state, {
-          kind: "slam",
-          pos: { x: target.pos.x, y: target.pos.y },
-          life: secToTicks(0.5),
-          maxLife: secToTicks(0.5),
-          color: getUnitDef(target.defId).accent,
-        });
       } else {
         transitionTo(target, "dead");
         target.targetUid = null;
 
-        // Berserker Bloodthirst: landing a killing blow restores 5% of its max
-        // HP. Fires per kill (a Cleave that drops several foes heals several
-        // times), feeding the Last Stand comeback.
-        if (
-          source.defId === "berserker" &&
-          source !== target &&
-          source.state !== "dead"
-        ) {
-          const before = source.hp;
-          source.hp = Math.min(
-            source.maxHp,
-            source.hp + Math.round(source.maxHp * 0.05)
-          );
-          const gained = source.hp - before;
-          if (gained > 0) spawnFloatingText(state, source, `+${gained}`, "heal");
+        // [seam] kit on-kill reaction on the KILLER (Berserker Bloodthirst now
+        // lives in kits/berserker.ts onKill, healing through the funnel).
+        const srcKit = getKit(source.defId);
+        if (srcKit?.onKill && source !== target && source.state !== "dead") {
+          srcKit.onKill(source, target, makeKitCtx(source, true));
         }
 
         spawnVfx(state, {
@@ -297,67 +196,32 @@ function makeDamageDealer(state: SimState) {
           color: getUnitDef(target.defId).color,
         });
 
-        // Bloater Putrid Burst: on death it ruptures — AoE damage plus a
-        // lingering poison on every nearby enemy. Same one-shot safety as the
-        // slime burst (a unit only dies once).
-        if (target.defId === "bloater") {
-          const CLOUD_RADIUS = 110;
-          const CLOUD_DMG = 30;
-          for (const u of state.units) {
-            if (u.state === "dead" || u.team === target.team) continue;
-            if (dist(target.pos, u.pos) <= CLOUD_RADIUS) {
-              dealDamage(u, CLOUD_DMG, target);
-              applyEffect(
-                u,
-                makeEffect("poison", {
-                  source: target.uid,
-                  durationSec: 4,
-                  damagePerTick: 4,
-                  tickIntervalSec: 0.5,
-                })
-              );
-            }
-          }
-          spawnVfx(state, {
-            kind: "slam",
-            pos: { x: target.pos.x, y: target.pos.y },
-            life: secToTicks(0.6),
-            maxLife: secToTicks(0.6),
-            color: getUnitDef(target.defId).accent,
-          });
-        }
+        // [seam] kit on-death reaction on the victim (Bloater / Slime burst —
+        // may re-enter dealDamage; the makeKitCtx(damageContext) summon queue
+        // keeps any spawned clones on the same-tick flush).
+        if (kit?.onDeath) kit.onDeath(target, makeKitCtx(target, true));
 
-        // Slime death-burst: any slime (original or clone) explodes on death,
-        // dealing AoE damage to nearby ENEMIES. Chain reactions are intentional
-        // and safe — a unit only dies (and thus explodes) once.
-        if (target.defId === "slime" || target.defId === "slime_clone") {
-          const BURST_RADIUS = 90;
-          const BURST_DMG = target.defId === "slime" ? 40 : 20;
-          for (const u of state.units) {
-            if (u.state === "dead" || u.team === target.team) continue;
-            if (dist(target.pos, u.pos) <= BURST_RADIUS) {
-              dealDamage(u, BURST_DMG, target);
-            }
-          }
-          spawnVfx(state, {
-            kind: "slam",
-            pos: { x: target.pos.x, y: target.pos.y },
-            life: secToTicks(0.45),
-            maxLife: secToTicks(0.45),
-            color: getUnitDef(target.defId).accent,
-          });
-        }
+        // (Bloater Putrid Burst + Slime death-burst now live in their kits'
+        // onDeath, fired by the onDeath seam above; both re-enter dealDamage via
+        // ctx.dealDamage on the same-tick damage funnel.)
       }
     }
   };
 }
 
-function makeHealer(state: SimState) {
+function makeHealer(
+  state: SimState,
+  makeKitCtx: (subject: Unit, damageContext?: boolean) => KitCtx
+) {
   return function heal(target: Unit, amount: number): void {
     if (target.state === "dead" || amount <= 0) return;
-    // Bear Form: the Druid receives 50% more healing while transformed.
-    const amt =
-      target.defId === "summoner" && target.transformed ? amount * 1.5 : amount;
+    const kit = getKit(target.defId);
+    // [seam] kit incoming-heal modifier (Druid bear form 1.5x). Identity while
+    // un-migrated.
+    let amt = amount;
+    if (kit?.modifyIncomingHeal) {
+      amt = kit.modifyIncomingHeal(target, amount, makeKitCtx(target, true));
+    }
     const before = target.hp;
     target.hp = Math.min(target.maxHp, target.hp + Math.round(amt));
     const gained = target.hp - before;
@@ -403,36 +267,15 @@ function transitionTo(unit: Unit, next: Unit["state"]): void {
   unit.state = next;
 }
 
-// Druid -> Bear. One-way shapeshift into a melee bruiser. Its thick hide gives
-// 80% damage reduction, but only for the first 5s (then it's a normal-toughness
-// brawler). It keeps its caster kit — still summons wolves and Rejuvenates.
-function transformDruid(state: SimState, unit: Unit): void {
-  unit.transformed = true;
-  unit.range = 48; // melee
-  unit.damage = 26; // bigger claws
-  unit.attackSpeed = 1.1; // faster than caster form
-  unit.moveSpeed = 78; // charges in
-  unit.damageTakenMult = 0.2; // thick hide — takes only 20% damage…
-  unit.bearGuardTimer = secToTicks(5); // …for 5s, then reverts to normal
-  unit.abilityCooldown = 0; // keeps summoning as a bear
-  unit.attackCooldown = 0;
-  // Burst of leaves/spirit energy on transform.
-  spawnVfx(state, {
-    kind: "shield_pop",
-    pos: { x: unit.pos.x, y: unit.pos.y - 4 },
-    life: secToTicks(0.6),
-    maxLife: secToTicks(0.6),
-    color: "#a3e635",
-  });
-  spawnFloatingText(state, unit, "Bear Form!", "heal");
-}
+// (Druid -> Bear shapeshift now lives in kits/druid.ts onTick — the pre-gate
+// maintenance slot, together with its guard-timer countdown.)
 
 // Orc Charge speed — well above any unit's normal moveSpeed so the rush reads as
 // a fast lunge that quickly closes the gap, without being an instant teleport.
 const CHARGE_SPEED = 340; // px/sec
 
-// Hunter Scatter Trap tuning.
-const SCATTER_TRAP_CD_SEC = 12; // between trap sets
+// Hunter Scatter Trap tuning. (The lay-cadence, SCATTER_TRAP_CD_SEC, now lives in
+// kits/hunter.ts; these two drive the generic trap TRIGGER, still in this file.)
 const TRAP_STUN_SEC = 7; // how long a caught unit is held
 const TRAP_RADIUS = 26; // how close a foe must step to trigger it
 
@@ -440,15 +283,12 @@ const TRAP_RADIUS = 26; // how close a foe must step to trigger it
 // target at CHARGE_SPEED and slams on contact (bonus damage + brief stun). This
 // owns the unit's movement for the duration (MovementSystem skips charging units)
 // so the dash can't be double-applied. Fully deterministic — no randomness.
-function stepCharge(
-  state: SimState,
-  unit: Unit,
-  byUid: Map<string, Unit>,
-  dealDamage: (target: Unit, amount: number, source: Unit) => void
-): void {
+function stepCharge(unit: Unit, ctx: KitCtx): void {
   unit.chargeTicks--;
 
-  const target = unit.chargeTargetUid ? byUid.get(unit.chargeTargetUid) : null;
+  const target = unit.chargeTargetUid
+    ? ctx.unitsByUid.get(unit.chargeTargetUid)
+    : null;
   if (!target || target.state === "dead") {
     // Target gone — abandon the charge and resume normal AI next tick.
     unit.chargeTicks = 0;
@@ -463,23 +303,10 @@ function stepCharge(
   const d = dist(unit.pos, target.pos);
 
   if (d <= contact) {
-    if (unit.defId === "boar") {
-      // Boar guard: on contact, taunt the target onto itself (charge, then taunt).
-      applyEffect(
-        target,
-        makeEffect("taunt", { source: unit.uid, durationSec: 2.5 })
-      );
-      target.tauntedByUid = unit.uid;
-      target.targetUid = unit.uid;
-    } else {
-      // Orc: slam for bonus damage and a short stagger.
-      dealDamage(target, 22, unit);
-      applyEffect(
-        target,
-        makeEffect("stun", { source: unit.uid, durationSec: 0.8 })
-      );
-    }
-    spawnVfx(state, {
+    // [seam] the kit resolves the on-contact effect (Orc slam / Boar taunt); the
+    // driver stays defId-free. Field-gated on chargeTicks, like stepArcaneBarrage.
+    getKit(unit.defId)?.onChargeContact?.(unit, target, ctx);
+    ctx.spawnVfx({
       kind: "slam",
       pos: { x: target.pos.x, y: target.pos.y },
       life: secToTicks(0.4),
@@ -504,10 +331,11 @@ function stepCharge(
   if (unit.chargeTicks <= 0) unit.chargeTargetUid = null;
 }
 
-// Arcane Mage: Arcane Barrage volley. The active cast (castArcaneBarrage) arms a
-// 3-shot burst locked onto one target; this fires the missiles one at a time in
-// quick succession so they stream out rather than all leaving at once. Runs every
-// tick while a volley is queued; the locked target is held for the whole volley.
+// Arcane Mage: Arcane Barrage volley. The kit's fireAbility (kits/arcaneMage.ts)
+// arms a 3-shot burst locked onto one target; this streamer fires the missiles one
+// at a time in quick succession so they leave in sequence rather than all at once.
+// Field-gated on barrageShots (not defId) — like stepCharge, it stays engine
+// plumbing while the kit only arms it. Runs every tick while a volley is queued.
 const ARCANE_MISSILE_DAMAGE = 12;
 const ARCANE_VOLLEY_GAP = 2; // ticks between consecutive missiles (~0.15s)
 
@@ -543,159 +371,16 @@ function stepArcaneBarrage(
   unit.barrageTimer = unit.barrageShots > 0 ? ARCANE_VOLLEY_GAP : 0;
 }
 
-// Arcane Mage: Blink. An instant defensive teleport (not a dash) away from the
-// nearest melee attacker that has closed in. Reactive and on its own cooldown,
-// so it's independent of the unit's active ability (Arcane Barrage).
-function tryBlink(state: SimState, unit: Unit, enemies: Unit[]): boolean {
-  const threatRange = unit.radius * 2.6;
-  let threat: Unit | null = null;
-  let bestD = Infinity;
-  for (const e of enemies) {
-    if (e.state === "dead") continue;
-    if (isStealthed(e)) continue; // can't blink away from an unseen attacker
-    if (getUnitDef(e.defId).range > 80) continue; // only melee threats trigger Blink
-    const d = dist(unit.pos, e.pos);
-    if (d <= threatRange && d < bestD) {
-      bestD = d;
-      threat = e;
-    }
-  }
-  if (!threat) return false;
+// (Arcane Mage Blink now lives in kits/arcaneMage.ts onReactTick — the pre-idle
+// reactive teleport away from a closing melee threat, on its own blinkCooldown.)
 
-  let away = dir(threat.pos, unit.pos);
-  // Degenerate case (threat exactly overlapping): retreat toward own side.
-  if (away.x === 0 && away.y === 0) {
-    away = { x: 0, y: unit.team === "player" ? -1 : 1 };
-  }
-  const BLINK = 170;
-  unit.pos.x = clamp(unit.pos.x + away.x * BLINK, unit.radius, FIELD_WIDTH - unit.radius);
-  unit.pos.y = clamp(unit.pos.y + away.y * BLINK, unit.radius, FIELD_HEIGHT - unit.radius);
-  spawnVfx(state, {
-    kind: "frost",
-    pos: { x: unit.pos.x, y: unit.pos.y },
-    life: secToTicks(0.3),
-    maxLife: secToTicks(0.3),
-    color: getUnitDef(unit.defId).accent,
-  });
-  return true;
-}
+// (Trickster Shadow Step + its tuning now live in kits/trickster.ts — onReactTick
+// blinks to a nearby casting enemy and kicks/interrupts it, in the pre-idle
+// reactive act slot.)
 
-// Trickster tuning. Shadow Step is a reactive interrupt: a large reaction radius
-// so it polices casts across most of the board, a short interrupting stun, light
-// damage (its value is denial, not burst), and a cooldown so casters can bait it.
-const TRICKSTER_REACH = 400;
-const TRICKSTER_KICK_DAMAGE = 20;
-const TRICKSTER_STUN_SEC = 0.75;
-const TRICKSTER_COOLDOWN_SEC = 6;
-const TRICKSTER_RECLOAK_SEC = 1.5;
-
-// Trickster: Shadow Step. When an enemy within reach begins a cast, blink to it and
-// kick — the stun interrupts the cast (the cast-fizzle rule handles the actual
-// cancel when the stunned victim is processed). Reactive, on its own cooldown.
-function tryShadowStep(
-  state: SimState,
-  unit: Unit,
-  enemies: Unit[],
-  dealDamage: (t: Unit, amt: number, s: Unit) => void
-): boolean {
-  let victim: Unit | null = null;
-  let bestD = Infinity;
-  for (const e of enemies) {
-    if (e.state === "dead" || e.castTicks <= 0) continue; // only mid-cast foes
-    if (isStealthed(e)) continue; // can't react to an unseen caster
-    const d = dist(unit.pos, e.pos);
-    if (d <= TRICKSTER_REACH && d < bestD) {
-      bestD = d;
-      victim = e;
-    }
-  }
-  if (!victim) return false;
-
-  // Land just short of the victim, along the line of approach.
-  let toward = dir(unit.pos, victim.pos);
-  if (toward.x === 0 && toward.y === 0) {
-    toward = { x: 0, y: unit.team === "player" ? -1 : 1 };
-  }
-  const standoff = unit.radius + victim.radius - 4;
-  unit.pos.x = clamp(victim.pos.x - toward.x * standoff, unit.radius, FIELD_WIDTH - unit.radius);
-  unit.pos.y = clamp(victim.pos.y - toward.y * standoff, unit.radius, FIELD_HEIGHT - unit.radius);
-  unit.facing = victim.pos.x >= unit.pos.x ? 1 : -1;
-
-  // Kick: light damage + a short stun (the stun fizzles the in-flight cast).
-  dealDamage(victim, TRICKSTER_KICK_DAMAGE, unit);
-  applyEffect(victim, makeEffect("stun", { source: unit.uid, durationSec: TRICKSTER_STUN_SEC }));
-
-  // Revealed by the strike; start the re-cloak countdown so it vanishes again.
-  unit.effects = unit.effects.filter((e) => e.type !== "stealth");
-  unit.recloakTimer = secToTicks(TRICKSTER_RECLOAK_SEC);
-
-  spawnVfx(state, {
-    kind: "slam",
-    pos: { x: victim.pos.x, y: victim.pos.y },
-    life: secToTicks(0.4),
-    maxLife: secToTicks(0.4),
-    color: getUnitDef(unit.defId).accent,
-  });
-  return true;
-}
-
-// Necromancer casting. It juggles two casts on one cast bar, so it's handled
-// here instead of the shared mage pipeline: its big Curse (long cooldown) when
-// ready, otherwise Terrify. Raise Dead is a separate passive (periodic spawn).
-// Cast times + cooldowns come from the ability data (curse / fear_aura) so the
-// engine and the detail panel never drift.
-const NECRO_FEAR_REACH = 210; // a foe must be roughly within Terrify's range to bother
-
-function necroHasFearTarget(unit: Unit, enemies: Unit[]): boolean {
-  return enemies.some(
-    (e) =>
-      e.state !== "dead" &&
-      !isStealthed(e) &&
-      dist(unit.pos, e.pos) <= NECRO_FEAR_REACH
-  );
-}
-
-/** Returns true while the Necromancer is busy casting (caller should skip the
- *  rest of its tick). A finished cast fires Curse (castTargetUid set → DoT a
- *  target) or Terrify (castTargetUid null → AoE fear). */
-function stepNecromancerCast(state: SimState, ctx: AbilityContext): boolean {
-  const unit = ctx.unit;
-
-  if (unit.castTicks > 0) {
-    unit.castTicks--;
-    if (unit.castTicks <= 0) {
-      if (unit.castTargetUid) applyCurse(ctx);
-      else applyTerrify(ctx);
-      unit.castTicksMax = 0;
-      unit.castTargetUid = null;
-      return false; // free to basic-attack the rest of the tick
-    }
-    transitionTo(unit, "casting");
-    return true;
-  }
-
-  if (isStunned(unit) || isSilenced(unit)) return false;
-  const target = unit.targetUid ? ctx.unitsByUid.get(unit.targetUid) : null;
-
-  // Curse first (saved for its long cooldown), then Terrify.
-  if (unit.curseCooldown <= 0 && target && target.state !== "dead") {
-    unit.castTicks = abilityCastTimeTicks("curse");
-    unit.castTicksMax = unit.castTicks;
-    unit.castTargetUid = target.uid;
-    unit.curseCooldown = abilityCooldownTicks("curse");
-    transitionTo(unit, "casting");
-    return true;
-  }
-  if (unit.abilityCooldown <= 0 && necroHasFearTarget(unit, ctx.enemies)) {
-    unit.castTicks = abilityCastTimeTicks("fear_aura");
-    unit.castTicksMax = unit.castTicks;
-    unit.castTargetUid = null; // AoE → Terrify on completion
-    unit.abilityCooldown = abilityCooldownTicks("fear_aura");
-    transitionTo(unit, "casting");
-    return true;
-  }
-  return false;
-}
+// (Necromancer casting — the dual Curse/Terrify cast bar — now lives in
+// kits/necromancer.ts onActTick, which returns true so the engine bypasses its
+// standard cast-handling chain. Raise Dead moved to that kit's onTick.)
 
 // ---------------------------------------------------------------------------
 // Main tick
@@ -709,8 +394,53 @@ export function stepSimulation(state: SimState): void {
   const living = state.units.filter((u) => u.state !== "dead");
   const byUid = new Map(state.units.map((u) => [u.uid, u]));
 
-  const dealDamage = makeDamageDealer(state);
-  const heal = makeHealer(state);
+  // Units summoned this tick are queued here and flushed after the AI loop, so we
+  // never mutate the array we're iterating. Hoisted above the funnel so the kit
+  // context builder can route a kit's ability-driven summons into this queue.
+  const pendingSpawns: {
+    defId: string;
+    team: Unit["team"];
+    pos: { x: number; y: number };
+  }[] = [];
+
+  // The single HP funnel, forward-declared so makeKitCtx (which a kit hook fired
+  // from *inside* dealDamage/heal captures) can reference them. Both are assigned
+  // immediately below, before any tick logic — and thus any hook — runs.
+  let dealDamage!: (target: Unit, amount: number, source: Unit) => void;
+  let heal!: (target: Unit, amount: number) => void;
+
+  // Build the context a kit hook receives. `damageContext` routes a kit's summons
+  // to the same-tick damageSpawns queue (on-damage / on-death hooks re-enter the
+  // funnel); otherwise they join pendingSpawns like ability-driven summons. Only
+  // ever invoked from a guarded call site, so it costs nothing while no unit is
+  // migrated (the registry is empty).
+  const makeKitCtx = (subject: Unit, damageContext = false): KitCtx => {
+    const liveNow = state.units.filter((u) => u.state !== "dead");
+    return {
+      unit: subject,
+      tick: state.tick,
+      unitsByUid: byUid,
+      enemies: liveNow.filter((e) => e.team !== subject.team),
+      allies: liveNow.filter(
+        (a) => a.team === subject.team && a.uid !== subject.uid
+      ),
+      dealDamage,
+      heal,
+      spawnProjectile: (p) => spawnProjectile(state, p),
+      spawnVfx: (v) => spawnVfx(state, v),
+      spawnUnit: (defId, team, pos) =>
+        (damageContext ? state.damageSpawns : pendingSpawns).push({
+          defId,
+          team,
+          pos,
+        }),
+      spawnTrap: (t) => state.traps.push(t),
+      spawnFloatingText: (u, v, k) => spawnFloatingText(state, u, v, k),
+    };
+  };
+
+  dealDamage = makeDamageDealer(state, makeKitCtx);
+  heal = makeHealer(state, makeKitCtx);
 
   // 1. Status effect timers + DoT / HoT.
   const { dots, hots } = tickEffects(living);
@@ -740,14 +470,8 @@ export function stepSimulation(state: SimState): void {
     }
   }
 
-  // 2 & 3 & 4. Per-unit AI / state machine.
-  // Units summoned this tick are queued and added after the loop, so we never
-  // mutate the array we're iterating.
-  const pendingSpawns: {
-    defId: string;
-    team: Unit["team"];
-    pos: { x: number; y: number };
-  }[] = [];
+  // 2 & 3 & 4. Per-unit AI / state machine. (pendingSpawns is declared above the
+  // funnel so the kit context builder can queue ability-driven summons into it.)
   for (const unit of alive) {
     // Cooldowns always tick down.
     if (unit.attackCooldown > 0) unit.attackCooldown--;
@@ -757,89 +481,32 @@ export function stepSimulation(state: SimState): void {
     if (unit.curseCooldown > 0) unit.curseCooldown--;
     if (unit.rejuvCooldown > 0) unit.rejuvCooldown--;
 
-    // Bear Form's 80% damage reduction lasts 5s, then the bear reverts to normal
-    // toughness. (Only the transformed Druid ever sets bearGuardTimer.)
-    if (unit.bearGuardTimer > 0) {
-      unit.bearGuardTimer--;
-      if (unit.bearGuardTimer === 0) unit.damageTakenMult = 1;
+    // (Bear Form's guard-timer countdown now lives in kits/druid.ts onTick — the
+    // pre-gate maintenance slot, decremented before the transform check.)
+
+    // (Trickster re-cloak countdown now lives in kits/trickster.ts onTick — the
+    // pre-gate maintenance slot.)
+
+    // [seam] kit pre-gate maintenance slot — runs every tick, even while stunned
+    // (periodic passives, per-tick stat recompute, threshold transforms). This is
+    // where Field Repairs / Raise Dead / boar+trap / bloodrage / momentum / bear
+    // transform migrate. Placement is behavior-defining once units move here, so
+    // each migration re-verifies digest().
+    {
+      const kit = getKit(unit.defId);
+      if (kit?.onTick) kit.onTick(unit, makeKitCtx(unit));
     }
 
-    // Trickster re-cloak: a beat after it last struck, it melts back into stealth.
-    // (Only the Trickster ever sets recloakTimer, so no defId gate is needed.)
-    if (unit.recloakTimer > 0) {
-      unit.recloakTimer--;
-      if (unit.recloakTimer === 0 && !isStealthed(unit)) {
-        applyEffect(
-          unit,
-          makeEffect("stealth", { source: unit.uid, durationSec: MATCH_TIME_SEC })
-        );
-      }
-    }
+    // (Engineer Field Repairs now lives in kits/engineer.ts onTick — the pre-gate
+    // maintenance slot, on the same 2s cadence, healing itself + nearby turrets.)
 
-    // Engineer Field Repairs: every 2s, repair itself and nearby turrets,
-    // keeping its emplacements alive longer than their raw HP suggests.
-    if (unit.defId === "engineer" && state.tick % secToTicks(2) === 0) {
-      const REPAIR = 8;
-      const REPAIR_RADIUS = 200;
-      heal(unit, REPAIR);
-      for (const ally of state.units) {
-        if (ally.state === "dead" || ally.team !== unit.team) continue;
-        if (ally.defId === "turret" && dist(unit.pos, ally.pos) <= REPAIR_RADIUS) {
-          heal(ally, REPAIR);
-        }
-      }
-    }
+    // (Necromancer Raise Dead now lives in kits/necromancer.ts onTick — the
+    // pre-gate maintenance slot, synced to the global tick.)
 
-    // Necromancer Raise Dead: a passive that continuously raises a skeleton every
-    // 5s. The summon cap is enforced when spawns flush, so it can't flood the board.
-    if (unit.defId === "necromancer" && state.tick % secToTicks(5) === 0) {
-      pendingSpawns.push({
-        defId: "skeleton",
-        team: unit.team,
-        pos: { x: unit.pos.x, y: unit.pos.y + (unit.team === "player" ? -24 : 24) },
-      });
-    }
-
-    // Hunter Boar Companion: keep a pet boar alive beside the Hunter. Summons one
-    // immediately at deploy (boarCooldown 0), and after the boar dies the timer
-    // (frozen while a boar lives) counts down to re-summon ~8s later.
-    if (unit.defId === "hunter") {
-      const hasBoar = state.units.some(
-        (u) => u.defId === "boar" && u.team === unit.team && u.state !== "dead"
-      );
-      if (!hasBoar) {
-        if (unit.boarCooldown > 0) unit.boarCooldown--;
-        if (unit.boarCooldown <= 0) {
-          pendingSpawns.push({
-            defId: "boar",
-            team: unit.team,
-            pos: {
-              x: unit.pos.x + (unit.team === "player" ? -30 : 30),
-              y: unit.pos.y + 12,
-            },
-          });
-          unit.boarCooldown = secToTicks(8);
-        }
-      }
-    }
-
-    // Hunter Scatter Trap: on its cooldown, lay a spread of traps on the ground
-    // ahead of it (toward the enemy). Any enemy that later steps on one is caught
-    // (stunned) and the trap is spent. First set is laid at deploy.
-    if (unit.defId === "hunter") {
-      if (unit.trapCooldown > 0) unit.trapCooldown--;
-      if (unit.trapCooldown <= 0) {
-        const forward = unit.team === "player" ? -1 : 1;
-        for (const dx of [-70, 0, 70]) {
-          state.traps.push({
-            x: clamp(unit.pos.x + dx, 20, FIELD_WIDTH - 20),
-            y: clamp(unit.pos.y + forward * 120, 20, FIELD_HEIGHT - 20),
-            team: unit.team,
-          });
-        }
-        unit.trapCooldown = secToTicks(SCATTER_TRAP_CD_SEC);
-      }
-    }
+    // (Hunter Boar Companion + Scatter Trap laying now live in kits/hunter.ts
+    // onTick — the pre-gate maintenance slot. The generic trap TRIGGER stays
+    // below in the movement step; the boar's guard-charge stays gated by defId
+    // pending the shared charge-system refactor.)
 
     // A spell cast in progress (the cast bar) is interrupted by a stun or fear —
     // the spell fizzles. Runs before the stun check so the stun can cancel it;
@@ -860,36 +527,14 @@ export function stepSimulation(state: SimState): void {
       });
     }
 
-    // Druid shapeshift: at <30% HP, transform into a bear — melee bruiser that
-    // takes only 20% damage (80% reduction). One-way. Stops summoning; becomes
-    // a frontline brawler.
-    if (
-      unit.defId === "summoner" &&
-      !unit.transformed &&
-      unit.hp <= unit.maxHp * 0.3
-    ) {
-      transformDruid(state, unit);
-    }
+    // (Druid Bear Form shapeshift now lives in kits/druid.ts onTick — the
+    // pre-gate maintenance slot.)
 
-    // Berserker Bloodrage: damage and attack speed scale up as HP drops. At full
-    // HP it's baseline; near death it hits much harder and faster. Recomputed
-    // each tick from the unit's data-defined base stats.
-    if (unit.defId === "berserker") {
-      const def = getUnitDef(unit.defId);
-      const missing = 1 - unit.hp / unit.maxHp; // 0 at full, ~1 near death
-      const dmgBonus = 1 + missing * 0.9; // up to +90% damage
-      const spdBonus = 1 - missing * 0.4; // up to 40% faster attacks
-      unit.damage = Math.round(def.damage * dmgBonus);
-      unit.attackSpeed = def.attackSpeed * spdBonus;
-    }
+    // (Berserker Bloodrage now lives in kits/berserker.ts onTick — the pre-gate
+    // maintenance slot, recomputed each tick from base stats.)
 
-    // Mystic Archer Momentum: each Light/Dark form shift permanently ramps its
-    // attack speed by 15% (capped at +75%). Recomputed from base each tick.
-    if (unit.defId === "mystic_archer") {
-      const def = getUnitDef(unit.defId);
-      const bonus = Math.min(0.75, unit.momentumStacks * 0.15);
-      unit.attackSpeed = def.attackSpeed / (1 + bonus);
-    }
+    // (Mystic Archer Momentum recompute now lives in kits/mysticArcher.ts onTick
+    // — the pre-gate maintenance slot, recomputed each tick from base stats.)
 
     // Stun overrides everything.
     if (isStunned(unit)) {
@@ -911,60 +556,40 @@ export function stepSimulation(state: SimState): void {
       continue;
     }
 
-    // Arcane Mage: stream out any queued Arcane Barrage missiles (one at a time).
-    // Non-blocking — the mage still moves/attacks normally during the volley.
+    // Stream out any queued Arcane Barrage missiles (one at a time), armed by the
+    // Arcane Mage kit's fireAbility. Field-gated on barrageShots, so it stays engine
+    // plumbing. Non-blocking — the mage still moves/attacks normally during the volley.
     if (unit.barrageShots > 0) stepArcaneBarrage(state, unit, byUid);
 
-    // Boar guard: when its Hunter is attacked, charge that attacker (Orc-charge
-    // dash) and, on contact, taunt it off the Hunter — so it works even when the
-    // boar is far away. Re-charges each time the 2.5s taunt lapses. Runs before
-    // the charge-step below so the rush kicks off the same tick.
-    if (unit.defId === "boar" && unit.chargeTicks <= 0) {
-      const hunter = alive.find(
-        (u) => u.defId === "hunter" && u.team === unit.team
-      );
-      const attacker = hunter?.attackedByUid
-        ? byUid.get(hunter.attackedByUid)
-        : null;
-      if (
-        attacker &&
-        attacker.state !== "dead" &&
-        attacker.team !== unit.team &&
-        attacker.tauntedByUid !== unit.uid
-      ) {
-        unit.chargeTargetUid = attacker.uid;
-        unit.chargeTicks = secToTicks(1.5);
-        unit.facing = attacker.pos.x >= unit.pos.x ? 1 : -1;
-      }
-    }
+    // (Boar guard-charge arming now lives in kits/boar.ts onTick — guarded to match
+    // its old post-gate spot, it locks a rush at the Hunter's attacker before the
+    // charge-step below fires it the same tick.)
 
     // Orc Charge (and Boar guard-charge): while a rush is in progress it owns
-    // movement until contact.
+    // movement until contact. The dash driver is field-gated on chargeTicks (not
+    // defId); the kit arms it (Orc fireAbility / Boar onTick) and defines the
+    // contact effect (onChargeContact).
     if (unit.chargeTicks > 0) {
-      stepCharge(state, unit, byUid, dealDamage);
+      stepCharge(unit, makeKitCtx(unit));
       continue;
     }
 
     const enemies = alive.filter((e) => e.team !== unit.team);
     updateTarget(unit, byUid, enemies);
 
-    // Arcane Mage: Blink away from a closing melee threat (own cooldown, so it's
-    // independent of the passive ability slot). Just repositions; the rest of the
-    // tick (movement/kiting) resumes from the new spot.
-    if (unit.defId === "arcane_mage" && unit.blinkCooldown <= 0) {
-      if (tryBlink(state, unit, enemies)) {
-        unit.blinkCooldown = secToTicks(5);
-      }
+    // [seam] pre-idle reactive act slot — runs after targeting but BEFORE the
+    // target-dead idle-out below, so a kit reacts even when its committed target
+    // just died (Trickster Shadow Step interrupts any nearby caster; Arcane Mage
+    // Blinks away from a closing melee threat, on its own blinkCooldown). The
+    // post-idle act slot (onActTick: Rejuvenation / Necromancer cast) is after the
+    // idle-out, where an instant act needs a live target.
+    {
+      const kit = getKit(unit.defId);
+      if (kit?.onReactTick) kit.onReactTick(unit, makeKitCtx(unit));
     }
 
-    // Trickster: Shadow Step to an enemy that just started casting and kick it,
-    // interrupting the cast. Reactive, on its own cooldown — independent of its
-    // basic attacks (it still brawls normally when nothing is casting).
-    if (unit.defId === "trickster" && unit.shadowCooldown <= 0) {
-      if (tryShadowStep(state, unit, enemies, dealDamage)) {
-        unit.shadowCooldown = secToTicks(TRICKSTER_COOLDOWN_SEC);
-      }
-    }
+    // (Trickster Shadow Step + Arcane Mage Blink now fire from the pre-idle
+    // onReactTick seam above — kits/trickster.ts, kits/arcaneMage.ts.)
 
     const target = unit.targetUid ? byUid.get(unit.targetUid) : null;
 
@@ -981,6 +606,7 @@ export function stepSimulation(state: SimState): void {
 
     const abilityCtx: AbilityContext = {
       unit,
+      tick: state.tick,
       unitsByUid: byUid,
       enemies,
       allies,
@@ -989,34 +615,34 @@ export function stepSimulation(state: SimState): void {
       spawnProjectile: (p) => spawnProjectile(state, p),
       spawnVfx: (v) => spawnVfx(state, v),
       spawnUnit: (defId, team, pos) => pendingSpawns.push({ defId, team, pos }),
+      spawnTrap: (t) => state.traps.push(t),
+      spawnFloatingText: (u, v, k) => spawnFloatingText(state, u, v, k),
     };
+    const abilityKit = getKit(unit.defId);
 
-    // Druid Rejuvenation: an instant HoT on the most-wounded nearby ally (incl.
-    // itself), on its own cooldown. Works in bear form too. Instant, so it never
-    // uses the cast bar — but it won't fire mid-summon-cast.
-    if (
-      unit.defId === "summoner" &&
-      unit.castTicks <= 0 &&
-      unit.rejuvCooldown <= 0 &&
-      !isStunned(unit) &&
-      !isSilenced(unit)
-    ) {
-      if (applyRejuvenation(abilityCtx)) {
-        unit.rejuvCooldown = abilityCooldownTicks("rejuvenation");
-      }
-    }
+    // [seam] kit post-idle act slot — reached only with a LIVE target (the idle-out
+    // above already fired for a dead/absent target) or mid-cast, and always
+    // un-stunned/un-feared. Druid Rejuvenation runs here (instant → returns void).
+    // A kit that OWNS its whole cast pipeline (the Necromancer's dual Curse/Terrify
+    // on one bar) returns true, so the standard cast-handling chain below is
+    // bypassed. Passes the loop's abilityCtx so allies/enemies match the funnel
+    // exactly (makeKitCtx would rebuild a fresher snapshot).
+    const ownsCast = abilityKit?.onActTick?.(unit, abilityCtx);
 
     // Cast handling. An in-flight cast (the cast bar) ticks down and fires its
     // spell on completion, locking the mage meanwhile. Otherwise, begin a
     // cast-time ability (the mages) or fire an instant one (taunt, mend, charge,
     // kiting leap, summon, …) — kiting leap can interrupt the approach.
-    if (unit.defId === "necromancer") {
-      // Necromancer runs its own cast logic (Curse / Terrify) — see above.
-      if (stepNecromancerCast(state, abilityCtx)) continue;
+    if (ownsCast) {
+      // The kit ran its own cast pipeline (Necromancer). If it's mid-cast the unit
+      // is locked for the tick; otherwise fall through to attack — either way the
+      // standard cast-handling chain below is skipped.
+      if (unit.castTicks > 0) continue;
     } else if (unit.castTicks > 0) {
       unit.castTicks--;
       if (unit.castTicks <= 0) {
-        fireCastAbility(abilityCtx); // the spell goes off
+        // The kit fires the completed cast's effect (every cast unit has one).
+        abilityKit?.fireAbility?.(abilityCtx); // the spell goes off
         unit.castTicksMax = 0;
         unit.castTargetUid = null;
       } else {
@@ -1029,7 +655,13 @@ export function stepSimulation(state: SimState): void {
         // Begin a cast. A stun/silence blocks the start, and some casts (Mend)
         // only begin when they have a reason to — so the Cleric doesn't freeze
         // mid-field winding up a heal with no wounded ally to land it on.
-        if (!isStunned(unit) && !isSilenced(unit) && wantsToCast(abilityCtx)) {
+        // A kit may gate its begin-cast (Cleric Mend / Mage Polymorph won't wind
+        // up with no valid target); every other cast always wants to (there's an
+        // enemy to hit).
+        const wants = abilityKit?.wantsToCast
+          ? abilityKit.wantsToCast(abilityCtx)
+          : true;
+        if (!isStunned(unit) && !isSilenced(unit) && wants) {
           unit.castTicks = castTime;
           unit.castTicksMax = castTime;
           unit.castTargetUid = target ? target.uid : null;
@@ -1038,7 +670,14 @@ export function stepSimulation(state: SimState): void {
           continue;
         }
       } else {
-        const fired = tryCastAbility(abilityCtx);
+        // Instant cast: the kit fires the effect (has-an-active-cast <=>
+        // fireAbility defined), gated on stun/silence. A unit with no active-cast
+        // kit does nothing here — its passive/reactive mechanics run elsewhere.
+        const fired =
+          abilityKit?.fireAbility != null &&
+          !isStunned(unit) &&
+          !isSilenced(unit) &&
+          abilityKit.fireAbility(abilityCtx);
         if (fired) unit.abilityCooldown = abilityCooldownTicks(unit.ability);
       }
     }
@@ -1058,7 +697,7 @@ export function stepSimulation(state: SimState): void {
       transitionTo(unit, "attacking");
       unit.facing = target.pos.x >= unit.pos.x ? 1 : -1;
       if (unit.attackCooldown <= 0) {
-        performBasicAttack(state, unit, target, byUid, dealDamage, heal);
+        performBasicAttack(state, unit, target, byUid, dealDamage, heal, abilityCtx);
         const delay = unit.attackSpeed * attackDelayMultiplier(unit);
         unit.attackCooldown = secToTicks(delay);
       }
@@ -1086,6 +725,7 @@ export function stepSimulation(state: SimState): void {
     const summoned = createUnit(spawn.defId, spawn.team, spawn.pos);
     state.units.push(summoned);
     byUid.set(summoned.uid, summoned);
+    getKit(summoned.defId)?.onSpawn?.(summoned); // [seam] spawn hook (both spawn paths)
   }
 
   // 5a. Movement + collisions.
@@ -1119,7 +759,7 @@ export function stepSimulation(state: SimState): void {
   }
 
   // 5b. Projectiles.
-  stepProjectiles(state, byUid, dealDamage);
+  stepProjectiles(state, byUid, dealDamage, makeKitCtx);
 
   // 5c. Floating texts / vfx decay.
   for (const ft of state.floatingTexts) ft.life--;
@@ -1140,108 +780,41 @@ function performBasicAttack(
   target: Unit,
   _byUid: Map<string, Unit>,
   dealDamage: (t: Unit, amt: number, s: Unit) => void,
-  heal: (t: Unit, amt: number) => void
+  heal: (t: Unit, amt: number) => void,
+  ctx: KitCtx
 ): void {
   const def = getUnitDef(unit.defId);
+  const kit = getKit(unit.defId);
   // Use the LIVE range, not the static def — the Druid's bear form drops its range
   // to melee, so it should swing, not fire a projectile.
   const ranged = unit.range > 80;
 
-  // Assassin Ambush: the first strike out of opening stealth stuns the victim for
-  // 3s and reveals the assassin. One-time (ambushReady) so a later re-stealth
-  // (e.g. Vanish) never re-triggers it.
-  if (unit.ambushReady) {
-    unit.ambushReady = false;
-    unit.effects = unit.effects.filter((e) => e.type !== "stealth");
-    applyEffect(target, makeEffect("stun", { source: unit.uid, durationSec: 3 }));
-    spawnVfx(state, {
-      kind: "slam",
-      pos: { x: target.pos.x, y: target.pos.y },
-      life: secToTicks(0.4),
-      maxLife: secToTicks(0.4),
-      color: def.accent,
-    });
-  }
-
-  // Rogue & Trickster reveal on a strike (stripping is a no-op once revealed). The
-  // Trickster also (re)starts its re-cloak timer, so it slips back into stealth a
-  // beat after it stops swinging.
-  if (unit.defId === "rogue" || unit.defId === "trickster") {
-    unit.effects = unit.effects.filter((e) => e.type !== "stealth");
-    if (unit.defId === "trickster") unit.recloakTimer = secToTicks(TRICKSTER_RECLOAK_SEC);
-  }
+  // [seam] before the swing resolves (open contract 2). Assassin Ambush (opening
+  // stun + reveal) and the Trickster's reveal + re-cloak restart now live in their
+  // kits (kits/assassin.ts, kits/trickster.ts onBeforeAttack).
+  if (kit?.onBeforeAttack) kit.onBeforeAttack(unit, target, ctx);
 
   unit.attackCount += 1;
-  // Ice Mage: every second basic attack freezes the target (2s stun).
-  const freezeThisHit =
-    unit.defId === "ice_mage" && unit.attackCount % 2 === 0;
-  // Fire Mage: every third basic attack sets the target ablaze (Burn).
-  const burnThisHit =
-    unit.defId === "fire_mage" && unit.attackCount % 3 === 0;
 
-  // Mystic Archer fires a form-tagged shot; stacking/detonation resolves on hit.
-  if (unit.defId === "mystic_archer") {
-    spawnProjectile(state, {
-      pos: { x: unit.pos.x, y: unit.pos.y },
-      target: { x: target.pos.x, y: target.pos.y },
-      targetUid: target.uid,
-      speed: 400,
-      damage: unit.damage,
-      team: unit.team,
-      sourceUid: unit.uid,
-      ability: "mystic_shift", // resolved specially on impact
-      color: unit.mysticForm === "light" ? "#fcd34d" : "#7c3aed",
-      angle: 0,
-    });
-    return;
-  }
+  // [seam] replace the default swing entirely (open contract 2 — Mystic / Ranger /
+  // Warrior do their own thing). attackCount is already bumped, matching today.
+  // Mystic Archer fires its form-tagged shot here (kits/mysticArcher.ts
+  // onBasicAttack); its stacking/detonation resolves on impact (onProjectileHit).
+  if (kit?.onBasicAttack && kit.onBasicAttack(unit, target, ctx)) return;
 
-  // Ranger Multishot: every second shot looses three arrows at once, each locked
-  // onto a different enemy in range (the committed target plus the two nearest
-  // others). Against a lone foe only one arrow finds a mark, so it's an anti-swarm
-  // spread rather than extra single-target burst. Extra targets are picked nearest-
-  // first with a uid tiebreak so the volley is deterministic.
-  if (unit.defId === "ranger") {
-    const shots: Unit[] = [target];
-    if (unit.attackCount % 2 === 0) {
-      const extras = state.units
-        .filter(
-          (e) =>
-            e.team !== unit.team &&
-            e.state !== "dead" &&
-            e.uid !== target.uid &&
-            dist(unit.pos, e.pos) <= unit.range
-        )
-        .sort((a, b) => {
-          const da = dist(unit.pos, a.pos);
-          const db = dist(unit.pos, b.pos);
-          if (da !== db) return da - db;
-          return a.uid < b.uid ? -1 : 1;
-        });
-      for (const e of extras.slice(0, 2)) shots.push(e);
-    }
-    for (const t of shots) {
-      spawnProjectile(state, {
-        pos: { x: unit.pos.x, y: unit.pos.y },
-        target: { x: t.pos.x, y: t.pos.y },
-        targetUid: t.uid,
-        speed: 380,
-        damage: unit.damage,
-        team: unit.team,
-        sourceUid: unit.uid,
-        ability: "lifesteal", // sentinel: basic shot, no on-hit status
-        color: def.accent,
-        angle: 0,
-      });
-    }
-    return;
-  }
+  // [seam] Ranger Multishot (the every-2nd-shot three-arrow spread) now lives in
+  // kits/ranger.ts onBasicAttack, fired above.
 
   // (The Arcane Mage has no special basic attack — it uses the default ranged
   // shot below, and nukes with its active Arcane Barrage on cooldown.)
 
   if (ranged) {
-    // Ranged basic attacks spawn a simple projectile (archer arrows etc.).
+    // Ranged basic attacks spawn a simple projectile (archer arrows etc.). A unit
+    // with a basicShotRider (Ice Mage freeze / Fire Mage burn) plants its on-hit
+    // rider every Nth attack — pure UnitDef data, resolved in stepProjectiles.
+    const sr = def.basicShotRider;
+    const rider =
+      sr && unit.attackCount % sr.everyNthAttack === 0 ? sr.rider : undefined;
     spawnProjectile(state, {
       pos: { x: unit.pos.x, y: unit.pos.y },
       target: { x: target.pos.x, y: target.pos.y },
@@ -1250,192 +823,41 @@ function performBasicAttack(
       damage: unit.damage,
       team: unit.team,
       sourceUid: unit.uid,
-      ability: "lifesteal", // sentinel: "basic"; no on-hit status
-      color: freezeThisHit ? "#bae6fd" : burnThisHit ? "#fb923c" : def.accent,
+      ability: "lifesteal", // sentinel: "basic"; on-hit rider carried in `rider`
+      color: rider ? rider.color : def.accent,
       angle: 0,
-      onHitStunSec: freezeThisHit ? 2 : undefined,
-      onHitBurn: burnThisHit || undefined,
-    });
-  } else if (unit.defId === "warrior") {
-    // Whirlwind: the Warrior spins its claymore instead of a single swing —
-    // striking every enemy within melee reach for its damage and leaving a
-    // refreshing bleed (poison-type DoT) on each. Anti-swarm melee; no lifesteal.
-    const reach = unit.range + unit.radius;
-    for (const e of state.units) {
-      if (e.team === unit.team || e.state === "dead") continue;
-      if (dist(unit.pos, e.pos) <= reach) {
-        dealDamage(e, unit.damage, unit);
-        applyEffect(
-          e,
-          makeEffect("poison", {
-            source: unit.uid,
-            durationSec: 2,
-            damagePerTick: 3,
-            tickIntervalSec: 0.5,
-          })
-        );
-      }
-    }
-    spawnVfx(state, {
-      kind: "slam",
-      pos: { x: unit.pos.x, y: unit.pos.y },
-      life: secToTicks(0.4),
-      maxLife: secToTicks(0.4),
-      color: def.accent,
+      rider,
     });
   } else {
+    // [seam] Warrior Whirlwind (the AoE spin + bleed that replaces the swing) now
+    // lives in kits/warrior.ts onBasicAttack, fired above.
     dealDamage(target, unit.damage, unit);
     applyLifesteal(unit, unit.damage, heal);
 
-    // Zombie Shambler's Numbing Bite: every bite slows the victim's movement
-    // and attacks by 30% for 2s (refreshed, never stacked). The horde's threat
-    // is being mired in it, not the bite itself.
-    if (unit.defId === "zombie_shambler") {
-      applyEffect(
-        target,
-        makeEffect("slow", { source: unit.uid, durationSec: 2, magnitude: 0.3 })
-      );
-    }
+    // [seam] after the default melee swing lands (open contract 2). Zombie
+    // Shambler's Numbing Bite now lives in its kit (kits/zombieShambler.ts);
+    // Venom / Cleave / Backlash migrate here next.
+    if (kit?.onAfterAttack) kit.onAfterAttack(unit, target, ctx);
 
-    // Rogue Venom: every strike envenoms the target. A short, fast-ticking poison
-    // (refreshed each hit via applyEffect, never stacked) so it keeps damaging even
-    // between the Rogue's quick swings.
-    if (unit.defId === "rogue") {
-      applyEffect(
-        target,
-        makeEffect("poison", {
-          source: unit.uid,
-          durationSec: 3,
-          damagePerTick: 3,
-          tickIntervalSec: 0.5,
-        })
-      );
-    }
+    // (Rogue Venom now lives in kits/rogue.ts onAfterAttack, fired by the seam.)
 
-    // Berserker Cleave: the same swing also strikes every other enemy within
-    // melee reach, so it carves through a crowd.
-    if (unit.defId === "berserker") {
-      const reach = unit.range + unit.radius;
-      for (const e of state.units) {
-        if (e === target || e.team === unit.team || e.state === "dead") continue;
-        if (dist(unit.pos, e.pos) <= reach) {
-          dealDamage(e, unit.damage, unit);
-        }
-      }
-      spawnVfx(state, {
-        kind: "slam",
-        pos: { x: unit.pos.x, y: unit.pos.y },
-        life: secToTicks(0.3),
-        maxLife: secToTicks(0.3),
-        color: def.accent,
-      });
-    }
+    // (Berserker Cleave now lives in kits/berserker.ts onAfterAttack, fired by
+    // the onAfterAttack seam above.)
 
-    // Aegis Knight Backlash: a full magic shield discharges as an area burst on
-    // the next swing, spending the shield.
-    if (unit.defId === "aegis_knight" && unit.shieldHp >= AEGIS_SHIELD_CAP) {
-      const burst = Math.min(55, Math.round(unit.shieldHp * 0.5));
-      unit.shieldHp = 0;
-      unit.shieldHpMax = 0;
-      for (const e of state.units) {
-        if (e.team === unit.team || e.state === "dead") continue;
-        if (dist(unit.pos, e.pos) <= 100) dealDamage(e, burst, unit);
-      }
-      spawnVfx(state, {
-        kind: "slam",
-        pos: { x: unit.pos.x, y: unit.pos.y },
-        life: secToTicks(0.5),
-        maxLife: secToTicks(0.5),
-        color: def.accent,
-      });
-    }
+    // (Aegis Knight Backlash now lives in kits/aegisKnight.ts onAfterAttack,
+    // fired by the onAfterAttack seam above.)
   }
 }
 
-// Mystic Archer's on-hit resolution. Light form marks a single target; at 3
-// light stacks that target detonates and the archer flips to Dark. Dark form
-// chains to all enemies in a radius, stacking darkness on each; when any reaches
-// 3 dark stacks it detonates and the archer flips back to Light.
-function resolveMysticHit(
-  state: SimState,
-  archer: Unit,
-  target: Unit,
-  damage: number,
-  dealDamage: (t: Unit, amt: number, s: Unit) => void
-): void {
-  const accent = getUnitDef(archer.defId).accent;
-  const DETONATE = 28; // burst damage when 3 stacks pop
-
-  if (archer.mysticForm === "light") {
-    // Single-target hit + light stack.
-    dealDamage(target, damage, archer);
-    if (target.state === "dead") return;
-    target.lightStacks += 1;
-    spawnVfx(state, {
-      kind: "slam",
-      pos: { x: target.pos.x, y: target.pos.y - 4 },
-      life: secToTicks(0.25),
-      maxLife: secToTicks(0.25),
-      color: "#fcd34d",
-    });
-    if (target.lightStacks >= 3) {
-      // Detonate this target, clear its light stacks, flip to Dark.
-      dealDamage(target, DETONATE, archer);
-      target.lightStacks = 0;
-      archer.mysticForm = "dark";
-      archer.momentumStacks = Math.min(5, archer.momentumStacks + 1); // +15% atk speed/shift
-
-      spawnVfx(state, {
-        kind: "death",
-        pos: { x: target.pos.x, y: target.pos.y },
-        life: secToTicks(0.5),
-        maxLife: secToTicks(0.5),
-        color: "#fde68a",
-      });
-    }
-  } else {
-    // Dark form: chain to all enemies in a radius around the primary target.
-    const CHAIN_RADIUS = 130;
-    dealDamage(target, damage, archer);
-    let flipped = false;
-    for (const e of state.units) {
-      if (e.state === "dead" || e.team === archer.team) continue;
-      if (dist(target.pos, e.pos) > CHAIN_RADIUS) continue;
-      // Chain damage to secondary targets (primary already took the hit).
-      if (e.uid !== target.uid) dealDamage(e, Math.round(damage * 0.6), archer);
-      if (e.hp <= 0) continue; // may have died from the chain hit
-      e.darkStacks += 1;
-      spawnVfx(state, {
-        kind: "frost",
-        pos: { x: e.pos.x, y: e.pos.y - 4 },
-        life: secToTicks(0.25),
-        maxLife: secToTicks(0.25),
-        color: "#7c3aed",
-      });
-      if (e.darkStacks >= 3) {
-        dealDamage(e, DETONATE, archer);
-        e.darkStacks = 0;
-        flipped = true;
-        spawnVfx(state, {
-          kind: "death",
-          pos: { x: e.pos.x, y: e.pos.y },
-          life: secToTicks(0.5),
-          maxLife: secToTicks(0.5),
-          color: "#a78bfa",
-        });
-      }
-    }
-    if (flipped) {
-      archer.mysticForm = "light";
-      archer.momentumStacks = Math.min(5, archer.momentumStacks + 1); // +15% atk speed/shift
-    }
-  }
-}
+// (Mystic Archer's on-hit resolution now lives in kits/mysticArcher.ts
+// onProjectileHit — Light single-target mark/detonate + Dark radius chain + form
+// flip + Momentum stack, dispatched from stepProjectiles via the source's kit.)
 
 function stepProjectiles(
   state: SimState,
   byUid: Map<string, Unit>,
-  dealDamage: (t: Unit, amt: number, s: Unit) => void
+  dealDamage: (t: Unit, amt: number, s: Unit) => void,
+  makeKitCtx: (subject: Unit, damageContext?: boolean) => KitCtx
 ): void {
   for (const proj of state.projectiles) {
     if (!proj.alive) continue;
@@ -1455,45 +877,42 @@ function stepProjectiles(
         const source = byUid.get(proj.sourceUid);
         const isBasic =
           proj.ability === "lifesteal"; // sentinel for basic ranged shot
-        const isMystic = proj.ability === "mystic_shift";
-        if (isMystic) {
-          if (source) resolveMysticHit(state, source, target, proj.damage, dealDamage);
+        // [seam] the SOURCE unit's kit resolves its own shot's impact (Mystic
+        // Light/Dark stacks/detonate/flip → kits/mysticArcher.ts onProjectileHit).
+        // Keyed on the mystic_shift tag so a dead source fizzles exactly as before;
+        // the kit owns the damage + stack bookkeeping via ctx.
+        if (proj.ability === "mystic_shift") {
+          if (source) {
+            getKit(source.defId)?.onProjectileHit?.(
+              source,
+              target,
+              proj,
+              makeKitCtx(source, true)
+            );
+          }
         } else if (isBasic) {
           if (source) dealDamage(target, proj.damage, source);
-          // Ice Mage every-second-attack freeze.
-          if (proj.onHitStunSec) {
+          // On-hit rider (Ice freeze / Fire burn) — applied generically from the
+          // shot's data-descriptor (UnitDef.basicShotRider → proj.rider), so no
+          // per-unit defId branch lives here.
+          if (proj.rider) {
+            const r = proj.rider;
             applyEffect(
               target,
-              makeEffect("stun", {
+              makeEffect(r.effectType, {
                 source: proj.sourceUid,
-                durationSec: proj.onHitStunSec,
+                durationSec: r.durationSec,
+                damagePerTick: r.damagePerTick,
+                tickIntervalSec: r.tickIntervalSec,
+                magnitude: r.magnitude,
               })
             );
             spawnVfx(state, {
-              kind: "frost",
+              kind: r.vfxKind,
               pos: { x: target.pos.x, y: target.pos.y },
               life: secToTicks(0.4),
               maxLife: secToTicks(0.4),
-              color: "#bae6fd",
-            });
-          }
-          // Fire Mage every-third-attack burn.
-          if (proj.onHitBurn) {
-            applyEffect(
-              target,
-              makeEffect("burn", {
-                source: proj.sourceUid,
-                durationSec: 3,
-                damagePerTick: 7,
-                tickIntervalSec: 1,
-              })
-            );
-            spawnVfx(state, {
-              kind: "burn_burst",
-              pos: { x: target.pos.x, y: target.pos.y },
-              life: secToTicks(0.4),
-              maxLife: secToTicks(0.4),
-              color: "#fb923c",
+              color: r.color,
             });
           }
         } else {

@@ -128,6 +128,98 @@ automatically) and Heroes of the Arena (all deckables).
   tuned so torches flank on narrow screens; the battle canvas is capped at 480px, safe
   to scale up on desktop since the 480×720 sim is display-independent).
 
+### Engine architecture — UnitKit seam ✅ COMPLETE (on `refactor/unitkit-seam`, PR #41, unmerged)
+Collapsed the ~38 `defId`/`ability` branches in `CombatSystem`, the `AbilityId`
+`dispatchAbility` switch + `PASSIVE_ABILITIES` in `AbilitySystem`, and the role
+heuristics in `MatchController` into **one stateless kit per `defId`** behind a
+`UnitKit` seam. **All 28 kits migrated + the old path deleted** — every commit
+digest-byte-identical; the temp digest guard has been retired. Full design (8 locked
+decisions, the interface, hook contracts, migration order) in **`docs/adr/0001-unitkit-seam.md`**.
+- **Guardrail:** behavior-identical — `digest()` byte-identical at every commit.
+- **Shape:** engine owns the tick skeleton (gate/targeting/cast pipeline); kit gets
+  `onTick`/`onActTick` + event/modifier/override hooks + `fireAbility`/`wantsToCast`;
+  private state moves to a flat typed `unit.kit` (opportunistically, per-unit).
+- **Migration:** strangler-fig (kit-preferred, old-path fallback). Each kit lives in
+  `src/engine/kits/`; the registry is `kits/UnitKit.ts` (`getKit`).
+- **Done (on `refactor/unitkit-seam`, PR #41), all digest-byte-identical:** scaffolding
+  (every seam call site, empty registry) → **Zombie Shambler** (`onAfterAttack`) →
+  **Knight** (`fireAbility`+`roleClass`) → **Slime + Slimeling** (`onDamaged` split +
+  `onDeath` burst) → **Ogre** (`onDamaged`+`onWouldDie` Second Wind; `fireAbility`
+  Crushing Slam) → **Assassin** (`onSpawn` stealth + `onBeforeAttack` Ambush +
+  `onWouldDie` Vanish — wired `onSpawn` into deploy + summon flush) → **Berserker**
+  (`onTick` Bloodrage + `onWouldDie` Last Stand + `onKill` Bloodthirst + `onAfterAttack`
+  Cleave) → **Rogue** (`onSpawn`+`onBeforeAttack`+`onAfterAttack`) → **Aegis Knight**
+  (two-phase `modifyIncomingDamage` soak + `onDamaged` bank + `onAfterAttack` Backlash;
+  **Warded is now data** — `UnitDef.wardedAgainst`, read in `StatusEffectSystem`) →
+  **Druid** (`onTick` bear transform + guard-timer, `onActTick` Rejuv, `modifyIncomingHeal`
+  bear +50%, `fireAbility` Summon Wolves — **first `onActTick` user**) → **Mystic Archer**
+  (`onTick` Momentum, `onBasicAttack` form shot, **`onProjectileHit`** Light/Dark
+  stack+detonate+flip — added that hook; stacks stay flat cross-unit fields) →
+  **Hunter** (`onTick` boar re-summon + Scatter Trap laying via new **`ctx.spawnTrap`**,
+  `fireAbility` Mend Beast; the boar's guard-charge stays `defId`-gated pending the
+  charge-system refactor with the Orc) → **Trickster** (onSpawn stealth, onTick re-cloak,
+  onBeforeAttack reveal, **`onReactTick`** Shadow Step — added that hook, the **pre-idle
+  reactive slot** reserved at the Druid; retired the last deploy-stealth branch) →
+  **Necromancer** (onTick Raise Dead via new **`ctx.tick`**; **`onActTick` returns `true`**
+  to OWN its dual Curse/Terrify cast bar and bypass the standard cast chain). **All 14 kits
+  migrated — the per-unit strangler-fig is done.**
+- **Done (ordinary units, extending the batch past the ADR's 14 — same recipe, all
+  digest-byte-identical):** **Warrior** (`onBasicAttack` → true, Whirlwind spin + bleed) →
+  **Ranger** (`onBasicAttack` → true, Multishot spread) → **Holy Knight** (`fireAbility`
+  Blessing, instant — fires through the instant-cast seam) → **Cleric/`healer`**
+  (`fireAbility` Mend + **`wantsToCast`** begin-cast gate — **first `wantsToCast` user**;
+  its `mendTarget` helper moved into the kit). Dropped the `blessing` + `mend` cases from the
+  `dispatchAbility` switch (12 → 10 live cases).
+- **Done (next easy tier — same recipe, all digest-safe):** **Archer** (`fireAbility` Kiting
+  Leap, instant) → **Bloater** (`onDeath` Putrid Burst) → **Mage** (`fireAbility` Polymorph +
+  `wantsToCast`) → **Engineer** (`onTick` Field Repairs + `fireAbility` Deploy Turret). Dropped
+  `kiting_leap`/`polymorph`/`deploy_turret` (switch 10 → 7). Guard covers Archer (seed 20260626)
+  + Engineer (777/999); Bloater/Mage aren't in the guard's decks so `bloater.test.ts` (added) and
+  `mage.test.ts` are their nets. `AbilitySystem.wantsToCast` collapsed to the `return true`
+  fallback; trimmed the imports the deleted casts left unused. Then **Electric Mage**
+  (`fireAbility` Chain Lightning — a pure cast, no rider; guard-covered via seed 42) closed out
+  the easy pure-cast units, dropping `chain_lightning` (switch 7 → 6). Then **Arcane Mage**
+  (`onReactTick` Blink + `fireAbility` Arcane Barrage arm) dropped `arcane_barrage` (switch 6 → 5).
+  Its Barrage **streamer** (`stepArcaneBarrage`) intentionally **stays engine plumbing** — it's
+  field-gated on `barrageShots`, not `defId` (like `stepCharge`), so the kit only arms it (the
+  Hunter-trap split). Guard-covered (seed 20260626) + `arcaneMage.test.ts`; Blink's `blinkCooldown`
+  is in `digest()`, so its timing is verified too. Then **Orc + Boar** (charge-system refactor):
+  `stepCharge` became the shared **defId-free** dash driver (field-gated on `chargeTicks`), the
+  kits ARM the rush (Orc `fireAbility` / Boar `onTick`, guarded to keep its post-gate spot), and a
+  new **`onChargeContact`** hook resolves the impact (Orc slam / Boar taunt). Dropped `charge`
+  (switch 5 → 4) and the last charge-system `defId` checks. Guard-covered (Orc seed 20260626, Boar
+  via the Hunter in 777/999) + `orc.test.ts`/`boar.test.ts`. Then **Fire + Ice Mage** (the last
+  unit): the casts (`fireball`/`frost_blast`) moved to `kits/fireMage.ts` / `kits/iceMage.ts`
+  (fireAbility), and the every-Nth-attack burn/freeze riders became **pure `UnitDef` data**
+  (`basicShotRider`, like `wardedAgainst`) — the candidate-3 projectile on-hit *data-descriptor*
+  (`Projectile.rider: ShotRider`, applied generically in `stepProjectiles`; the DATA half that
+  complements the Mystic's `onProjectileHit` CODE-hook). Dropped `fireball`/`frost_blast` (switch
+  4 → 2). **ALL per-unit `defId` branches are now gone — the strangler-fig migration is COMPLETE.**
+- **✅ Cleanup commit SHIPPED** (`2c5c597`, digest-byte-identical, −71 net lines): deleted the
+  `dispatchAbility` switch, `tryCastAbility`/`fireCastAbility`, `PASSIVE_ABILITIES` +
+  `isActiveAbility`, the `AbilitySystem.wantsToCast` fallback, `castShieldBlock` (+ its `ABILITIES`
+  entry and `AbilityId` member — no unit had it), and `unitRoleClass`'s ability heuristic (added the
+  last kit `roleClass`, `zombie_shambler`). Inlined the three `?? old-path` cast-seam fallbacks. Kept
+  `stepCharge`/`stepArcaneBarrage` + the free `onProjectileHit` resolver (field-gated engine plumbing,
+  not per-unit code); `castFear` stays (the Necromancer kit reaches it via `applyTerrify`). The temp
+  `_migration_digest_guard.test.ts` was deleted as the final step.
+- **The refactor is done, and the first balance dividend shipped** (`9588bcc`, `feat`, intentional
+  behavior change): stun/fear/polymorph now suppress the units' passive upkeep — a new
+  `isIncapacitated(unit)` early-return guards the Necromancer's Raise Dead, the Engineer's Field
+  Repairs, and the Hunter's traps + boar re-summon (specs added; determinism holds). Next up on this
+  branch is optional: more balance passes, or finalize/merge PR #41 (a Netlify deploy — ask first).
+- **✓ onActTick split (RESOLVED, now fully wired):** two distinct post-target slots ended up
+  needed. **`onActTick`** fires **POST-idle** (needs a live target): Druid Rejuv (instant →
+  returns void → falls through to the standard cast chain) and the Necromancer's dual cast
+  (returns **`true`** to OWN the pipeline and bypass the standard chain, locking the unit while
+  `castTicks > 0`). **`onReactTick`** fires **PRE-idle** (reacts even when the committed target
+  just died): the Trickster's Shadow Step wired it first; the Arcane Mage's Blink slots into
+  the same seam when it migrates. Both are passed the loop's `abilityCtx`.
+- **✓ First balance dividend SHIPPED** (`9588bcc`): stun/fear/polymorph suppress Raise Dead /
+  Engineer repair / Hunter traps+boar — via an `isIncapacitated` early-return in each upkeep `onTick`.
+- Retires the `NOTES.md §2` "consider a per-unit traits field" note and the §3
+  `PASSIVE_ABILITIES` footgun.
+
 ### Items / equipment for units (planned)
 Gear that modifies a unit's stats or kit (weapon → +damage, armor → +HP / damage
 reduction, trinket → a small effect or extra trait). Design notes:

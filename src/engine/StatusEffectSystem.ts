@@ -9,6 +9,7 @@
 // ============================================================================
 
 import type { ActiveStatusEffect, StatusEffectType, Unit } from "@/types";
+import { getUnitDef } from "@/data/units";
 import { secToTicks } from "@/utils/constants";
 
 export interface StatusFactoryArgs {
@@ -45,13 +46,9 @@ export function makeEffect(
 /** Attach an effect, merging with an existing one of the same type (refresh). */
 export function applyEffect(unit: Unit, effect: ActiveStatusEffect): void {
   if (unit.state === "dead") return;
-  // Aegis Knight is warded against magical afflictions.
-  if (
-    unit.defId === "aegis_knight" &&
-    (effect.type === "burn" || effect.type === "slow" || effect.type === "poison")
-  ) {
-    return;
-  }
+  // Warded units drop the afflictions they're immune to (data-driven, e.g. the
+  // Aegis Knight vs burn/slow/poison).
+  if (getUnitDef(unit.defId).wardedAgainst?.includes(effect.type)) return;
   const existing = unit.effects.find((e) => e.type === effect.type);
   if (existing) {
     // Refresh duration to the longer of the two; keep stronger magnitude.
@@ -103,6 +100,14 @@ export function isPolymorphed(unit: Unit): boolean {
 
 export function isSilenced(unit: Unit): boolean {
   return hasEffect(unit, "silence");
+}
+
+/** Can't take actions this tick — stunned, feared, or polymorphed. Mirrors the
+ *  main tick loop's stun/fear/polymorph gates (silence only blocks casts, so it's
+ *  excluded). Kits use this to suppress active upkeep (Raise Dead, Field Repairs,
+ *  Hunter traps) while incapacitated, matching that post-gate behavior. */
+export function isIncapacitated(unit: Unit): boolean {
+  return isStunned(unit) || isFeared(unit) || isPolymorphed(unit);
 }
 
 /** Stealthed = invisible to enemies: untargetable AND ignored by reactive AI
