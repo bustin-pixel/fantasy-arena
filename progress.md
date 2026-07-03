@@ -175,12 +175,12 @@ contracts, migration order) in **`docs/adr/0001-unitkit-seam.md`**.
   `kiting_leap`/`polymorph`/`deploy_turret` (switch 10 → 7). Guard covers Archer (seed 20260626)
   + Engineer (777/999); Bloater/Mage aren't in the guard's decks so `bloater.test.ts` (added) and
   `mage.test.ts` are their nets. `AbilitySystem.wantsToCast` collapsed to the `return true`
-  fallback; trimmed the imports the deleted casts left unused.
+  fallback; trimmed the imports the deleted casts left unused. Then **Electric Mage**
+  (`fireAbility` Chain Lightning — a pure cast, no rider; guard-covered via seed 42) closed out
+  the easy pure-cast units, dropping `chain_lightning` (switch 7 → 6).
 - **Remaining: the cleanup commit** — delete `dispatchAbility`, `PASSIVE_ABILITIES`,
   `isActiveAbility`, `unitRoleClass` internals, and the `?? old-path` fallbacks (only once
-  nothing needs them). Still `defId`-gated / on the switch:
-  - **Electric Mage** (`chain_lightning`) — a pure cast, **no projectile rider**, so it's an easy
-    `fireAbility` migration (the quick next win).
+  nothing needs them). Still `defId`-gated / on the switch (all need design work):
   - **Fire / Ice Mage** — the `fireball`/`frost_blast` casts are easy, but their every-Nth-attack
     burn/freeze **ride the projectile** (`onHitBurn`/`onHitStunSec`), still deferred to the
     candidate-3 projectile on-hit *data-descriptor* (complements the Mystic's `onProjectileHit`
