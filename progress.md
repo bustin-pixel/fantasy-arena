@@ -188,15 +188,25 @@ contracts, migration order) in **`docs/adr/0001-unitkit-seam.md`**.
   new **`onChargeContact`** hook resolves the impact (Orc slam / Boar taunt). Dropped `charge`
   (switch 5 → 4) and the last charge-system `defId` checks. Guard-covered (Orc seed 20260626, Boar
   via the Hunter in 777/999) + `orc.test.ts`/`boar.test.ts`.
-- **Remaining: ONE unit, then the cleanup commit** — delete `dispatchAbility`, `PASSIVE_ABILITIES`,
-  `isActiveAbility`, `unitRoleClass` internals, and the `?? old-path` fallbacks (only once nothing
-  needs them). The last un-migrated unit:
-  - **Fire / Ice Mage** — the `fireball`/`frost_blast` casts are easy, but their every-Nth-attack
-    burn/freeze **ride the projectile** (`onHitBurn`/`onHitStunSec`), deferred to the candidate-3
-    projectile on-hit *data-descriptor* (complements the Mystic's `onProjectileHit` code-hook);
-    migrate cast + rider together. This is the ONLY remaining unit.
-  - Then the switch holds only `shield_block` (no owning unit — likely dead code) + `fear_aura`
-    (invoked internally by the already-migrated Necromancer), which the cleanup commit resolves.
+  via the Hunter in 777/999) + `orc.test.ts`/`boar.test.ts`. Then **Fire + Ice Mage** (the last
+  unit): the casts (`fireball`/`frost_blast`) moved to `kits/fireMage.ts` / `kits/iceMage.ts`
+  (fireAbility), and the every-Nth-attack burn/freeze riders became **pure `UnitDef` data**
+  (`basicShotRider`, like `wardedAgainst`) — the candidate-3 projectile on-hit *data-descriptor*
+  (`Projectile.rider: ShotRider`, applied generically in `stepProjectiles`; the DATA half that
+  complements the Mystic's `onProjectileHit` CODE-hook). Dropped `fireball`/`frost_blast` (switch
+  4 → 2). **ALL per-unit `defId` branches are now gone — the strangler-fig migration is COMPLETE.**
+- **Remaining: ONLY the cleanup commit.** Every unit's mechanics live in a kit (or in data). What's
+  left to delete, once verified nothing reaches them:
+  - `PASSIVE_ABILITIES` + `isActiveAbility` (the fireAbility-defined check supersedes them),
+    `unitRoleClass`'s ability/hp heuristic internals (all deckable units declare `roleClass`), and
+    the `?? old-path` seam fallbacks (`kit?.fireAbility ?? fireCastAbility`, etc.).
+  - The `dispatchAbility` switch is down to `shield_block` (an orphan — **no unit has this
+    ability**; likely dead, verify + delete) and `fear_aura` (the Necromancer's Terrify — its kit
+    calls it; keep `castFear` reachable, e.g. call it directly from the kit or a small helper, then
+    the switch can go). The free `onProjectileHit` resolver (fireball/frost_blast/arcane_barrage)
+    stays — it's projectile plumbing, not per-unit code.
+  - **Delete the untracked digest guard as the LAST step**, before finalizing the PR (the cleanup
+    itself should keep it green — it only removes dead code).
 - **✓ onActTick split (RESOLVED, now fully wired):** two distinct post-target slots ended up
   needed. **`onActTick`** fires **POST-idle** (needs a live target): Druid Rejuv (instant →
   returns void → falls through to the standard cast chain) and the Necromancer's dual cast
