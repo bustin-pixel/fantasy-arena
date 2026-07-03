@@ -1657,6 +1657,78 @@ function drawBigAxe(ctx: Ctx, hx: number, hy: number, side: number) {
   ctx.restore();
 }
 
+/** The berserker's variant of the big axe: leather-wrapped haft, a notch
+ *  bitten out of the crescent, and a cutting edge lit by the rage accent. */
+function drawRageAxe(ctx: Ctx, hx: number, hy: number, side: number, accent: string, A: SpriteAnim) {
+  ctx.save();
+  ctx.translate(hx, hy);
+  ctx.scale(side, 1);
+  // wooden haft with leather wraps
+  ctx.strokeStyle = "#5a3a1f";
+  ctx.lineWidth = 3.5;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(-1, -15);
+  ctx.lineTo(2, 18);
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(255,255,255,0.15)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-1.5, -13);
+  ctx.lineTo(1.5, 16);
+  ctx.stroke();
+  ctx.lineCap = "butt";
+  ctx.strokeStyle = "#7c4a24";
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.moveTo(-2.2, 6);
+  ctx.lineTo(2.8, 8);
+  ctx.moveTo(-1.8, 10);
+  ctx.lineTo(3.2, 12);
+  ctx.stroke();
+  // notched crescent blade
+  const g = ctx.createLinearGradient(0, -17, 12, -6);
+  g.addColorStop(0, "#e9edf2");
+  g.addColorStop(1, "#9aa0a8");
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.moveTo(-1, -15);
+  ctx.bezierCurveTo(14, -17, 17, -10, 15, -6);
+  ctx.lineTo(12.5, -4.5);
+  ctx.lineTo(15.5, -3.5);
+  ctx.bezierCurveTo(16, -1, 12, 2, -1, 1);
+  ctx.closePath();
+  ctx.fill();
+  // darker steel near the haft (the poll/eye)
+  ctx.fillStyle = "#8a9099";
+  ctx.beginPath();
+  ctx.moveTo(-1, -13);
+  ctx.lineTo(6, -11);
+  ctx.lineTo(6, -2);
+  ctx.lineTo(-1, -1);
+  ctx.closePath();
+  ctx.fill();
+  // cutting edge, rage-lit on the glow pulse
+  ctx.save();
+  ctx.strokeStyle = accent;
+  ctx.globalAlpha = 0.55 + A.glow * 0.35;
+  ctx.shadowColor = accent;
+  ctx.shadowBlur = 3 + A.glow * 6;
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(15, -6);
+  ctx.bezierCurveTo(17, -10, 14, -17, -1, -15);
+  ctx.stroke();
+  ctx.restore();
+  ctx.strokeStyle = "rgba(255,255,255,0.8)";
+  ctx.lineWidth = 0.9;
+  ctx.beginPath();
+  ctx.moveTo(15, -6);
+  ctx.bezierCurveTo(17, -10, 14, -17, -1, -15);
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawHealer(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {
   // robed cleric with a shaded robe
   const rg = ctx.createLinearGradient(0, -10, 0, 20);
@@ -2222,42 +2294,199 @@ function drawBear(ctx: Ctx, body: string, dark: string, light: string, accent: s
 }
 
 function drawBerserker(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {
-  // hulking, hunched, dual axes
-  metalBody(ctx, 26, 24, 0, body, dark, light, 7);
-  ctx.fillStyle = dark;
-  ctx.fillRect(-13, 12, 26, 8);
-  // war-paint scars
+  // hulking, hunched, dual axes — rage is the signature emitter
+  // pulsing blood-red backlight
+  ctx.save();
+  ctx.globalAlpha = 0.14 + A.glow * 0.08;
+  const bl = ctx.createRadialGradient(0, 0, 4, 0, 0, 26);
+  bl.addColorStop(0, accent);
+  bl.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = bl;
+  ctx.beginPath();
+  ctx.arc(0, 0, 26, 0, PI2);
+  ctx.fill();
+  ctx.restore();
+  // rage fissures underfoot
+  ctx.save();
   ctx.strokeStyle = accent;
-  ctx.globalAlpha = 0.5;
-  ctx.lineWidth = 1.5;
+  ctx.globalAlpha = 0.25 + A.glow * 0.3;
+  ctx.shadowColor = accent;
+  ctx.shadowBlur = 5;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-4, 24);
+  ctx.lineTo(-9, 26.5);
+  ctx.lineTo(-15, 25.5);
+  ctx.moveTo(3, 24.5);
+  ctx.lineTo(9, 27);
+  ctx.lineTo(13, 25.5);
+  ctx.moveTo(-1, 25);
+  ctx.lineTo(1, 28);
+  ctx.stroke();
+  ctx.restore();
+  // hunched torso — wide shoulders tapering to the hips, with rim light
+  const tg = ctx.createLinearGradient(0, -6, 0, 22);
+  tg.addColorStop(0, light);
+  tg.addColorStop(0.5, body);
+  tg.addColorStop(1, dark);
+  ctx.fillStyle = tg;
+  ctx.beginPath();
+  ctx.moveTo(-16, -2);
+  ctx.quadraticCurveTo(-14, -8, 0, -8);
+  ctx.quadraticCurveTo(14, -8, 16, -2);
+  ctx.quadraticCurveTo(15, 12, 10, 20);
+  ctx.lineTo(-10, 20);
+  ctx.quadraticCurveTo(-15, 12, -16, -2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.22)";
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(-15.2, 0);
+  ctx.quadraticCurveTo(-14.6, 10, -10.5, 18.5);
+  ctx.stroke();
+  // fur pelt mantle across the shoulders
+  ctx.fillStyle = "#3a2417";
+  ctx.beginPath();
+  ctx.moveTo(-17, -3);
+  const tufts: [number, number][] = [
+    [-13, -1], [-11, -6], [-8, -2], [-5, -7], [-2, -3], [2, -7], [5, -2], [8, -7], [11, -2], [13, -6], [17, -3],
+  ];
+  for (const [tx, ty] of tufts) ctx.lineTo(tx, ty);
+  ctx.lineTo(17, -8);
+  ctx.quadraticCurveTo(0, -13, -17, -8);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "rgba(255,255,255,0.12)";
+  ctx.beginPath();
+  ctx.moveTo(-17, -8);
+  ctx.quadraticCurveTo(0, -13, 17, -8);
+  ctx.lineTo(15, -6.5);
+  ctx.quadraticCurveTo(0, -11.2, -15, -6.5);
+  ctx.closePath();
+  ctx.fill();
+  // war-paint chevrons, faintly rage-lit
+  ctx.save();
+  ctx.strokeStyle = accent;
+  ctx.globalAlpha = 0.65;
+  ctx.shadowColor = accent;
+  ctx.shadowBlur = 2 + A.glow * 3;
+  ctx.lineWidth = 1.6;
   ctx.beginPath();
   ctx.moveTo(-8, 2);
-  ctx.lineTo(-2, 6);
+  ctx.lineTo(-2, 7);
   ctx.moveTo(8, 2);
-  ctx.lineTo(2, 6);
+  ctx.lineTo(2, 7);
+  ctx.moveTo(-7, 7);
+  ctx.lineTo(-2, 11);
+  ctx.moveTo(7, 7);
+  ctx.lineTo(2, 11);
   ctx.stroke();
-  ctx.globalAlpha = 1;
+  ctx.restore();
+  // belt with a skull buckle
+  ctx.fillStyle = dark;
+  ctx.fillRect(-12, 14, 24, 6);
+  ctx.fillStyle = "#e7e5e4";
+  ctx.beginPath();
+  ctx.arc(0, 17, 2.6, 0, PI2);
+  ctx.fill();
+  ctx.fillStyle = "#1c1917";
+  ctx.fillRect(-1.8, 16.2, 1.2, 1.2);
+  ctx.fillRect(0.7, 16.2, 1.2, 1.2);
+  // fists gripping the hafts, veins pulsing with bloodrage
+  for (const s of [-1, 1]) {
+    ctx.save();
+    ctx.scale(s, 1);
+    const ag = ctx.createLinearGradient(10, -2, 18, 6);
+    ag.addColorStop(0, withShade(body, 25));
+    ag.addColorStop(1, withShade(body, -20));
+    ctx.fillStyle = ag;
+    ctx.beginPath();
+    ctx.arc(14.5, 2, 4.6, 0, PI2);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.18)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(14.5, 2, 4.6, Math.PI * 0.9, Math.PI * 1.5);
+    ctx.stroke();
+    ctx.strokeStyle = accent;
+    ctx.globalAlpha = 0.3 + A.glow * 0.3;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(11, 0);
+    ctx.quadraticCurveTo(13.5, 2, 12.5, 5);
+    ctx.stroke();
+    ctx.restore();
+  }
+  // head with a war-paint band across the face
   ctx.fillStyle = light;
   ctx.beginPath();
-  ctx.arc(0, -8, 9, 0, PI2);
+  ctx.arc(0, -13, 8.5, 0, PI2);
   ctx.fill();
   ctx.fillStyle = withShade(body, -15);
   ctx.beginPath();
-  ctx.arc(0, -8, 9, 0.15 * Math.PI, 0.85 * Math.PI);
+  ctx.arc(0, -13, 8.5, 0.15 * Math.PI, 0.85 * Math.PI);
   ctx.fill();
-  // rage eyes (glow)
+  ctx.save();
+  ctx.strokeStyle = accent;
+  ctx.globalAlpha = 0.55;
+  ctx.lineWidth = 2.4;
+  ctx.beginPath();
+  ctx.moveTo(-7.5, -16);
+  ctx.lineTo(7.5, -12);
+  ctx.stroke();
+  ctx.restore();
+  // topknot, swaying on the presentation clock
+  ctx.fillStyle = "#2a1810";
+  ctx.beginPath();
+  ctx.arc(0, -20.5, 3.4, Math.PI, 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "#2a1810";
+  ctx.lineWidth = 2;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(0, -21.5);
+  ctx.quadraticCurveTo(3 + Math.sin(A.t * 2.4), -26, 1.5 + Math.sin(A.t * 2.4) * 1.6, -28.5);
+  ctx.stroke();
+  ctx.lineCap = "butt";
+  // rage eyes (glow) with rising ember flecks
   ctx.save();
   ctx.fillStyle = accent;
   ctx.shadowColor = accent;
-  ctx.shadowBlur = 4 + A.glow * 5;
-  ctx.fillRect(-5, -10, 3, 2);
-  ctx.fillRect(2, -10, 3, 2);
+  ctx.shadowBlur = 5 + A.glow * 7;
+  ctx.fillRect(-5.5, -15, 3.4, 2);
+  ctx.fillRect(2.1, -15, 3.4, 2);
+  if (A.live) {
+    ctx.globalAlpha = 0.4 + A.glow * 0.3;
+    ctx.fillRect(-4.6, -18 - A.glow * 1.5, 1.4, 1.4);
+    ctx.fillRect(3.2, -18.5 - A.glow * 1.2, 1.4, 1.4);
+  }
   ctx.restore();
-  // twin big axes
-  drawBigAxe(ctx, 14, -2, 1);
-  drawBigAxe(ctx, -14, -2, -1);
-  // rising rage motes
-  rising(ctx, 0, 12, 14, 24, accent, A, 4);
+  // twin notched axes with rage-lit edges
+  drawRageAxe(ctx, 15, -1, 1, accent, A);
+  drawRageAxe(ctx, -15, -1, -1, accent, A);
+  // rising rage motes + the odd bright spark
+  rising(ctx, 0, 13, 16, 30, accent, A, 6);
+  if (A.live) {
+    ctx.save();
+    ctx.strokeStyle = "#ffd9b0";
+    ctx.lineWidth = 0.8;
+    for (let i = 0; i < 2; i++) {
+      const seed = i * 2.3 + 0.9;
+      const life = (A.t * 0.8 + seed) % 1;
+      const x = Math.sin(seed * 7) * 10;
+      const y = 14 - life * 26;
+      ctx.globalAlpha = (1 - life) * 0.7;
+      ctx.beginPath();
+      ctx.moveTo(x - 1.4, y);
+      ctx.lineTo(x + 1.4, y);
+      ctx.moveTo(x, y - 1.4);
+      ctx.lineTo(x, y + 1.4);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
 }
 
 function drawNecromancer(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {
