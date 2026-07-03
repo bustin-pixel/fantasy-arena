@@ -153,8 +153,11 @@ contracts, migration order) in **`docs/adr/0001-unitkit-seam.md`**.
   **Druid** (`onTick` bear transform + guard-timer, `onActTick` Rejuv, `modifyIncomingHeal`
   bear +50%, `fireAbility` Summon Wolves — **first `onActTick` user**) → **Mystic Archer**
   (`onTick` Momentum, `onBasicAttack` form shot, **`onProjectileHit`** Light/Dark
-  stack+detonate+flip — added that hook; stacks stay flat cross-unit fields).
-- **Remaining:** Hunter → Trickster (Shadow Step `onActTick`) →
+  stack+detonate+flip — added that hook; stacks stay flat cross-unit fields) →
+  **Hunter** (`onTick` boar re-summon + Scatter Trap laying via new **`ctx.spawnTrap`**,
+  `fireAbility` Mend Beast; the boar's guard-charge stays `defId`-gated pending the
+  charge-system refactor with the Orc).
+- **Remaining:** Trickster (Shadow Step `onActTick`, pre-idle reactive slot) →
   **Necromancer last** (custom dual-cast) → cleanup (delete `dispatchAbility`,
   `PASSIVE_ABILITIES`, `isActiveAbility`, `unitRoleClass` internals, all fallbacks).
   **Ice/Fire Mage** freeze/burn riders ride the projectile — deferred to the candidate-3
