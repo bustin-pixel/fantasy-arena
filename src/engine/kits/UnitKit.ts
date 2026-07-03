@@ -30,6 +30,7 @@ import { mysticArcherKit } from "./mysticArcher";
 import { ogreKit } from "./ogre";
 import { rogueKit } from "./rogue";
 import { slimeKit, slimeCloneKit } from "./slime";
+import { tricksterKit } from "./trickster";
 import { zombieShamblerKit } from "./zombieShambler";
 
 /** The context every kit hook receives (the engine's AbilityContext). For the
@@ -57,9 +58,15 @@ export interface UnitKit {
    *  passives like Raise Dead / Field Repairs, per-tick stat recompute, threshold
    *  transforms). Determinism forces this to stay pre-gate (see ADR decision 3). */
   onTick?(unit: Unit, ctx: KitCtx): void;
-  /** Post-target, only when the unit can act (Blink, Shadow Step, Rejuvenation,
-   *  the Necromancer's custom dual-cast). */
+  /** Post-target, POST-idle: only when the unit still has a live target (or is
+   *  mid-cast) — the instant acts that need something to act on (Rejuvenation, the
+   *  Necromancer's custom dual-cast). */
   onActTick?(unit: Unit, ctx: KitCtx): void;
+  /** Post-target, PRE-idle: reactive acts that fire even when the unit's committed
+   *  target just died — they react to the wider board (Trickster Shadow Step
+   *  interrupts any nearby caster; Arcane Blink dodges a closing melee threat).
+   *  Runs at a separate call site BEFORE the target-dead idle-out. */
+  onReactTick?(unit: Unit, ctx: KitCtx): void;
 
   // --- HP funnel (called from inside dealDamage / heal) ---
   /** Transform an incoming heal before it lands (Druid bear form 1.5x). */
@@ -126,6 +133,7 @@ export const UNIT_KITS: UnitKitRegistry = {
   slime: slimeKit,
   slime_clone: slimeCloneKit,
   summoner: druidKit,
+  trickster: tricksterKit,
   zombie_shambler: zombieShamblerKit,
 };
 

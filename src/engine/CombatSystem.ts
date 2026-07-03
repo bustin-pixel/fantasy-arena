@@ -30,7 +30,6 @@ import {
   FIELD_WIDTH,
   FLOAT_TEXT_TICKS,
   HIT_FLASH_TICKS,
-  MATCH_TIME_SEC,
   MAX_ACTIVE_UNITS_PER_SIDE,
   MAX_EFFECTS,
   MAX_PROJECTILES,
@@ -459,64 +458,9 @@ function tryBlink(state: SimState, unit: Unit, enemies: Unit[]): boolean {
   return true;
 }
 
-// Trickster tuning. Shadow Step is a reactive interrupt: a large reaction radius
-// so it polices casts across most of the board, a short interrupting stun, light
-// damage (its value is denial, not burst), and a cooldown so casters can bait it.
-const TRICKSTER_REACH = 400;
-const TRICKSTER_KICK_DAMAGE = 20;
-const TRICKSTER_STUN_SEC = 0.75;
-const TRICKSTER_COOLDOWN_SEC = 6;
-const TRICKSTER_RECLOAK_SEC = 1.5;
-
-// Trickster: Shadow Step. When an enemy within reach begins a cast, blink to it and
-// kick — the stun interrupts the cast (the cast-fizzle rule handles the actual
-// cancel when the stunned victim is processed). Reactive, on its own cooldown.
-function tryShadowStep(
-  state: SimState,
-  unit: Unit,
-  enemies: Unit[],
-  dealDamage: (t: Unit, amt: number, s: Unit) => void
-): boolean {
-  let victim: Unit | null = null;
-  let bestD = Infinity;
-  for (const e of enemies) {
-    if (e.state === "dead" || e.castTicks <= 0) continue; // only mid-cast foes
-    if (isStealthed(e)) continue; // can't react to an unseen caster
-    const d = dist(unit.pos, e.pos);
-    if (d <= TRICKSTER_REACH && d < bestD) {
-      bestD = d;
-      victim = e;
-    }
-  }
-  if (!victim) return false;
-
-  // Land just short of the victim, along the line of approach.
-  let toward = dir(unit.pos, victim.pos);
-  if (toward.x === 0 && toward.y === 0) {
-    toward = { x: 0, y: unit.team === "player" ? -1 : 1 };
-  }
-  const standoff = unit.radius + victim.radius - 4;
-  unit.pos.x = clamp(victim.pos.x - toward.x * standoff, unit.radius, FIELD_WIDTH - unit.radius);
-  unit.pos.y = clamp(victim.pos.y - toward.y * standoff, unit.radius, FIELD_HEIGHT - unit.radius);
-  unit.facing = victim.pos.x >= unit.pos.x ? 1 : -1;
-
-  // Kick: light damage + a short stun (the stun fizzles the in-flight cast).
-  dealDamage(victim, TRICKSTER_KICK_DAMAGE, unit);
-  applyEffect(victim, makeEffect("stun", { source: unit.uid, durationSec: TRICKSTER_STUN_SEC }));
-
-  // Revealed by the strike; start the re-cloak countdown so it vanishes again.
-  unit.effects = unit.effects.filter((e) => e.type !== "stealth");
-  unit.recloakTimer = secToTicks(TRICKSTER_RECLOAK_SEC);
-
-  spawnVfx(state, {
-    kind: "slam",
-    pos: { x: victim.pos.x, y: victim.pos.y },
-    life: secToTicks(0.4),
-    maxLife: secToTicks(0.4),
-    color: getUnitDef(unit.defId).accent,
-  });
-  return true;
-}
+// (Trickster Shadow Step + its tuning now live in kits/trickster.ts — onReactTick
+// blinks to a nearby casting enemy and kicks/interrupts it, in the pre-idle
+// reactive act slot.)
 
 // Necromancer casting. It juggles two casts on one cast bar, so it's handled
 // here instead of the shared mage pipeline: its big Curse (long cooldown) when
@@ -677,17 +621,8 @@ export function stepSimulation(state: SimState): void {
     // (Bear Form's guard-timer countdown now lives in kits/druid.ts onTick — the
     // pre-gate maintenance slot, decremented before the transform check.)
 
-    // Trickster re-cloak: a beat after it last struck, it melts back into stealth.
-    // (Only the Trickster ever sets recloakTimer, so no defId gate is needed.)
-    if (unit.recloakTimer > 0) {
-      unit.recloakTimer--;
-      if (unit.recloakTimer === 0 && !isStealthed(unit)) {
-        applyEffect(
-          unit,
-          makeEffect("stealth", { source: unit.uid, durationSec: MATCH_TIME_SEC })
-        );
-      }
-    }
+    // (Trickster re-cloak countdown now lives in kits/trickster.ts onTick — the
+    // pre-gate maintenance slot.)
 
     // [seam] kit pre-gate maintenance slot — runs every tick, even while stunned
     // (periodic passives, per-tick stat recompute, threshold transforms). This is
@@ -813,12 +748,16 @@ export function stepSimulation(state: SimState): void {
     const enemies = alive.filter((e) => e.team !== unit.team);
     updateTarget(unit, byUid, enemies);
 
-    // [seam] (reserved) pre-idle reactive act slot — Blink / Shadow Step must
-    // react even when the committed target just died, i.e. BEFORE the idle-out
-    // below, so Arcane Mage / Trickster will hook their onActTick in HERE when
-    // they migrate (they still use the hardcoded blocks just below for now). The
-    // post-idle act slot (Rejuvenation / Necromancer cast) lives after the
-    // idle-out, where an instant act needs a live target.
+    // [seam] pre-idle reactive act slot — runs after targeting but BEFORE the
+    // target-dead idle-out below, so a kit reacts even when its committed target
+    // just died (Trickster Shadow Step interrupts any nearby caster). The post-idle
+    // act slot (onActTick: Rejuvenation / Necromancer cast) is after the idle-out,
+    // where an instant act needs a live target. Arcane Mage's Blink still uses its
+    // hardcoded block just below until it migrates into this same slot.
+    {
+      const kit = getKit(unit.defId);
+      if (kit?.onReactTick) kit.onReactTick(unit, makeKitCtx(unit));
+    }
 
     // Arcane Mage: Blink away from a closing melee threat (own cooldown, so it's
     // independent of the passive ability slot). Just repositions; the rest of the
@@ -829,14 +768,8 @@ export function stepSimulation(state: SimState): void {
       }
     }
 
-    // Trickster: Shadow Step to an enemy that just started casting and kick it,
-    // interrupting the cast. Reactive, on its own cooldown — independent of its
-    // basic attacks (it still brawls normally when nothing is casting).
-    if (unit.defId === "trickster" && unit.shadowCooldown <= 0) {
-      if (tryShadowStep(state, unit, enemies, dealDamage)) {
-        unit.shadowCooldown = secToTicks(TRICKSTER_COOLDOWN_SEC);
-      }
-    }
+    // (Trickster Shadow Step now fires from the pre-idle onReactTick seam above —
+    // kits/trickster.ts.)
 
     const target = unit.targetUid ? byUid.get(unit.targetUid) : null;
 
@@ -1029,15 +962,9 @@ function performBasicAttack(
   const ranged = unit.range > 80;
 
   // [seam] before the swing resolves (open contract 2). Assassin Ambush (opening
-  // stun + reveal) now lives in its kit (kits/assassin.ts onBeforeAttack).
+  // stun + reveal) and the Trickster's reveal + re-cloak restart now live in their
+  // kits (kits/assassin.ts, kits/trickster.ts onBeforeAttack).
   if (kit?.onBeforeAttack) kit.onBeforeAttack(unit, target, ctx);
-
-  // Trickster reveals on a strike and (re)starts its re-cloak timer, slipping back
-  // into stealth a beat after it stops swinging. (Rogue's reveal is in its kit.)
-  if (unit.defId === "trickster") {
-    unit.effects = unit.effects.filter((e) => e.type !== "stealth");
-    unit.recloakTimer = secToTicks(TRICKSTER_RECLOAK_SEC);
-  }
 
   unit.attackCount += 1;
   // Ice Mage: every second basic attack freezes the target (2s stun).

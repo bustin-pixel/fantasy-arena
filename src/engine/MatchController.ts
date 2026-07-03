@@ -34,7 +34,6 @@ import {
   stepSimulation,
   type SimState,
 } from "./CombatSystem";
-import { applyEffect, makeEffect } from "./StatusEffectSystem";
 import { getKit } from "./kits/UnitKit";
 import { WaveController } from "./WaveController";
 import { isMelee, getUnitDef } from "@/data/units";
@@ -178,17 +177,9 @@ export class MatchController {
     });
     this.state.units.push(unit);
 
-    // [seam] kit spawn hook (the Assassin's opening stealth rides its kit here).
+    // [seam] kit spawn hook (opening stealth for the Assassin/Rogue/Trickster rides
+    // their kits here).
     getKit(defId)?.onSpawn?.(unit);
-
-    // Opening stealth for the still-un-migrated Trickster (Rogue rides its kit's
-    // onSpawn): it enters untargetable until its first strike reveals it.
-    if (unit.defId === "trickster") {
-      applyEffect(
-        unit,
-        makeEffect("stealth", { source: unit.uid, durationSec: MATCH_TIME_SEC })
-      );
-    }
 
     // Mark the consumed deck index. For the player, deploy the selected card;
     // otherwise the first undeployed copy matching defId.

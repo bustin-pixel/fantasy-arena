@@ -80,9 +80,14 @@ Still gated by `defId` string literals in `CombatSystem.ts`:
   skeleton every 5s.
 - ~~`"rogue"`~~ — **migrated** to `kits/rogue.ts` (onSpawn stealth + onBeforeAttack
   reveal + onAfterAttack Venom).
-- `"trickster"` → opening stealth that reveals on first strike; Shadow Step
-  (reactive cast-interrupt blink) + re-cloak. (Shares the deploy stealth + reveal
-  paths, now trickster-only until it migrates.)
+- ~~`"trickster"` → opening stealth + reveal-on-strike + re-cloak + Shadow Step~~ —
+  **migrated** to `kits/trickster.ts` (onSpawn stealth, onTick re-cloak, onBeforeAttack
+  reveal + re-cloak restart, **onReactTick** Shadow Step). Added the `onReactTick` hook
+  — the **pre-idle reactive act slot** (fires before the target-dead idle-out, so it
+  interrupts any nearby caster even when its own target just died), the first user of the
+  slot reserved at the Druid. The Arcane Mage's Blink still uses its hardcoded block in
+  that same seam location until it migrates. The Trickster was the last stealther (Rogue
+  already migrated), so the deploy-stealth `defId` branch in `MatchController` is now gone.
 - `"warrior"` → Whirlwind: its melee swing is replaced by an AoE spin — hits every
   enemy within melee reach (`range + radius`) for its damage and applies a
   refreshing bleed (poison-type DoT, non-stacking). No lifesteal. `ability` slot is
