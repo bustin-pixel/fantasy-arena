@@ -203,8 +203,11 @@ decisions, the interface, hook contracts, migration order) in **`docs/adr/0001-u
   `stepCharge`/`stepArcaneBarrage` + the free `onProjectileHit` resolver (field-gated engine plumbing,
   not per-unit code); `castFear` stays (the Necromancer kit reaches it via `applyTerrify`). The temp
   `_migration_digest_guard.test.ts` was deleted as the final step.
-- **The refactor is done.** Next up on this branch is optional: the **first balance dividend** below
-  (its own commit, INTENTIONAL digest change), or finalize/merge PR #41 (a Netlify deploy — ask first).
+- **The refactor is done, and the first balance dividend shipped** (`9588bcc`, `feat`, intentional
+  behavior change): stun/fear/polymorph now suppress the units' passive upkeep — a new
+  `isIncapacitated(unit)` early-return guards the Necromancer's Raise Dead, the Engineer's Field
+  Repairs, and the Hunter's traps + boar re-summon (specs added; determinism holds). Next up on this
+  branch is optional: more balance passes, or finalize/merge PR #41 (a Netlify deploy — ask first).
 - **✓ onActTick split (RESOLVED, now fully wired):** two distinct post-target slots ended up
   needed. **`onActTick`** fires **POST-idle** (needs a live target): Druid Rejuv (instant →
   returns void → falls through to the standard cast chain) and the Necromancer's dual cast
@@ -212,8 +215,8 @@ decisions, the interface, hook contracts, migration order) in **`docs/adr/0001-u
   `castTicks > 0`). **`onReactTick`** fires **PRE-idle** (reacts even when the committed target
   just died): the Trickster's Shadow Step wired it first; the Arcane Mage's Blink slots into
   the same seam when it migrates. Both are passed the loop's `abilityCtx`.
-- **First balance dividend after the refactor** (separate commit, own spec): stun
-  suppresses Raise Dead / Engineer repair / Hunter traps (move the hook past the gate).
+- **✓ First balance dividend SHIPPED** (`9588bcc`): stun/fear/polymorph suppress Raise Dead /
+  Engineer repair / Hunter traps+boar — via an `isIncapacitated` early-return in each upkeep `onTick`.
 - Retires the `NOTES.md §2` "consider a per-unit traits field" note and the §3
   `PASSIVE_ABILITIES` footgun.
 
