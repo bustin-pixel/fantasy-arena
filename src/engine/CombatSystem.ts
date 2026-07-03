@@ -923,46 +923,8 @@ function performBasicAttack(
   // onBasicAttack); its stacking/detonation resolves on impact (onProjectileHit).
   if (kit?.onBasicAttack && kit.onBasicAttack(unit, target, ctx)) return;
 
-  // Ranger Multishot: every second shot looses three arrows at once, each locked
-  // onto a different enemy in range (the committed target plus the two nearest
-  // others). Against a lone foe only one arrow finds a mark, so it's an anti-swarm
-  // spread rather than extra single-target burst. Extra targets are picked nearest-
-  // first with a uid tiebreak so the volley is deterministic.
-  if (unit.defId === "ranger") {
-    const shots: Unit[] = [target];
-    if (unit.attackCount % 2 === 0) {
-      const extras = state.units
-        .filter(
-          (e) =>
-            e.team !== unit.team &&
-            e.state !== "dead" &&
-            e.uid !== target.uid &&
-            dist(unit.pos, e.pos) <= unit.range
-        )
-        .sort((a, b) => {
-          const da = dist(unit.pos, a.pos);
-          const db = dist(unit.pos, b.pos);
-          if (da !== db) return da - db;
-          return a.uid < b.uid ? -1 : 1;
-        });
-      for (const e of extras.slice(0, 2)) shots.push(e);
-    }
-    for (const t of shots) {
-      spawnProjectile(state, {
-        pos: { x: unit.pos.x, y: unit.pos.y },
-        target: { x: t.pos.x, y: t.pos.y },
-        targetUid: t.uid,
-        speed: 380,
-        damage: unit.damage,
-        team: unit.team,
-        sourceUid: unit.uid,
-        ability: "lifesteal", // sentinel: basic shot, no on-hit status
-        color: def.accent,
-        angle: 0,
-      });
-    }
-    return;
-  }
+  // [seam] Ranger Multishot (the every-2nd-shot three-arrow spread) now lives in
+  // kits/ranger.ts onBasicAttack, fired above.
 
   // (The Arcane Mage has no special basic attack — it uses the default ranged
   // shot below, and nukes with its active Arcane Barrage on cooldown.)

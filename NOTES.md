@@ -97,10 +97,12 @@ Still gated by `defId` string literals in `CombatSystem.ts`:
   refreshing bleed (poison-type DoT, non-stacking)~~ — **migrated** to
   `kits/warrior.ts` (onBasicAttack → true, replacing the swing with the spin + bleed;
   no lifesteal). `ability` slot stays the passive `whirlwind`.
-- `"ranger"` → Multishot: every second basic attack looses three arrows at once,
+- ~~`"ranger"` → Multishot: every second basic attack looses three arrows at once,
   each locked onto a different enemy in range (committed target + the two nearest
   others, nearest-first with a uid tiebreak). Against a lone foe only one arrow
-  spawns, so it's an anti-swarm spread. `ability` slot is the passive `multishot`.
+  spawns, so it's an anti-swarm spread~~ — **migrated** to `kits/ranger.ts`
+  (onBasicAttack → true, the every-2nd-shot spread). `ability` slot stays the
+  passive `multishot`.
 - ~~`"mystic_archer"` → Light/Dark form-tagged shots + on-hit stack/detonate
   resolution (`resolveMysticHit`) + Momentum~~ — **migrated** to
   `kits/mysticArcher.ts` (onTick Momentum recompute, onBasicAttack form shot,

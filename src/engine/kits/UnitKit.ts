@@ -29,6 +29,7 @@ import { knightKit } from "./knight";
 import { mysticArcherKit } from "./mysticArcher";
 import { necromancerKit } from "./necromancer";
 import { ogreKit } from "./ogre";
+import { rangerKit } from "./ranger";
 import { rogueKit } from "./rogue";
 import { slimeKit, slimeCloneKit } from "./slime";
 import { tricksterKit } from "./trickster";
@@ -136,6 +137,7 @@ export const UNIT_KITS: UnitKitRegistry = {
   mystic_archer: mysticArcherKit,
   necromancer: necromancerKit,
   ogre: ogreKit,
+  ranger: rangerKit,
   rogue: rogueKit,
   slime: slimeKit,
   slime_clone: slimeCloneKit,
