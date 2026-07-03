@@ -124,9 +124,11 @@ Still gated by `defId` string literals in `CombatSystem.ts`:
   Orc's charge), pending a charge-system refactor when the Orc migrates.
 - ~~`"zombie_shambler"` → Numbing Bite~~ — **migrated** to `kits/zombieShambler.ts`
   (onAfterAttack: 30% move+attack slow for 2s). First UnitKit migration.
-- `"bloater"` → Putrid Burst: on death it ruptures — 30 AoE damage + a poison
-  DoT to every enemy within 110px (same one-shot safety as the slime burst).
-  Depths tier-1 boss, never in a deck. (The Giant Rat is pure stats — no gate.)
+- ~~`"bloater"` → Putrid Burst: on death it ruptures — 30 AoE damage + a poison
+  DoT to every enemy within 110px (same one-shot safety as the slime burst)~~ —
+  **migrated** to `kits/bloater.ts` (onDeath, fired by the same seam as the Slime
+  burst; not in the digest guard, so `bloater.test.ts` is its safety net). Depths
+  tier-1 boss, never in a deck. (The Giant Rat is pure stats — no gate.)
 - `"arcane_mage"` → the Blink defensive teleport (own `blinkCooldown` field, 5s),
   plus the Arcane Barrage volley streamer (`stepArcaneBarrage`): the active cast
   (`castArcaneBarrage` in AbilitySystem) only *arms* a 3-shot burst locked onto one

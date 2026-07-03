@@ -205,38 +205,9 @@ function makeDamageDealer(
         // keeps any spawned clones on the same-tick flush).
         if (kit?.onDeath) kit.onDeath(target, makeKitCtx(target, true));
 
-        // Bloater Putrid Burst: on death it ruptures — AoE damage plus a
-        // lingering poison on every nearby enemy. Same one-shot safety as the
-        // slime burst (a unit only dies once).
-        if (target.defId === "bloater") {
-          const CLOUD_RADIUS = 110;
-          const CLOUD_DMG = 30;
-          for (const u of state.units) {
-            if (u.state === "dead" || u.team === target.team) continue;
-            if (dist(target.pos, u.pos) <= CLOUD_RADIUS) {
-              dealDamage(u, CLOUD_DMG, target);
-              applyEffect(
-                u,
-                makeEffect("poison", {
-                  source: target.uid,
-                  durationSec: 4,
-                  damagePerTick: 4,
-                  tickIntervalSec: 0.5,
-                })
-              );
-            }
-          }
-          spawnVfx(state, {
-            kind: "slam",
-            pos: { x: target.pos.x, y: target.pos.y },
-            life: secToTicks(0.6),
-            maxLife: secToTicks(0.6),
-            color: getUnitDef(target.defId).accent,
-          });
-        }
-
-        // (Slime death-burst now lives in its kit — kits/slime.ts onDeath, fired
-        // by the onDeath seam above; it re-enters dealDamage via ctx.dealDamage.)
+        // (Bloater Putrid Burst + Slime death-burst now live in their kits'
+        // onDeath, fired by the onDeath seam above; both re-enter dealDamage via
+        // ctx.dealDamage on the same-tick damage funnel.)
       }
     }
   };
