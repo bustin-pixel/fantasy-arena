@@ -61,9 +61,11 @@ Still gated by `defId` string literals in `CombatSystem.ts`:
   `onSpawn` user — the hook is now wired in `MatchController.deploy` + the summon flush.
 - ~~`"slime"` / `"slime_clone"` → split-on-damage and death explosion~~ —
   **migrated** to `kits/slime.ts` (onDamaged split → damageSpawns; onDeath burst)
-- `"aegis_knight"` → soaks magic into a shield, Backlash AoE, Warded (immune
-  to burn/slow/poison). Magic is identified by the source unit's `school: "magic"`
-  field (the casters) — see `isMagicSource` in CombatSystem.
+- ~~`"aegis_knight"` → soaks magic, Backlash AoE, Warded~~ — **migrated** to
+  `kits/aegisKnight.ts` (two-phase `modifyIncomingDamage` soak + `onDamaged` bank +
+  `onAfterAttack` Backlash; `isMagicSource` moved into the kit). **Warded is now
+  data-driven**: `UnitDef.wardedAgainst: StatusEffectType[]`, read in
+  `StatusEffectSystem.applyEffect` — a static resistance, like `school`/`lifesteal`.
 - `"engineer"` → Field Repairs (defId-gated periodic heal of itself + nearby
   turrets). `"turret"` → stationary (moveSpeed 0) ranged construct, summoned via
   Deploy Turret (a non-deck summon, like `skeleton`/`wolf`).

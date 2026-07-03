@@ -113,6 +113,10 @@ export interface UnitDef {
   role: string;
   /** Damage school of this unit's attacks/abilities. Absent = physical. */
   school?: "physical" | "magic";
+  /** Status effects this unit is immune to (e.g. the Aegis Knight's Warded ward
+   *  against burn/slow/poison). A static resistance, so it lives in data like
+   *  `school` — StatusEffectSystem drops a warded effect at application. */
+  wardedAgainst?: StatusEffectType[];
   /** Human-readable passive traits (engine-coded behaviors) for the detail UI. */
   traits?: { name: string; description: string }[];
 }

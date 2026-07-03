@@ -484,6 +484,7 @@ export const UNITS: Record<string, UnitDef> = {
     ability: "aegis",
     color: "#5b6b8a",
     accent: "#7dd3fc",
+    wardedAgainst: ["burn", "slow", "poison"],
     traits: [
       {
         name: "Backlash",

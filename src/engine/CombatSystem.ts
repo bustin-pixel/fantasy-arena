@@ -125,14 +125,6 @@ function nextId(state: SimState, prefix: string): string {
 // HP mutation helpers — the ONLY places hp changes.
 // ---------------------------------------------------------------------------
 
-/** True if the damage comes from a magic-school unit (the casters). */
-function isMagicSource(source: Unit): boolean {
-  return getUnitDef(source.defId).school === "magic";
-}
-
-/** Cap on the Aegis Knight's banked magic shield; also its Backlash threshold. */
-const AEGIS_SHIELD_CAP = 120;
-
 function makeDamageDealer(
   state: SimState,
   makeKitCtx: (subject: Unit, damageContext?: boolean) => KitCtx
@@ -150,19 +142,11 @@ function makeDamageDealer(
     }
 
     // [seam] kit incoming-damage modifier (open contract 1): reduce the hit before
-    // HP is applied. Identity while un-migrated; the post-hit bank rides onDamaged.
+    // HP is applied (Aegis magic soak → 0.25x). Identity while un-migrated; the
+    // post-hit shield bank rides onDamaged below.
     let effAmount = amount;
     if (amount > 0 && kit?.modifyIncomingDamage) {
       effAmount = kit.modifyIncomingDamage(target, effAmount, source, makeKitCtx(target, true));
-    }
-
-    // Aegis Knight soaks magic: most of a magic hit is banked as overhealth
-    // shield (applied after, so it doesn't absorb this same hit) — only a sliver
-    // leaks through as HP damage.
-    let aegisBank = 0;
-    if (amount > 0 && target.defId === "aegis_knight" && isMagicSource(source)) {
-      effAmount = amount * 0.25;
-      aegisBank = Math.round(amount * 0.6);
     }
 
     let dmg = Math.max(0, Math.round(effAmount * target.damageTakenMult));
@@ -180,17 +164,11 @@ function makeDamageDealer(
     target.attackedByUid = source.uid;
     spawnFloatingText(state, target, `-${Math.round(effAmount * target.damageTakenMult)}`, "damage");
 
-    // Bank the absorbed magic into the Aegis shield (capped), after the hit.
-    if (aegisBank > 0 && target.hp > 0) {
-      target.shieldHpMax = AEGIS_SHIELD_CAP;
-      target.shieldHp = Math.min(AEGIS_SHIELD_CAP, target.shieldHp + aegisBank);
-    }
-
-    // [seam] kit post-hit reaction on a surviving target. Slime split now lives
-    // in its kit (kits/slime.ts onDamaged, routing clones to damageSpawns);
-    // Aegis bank migrates here next.
+    // [seam] kit post-hit reaction on a surviving target — gets the ORIGINAL
+    // incoming amount (Slime split reads hp thresholds; the Aegis magic bank needs
+    // the pre-mitigation hit). Slime split → kits/slime.ts; Aegis bank → aegisKnight.ts.
     if (kit?.onDamaged && target.hp > 0) {
-      kit.onDamaged(target, dmg, source, makeKitCtx(target, true));
+      kit.onDamaged(target, amount, source, makeKitCtx(target, true));
     }
 
     // (Ogre Second Wind now lives in its kit — kits/ogre.ts. onDamaged catches a
@@ -1277,24 +1255,8 @@ function performBasicAttack(
     // (Berserker Cleave now lives in kits/berserker.ts onAfterAttack, fired by
     // the onAfterAttack seam above.)
 
-    // Aegis Knight Backlash: a full magic shield discharges as an area burst on
-    // the next swing, spending the shield.
-    if (unit.defId === "aegis_knight" && unit.shieldHp >= AEGIS_SHIELD_CAP) {
-      const burst = Math.min(55, Math.round(unit.shieldHp * 0.5));
-      unit.shieldHp = 0;
-      unit.shieldHpMax = 0;
-      for (const e of state.units) {
-        if (e.team === unit.team || e.state === "dead") continue;
-        if (dist(unit.pos, e.pos) <= 100) dealDamage(e, burst, unit);
-      }
-      spawnVfx(state, {
-        kind: "slam",
-        pos: { x: unit.pos.x, y: unit.pos.y },
-        life: secToTicks(0.5),
-        maxLife: secToTicks(0.5),
-        color: def.accent,
-      });
-    }
+    // (Aegis Knight Backlash now lives in kits/aegisKnight.ts onAfterAttack,
+    // fired by the onAfterAttack seam above.)
   }
 }
 
