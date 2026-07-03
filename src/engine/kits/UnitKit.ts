@@ -27,6 +27,7 @@ import { druidKit } from "./druid";
 import { hunterKit } from "./hunter";
 import { knightKit } from "./knight";
 import { mysticArcherKit } from "./mysticArcher";
+import { necromancerKit } from "./necromancer";
 import { ogreKit } from "./ogre";
 import { rogueKit } from "./rogue";
 import { slimeKit, slimeCloneKit } from "./slime";
@@ -60,8 +61,12 @@ export interface UnitKit {
   onTick?(unit: Unit, ctx: KitCtx): void;
   /** Post-target, POST-idle: only when the unit still has a live target (or is
    *  mid-cast) — the instant acts that need something to act on (Rejuvenation, the
-   *  Necromancer's custom dual-cast). */
-  onActTick?(unit: Unit, ctx: KitCtx): void;
+   *  Necromancer's custom dual-cast). Return `true` to signal the kit OWNS this
+   *  unit's cast pipeline (the Necromancer's dual Curse/Terrify on one bar): the
+   *  engine then bypasses its standard cast-handling chain, and locks the unit for
+   *  the tick while that cast is mid-flight. An instant act (Druid Rejuvenation)
+   *  returns void and falls through to the standard chain. */
+  onActTick?(unit: Unit, ctx: KitCtx): boolean | void;
   /** Post-target, PRE-idle: reactive acts that fire even when the unit's committed
    *  target just died — they react to the wider board (Trickster Shadow Step
    *  interrupts any nearby caster; Arcane Blink dodges a closing melee threat).
@@ -128,6 +133,7 @@ export const UNIT_KITS: UnitKitRegistry = {
   hunter: hunterKit,
   knight: knightKit,
   mystic_archer: mysticArcherKit,
+  necromancer: necromancerKit,
   ogre: ogreKit,
   rogue: rogueKit,
   slime: slimeKit,

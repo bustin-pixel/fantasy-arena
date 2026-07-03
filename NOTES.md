@@ -75,9 +75,13 @@ Still gated by `defId` string literals in `CombatSystem.ts`:
 - `"engineer"` → Field Repairs (defId-gated periodic heal of itself + nearby
   turrets). `"turret"` → stationary (moveSpeed 0) ranged construct, summoned via
   Deploy Turret (a non-deck summon, like `skeleton`/`wolf`).
-- `"necromancer"` → custom cast handler (Curse DoT / Terrify fear on one cast bar,
-  see `stepNecromancerCast`) + Raise Dead, a periodic passive that summons a
-  skeleton every 5s.
+- ~~`"necromancer"` → custom dual-cast (Curse DoT / Terrify fear on one cast bar) +
+  Raise Dead~~ — **migrated** to `kits/necromancer.ts` (onTick Raise Dead every 5s;
+  onActTick runs the dual Curse/Terrify cast bar). The Necromancer OWNS its cast
+  pipeline: its `onActTick` returns `true`, so the engine bypasses the standard
+  cast-handling chain (and locks the unit while `castTicks > 0`) — the mechanism
+  that lets `onActTick` serve both an instant act (Druid) and a full custom pipeline.
+  Added `ctx.tick` to the AbilityContext (Raise Dead is synced to the global tick).
 - ~~`"rogue"`~~ — **migrated** to `kits/rogue.ts` (onSpawn stealth + onBeforeAttack
   reveal + onAfterAttack Venom).
 - ~~`"trickster"` → opening stealth + reveal-on-strike + re-cloak + Shadow Step~~ —

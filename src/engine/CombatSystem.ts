@@ -42,9 +42,7 @@ import { createUnit } from "@/entities/createUnit";
 import {
   abilityCastTimeTicks,
   abilityCooldownTicks,
-  applyCurse,
   applyLifesteal,
-  applyTerrify,
   fireCastAbility,
   onProjectileHit,
   tryCastAbility,
@@ -462,63 +460,9 @@ function tryBlink(state: SimState, unit: Unit, enemies: Unit[]): boolean {
 // blinks to a nearby casting enemy and kicks/interrupts it, in the pre-idle
 // reactive act slot.)
 
-// Necromancer casting. It juggles two casts on one cast bar, so it's handled
-// here instead of the shared mage pipeline: its big Curse (long cooldown) when
-// ready, otherwise Terrify. Raise Dead is a separate passive (periodic spawn).
-// Cast times + cooldowns come from the ability data (curse / fear_aura) so the
-// engine and the detail panel never drift.
-const NECRO_FEAR_REACH = 210; // a foe must be roughly within Terrify's range to bother
-
-function necroHasFearTarget(unit: Unit, enemies: Unit[]): boolean {
-  return enemies.some(
-    (e) =>
-      e.state !== "dead" &&
-      !isStealthed(e) &&
-      dist(unit.pos, e.pos) <= NECRO_FEAR_REACH
-  );
-}
-
-/** Returns true while the Necromancer is busy casting (caller should skip the
- *  rest of its tick). A finished cast fires Curse (castTargetUid set → DoT a
- *  target) or Terrify (castTargetUid null → AoE fear). */
-function stepNecromancerCast(state: SimState, ctx: AbilityContext): boolean {
-  const unit = ctx.unit;
-
-  if (unit.castTicks > 0) {
-    unit.castTicks--;
-    if (unit.castTicks <= 0) {
-      if (unit.castTargetUid) applyCurse(ctx);
-      else applyTerrify(ctx);
-      unit.castTicksMax = 0;
-      unit.castTargetUid = null;
-      return false; // free to basic-attack the rest of the tick
-    }
-    transitionTo(unit, "casting");
-    return true;
-  }
-
-  if (isStunned(unit) || isSilenced(unit)) return false;
-  const target = unit.targetUid ? ctx.unitsByUid.get(unit.targetUid) : null;
-
-  // Curse first (saved for its long cooldown), then Terrify.
-  if (unit.curseCooldown <= 0 && target && target.state !== "dead") {
-    unit.castTicks = abilityCastTimeTicks("curse");
-    unit.castTicksMax = unit.castTicks;
-    unit.castTargetUid = target.uid;
-    unit.curseCooldown = abilityCooldownTicks("curse");
-    transitionTo(unit, "casting");
-    return true;
-  }
-  if (unit.abilityCooldown <= 0 && necroHasFearTarget(unit, ctx.enemies)) {
-    unit.castTicks = abilityCastTimeTicks("fear_aura");
-    unit.castTicksMax = unit.castTicks;
-    unit.castTargetUid = null; // AoE → Terrify on completion
-    unit.abilityCooldown = abilityCooldownTicks("fear_aura");
-    transitionTo(unit, "casting");
-    return true;
-  }
-  return false;
-}
+// (Necromancer casting — the dual Curse/Terrify cast bar — now lives in
+// kits/necromancer.ts onActTick, which returns true so the engine bypasses its
+// standard cast-handling chain. Raise Dead moved to that kit's onTick.)
 
 // ---------------------------------------------------------------------------
 // Main tick
@@ -556,6 +500,7 @@ export function stepSimulation(state: SimState): void {
     const liveNow = state.units.filter((u) => u.state !== "dead");
     return {
       unit: subject,
+      tick: state.tick,
       unitsByUid: byUid,
       enemies: liveNow.filter((e) => e.team !== subject.team),
       allies: liveNow.filter(
@@ -648,15 +593,8 @@ export function stepSimulation(state: SimState): void {
       }
     }
 
-    // Necromancer Raise Dead: a passive that continuously raises a skeleton every
-    // 5s. The summon cap is enforced when spawns flush, so it can't flood the board.
-    if (unit.defId === "necromancer" && state.tick % secToTicks(5) === 0) {
-      pendingSpawns.push({
-        defId: "skeleton",
-        team: unit.team,
-        pos: { x: unit.pos.x, y: unit.pos.y + (unit.team === "player" ? -24 : 24) },
-      });
-    }
+    // (Necromancer Raise Dead now lives in kits/necromancer.ts onTick — the
+    // pre-gate maintenance slot, synced to the global tick.)
 
     // (Hunter Boar Companion + Scatter Trap laying now live in kits/hunter.ts
     // onTick — the pre-gate maintenance slot. The generic trap TRIGGER stays
@@ -786,6 +724,7 @@ export function stepSimulation(state: SimState): void {
 
     const abilityCtx: AbilityContext = {
       unit,
+      tick: state.tick,
       unitsByUid: byUid,
       enemies,
       allies,
@@ -799,20 +738,24 @@ export function stepSimulation(state: SimState): void {
     };
     const abilityKit = getKit(unit.defId);
 
-    // [seam] kit post-idle act slot — reached only with a LIVE target (the
-    // idle-out above already fired for a dead/absent target) or mid-cast, and
-    // always un-stunned/un-feared. Druid Rejuvenation runs here; the Necromancer's
-    // custom cast will too. Passes the loop's abilityCtx so allies/enemies match
-    // the funnel exactly (makeKitCtx would rebuild a fresher snapshot).
-    abilityKit?.onActTick?.(unit, abilityCtx);
+    // [seam] kit post-idle act slot — reached only with a LIVE target (the idle-out
+    // above already fired for a dead/absent target) or mid-cast, and always
+    // un-stunned/un-feared. Druid Rejuvenation runs here (instant → returns void).
+    // A kit that OWNS its whole cast pipeline (the Necromancer's dual Curse/Terrify
+    // on one bar) returns true, so the standard cast-handling chain below is
+    // bypassed. Passes the loop's abilityCtx so allies/enemies match the funnel
+    // exactly (makeKitCtx would rebuild a fresher snapshot).
+    const ownsCast = abilityKit?.onActTick?.(unit, abilityCtx);
 
     // Cast handling. An in-flight cast (the cast bar) ticks down and fires its
     // spell on completion, locking the mage meanwhile. Otherwise, begin a
     // cast-time ability (the mages) or fire an instant one (taunt, mend, charge,
     // kiting leap, summon, …) — kiting leap can interrupt the approach.
-    if (unit.defId === "necromancer") {
-      // Necromancer runs its own cast logic (Curse / Terrify) — see above.
-      if (stepNecromancerCast(state, abilityCtx)) continue;
+    if (ownsCast) {
+      // The kit ran its own cast pipeline (Necromancer). If it's mid-cast the unit
+      // is locked for the tick; otherwise fall through to attack — either way the
+      // standard cast-handling chain below is skipped.
+      if (unit.castTicks > 0) continue;
     } else if (unit.castTicks > 0) {
       unit.castTicks--;
       if (unit.castTicks <= 0) {

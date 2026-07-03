@@ -29,6 +29,8 @@ import {
 
 export interface AbilityContext {
   unit: Unit;
+  /** The current global sim tick (for tick-synced periodics like Raise Dead). */
+  tick: number;
   unitsByUid: Map<string, Unit>;
   enemies: Unit[];
   /** Living allies (same team, excluding self) — for healing/support abilities. */
