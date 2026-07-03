@@ -23,6 +23,7 @@ import type { AbilityContext } from "../AbilitySystem";
 import { aegisKnightKit } from "./aegisKnight";
 import { assassinKit } from "./assassin";
 import { berserkerKit } from "./berserker";
+import { druidKit } from "./druid";
 import { knightKit } from "./knight";
 import { ogreKit } from "./ogre";
 import { rogueKit } from "./rogue";
@@ -111,6 +112,7 @@ export const UNIT_KITS: UnitKitRegistry = {
   rogue: rogueKit,
   slime: slimeKit,
   slime_clone: slimeCloneKit,
+  summoner: druidKit,
   zombie_shambler: zombieShamblerKit,
 };
 

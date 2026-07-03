@@ -81,3 +81,19 @@ describe("Druid — Bear Form", () => {
     expect(firedProjectile).toBe(false); // …in melee, no projectile
   });
 });
+
+describe("Druid — Summon Wolves", () => {
+  it("summons a spirit wolf on its own team from caster form", () => {
+    const s = battleState(5);
+    place(s, "summoner", "player", 240, 600);
+    makeDummy(place(s, "skeleton", "enemy", 240, 300)); // a target to commit to
+
+    // abilityCooldown starts at 0, so the 0.5s summon cast begins at once and
+    // fires well within 30 ticks; the Druid is at full HP (caster, not bear).
+    for (let i = 0; i < 30; i++) stepSimulation(s);
+
+    expect(
+      s.units.some((u) => u.defId === "wolf" && u.team === "player")
+    ).toBe(true);
+  });
+});

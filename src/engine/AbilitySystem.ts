@@ -93,8 +93,6 @@ function dispatchAbility(ctx: AbilityContext): boolean {
       return castBlessing(ctx);
     case "deploy_turret":
       return castDeployTurret(ctx);
-    case "summon_wolves":
-      return castSummonWolves(ctx);
     case "polymorph":
       return castPolymorph(ctx);
     case "mend_beast":
@@ -360,74 +358,8 @@ function castBlessing(ctx: AbilityContext): boolean {
   return true;
 }
 
-// --- DRUID: Summon Wolves ----------------------------------------------------
-// Spawns a spirit wolf next to the summoner, on the same team. The wolf is a
-// full sim unit and fights under the same rules as everyone else.
-function castSummonWolves(ctx: AbilityContext): boolean {
-  const { unit } = ctx;
-  const offsetX = unit.facing >= 0 ? 36 : -36;
-  ctx.spawnUnit("wolf", unit.team, {
-    x: clamp(unit.pos.x + offsetX, 40, FIELD_WIDTH - 40),
-    y: clamp(unit.pos.y + 24, 40, FIELD_HEIGHT - 40),
-  });
-  ctx.spawnVfx({
-    kind: "frost",
-    pos: { x: unit.pos.x, y: unit.pos.y },
-    life: secToTicks(0.4),
-    maxLife: secToTicks(0.4),
-    color: getUnitDef(unit.defId).accent,
-  });
-  return true;
-}
-
-// --- DRUID: Rejuvenation -----------------------------------------------------
-// Instant cast: lays a healing-over-time on the most-wounded ally in range
-// (including itself) — 6 HP every 2s for 8s (24 total). Fired by CombatSystem on
-// the Druid's own cooldown; works in caster and bear form alike.
-const REJUV_RANGE = 160;
-const REJUV_HEAL_PER_TICK = 6;
-const REJUV_TICK_SEC = 2;
-const REJUV_DURATION_SEC = 8;
-
-export function applyRejuvenation(ctx: AbilityContext): boolean {
-  const { unit, allies } = ctx;
-  const candidates = [unit, ...allies].filter(
-    (u) =>
-      u.state !== "dead" &&
-      u.hp < u.maxHp &&
-      dist(unit.pos, u.pos) <= REJUV_RANGE
-  );
-  if (candidates.length === 0) return false; // no one hurt; save the cooldown
-
-  // Most-wounded by missing HP (uid tie-break for determinism).
-  let best = candidates[0];
-  let bestMissing = best.maxHp - best.hp;
-  for (const u of candidates) {
-    const missing = u.maxHp - u.hp;
-    if (missing > bestMissing || (missing === bestMissing && u.uid < best.uid)) {
-      best = u;
-      bestMissing = missing;
-    }
-  }
-
-  applyEffect(
-    best,
-    makeEffect("regen", {
-      source: unit.uid,
-      healPerTick: REJUV_HEAL_PER_TICK,
-      tickIntervalSec: REJUV_TICK_SEC,
-      durationSec: REJUV_DURATION_SEC,
-    })
-  );
-  ctx.spawnVfx({
-    kind: "shield_pop",
-    pos: { x: best.pos.x, y: best.pos.y - 4 },
-    life: secToTicks(0.5),
-    maxLife: secToTicks(0.5),
-    color: "#a3e635",
-  });
-  return true;
-}
+// (DRUID: Summon Wolves + Rejuvenation now live in kits/druid.ts — fireAbility
+// summons the wolf on cast completion; onActTick lays the Rejuvenation HoT.)
 
 // --- MAGE: Polymorph ---------------------------------------------------------
 // Turns the nearest non-summoned enemy into a harmless sheep for 7s. Only real

@@ -45,7 +45,6 @@ import {
   abilityCooldownTicks,
   applyCurse,
   applyLifesteal,
-  applyRejuvenation,
   applyTerrify,
   fireCastAbility,
   onProjectileHit,
@@ -259,8 +258,6 @@ function makeHealer(
     if (kit?.modifyIncomingHeal) {
       amt = kit.modifyIncomingHeal(target, amount, makeKitCtx(target, true));
     }
-    // Bear Form: the Druid receives 50% more healing while transformed.
-    if (target.defId === "summoner" && target.transformed) amt = amount * 1.5;
     const before = target.hp;
     target.hp = Math.min(target.maxHp, target.hp + Math.round(amt));
     const gained = target.hp - before;
@@ -306,29 +303,8 @@ function transitionTo(unit: Unit, next: Unit["state"]): void {
   unit.state = next;
 }
 
-// Druid -> Bear. One-way shapeshift into a melee bruiser. Its thick hide gives
-// 80% damage reduction, but only for the first 5s (then it's a normal-toughness
-// brawler). It keeps its caster kit — still summons wolves and Rejuvenates.
-function transformDruid(state: SimState, unit: Unit): void {
-  unit.transformed = true;
-  unit.range = 48; // melee
-  unit.damage = 26; // bigger claws
-  unit.attackSpeed = 1.1; // faster than caster form
-  unit.moveSpeed = 78; // charges in
-  unit.damageTakenMult = 0.2; // thick hide — takes only 20% damage…
-  unit.bearGuardTimer = secToTicks(5); // …for 5s, then reverts to normal
-  unit.abilityCooldown = 0; // keeps summoning as a bear
-  unit.attackCooldown = 0;
-  // Burst of leaves/spirit energy on transform.
-  spawnVfx(state, {
-    kind: "shield_pop",
-    pos: { x: unit.pos.x, y: unit.pos.y - 4 },
-    life: secToTicks(0.6),
-    maxLife: secToTicks(0.6),
-    color: "#a3e635",
-  });
-  spawnFloatingText(state, unit, "Bear Form!", "heal");
-}
+// (Druid -> Bear shapeshift now lives in kits/druid.ts onTick — the pre-gate
+// maintenance slot, together with its guard-timer countdown.)
 
 // Orc Charge speed — well above any unit's normal moveSpeed so the rush reads as
 // a fast lunge that quickly closes the gap, without being an instant teleport.
@@ -697,12 +673,8 @@ export function stepSimulation(state: SimState): void {
     if (unit.curseCooldown > 0) unit.curseCooldown--;
     if (unit.rejuvCooldown > 0) unit.rejuvCooldown--;
 
-    // Bear Form's 80% damage reduction lasts 5s, then the bear reverts to normal
-    // toughness. (Only the transformed Druid ever sets bearGuardTimer.)
-    if (unit.bearGuardTimer > 0) {
-      unit.bearGuardTimer--;
-      if (unit.bearGuardTimer === 0) unit.damageTakenMult = 1;
-    }
+    // (Bear Form's guard-timer countdown now lives in kits/druid.ts onTick — the
+    // pre-gate maintenance slot, decremented before the transform check.)
 
     // Trickster re-cloak: a beat after it last struck, it melts back into stealth.
     // (Only the Trickster ever sets recloakTimer, so no defId gate is needed.)
@@ -810,16 +782,8 @@ export function stepSimulation(state: SimState): void {
       });
     }
 
-    // Druid shapeshift: at <30% HP, transform into a bear — melee bruiser that
-    // takes only 20% damage (80% reduction). One-way. Stops summoning; becomes
-    // a frontline brawler.
-    if (
-      unit.defId === "summoner" &&
-      !unit.transformed &&
-      unit.hp <= unit.maxHp * 0.3
-    ) {
-      transformDruid(state, unit);
-    }
+    // (Druid Bear Form shapeshift now lives in kits/druid.ts onTick — the
+    // pre-gate maintenance slot.)
 
     // (Berserker Bloodrage now lives in kits/berserker.ts onTick — the pre-gate
     // maintenance slot, recomputed each tick from base stats.)
@@ -889,15 +853,12 @@ export function stepSimulation(state: SimState): void {
     const enemies = alive.filter((e) => e.team !== unit.team);
     updateTarget(unit, byUid, enemies);
 
-    // [seam] kit post-target act slot — the unit has a target (or none) and is
-    // un-stunned/un-feared here. This is where Blink / Shadow Step / Rejuvenation
-    // / the Necromancer's custom cast migrate. Timing among those varies (some run
-    // before the "no target" idle-out below, some after), so each migration
-    // re-verifies digest() and relocates this call if its unit needs it.
-    {
-      const kit = getKit(unit.defId);
-      if (kit?.onActTick) kit.onActTick(unit, makeKitCtx(unit));
-    }
+    // [seam] (reserved) pre-idle reactive act slot — Blink / Shadow Step must
+    // react even when the committed target just died, i.e. BEFORE the idle-out
+    // below, so Arcane Mage / Trickster will hook their onActTick in HERE when
+    // they migrate (they still use the hardcoded blocks just below for now). The
+    // post-idle act slot (Rejuvenation / Necromancer cast) lives after the
+    // idle-out, where an instant act needs a live target.
 
     // Arcane Mage: Blink away from a closing melee threat (own cooldown, so it's
     // independent of the passive ability slot). Just repositions; the rest of the
@@ -944,20 +905,12 @@ export function stepSimulation(state: SimState): void {
     };
     const abilityKit = getKit(unit.defId);
 
-    // Druid Rejuvenation: an instant HoT on the most-wounded nearby ally (incl.
-    // itself), on its own cooldown. Works in bear form too. Instant, so it never
-    // uses the cast bar — but it won't fire mid-summon-cast.
-    if (
-      unit.defId === "summoner" &&
-      unit.castTicks <= 0 &&
-      unit.rejuvCooldown <= 0 &&
-      !isStunned(unit) &&
-      !isSilenced(unit)
-    ) {
-      if (applyRejuvenation(abilityCtx)) {
-        unit.rejuvCooldown = abilityCooldownTicks("rejuvenation");
-      }
-    }
+    // [seam] kit post-idle act slot — reached only with a LIVE target (the
+    // idle-out above already fired for a dead/absent target) or mid-cast, and
+    // always un-stunned/un-feared. Druid Rejuvenation runs here; the Necromancer's
+    // custom cast will too. Passes the loop's abilityCtx so allies/enemies match
+    // the funnel exactly (makeKitCtx would rebuild a fresher snapshot).
+    abilityKit?.onActTick?.(unit, abilityCtx);
 
     // Cast handling. An in-flight cast (the cast bar) ticks down and fires its
     // spell on completion, locking the mage meanwhile. Otherwise, begin a

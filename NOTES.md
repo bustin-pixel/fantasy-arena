@@ -39,7 +39,7 @@ The internal `id` and the player-facing `name` diverge here:
 These were renamed in the UI but kept their original ids so saved decks
 wouldn't break. **Always reference units by their `id`** (`"summoner"`,
 `"healer"`), never by the display name. Several pieces of engine logic key off
-the id literal (e.g. `unit.defId === "summoner"` triggers the bear transform).
+the id literal (e.g. the UnitKit registry maps `"summoner"` → the Druid's kit).
 If you ever add a unit, make the id match the name to avoid extending this trap.
 
 ### 2. Hardcoded unit-id checks in CombatSystem
@@ -50,7 +50,13 @@ byte-identical). Migrated units are struck from this list; when it's empty the
 `dispatchAbility` switch, `PASSIVE_ABILITIES`, and `unitRoleClass` internals go too.
 
 Still gated by `defId` string literals in `CombatSystem.ts`:
-- `"summoner"` → Druid bear transform at 30% HP
+- ~~`"summoner"` → Druid bear transform at 30% HP~~ — **migrated** to
+  `kits/druid.ts` (onTick bear transform + guard-timer countdown, onActTick
+  Rejuvenation, modifyIncomingHeal bear +50%, fireAbility Summon Wolves). First
+  `onActTick` user: the seam now fires **post-idle** (after the target-dead
+  idle-out, where an instant act needs a live target); the reactive **pre-idle**
+  slot (Blink / Shadow Step) is a reserved call site, wired when Arcane/Trickster
+  migrate.
 - ~~`"ogre"` → Second Wind full-heal at 25% HP~~ — **migrated** to `kits/ogre.ts`
   (onDamaged + onWouldDie; Crushing Slam → fireAbility)
 - ~~`"berserker"` → Bloodrage damage/speed scaling + melee Cleave (AoE swing)~~ —
