@@ -151,12 +151,16 @@ contracts, migration order) in **`docs/adr/0001-unitkit-seam.md`**.
   (two-phase `modifyIncomingDamage` soak + `onDamaged` bank + `onAfterAttack` Backlash;
   **Warded is now data** — `UnitDef.wardedAgainst`, read in `StatusEffectSystem`) →
   **Druid** (`onTick` bear transform + guard-timer, `onActTick` Rejuv, `modifyIncomingHeal`
-  bear +50%, `fireAbility` Summon Wolves — **first `onActTick` user**).
-- **Remaining:** Mystic/Hunter → Trickster (Shadow Step `onActTick`) →
+  bear +50%, `fireAbility` Summon Wolves — **first `onActTick` user**) → **Mystic Archer**
+  (`onTick` Momentum, `onBasicAttack` form shot, **`onProjectileHit`** Light/Dark
+  stack+detonate+flip — added that hook; stacks stay flat cross-unit fields).
+- **Remaining:** Hunter → Trickster (Shadow Step `onActTick`) →
   **Necromancer last** (custom dual-cast) → cleanup (delete `dispatchAbility`,
   `PASSIVE_ABILITIES`, `isActiveAbility`, `unitRoleClass` internals, all fallbacks).
   **Ice/Fire Mage** freeze/burn riders ride the projectile — deferred to the candidate-3
-  projectile on-hit descriptor (ADR consequence); migrate them together.
+  projectile on-hit descriptor (ADR consequence); migrate them together. NB the Mystic's
+  bespoke resolution used the new **`onProjectileHit` code-hook**; candidate 3 adds the
+  complementary **data-descriptor** for the simple Ice/Fire riders.
 - **✓ onActTick placement (RESOLVED at the Druid):** the scaffolded pre-idle `onActTick`
   seam was relocated to fire **POST-idle** (after the "target-dead → idle" check), where an
   instant act needs a live target — Druid Rejuv (and later the Necro cast) hook there, and

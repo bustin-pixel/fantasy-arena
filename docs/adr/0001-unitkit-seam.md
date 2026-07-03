@@ -215,7 +215,12 @@ byte-identical. Hard units (5–8) only after 1–3 prove the pattern.
   Hunter traps). Post-refactor this is a one-line hook move (pre-gate `onTick` → post-gate),
   its own commit + spec, with an intentional digest change. Captured as intent here.
 - `lightStacks`/`darkStacks` are really *stacking status effects* wearing bespoke-field
-  clothes; a later refactor could model them as `ActiveStatusEffect`s. `.kit` is their home
-  until then.
-- **ADR-candidate 3** (explicit projectile on-hit descriptor) intersects the `onBasicAttack`
-  ranged riders; sequence it near the Ice/Fire migration.
+  clothes; a later refactor could model them as `ActiveStatusEffect`s. Per decision 5's
+  opportunistic-flat fallback they stay **flat fields on the victim** (cross-unit state),
+  *not* a `unit.kit` namespace — the Mystic migration did not need to introduce one.
+- **ADR-candidate 3** (explicit projectile on-hit *data-descriptor*) intersects the
+  `onBasicAttack` ranged riders; sequence it near the Ice/Fire migration. **Update (Mystic
+  migration):** the *code-hook* half — `onProjectileHit?(unit, target, proj, ctx)`, a source
+  unit's kit resolving its OWN shot's impact — was added for the Mystic's Light/Dark
+  stack/detonate (dispatched from `stepProjectiles` via the source's kit). Candidate 3 adds
+  the complementary declarative descriptor for the simple Ice/Fire freeze/burn riders.
