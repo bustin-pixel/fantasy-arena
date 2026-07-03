@@ -72,9 +72,11 @@ Still gated by `defId` string literals in `CombatSystem.ts`:
   `onAfterAttack` Backlash; `isMagicSource` moved into the kit). **Warded is now
   data-driven**: `UnitDef.wardedAgainst: StatusEffectType[]`, read in
   `StatusEffectSystem.applyEffect` — a static resistance, like `school`/`lifesteal`.
-- `"engineer"` → Field Repairs (defId-gated periodic heal of itself + nearby
-  turrets). `"turret"` → stationary (moveSpeed 0) ranged construct, summoned via
-  Deploy Turret (a non-deck summon, like `skeleton`/`wolf`).
+- ~~`"engineer"` → Field Repairs (defId-gated periodic heal of itself + nearby
+  turrets)~~ — **migrated** to `kits/engineer.ts` (onTick Field Repairs on the 2s
+  cadence + fireAbility Deploy Turret; covered by the digest guard via seeds
+  777/999). `"turret"` → stationary (moveSpeed 0) ranged construct, summoned via
+  Deploy Turret (a non-deck summon, like `skeleton`/`wolf`) — no kit of its own.
 - ~~`"necromancer"` → custom dual-cast (Curse DoT / Terrify fear on one cast bar) +
   Raise Dead~~ — **migrated** to `kits/necromancer.ts` (onTick Raise Dead every 5s;
   onActTick runs the dual Curse/Terrify cast bar). The Necromancer OWNS its cast

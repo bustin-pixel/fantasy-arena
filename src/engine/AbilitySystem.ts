@@ -12,12 +12,8 @@
 import type { FloatingText, Projectile, Trap, Unit, Vfx } from "@/types";
 import { ABILITIES } from "@/data/abilities";
 import { getUnitDef } from "@/data/units";
-import {
-  FIELD_HEIGHT,
-  FIELD_WIDTH,
-  secToTicks,
-} from "@/utils/constants";
-import { clamp, dist } from "@/utils/math";
+import { secToTicks } from "@/utils/constants";
+import { dist } from "@/utils/math";
 import {
   applyEffect,
   isSilenced,
@@ -89,8 +85,6 @@ function dispatchAbility(ctx: AbilityContext): boolean {
       return castChainLightning(ctx);
     case "charge":
       return castCharge(ctx);
-    case "deploy_turret":
-      return castDeployTurret(ctx);
     case "fear_aura":
       return castFear(ctx);
     default:
@@ -333,26 +327,9 @@ function castChainLightning(ctx: AbilityContext): boolean {
   return true;
 }
 
-// --- DWARVEN ENGINEER: Deploy Turret -----------------------------------------
-// Builds a stationary ranged turret beside the engineer (a summoned, non-deck
-// unit). Like the Druid's wolves it's queued via spawnUnit; the per-team summon
-// cap bounds how many turrets can exist, so the fort can't flood the board.
-function castDeployTurret(ctx: AbilityContext): boolean {
-  const { unit } = ctx;
-  const offsetX = unit.facing >= 0 ? 40 : -40;
-  ctx.spawnUnit("turret", unit.team, {
-    x: clamp(unit.pos.x + offsetX, 40, FIELD_WIDTH - 40),
-    y: clamp(unit.pos.y, 40, FIELD_HEIGHT - 40),
-  });
-  ctx.spawnVfx({
-    kind: "slam",
-    pos: { x: clamp(unit.pos.x + offsetX, 40, FIELD_WIDTH - 40), y: unit.pos.y },
-    life: secToTicks(0.4),
-    maxLife: secToTicks(0.4),
-    color: getUnitDef(unit.defId).accent,
-  });
-  return true;
-}
+// (DWARVEN ENGINEER: Deploy Turret now lives in kits/engineer.ts — an instant
+// fireAbility that queues a turret summon beside the engineer, together with its
+// onTick Field Repairs.)
 
 // --- NECROMANCER: Terrify ----------------------------------------------------
 // Terrify: nearby enemies flee in terror (fear status) and can't attack for 2s.

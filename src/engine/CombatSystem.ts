@@ -550,19 +550,8 @@ export function stepSimulation(state: SimState): void {
       if (kit?.onTick) kit.onTick(unit, makeKitCtx(unit));
     }
 
-    // Engineer Field Repairs: every 2s, repair itself and nearby turrets,
-    // keeping its emplacements alive longer than their raw HP suggests.
-    if (unit.defId === "engineer" && state.tick % secToTicks(2) === 0) {
-      const REPAIR = 8;
-      const REPAIR_RADIUS = 200;
-      heal(unit, REPAIR);
-      for (const ally of state.units) {
-        if (ally.state === "dead" || ally.team !== unit.team) continue;
-        if (ally.defId === "turret" && dist(unit.pos, ally.pos) <= REPAIR_RADIUS) {
-          heal(ally, REPAIR);
-        }
-      }
-    }
+    // (Engineer Field Repairs now lives in kits/engineer.ts onTick — the pre-gate
+    // maintenance slot, on the same 2s cadence, healing itself + nearby turrets.)
 
     // (Necromancer Raise Dead now lives in kits/necromancer.ts onTick — the
     // pre-gate maintenance slot, synced to the global tick.)

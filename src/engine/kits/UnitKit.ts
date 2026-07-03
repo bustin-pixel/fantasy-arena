@@ -27,6 +27,7 @@ import { berserkerKit } from "./berserker";
 import { bloaterKit } from "./bloater";
 import { clericKit } from "./cleric";
 import { druidKit } from "./druid";
+import { engineerKit } from "./engineer";
 import { holyKnightKit } from "./holyKnight";
 import { hunterKit } from "./hunter";
 import { knightKit } from "./knight";
@@ -139,6 +140,7 @@ export const UNIT_KITS: UnitKitRegistry = {
   assassin: assassinKit,
   berserker: berserkerKit,
   bloater: bloaterKit,
+  engineer: engineerKit,
   healer: clericKit,
   holy_knight: holyKnightKit,
   hunter: hunterKit,
