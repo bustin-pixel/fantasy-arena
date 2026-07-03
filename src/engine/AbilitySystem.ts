@@ -11,7 +11,7 @@
 
 import type { FloatingText, Projectile, Trap, Unit, Vfx } from "@/types";
 import { ABILITIES } from "@/data/abilities";
-import { getUnitDef, NON_DECK_UNITS } from "@/data/units";
+import { getUnitDef } from "@/data/units";
 import {
   FIELD_HEIGHT,
   FIELD_WIDTH,
@@ -20,7 +20,6 @@ import {
 import { clamp, dist } from "@/utils/math";
 import {
   applyEffect,
-  isPolymorphed,
   isSilenced,
   isStealthed,
   isStunned,
@@ -92,8 +91,6 @@ function dispatchAbility(ctx: AbilityContext): boolean {
       return castCharge(ctx);
     case "deploy_turret":
       return castDeployTurret(ctx);
-    case "polymorph":
-      return castPolymorph(ctx);
     case "fear_aura":
       return castFear(ctx);
     default:
@@ -120,14 +117,11 @@ export function fireCastAbility(ctx: AbilityContext): boolean {
   return dispatchAbility(ctx);
 }
 
-/** Whether a cast-time ability has a reason to BEGIN its cast this tick. Most
- *  casts always do (there's always an enemy to hit); the Mage's Polymorph only
- *  commits when there's a valid non-summoned target to sheep — otherwise it would
- *  lock itself in place casting into nothing. (The Cleric's Mend gate now lives in
- *  kits/cleric.ts wantsToCast; a migrated unit's kit gate overrides this fallback.) */
-export function wantsToCast(ctx: AbilityContext): boolean {
-  if (ctx.unit.ability === "polymorph")
-    return polymorphTarget(ctx.unit, ctx.enemies) != null;
+/** Whether a cast-time ability has a reason to BEGIN its cast this tick — the
+ *  fallback for un-migrated casts, which always do (there's always an enemy to
+ *  hit). Units with a conditional begin-gate (the Cleric's Mend, the Mage's
+ *  Polymorph) now supply their own kit `wantsToCast`, which the seam prefers. */
+export function wantsToCast(_ctx: AbilityContext): boolean {
   return true;
 }
 
@@ -267,51 +261,9 @@ function castCharge(ctx: AbilityContext): boolean {
 // (DRUID: Summon Wolves + Rejuvenation now live in kits/druid.ts — fireAbility
 // summons the wolf on cast completion; onActTick lays the Rejuvenation HoT.)
 
-// --- MAGE: Polymorph ---------------------------------------------------------
-// Turns the nearest non-summoned enemy into a harmless sheep for 7s. Only real
-// (deckable) units can be sheeped — summons (wolves, skeletons, slime clones,
-// turrets) are immune. Skips already-sheeped and stealthed foes.
-const POLYMORPH_DURATION_SEC = 7;
-
-function polymorphTarget(unit: Unit, enemies: Unit[]): Unit | null {
-  let best: Unit | null = null;
-  let bestD = Infinity;
-  for (const e of enemies) {
-    if (e.state === "dead") continue;
-    if (NON_DECK_UNITS.has(e.defId)) continue; // not summoned units
-    if (isPolymorphed(e) || isStealthed(e)) continue;
-    const d = dist(unit.pos, e.pos);
-    if (d < bestD || (d === bestD && best != null && e.uid < best.uid)) {
-      bestD = d;
-      best = e;
-    }
-  }
-  return best;
-}
-
-function castPolymorph(ctx: AbilityContext): boolean {
-  const target = polymorphTarget(ctx.unit, ctx.enemies);
-  if (!target) return false;
-  applyEffect(
-    target,
-    makeEffect("polymorph", {
-      source: ctx.unit.uid,
-      durationSec: POLYMORPH_DURATION_SEC,
-    })
-  );
-  // It can't keep acting on whatever it was doing.
-  target.targetUid = null;
-  target.castTicks = 0;
-  target.castTicksMax = 0;
-  ctx.spawnVfx({
-    kind: "frost",
-    pos: { x: target.pos.x, y: target.pos.y - 4 },
-    life: secToTicks(0.5),
-    maxLife: secToTicks(0.5),
-    color: "#f0abfc", // magic pink poof
-  });
-  return true;
-}
+// (MAGE: Polymorph now lives in kits/mage.ts — a cast-time fireAbility that sheeps
+// the nearest non-summoned, un-sheeped, visible enemy for 7s, with wantsToCast as
+// the begin-cast gate. Its polymorphTarget picker moved into the kit.)
 
 // (HUNTER: Mend Beast now lives in kits/hunter.ts fireAbility — an instant HoT on
 // the most-wounded boar ally.)

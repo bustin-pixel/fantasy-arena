@@ -30,6 +30,7 @@ import { druidKit } from "./druid";
 import { holyKnightKit } from "./holyKnight";
 import { hunterKit } from "./hunter";
 import { knightKit } from "./knight";
+import { mageKit } from "./mage";
 import { mysticArcherKit } from "./mysticArcher";
 import { necromancerKit } from "./necromancer";
 import { ogreKit } from "./ogre";
@@ -142,6 +143,7 @@ export const UNIT_KITS: UnitKitRegistry = {
   holy_knight: holyKnightKit,
   hunter: hunterKit,
   knight: knightKit,
+  mage: mageKit,
   mystic_archer: mysticArcherKit,
   necromancer: necromancerKit,
   ogre: ogreKit,
