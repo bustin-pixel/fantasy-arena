@@ -162,14 +162,22 @@ contracts, migration order) in **`docs/adr/0001-unitkit-seam.md`**.
   **Necromancer** (onTick Raise Dead via new **`ctx.tick`**; **`onActTick` returns `true`**
   to OWN its dual Curse/Terrify cast bar and bypass the standard cast chain). **All 14 kits
   migrated — the per-unit strangler-fig is done.**
+- **Done (ordinary units, extending the batch past the ADR's 14 — same recipe, all
+  digest-byte-identical):** **Warrior** (`onBasicAttack` → true, Whirlwind spin + bleed) →
+  **Ranger** (`onBasicAttack` → true, Multishot spread) → **Holy Knight** (`fireAbility`
+  Blessing, instant — fires through the instant-cast seam) → **Cleric/`healer`**
+  (`fireAbility` Mend + **`wantsToCast`** begin-cast gate — **first `wantsToCast` user**;
+  its `mendTarget` helper moved into the kit). Dropped the `blessing` + `mend` cases from the
+  `dispatchAbility` switch (12 → 10 live cases).
 - **Remaining: the cleanup commit** — delete `dispatchAbility`, `PASSIVE_ABILITIES`,
   `isActiveAbility`, `unitRoleClass` internals, and the `?? old-path` fallbacks (only once
   nothing needs them). Out-of-ADR-scope units still `defId`-gated: Engineer (Field Repairs),
-  Warrior (Whirlwind), Ranger (Multishot), Arcane Mage (Blink + Barrage — Blink slots into
-  the `onReactTick` seam), Bloater (death burst), Boar (guard-charge, with the Orc).
-  **Ice/Fire Mage** freeze/burn riders ride the projectile — deferred to the candidate-3
-  projectile on-hit *data-descriptor* (complements the Mystic's `onProjectileHit` code-hook);
-  migrate them together.
+  Arcane Mage (Blink + Barrage — Blink slots into the `onReactTick` seam), Bloater (death
+  burst), Boar (guard-charge, with the Orc); plus the `dispatchAbility` switch's remaining
+  cast-ability cases (Archer `kiting_leap`, the mages, Orc `charge`, Engineer `deploy_turret`,
+  Mage `polymorph`, Necromancer `fear_aura`). **Ice/Fire Mage** freeze/burn riders ride the
+  projectile — deferred to the candidate-3 projectile on-hit *data-descriptor* (complements
+  the Mystic's `onProjectileHit` code-hook); migrate them together.
 - **✓ onActTick split (RESOLVED, now fully wired):** two distinct post-target slots ended up
   needed. **`onActTick`** fires **POST-idle** (needs a live target): Druid Rejuv (instant →
   returns void → falls through to the standard cast chain) and the Necromancer's dual cast
