@@ -128,12 +128,13 @@ automatically) and Heroes of the Arena (all deckables).
   tuned so torches flank on narrow screens; the battle canvas is capped at 480px, safe
   to scale up on desktop since the 480×720 sim is display-independent).
 
-### Engine architecture — UnitKit seam (in progress; PR 1 on `refactor/unitkit-seam`)
-Collapse the ~38 `defId`/`ability` branches in `CombatSystem`, the `AbilityId`
+### Engine architecture — UnitKit seam ✅ COMPLETE (on `refactor/unitkit-seam`, PR #41, unmerged)
+Collapsed the ~38 `defId`/`ability` branches in `CombatSystem`, the `AbilityId`
 `dispatchAbility` switch + `PASSIVE_ABILITIES` in `AbilitySystem`, and the role
 heuristics in `MatchController` into **one stateless kit per `defId`** behind a
-`UnitKit` seam. Full design (8 locked decisions, the interface, 3 open hook
-contracts, migration order) in **`docs/adr/0001-unitkit-seam.md`**.
+`UnitKit` seam. **All 28 kits migrated + the old path deleted** — every commit
+digest-byte-identical; the temp digest guard has been retired. Full design (8 locked
+decisions, the interface, hook contracts, migration order) in **`docs/adr/0001-unitkit-seam.md`**.
 - **Guardrail:** behavior-identical — `digest()` byte-identical at every commit.
 - **Shape:** engine owns the tick skeleton (gate/targeting/cast pipeline); kit gets
   `onTick`/`onActTick` + event/modifier/override hooks + `fireAbility`/`wantsToCast`;
@@ -187,7 +188,6 @@ contracts, migration order) in **`docs/adr/0001-unitkit-seam.md`**.
   kits ARM the rush (Orc `fireAbility` / Boar `onTick`, guarded to keep its post-gate spot), and a
   new **`onChargeContact`** hook resolves the impact (Orc slam / Boar taunt). Dropped `charge`
   (switch 5 → 4) and the last charge-system `defId` checks. Guard-covered (Orc seed 20260626, Boar
-  via the Hunter in 777/999) + `orc.test.ts`/`boar.test.ts`.
   via the Hunter in 777/999) + `orc.test.ts`/`boar.test.ts`. Then **Fire + Ice Mage** (the last
   unit): the casts (`fireball`/`frost_blast`) moved to `kits/fireMage.ts` / `kits/iceMage.ts`
   (fireAbility), and the every-Nth-attack burn/freeze riders became **pure `UnitDef` data**
@@ -195,18 +195,16 @@ contracts, migration order) in **`docs/adr/0001-unitkit-seam.md`**.
   (`Projectile.rider: ShotRider`, applied generically in `stepProjectiles`; the DATA half that
   complements the Mystic's `onProjectileHit` CODE-hook). Dropped `fireball`/`frost_blast` (switch
   4 → 2). **ALL per-unit `defId` branches are now gone — the strangler-fig migration is COMPLETE.**
-- **Remaining: ONLY the cleanup commit.** Every unit's mechanics live in a kit (or in data). What's
-  left to delete, once verified nothing reaches them:
-  - `PASSIVE_ABILITIES` + `isActiveAbility` (the fireAbility-defined check supersedes them),
-    `unitRoleClass`'s ability/hp heuristic internals (all deckable units declare `roleClass`), and
-    the `?? old-path` seam fallbacks (`kit?.fireAbility ?? fireCastAbility`, etc.).
-  - The `dispatchAbility` switch is down to `shield_block` (an orphan — **no unit has this
-    ability**; likely dead, verify + delete) and `fear_aura` (the Necromancer's Terrify — its kit
-    calls it; keep `castFear` reachable, e.g. call it directly from the kit or a small helper, then
-    the switch can go). The free `onProjectileHit` resolver (fireball/frost_blast/arcane_barrage)
-    stays — it's projectile plumbing, not per-unit code.
-  - **Delete the untracked digest guard as the LAST step**, before finalizing the PR (the cleanup
-    itself should keep it green — it only removes dead code).
+- **✅ Cleanup commit SHIPPED** (`2c5c597`, digest-byte-identical, −71 net lines): deleted the
+  `dispatchAbility` switch, `tryCastAbility`/`fireCastAbility`, `PASSIVE_ABILITIES` +
+  `isActiveAbility`, the `AbilitySystem.wantsToCast` fallback, `castShieldBlock` (+ its `ABILITIES`
+  entry and `AbilityId` member — no unit had it), and `unitRoleClass`'s ability heuristic (added the
+  last kit `roleClass`, `zombie_shambler`). Inlined the three `?? old-path` cast-seam fallbacks. Kept
+  `stepCharge`/`stepArcaneBarrage` + the free `onProjectileHit` resolver (field-gated engine plumbing,
+  not per-unit code); `castFear` stays (the Necromancer kit reaches it via `applyTerrify`). The temp
+  `_migration_digest_guard.test.ts` was deleted as the final step.
+- **The refactor is done.** Next up on this branch is optional: the **first balance dividend** below
+  (its own commit, INTENTIONAL digest change), or finalize/merge PR #41 (a Netlify deploy — ask first).
 - **✓ onActTick split (RESOLVED, now fully wired):** two distinct post-target slots ended up
   needed. **`onActTick`** fires **POST-idle** (needs a live target): Druid Rejuv (instant →
   returns void → falls through to the standard cast chain) and the Necromancer's dual cast
