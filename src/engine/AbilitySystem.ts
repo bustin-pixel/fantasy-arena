@@ -79,8 +79,6 @@ function dispatchAbility(ctx: AbilityContext): boolean {
       return castFireball(ctx);
     case "frost_blast":
       return castFrostBlast(ctx);
-    case "charge":
-      return castCharge(ctx);
     case "fear_aura":
       return castFear(ctx);
     default:
@@ -197,35 +195,9 @@ function castFrostBlast(ctx: AbilityContext): boolean {
 // Assassin "Ambush" is a passive (opening stealth + first-strike stun) resolved
 // in CombatSystem, not an active cast — see performBasicAttack / deploy().
 
-// --- ORC: Charge -------------------------------------------------------------
-// A gap-closer: when its target is out of melee reach, the orc commits to a fast
-// RUSH toward it (not a teleport). The dash and the slam-on-contact are resolved
-// over several ticks in CombatSystem (stepCharge); this cast just locks in the
-// charge. Lets the orc catch kiting ranged units it could otherwise never reach.
-function castCharge(ctx: AbilityContext): boolean {
-  const { unit, unitsByUid } = ctx;
-  const target = unit.targetUid ? unitsByUid.get(unit.targetUid) : null;
-  if (!target || target.state === "dead") return false;
-
-  const d = dist(unit.pos, target.pos);
-  // Only worth charging if there's real distance to cover.
-  if (d < unit.range + unit.radius + 40) return false;
-
-  // Commit to the rush. CombatSystem drives the dash each tick and slams on
-  // contact; chargeTicks is a safety cap so a charge that never connects ends.
-  unit.chargeTargetUid = target.uid;
-  unit.chargeTicks = secToTicks(1.5);
-  unit.facing = target.pos.x >= unit.pos.x ? 1 : -1;
-  // Dust kick-up at the orc's feet as it launches forward.
-  ctx.spawnVfx({
-    kind: "frost",
-    pos: { x: unit.pos.x, y: unit.pos.y },
-    life: secToTicks(0.25),
-    maxLife: secToTicks(0.25),
-    color: getUnitDef(unit.defId).accent,
-  });
-  return true;
-}
+// (ORC: Charge now lives in kits/orc.ts — an instant fireAbility that ARMS the
+// rush when the target is out of reach; CombatSystem's stepCharge drives the dash
+// and the kit's onChargeContact resolves the slam.)
 
 // (CLERIC: Mend now lives in kits/cleric.ts — a cast-time fireAbility that heals
 // the most-wounded ally in range on completion, gated by wantsToCast so the Cleric

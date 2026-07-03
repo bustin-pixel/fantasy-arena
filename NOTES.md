@@ -121,9 +121,15 @@ Still gated by `defId` string literals in `CombatSystem.ts`:
   **migrated** to `kits/hunter.ts` (onTick boar re-summon + trap laying via the new
   `ctx.spawnTrap`; fireAbility Mend Beast). Added `spawnTrap` to the ctx spawn family;
   the generic trap TRIGGER (stun on step-on) stays plumbing in CombatSystem over
-  `state.traps`. **The boar itself is still `defId`-gated** — its guard-charge init
-  (`onTick` region) + the `stepCharge` contact-taunt stay hardcoded (shared with the
-  Orc's charge), pending a charge-system refactor when the Orc migrates.
+  `state.traps`. **The Boar is now migrated too** (`kits/boar.ts`, below).
+- ~~`"orc"` → Charge (arm) + `"boar"` → guard-charge (arm) + the `stepCharge`
+  contact effect (Orc slam / Boar taunt)~~ — **migrated** via a charge-system refactor:
+  `stepCharge` is now the shared, **defId-free** dash driver (field-gated on
+  `chargeTicks`, like `stepArcaneBarrage`); the kits arm the rush (`kits/orc.ts`
+  fireAbility / `kits/boar.ts` onTick, guarded to keep its old post-gate spot) and
+  resolve the impact via the new **`onChargeContact`** hook. Orc `castCharge` left the
+  dispatch switch. Guard-covered (Orc seed 20260626, Boar via the Hunter in 777/999);
+  `orc.test.ts` + `boar.test.ts` added.
 - ~~`"zombie_shambler"` → Numbing Bite~~ — **migrated** to `kits/zombieShambler.ts`
   (onAfterAttack: 30% move+attack slow for 2s). First UnitKit migration.
 - ~~`"bloater"` → Putrid Burst: on death it ruptures — 30 AoE damage + a poison

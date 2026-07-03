@@ -286,15 +286,12 @@ const TRAP_RADIUS = 26; // how close a foe must step to trigger it
 // target at CHARGE_SPEED and slams on contact (bonus damage + brief stun). This
 // owns the unit's movement for the duration (MovementSystem skips charging units)
 // so the dash can't be double-applied. Fully deterministic — no randomness.
-function stepCharge(
-  state: SimState,
-  unit: Unit,
-  byUid: Map<string, Unit>,
-  dealDamage: (target: Unit, amount: number, source: Unit) => void
-): void {
+function stepCharge(unit: Unit, ctx: KitCtx): void {
   unit.chargeTicks--;
 
-  const target = unit.chargeTargetUid ? byUid.get(unit.chargeTargetUid) : null;
+  const target = unit.chargeTargetUid
+    ? ctx.unitsByUid.get(unit.chargeTargetUid)
+    : null;
   if (!target || target.state === "dead") {
     // Target gone — abandon the charge and resume normal AI next tick.
     unit.chargeTicks = 0;
@@ -309,23 +306,10 @@ function stepCharge(
   const d = dist(unit.pos, target.pos);
 
   if (d <= contact) {
-    if (unit.defId === "boar") {
-      // Boar guard: on contact, taunt the target onto itself (charge, then taunt).
-      applyEffect(
-        target,
-        makeEffect("taunt", { source: unit.uid, durationSec: 2.5 })
-      );
-      target.tauntedByUid = unit.uid;
-      target.targetUid = unit.uid;
-    } else {
-      // Orc: slam for bonus damage and a short stagger.
-      dealDamage(target, 22, unit);
-      applyEffect(
-        target,
-        makeEffect("stun", { source: unit.uid, durationSec: 0.8 })
-      );
-    }
-    spawnVfx(state, {
+    // [seam] the kit resolves the on-contact effect (Orc slam / Boar taunt); the
+    // driver stays defId-free. Field-gated on chargeTicks, like stepArcaneBarrage.
+    getKit(unit.defId)?.onChargeContact?.(unit, target, ctx);
+    ctx.spawnVfx({
       kind: "slam",
       pos: { x: target.pos.x, y: target.pos.y },
       life: secToTicks(0.4),
@@ -580,33 +564,16 @@ export function stepSimulation(state: SimState): void {
     // plumbing. Non-blocking — the mage still moves/attacks normally during the volley.
     if (unit.barrageShots > 0) stepArcaneBarrage(state, unit, byUid);
 
-    // Boar guard: when its Hunter is attacked, charge that attacker (Orc-charge
-    // dash) and, on contact, taunt it off the Hunter — so it works even when the
-    // boar is far away. Re-charges each time the 2.5s taunt lapses. Runs before
-    // the charge-step below so the rush kicks off the same tick.
-    if (unit.defId === "boar" && unit.chargeTicks <= 0) {
-      const hunter = alive.find(
-        (u) => u.defId === "hunter" && u.team === unit.team
-      );
-      const attacker = hunter?.attackedByUid
-        ? byUid.get(hunter.attackedByUid)
-        : null;
-      if (
-        attacker &&
-        attacker.state !== "dead" &&
-        attacker.team !== unit.team &&
-        attacker.tauntedByUid !== unit.uid
-      ) {
-        unit.chargeTargetUid = attacker.uid;
-        unit.chargeTicks = secToTicks(1.5);
-        unit.facing = attacker.pos.x >= unit.pos.x ? 1 : -1;
-      }
-    }
+    // (Boar guard-charge arming now lives in kits/boar.ts onTick — guarded to match
+    // its old post-gate spot, it locks a rush at the Hunter's attacker before the
+    // charge-step below fires it the same tick.)
 
     // Orc Charge (and Boar guard-charge): while a rush is in progress it owns
-    // movement until contact.
+    // movement until contact. The dash driver is field-gated on chargeTicks (not
+    // defId); the kit arms it (Orc fireAbility / Boar onTick) and defines the
+    // contact effect (onChargeContact).
     if (unit.chargeTicks > 0) {
-      stepCharge(state, unit, byUid, dealDamage);
+      stepCharge(unit, makeKitCtx(unit));
       continue;
     }
 

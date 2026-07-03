@@ -26,6 +26,7 @@ import { archerKit } from "./archer";
 import { assassinKit } from "./assassin";
 import { berserkerKit } from "./berserker";
 import { bloaterKit } from "./bloater";
+import { boarKit } from "./boar";
 import { clericKit } from "./cleric";
 import { druidKit } from "./druid";
 import { electricMageKit } from "./electricMage";
@@ -37,6 +38,7 @@ import { mageKit } from "./mage";
 import { mysticArcherKit } from "./mysticArcher";
 import { necromancerKit } from "./necromancer";
 import { ogreKit } from "./ogre";
+import { orcKit } from "./orc";
 import { rangerKit } from "./ranger";
 import { rogueKit } from "./rogue";
 import { slimeKit, slimeCloneKit } from "./slime";
@@ -129,6 +131,13 @@ export interface UnitKit {
    *  deferred ADR-candidate 3. (Distinct from AbilitySystem's free
    *  `onProjectileHit`, which resolves cast-ability projectiles like Fireball.) */
   onProjectileHit?(unit: Unit, target: Unit, proj: Projectile, ctx: KitCtx): void;
+
+  /** Resolve the on-contact effect when THIS unit's charge reaches its target —
+   *  the Orc slams (bonus damage + stagger), the Boar taunts it off the Hunter. The
+   *  shared dash driver (stepCharge) stays engine plumbing, field-gated on
+   *  chargeTicks like stepArcaneBarrage; this replaces its one defId branch (the
+   *  kit-arms / engine-drives split, as with the Hunter's traps). */
+  onChargeContact?(unit: Unit, target: Unit, ctx: KitCtx): void;
 }
 
 export type UnitKitRegistry = Record<string /* defId */, UnitKit>;
@@ -143,6 +152,7 @@ export const UNIT_KITS: UnitKitRegistry = {
   assassin: assassinKit,
   berserker: berserkerKit,
   bloater: bloaterKit,
+  boar: boarKit,
   electric_mage: electricMageKit,
   engineer: engineerKit,
   healer: clericKit,
@@ -153,6 +163,7 @@ export const UNIT_KITS: UnitKitRegistry = {
   mystic_archer: mysticArcherKit,
   necromancer: necromancerKit,
   ogre: ogreKit,
+  orc: orcKit,
   ranger: rangerKit,
   rogue: rogueKit,
   slime: slimeKit,
