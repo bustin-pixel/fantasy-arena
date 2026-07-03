@@ -79,8 +79,6 @@ function dispatchAbility(ctx: AbilityContext): boolean {
       return castFireball(ctx);
     case "frost_blast":
       return castFrostBlast(ctx);
-    case "arcane_barrage":
-      return castArcaneBarrage(ctx);
     case "charge":
       return castCharge(ctx);
     case "fear_aura":
@@ -192,21 +190,9 @@ function castFrostBlast(ctx: AbilityContext): boolean {
   return true;
 }
 
-// --- ARCANE MAGE: Arcane Barrage ---------------------------------------------
-// A burst nuke at a single target. This cast just ARMS a 3-missile volley locked
-// onto the current target; CombatSystem (stepArcaneBarrage) streams the missiles
-// out one after another in quick succession, so they fire in sequence rather than
-// all leaving at once. Each missile resolves as straight damage on impact.
-function castArcaneBarrage(ctx: AbilityContext): boolean {
-  const { unit, unitsByUid } = ctx;
-  const target = unit.targetUid ? unitsByUid.get(unit.targetUid) : null;
-  if (!target || target.state === "dead") return false;
-
-  unit.barrageShots = 3;
-  unit.barrageTimer = 0; // the first missile fires on the next tick
-  unit.barrageTargetUid = target.uid;
-  return true;
-}
+// (ARCANE MAGE: Arcane Barrage now lives in kits/arcaneMage.ts — a cast-time
+// fireAbility that ARMS a 3-missile volley on the current target; CombatSystem's
+// stepArcaneBarrage streamer (field-gated on barrageShots) sends the missiles out.)
 
 // Assassin "Ambush" is a passive (opening stealth + first-strike stun) resolved
 // in CombatSystem, not an active cast — see performBasicAttack / deploy().

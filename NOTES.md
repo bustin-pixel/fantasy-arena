@@ -131,12 +131,13 @@ Still gated by `defId` string literals in `CombatSystem.ts`:
   **migrated** to `kits/bloater.ts` (onDeath, fired by the same seam as the Slime
   burst; not in the digest guard, so `bloater.test.ts` is its safety net). Depths
   tier-1 boss, never in a deck. (The Giant Rat is pure stats — no gate.)
-- `"arcane_mage"` → the Blink defensive teleport (own `blinkCooldown` field, 5s),
-  plus the Arcane Barrage volley streamer (`stepArcaneBarrage`): the active cast
-  (`castArcaneBarrage` in AbilitySystem) only *arms* a 3-shot burst locked onto one
-  target, and CombatSystem fires the missiles one at a time in quick succession via
-  the `barrageShots`/`barrageTimer`/`barrageTargetUid` fields. Basic attack is the
-  default ranged shot.
+- ~~`"arcane_mage"` → the Blink defensive teleport + the Arcane Barrage arm~~ —
+  **migrated** to `kits/arcaneMage.ts` (onReactTick Blink on its own `blinkCooldown`;
+  fireAbility ARMS the 3-shot volley). The Arcane Barrage **streamer**
+  (`stepArcaneBarrage`, firing the queued missiles via `barrageShots`/`barrageTimer`/
+  `barrageTargetUid`) **stays in CombatSystem** — it's field-gated on `barrageShots`,
+  not `defId`, so like `stepCharge` it's engine plumbing the kit only arms (the same
+  split as the Hunter's traps). Basic attack is the default ranged shot.
 
 This worked but wasn't data-driven — hence the UnitKit migration above (ADR
 0001), which replaces the "consider a per-unit passive-traits field" idea with

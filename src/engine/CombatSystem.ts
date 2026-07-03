@@ -59,7 +59,6 @@ import {
   isFeared,
   isPolymorphed,
   isSilenced,
-  isStealthed,
   isStunned,
   makeEffect,
   tickEffects,
@@ -351,10 +350,11 @@ function stepCharge(
   if (unit.chargeTicks <= 0) unit.chargeTargetUid = null;
 }
 
-// Arcane Mage: Arcane Barrage volley. The active cast (castArcaneBarrage) arms a
-// 3-shot burst locked onto one target; this fires the missiles one at a time in
-// quick succession so they stream out rather than all leaving at once. Runs every
-// tick while a volley is queued; the locked target is held for the whole volley.
+// Arcane Mage: Arcane Barrage volley. The kit's fireAbility (kits/arcaneMage.ts)
+// arms a 3-shot burst locked onto one target; this streamer fires the missiles one
+// at a time in quick succession so they leave in sequence rather than all at once.
+// Field-gated on barrageShots (not defId) — like stepCharge, it stays engine
+// plumbing while the kit only arms it. Runs every tick while a volley is queued.
 const ARCANE_MISSILE_DAMAGE = 12;
 const ARCANE_VOLLEY_GAP = 2; // ticks between consecutive missiles (~0.15s)
 
@@ -390,42 +390,8 @@ function stepArcaneBarrage(
   unit.barrageTimer = unit.barrageShots > 0 ? ARCANE_VOLLEY_GAP : 0;
 }
 
-// Arcane Mage: Blink. An instant defensive teleport (not a dash) away from the
-// nearest melee attacker that has closed in. Reactive and on its own cooldown,
-// so it's independent of the unit's active ability (Arcane Barrage).
-function tryBlink(state: SimState, unit: Unit, enemies: Unit[]): boolean {
-  const threatRange = unit.radius * 2.6;
-  let threat: Unit | null = null;
-  let bestD = Infinity;
-  for (const e of enemies) {
-    if (e.state === "dead") continue;
-    if (isStealthed(e)) continue; // can't blink away from an unseen attacker
-    if (getUnitDef(e.defId).range > 80) continue; // only melee threats trigger Blink
-    const d = dist(unit.pos, e.pos);
-    if (d <= threatRange && d < bestD) {
-      bestD = d;
-      threat = e;
-    }
-  }
-  if (!threat) return false;
-
-  let away = dir(threat.pos, unit.pos);
-  // Degenerate case (threat exactly overlapping): retreat toward own side.
-  if (away.x === 0 && away.y === 0) {
-    away = { x: 0, y: unit.team === "player" ? -1 : 1 };
-  }
-  const BLINK = 170;
-  unit.pos.x = clamp(unit.pos.x + away.x * BLINK, unit.radius, FIELD_WIDTH - unit.radius);
-  unit.pos.y = clamp(unit.pos.y + away.y * BLINK, unit.radius, FIELD_HEIGHT - unit.radius);
-  spawnVfx(state, {
-    kind: "frost",
-    pos: { x: unit.pos.x, y: unit.pos.y },
-    life: secToTicks(0.3),
-    maxLife: secToTicks(0.3),
-    color: getUnitDef(unit.defId).accent,
-  });
-  return true;
-}
+// (Arcane Mage Blink now lives in kits/arcaneMage.ts onReactTick — the pre-idle
+// reactive teleport away from a closing melee threat, on its own blinkCooldown.)
 
 // (Trickster Shadow Step + its tuning now live in kits/trickster.ts — onReactTick
 // blinks to a nearby casting enemy and kicks/interrupts it, in the pre-idle
@@ -609,8 +575,9 @@ export function stepSimulation(state: SimState): void {
       continue;
     }
 
-    // Arcane Mage: stream out any queued Arcane Barrage missiles (one at a time).
-    // Non-blocking — the mage still moves/attacks normally during the volley.
+    // Stream out any queued Arcane Barrage missiles (one at a time), armed by the
+    // Arcane Mage kit's fireAbility. Field-gated on barrageShots, so it stays engine
+    // plumbing. Non-blocking — the mage still moves/attacks normally during the volley.
     if (unit.barrageShots > 0) stepArcaneBarrage(state, unit, byUid);
 
     // Boar guard: when its Hunter is attacked, charge that attacker (Orc-charge
@@ -648,26 +615,17 @@ export function stepSimulation(state: SimState): void {
 
     // [seam] pre-idle reactive act slot — runs after targeting but BEFORE the
     // target-dead idle-out below, so a kit reacts even when its committed target
-    // just died (Trickster Shadow Step interrupts any nearby caster). The post-idle
-    // act slot (onActTick: Rejuvenation / Necromancer cast) is after the idle-out,
-    // where an instant act needs a live target. Arcane Mage's Blink still uses its
-    // hardcoded block just below until it migrates into this same slot.
+    // just died (Trickster Shadow Step interrupts any nearby caster; Arcane Mage
+    // Blinks away from a closing melee threat, on its own blinkCooldown). The
+    // post-idle act slot (onActTick: Rejuvenation / Necromancer cast) is after the
+    // idle-out, where an instant act needs a live target.
     {
       const kit = getKit(unit.defId);
       if (kit?.onReactTick) kit.onReactTick(unit, makeKitCtx(unit));
     }
 
-    // Arcane Mage: Blink away from a closing melee threat (own cooldown, so it's
-    // independent of the passive ability slot). Just repositions; the rest of the
-    // tick (movement/kiting) resumes from the new spot.
-    if (unit.defId === "arcane_mage" && unit.blinkCooldown <= 0) {
-      if (tryBlink(state, unit, enemies)) {
-        unit.blinkCooldown = secToTicks(5);
-      }
-    }
-
-    // (Trickster Shadow Step now fires from the pre-idle onReactTick seam above —
-    // kits/trickster.ts.)
+    // (Trickster Shadow Step + Arcane Mage Blink now fire from the pre-idle
+    // onReactTick seam above — kits/trickster.ts, kits/arcaneMage.ts.)
 
     const target = unit.targetUid ? byUid.get(unit.targetUid) : null;
 
