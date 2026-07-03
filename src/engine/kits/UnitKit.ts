@@ -18,13 +18,14 @@
 // targeting directly (the determinism guardrails).
 // ============================================================================
 
-import type { Unit } from "@/types";
+import type { Projectile, Unit } from "@/types";
 import type { AbilityContext } from "../AbilitySystem";
 import { aegisKnightKit } from "./aegisKnight";
 import { assassinKit } from "./assassin";
 import { berserkerKit } from "./berserker";
 import { druidKit } from "./druid";
 import { knightKit } from "./knight";
+import { mysticArcherKit } from "./mysticArcher";
 import { ogreKit } from "./ogre";
 import { rogueKit } from "./rogue";
 import { slimeKit, slimeCloneKit } from "./slime";
@@ -96,6 +97,15 @@ export interface UnitKit {
    *  slow). Ranged on-hit riders (Ice freeze / Fire burn) are a projectile
    *  descriptor — a separate ADR — not this hook. */
   onAfterAttack?(unit: Unit, target: Unit, ctx: KitCtx): void;
+
+  /** Resolve the impact of a projectile THIS unit fired, replacing the default
+   *  on-hit damage (Mystic Archer's Light/Dark stack + detonate + form flip). The
+   *  engine calls it from the projectile step for the SOURCE unit's kit; the kit
+   *  owns all damage/stack bookkeeping via ctx. This is the *code-hook* half of
+   *  projectile-on-hit; the *data-descriptor* half (Ice/Fire riders) is still the
+   *  deferred ADR-candidate 3. (Distinct from AbilitySystem's free
+   *  `onProjectileHit`, which resolves cast-ability projectiles like Fireball.) */
+  onProjectileHit?(unit: Unit, target: Unit, proj: Projectile, ctx: KitCtx): void;
 }
 
 export type UnitKitRegistry = Record<string /* defId */, UnitKit>;
@@ -108,6 +118,7 @@ export const UNIT_KITS: UnitKitRegistry = {
   assassin: assassinKit,
   berserker: berserkerKit,
   knight: knightKit,
+  mystic_archer: mysticArcherKit,
   ogre: ogreKit,
   rogue: rogueKit,
   slime: slimeKit,

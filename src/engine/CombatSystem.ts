@@ -788,13 +788,8 @@ export function stepSimulation(state: SimState): void {
     // (Berserker Bloodrage now lives in kits/berserker.ts onTick — the pre-gate
     // maintenance slot, recomputed each tick from base stats.)
 
-    // Mystic Archer Momentum: each Light/Dark form shift permanently ramps its
-    // attack speed by 15% (capped at +75%). Recomputed from base each tick.
-    if (unit.defId === "mystic_archer") {
-      const def = getUnitDef(unit.defId);
-      const bonus = Math.min(0.75, unit.momentumStacks * 0.15);
-      unit.attackSpeed = def.attackSpeed / (1 + bonus);
-    }
+    // (Mystic Archer Momentum recompute now lives in kits/mysticArcher.ts onTick
+    // — the pre-gate maintenance slot, recomputed each tick from base stats.)
 
     // Stun overrides everything.
     if (isStunned(unit)) {
@@ -1037,7 +1032,7 @@ export function stepSimulation(state: SimState): void {
   }
 
   // 5b. Projectiles.
-  stepProjectiles(state, byUid, dealDamage);
+  stepProjectiles(state, byUid, dealDamage, makeKitCtx);
 
   // 5c. Floating texts / vfx decay.
   for (const ft of state.floatingTexts) ft.life--;
@@ -1088,24 +1083,9 @@ function performBasicAttack(
 
   // [seam] replace the default swing entirely (open contract 2 — Mystic / Ranger /
   // Warrior do their own thing). attackCount is already bumped, matching today.
+  // Mystic Archer fires its form-tagged shot here (kits/mysticArcher.ts
+  // onBasicAttack); its stacking/detonation resolves on impact (onProjectileHit).
   if (kit?.onBasicAttack && kit.onBasicAttack(unit, target, ctx)) return;
-
-  // Mystic Archer fires a form-tagged shot; stacking/detonation resolves on hit.
-  if (unit.defId === "mystic_archer") {
-    spawnProjectile(state, {
-      pos: { x: unit.pos.x, y: unit.pos.y },
-      target: { x: target.pos.x, y: target.pos.y },
-      targetUid: target.uid,
-      speed: 400,
-      damage: unit.damage,
-      team: unit.team,
-      sourceUid: unit.uid,
-      ability: "mystic_shift", // resolved specially on impact
-      color: unit.mysticForm === "light" ? "#fcd34d" : "#7c3aed",
-      angle: 0,
-    });
-    return;
-  }
 
   // Ranger Multishot: every second shot looses three arrows at once, each locked
   // onto a different enemy in range (the committed target plus the two nearest
@@ -1213,90 +1193,15 @@ function performBasicAttack(
   }
 }
 
-// Mystic Archer's on-hit resolution. Light form marks a single target; at 3
-// light stacks that target detonates and the archer flips to Dark. Dark form
-// chains to all enemies in a radius, stacking darkness on each; when any reaches
-// 3 dark stacks it detonates and the archer flips back to Light.
-function resolveMysticHit(
-  state: SimState,
-  archer: Unit,
-  target: Unit,
-  damage: number,
-  dealDamage: (t: Unit, amt: number, s: Unit) => void
-): void {
-  const accent = getUnitDef(archer.defId).accent;
-  const DETONATE = 28; // burst damage when 3 stacks pop
-
-  if (archer.mysticForm === "light") {
-    // Single-target hit + light stack.
-    dealDamage(target, damage, archer);
-    if (target.state === "dead") return;
-    target.lightStacks += 1;
-    spawnVfx(state, {
-      kind: "slam",
-      pos: { x: target.pos.x, y: target.pos.y - 4 },
-      life: secToTicks(0.25),
-      maxLife: secToTicks(0.25),
-      color: "#fcd34d",
-    });
-    if (target.lightStacks >= 3) {
-      // Detonate this target, clear its light stacks, flip to Dark.
-      dealDamage(target, DETONATE, archer);
-      target.lightStacks = 0;
-      archer.mysticForm = "dark";
-      archer.momentumStacks = Math.min(5, archer.momentumStacks + 1); // +15% atk speed/shift
-
-      spawnVfx(state, {
-        kind: "death",
-        pos: { x: target.pos.x, y: target.pos.y },
-        life: secToTicks(0.5),
-        maxLife: secToTicks(0.5),
-        color: "#fde68a",
-      });
-    }
-  } else {
-    // Dark form: chain to all enemies in a radius around the primary target.
-    const CHAIN_RADIUS = 130;
-    dealDamage(target, damage, archer);
-    let flipped = false;
-    for (const e of state.units) {
-      if (e.state === "dead" || e.team === archer.team) continue;
-      if (dist(target.pos, e.pos) > CHAIN_RADIUS) continue;
-      // Chain damage to secondary targets (primary already took the hit).
-      if (e.uid !== target.uid) dealDamage(e, Math.round(damage * 0.6), archer);
-      if (e.hp <= 0) continue; // may have died from the chain hit
-      e.darkStacks += 1;
-      spawnVfx(state, {
-        kind: "frost",
-        pos: { x: e.pos.x, y: e.pos.y - 4 },
-        life: secToTicks(0.25),
-        maxLife: secToTicks(0.25),
-        color: "#7c3aed",
-      });
-      if (e.darkStacks >= 3) {
-        dealDamage(e, DETONATE, archer);
-        e.darkStacks = 0;
-        flipped = true;
-        spawnVfx(state, {
-          kind: "death",
-          pos: { x: e.pos.x, y: e.pos.y },
-          life: secToTicks(0.5),
-          maxLife: secToTicks(0.5),
-          color: "#a78bfa",
-        });
-      }
-    }
-    if (flipped) {
-      archer.mysticForm = "light";
-      archer.momentumStacks = Math.min(5, archer.momentumStacks + 1); // +15% atk speed/shift
-    }
-  }
-}
+// (Mystic Archer's on-hit resolution now lives in kits/mysticArcher.ts
+// onProjectileHit — Light single-target mark/detonate + Dark radius chain + form
+// flip + Momentum stack, dispatched from stepProjectiles via the source's kit.)
 
 function stepProjectiles(
   state: SimState,
   byUid: Map<string, Unit>,
-  dealDamage: (t: Unit, amt: number, s: Unit) => void
+  dealDamage: (t: Unit, amt: number, s: Unit) => void,
+  makeKitCtx: (subject: Unit, damageContext?: boolean) => KitCtx
 ): void {
   for (const proj of state.projectiles) {
     if (!proj.alive) continue;
@@ -1316,9 +1221,19 @@ function stepProjectiles(
         const source = byUid.get(proj.sourceUid);
         const isBasic =
           proj.ability === "lifesteal"; // sentinel for basic ranged shot
-        const isMystic = proj.ability === "mystic_shift";
-        if (isMystic) {
-          if (source) resolveMysticHit(state, source, target, proj.damage, dealDamage);
+        // [seam] the SOURCE unit's kit resolves its own shot's impact (Mystic
+        // Light/Dark stacks/detonate/flip → kits/mysticArcher.ts onProjectileHit).
+        // Keyed on the mystic_shift tag so a dead source fizzles exactly as before;
+        // the kit owns the damage + stack bookkeeping via ctx.
+        if (proj.ability === "mystic_shift") {
+          if (source) {
+            getKit(source.defId)?.onProjectileHit?.(
+              source,
+              target,
+              proj,
+              makeKitCtx(source, true)
+            );
+          }
         } else if (isBasic) {
           if (source) dealDamage(target, proj.damage, source);
           // Ice Mage every-second-attack freeze.

@@ -52,3 +52,22 @@ describe("Mystic Archer — Momentum (attack-speed ramp)", () => {
     expect(minAtk).toBeGreaterThanOrEqual(BASE / 1.75 - 1e-9); // never past the cap
   });
 });
+
+describe("Mystic Archer — Dark form chain (on-hit)", () => {
+  it("chains its shot to a second nearby enemy, not just the primary", () => {
+    const s = battleState(5);
+    const archer = place(s, "mystic_archer", "player", 240, 500);
+    archer.mysticForm = "dark"; // force the AoE-chain form
+    const primary = makeDummy(place(s, "skeleton", "enemy", 240, 460));
+    const bystander = makeDummy(place(s, "skeleton", "enemy", 250, 465)); // within chain radius
+
+    let chained = false;
+    for (let i = 0; i < 30 && !chained; i++) {
+      stepSimulation(s);
+      if (bystander.hp < bystander.maxHp) chained = true;
+    }
+
+    expect(primary.hp).toBeLessThan(primary.maxHp); // primary took its hit
+    expect(bystander.hp).toBeLessThan(bystander.maxHp); // the chain reached the bystander
+  });
+});

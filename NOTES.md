@@ -91,13 +91,18 @@ Still gated by `defId` string literals in `CombatSystem.ts`:
   each locked onto a different enemy in range (committed target + the two nearest
   others, nearest-first with a uid tiebreak). Against a lone foe only one arrow
   spawns, so it's an anti-swarm spread. `ability` slot is the passive `multishot`.
-- `"mystic_archer"` → Light/Dark form-tagged shots + on-hit stack/detonate
-  resolution (`resolveMysticHit`), plus the Momentum passive: each form shift
-  adds a `momentumStacks` (capped at 5) that ramps attack speed +15%/shift up to
-  +75%. NOTE: its `ability` slot is `momentum` (the headline passive shown in the
-  UI); the Light/Dark mechanic is driven by `defId` + the `mystic_shift` projectile
-  tag, and is explained by the Light Form / Dark Form *traits* — there is no longer
-  a "Light & Dark" header in the UI.
+- ~~`"mystic_archer"` → Light/Dark form-tagged shots + on-hit stack/detonate
+  resolution (`resolveMysticHit`) + Momentum~~ — **migrated** to
+  `kits/mysticArcher.ts` (onTick Momentum recompute, onBasicAttack form shot,
+  **onProjectileHit** Light/Dark stack+detonate+flip). Introduced the
+  `onProjectileHit` kit hook — the *code-hook* half of projectile-on-hit,
+  dispatched from `stepProjectiles` via the SOURCE unit's kit (keyed on the
+  `mystic_shift` tag; the Ice/Fire *data-descriptor* half stays deferred to
+  ADR-candidate 3). The Light/Dark stacks stay FLAT on the victim
+  (`lightStacks`/`darkStacks`) — cross-unit state kept flat per the ADR's
+  opportunistic fallback, not a `unit.kit` namespace. `ability` slot stays
+  `momentum` (the headline passive in the UI; still explained by the Light Form /
+  Dark Form *traits*).
 - ~~`"zombie_shambler"` → Numbing Bite~~ — **migrated** to `kits/zombieShambler.ts`
   (onAfterAttack: 30% move+attack slow for 2s). First UnitKit migration.
 - `"bloater"` → Putrid Burst: on death it ruptures — 30 AoE damage + a poison
