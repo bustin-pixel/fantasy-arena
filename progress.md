@@ -147,14 +147,21 @@ contracts, migration order) in **`docs/adr/0001-unitkit-seam.md`**.
   Crushing Slam) → **Assassin** (`onSpawn` stealth + `onBeforeAttack` Ambush +
   `onWouldDie` Vanish — wired `onSpawn` into deploy + summon flush) → **Berserker**
   (`onTick` Bloodrage + `onWouldDie` Last Stand + `onKill` Bloodthirst + `onAfterAttack`
-  Cleave) → **Rogue** (`onSpawn`+`onBeforeAttack`+`onAfterAttack`).
-- **Remaining:** Aegis Knight (two-phase `modifyIncomingDamage`+`onDamaged` bank +
-  `onAfterAttack` Backlash + Warded) → Druid (`onTick` transform + `modifyIncomingHeal` +
-  `onActTick` Rejuv + `fireAbility` Summon Wolves) → Mystic/Hunter → Trickster (Shadow
-  Step `onActTick`) → **Necromancer last** (custom dual-cast) → cleanup (delete
-  `dispatchAbility`, `PASSIVE_ABILITIES`, `isActiveAbility`, `unitRoleClass` internals,
-  all fallbacks). **Ice/Fire Mage** freeze/burn riders ride the projectile — deferred to
-  the candidate-3 projectile on-hit descriptor (ADR consequence); migrate them together.
+  Cleave) → **Rogue** (`onSpawn`+`onBeforeAttack`+`onAfterAttack`) → **Aegis Knight**
+  (two-phase `modifyIncomingDamage` soak + `onDamaged` bank + `onAfterAttack` Backlash;
+  **Warded is now data** — `UnitDef.wardedAgainst`, read in `StatusEffectSystem`).
+- **Remaining:** Druid (`onTick` transform + `modifyIncomingHeal` + `onActTick` Rejuv +
+  `fireAbility` Summon Wolves) → Mystic/Hunter → Trickster (Shadow Step `onActTick`) →
+  **Necromancer last** (custom dual-cast) → cleanup (delete `dispatchAbility`,
+  `PASSIVE_ABILITIES`, `isActiveAbility`, `unitRoleClass` internals, all fallbacks).
+  **Ice/Fire Mage** freeze/burn riders ride the projectile — deferred to the candidate-3
+  projectile on-hit descriptor (ADR consequence); migrate them together.
+- **⚠ onActTick placement (unresolved, decide at the Druid):** the scaffolded `onActTick`
+  seam sits BEFORE the "target-dead → idle" check. Druid Rejuv (and Necro cast) must run
+  AFTER it (act only with a live target/cast); Arcane Blink + Trickster Shadow Step must
+  run BEFORE it (react even when the target just died). One slot can't serve both — likely
+  two call sites (pre-idle reactive vs post-idle act) or a second hook. No `onActTick` user
+  is migrated yet, so the seam can be relocated/split freely (digest-neutral until used).
 - **First balance dividend after the refactor** (separate commit, own spec): stun
   suppresses Raise Dead / Engineer repair / Hunter traps (move the hook past the gate).
 - Retires the `NOTES.md §2` "consider a per-unit traits field" note and the §3
