@@ -177,7 +177,12 @@ contracts, migration order) in **`docs/adr/0001-unitkit-seam.md`**.
   `mage.test.ts` are their nets. `AbilitySystem.wantsToCast` collapsed to the `return true`
   fallback; trimmed the imports the deleted casts left unused. Then **Electric Mage**
   (`fireAbility` Chain Lightning — a pure cast, no rider; guard-covered via seed 42) closed out
-  the easy pure-cast units, dropping `chain_lightning` (switch 7 → 6).
+  the easy pure-cast units, dropping `chain_lightning` (switch 7 → 6). Then **Arcane Mage**
+  (`onReactTick` Blink + `fireAbility` Arcane Barrage arm) dropped `arcane_barrage` (switch 6 → 5).
+  Its Barrage **streamer** (`stepArcaneBarrage`) intentionally **stays engine plumbing** — it's
+  field-gated on `barrageShots`, not `defId` (like `stepCharge`), so the kit only arms it (the
+  Hunter-trap split). Guard-covered (seed 20260626) + `arcaneMage.test.ts`; Blink's `blinkCooldown`
+  is in `digest()`, so its timing is verified too.
 - **Remaining: the cleanup commit** — delete `dispatchAbility`, `PASSIVE_ABILITIES`,
   `isActiveAbility`, `unitRoleClass` internals, and the `?? old-path` fallbacks (only once
   nothing needs them). Still `defId`-gated / on the switch (all need design work):
@@ -185,8 +190,6 @@ contracts, migration order) in **`docs/adr/0001-unitkit-seam.md`**.
     burn/freeze **ride the projectile** (`onHitBurn`/`onHitStunSec`), still deferred to the
     candidate-3 projectile on-hit *data-descriptor* (complements the Mystic's `onProjectileHit`
     code-hook); migrate the cast + rider together.
-  - **Arcane Mage** — Blink (`defId`-gated, slots into `onReactTick`) + the Arcane Barrage
-    streamer (`stepArcaneBarrage`) + the `arcane_barrage` cast.
   - **Orc + Boar** — the `charge`/`stepCharge`/guard-charge shared system; migrate together via a
     charge-system refactor.
   - Switch leftovers not tied to an un-migrated unit: `shield_block` (no owning unit — likely dead)
