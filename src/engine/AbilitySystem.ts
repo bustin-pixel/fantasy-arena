@@ -9,7 +9,7 @@
 // shields, and floating numbers stay centralized and deterministic.
 // ============================================================================
 
-import type { FloatingText, Projectile, Unit, Vfx } from "@/types";
+import type { FloatingText, Projectile, Trap, Unit, Vfx } from "@/types";
 import { ABILITIES } from "@/data/abilities";
 import { getUnitDef, NON_DECK_UNITS } from "@/data/units";
 import {
@@ -40,6 +40,9 @@ export interface AbilityContext {
   heal: (target: Unit, amount: number) => void;
   /** Spawn a fresh unit into the live sim (e.g. summoner's wolves). */
   spawnUnit: (defId: string, team: Unit["team"], pos: { x: number; y: number }) => void;
+  /** Lay a ground trap into the sim (Hunter's Scatter Trap). The generic trigger
+   *  (stun on step-on) stays in CombatSystem; the kit just places them. */
+  spawnTrap: (trap: Trap) => void;
   /** Spawn a floating combat number/label over a unit (kit hooks: "Vanish!",
    *  "Second Wind!", heal ticks). Presentation-only; never affects the digest. */
   spawnFloatingText: (
@@ -95,8 +98,6 @@ function dispatchAbility(ctx: AbilityContext): boolean {
       return castDeployTurret(ctx);
     case "polymorph":
       return castPolymorph(ctx);
-    case "mend_beast":
-      return castMendBeast(ctx);
     case "fear_aura":
       return castFear(ctx);
     default:
@@ -407,39 +408,8 @@ function castPolymorph(ctx: AbilityContext): boolean {
   return true;
 }
 
-// --- HUNTER: Mend Beast ------------------------------------------------------
-// Instant: lays a heal-over-time on the Hunter's boar (5 HP/s for 6s = 30).
-// Only fires when the boar is actually wounded, so the cooldown isn't wasted.
-function castMendBeast(ctx: AbilityContext): boolean {
-  let boar: Unit | null = null;
-  let bestMissing = 0;
-  for (const a of ctx.allies) {
-    if (a.defId !== "boar" || a.state === "dead") continue;
-    const missing = a.maxHp - a.hp;
-    if (missing > bestMissing) {
-      boar = a;
-      bestMissing = missing;
-    }
-  }
-  if (!boar) return false;
-  applyEffect(
-    boar,
-    makeEffect("regen", {
-      source: ctx.unit.uid,
-      healPerTick: 5,
-      tickIntervalSec: 1,
-      durationSec: 6,
-    })
-  );
-  ctx.spawnVfx({
-    kind: "shield_pop",
-    pos: { x: boar.pos.x, y: boar.pos.y - 4 },
-    life: secToTicks(0.5),
-    maxLife: secToTicks(0.5),
-    color: "#a3e635",
-  });
-  return true;
-}
+// (HUNTER: Mend Beast now lives in kits/hunter.ts fireAbility — an instant HoT on
+// the most-wounded boar ally.)
 
 // --- ELECTRIC MAGE: Chain Lightning ------------------------------------------
 // Fired when the ~2s cast completes. Arcs from the mage to the cast target (or

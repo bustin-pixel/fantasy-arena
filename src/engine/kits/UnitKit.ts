@@ -24,6 +24,7 @@ import { aegisKnightKit } from "./aegisKnight";
 import { assassinKit } from "./assassin";
 import { berserkerKit } from "./berserker";
 import { druidKit } from "./druid";
+import { hunterKit } from "./hunter";
 import { knightKit } from "./knight";
 import { mysticArcherKit } from "./mysticArcher";
 import { ogreKit } from "./ogre";
@@ -117,6 +118,7 @@ export const UNIT_KITS: UnitKitRegistry = {
   aegis_knight: aegisKnightKit,
   assassin: assassinKit,
   berserker: berserkerKit,
+  hunter: hunterKit,
   knight: knightKit,
   mystic_archer: mysticArcherKit,
   ogre: ogreKit,

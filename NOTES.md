@@ -103,6 +103,13 @@ Still gated by `defId` string literals in `CombatSystem.ts`:
   opportunistic fallback, not a `unit.kit` namespace. `ability` slot stays
   `momentum` (the headline passive in the UI; still explained by the Light Form /
   Dark Form *traits*).
+- ~~`"hunter"` → Boar Companion (auto-summon) + Scatter Trap laying + Mend Beast~~ —
+  **migrated** to `kits/hunter.ts` (onTick boar re-summon + trap laying via the new
+  `ctx.spawnTrap`; fireAbility Mend Beast). Added `spawnTrap` to the ctx spawn family;
+  the generic trap TRIGGER (stun on step-on) stays plumbing in CombatSystem over
+  `state.traps`. **The boar itself is still `defId`-gated** — its guard-charge init
+  (`onTick` region) + the `stepCharge` contact-taunt stay hardcoded (shared with the
+  Orc's charge), pending a charge-system refactor when the Orc migrates.
 - ~~`"zombie_shambler"` → Numbing Bite~~ — **migrated** to `kits/zombieShambler.ts`
   (onAfterAttack: 30% move+attack slow for 2s). First UnitKit migration.
 - `"bloater"` → Putrid Burst: on death it ruptures — 30 AoE damage + a poison

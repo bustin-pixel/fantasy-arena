@@ -310,8 +310,8 @@ function transitionTo(unit: Unit, next: Unit["state"]): void {
 // a fast lunge that quickly closes the gap, without being an instant teleport.
 const CHARGE_SPEED = 340; // px/sec
 
-// Hunter Scatter Trap tuning.
-const SCATTER_TRAP_CD_SEC = 12; // between trap sets
+// Hunter Scatter Trap tuning. (The lay-cadence, SCATTER_TRAP_CD_SEC, now lives in
+// kits/hunter.ts; these two drive the generic trap TRIGGER, still in this file.)
 const TRAP_STUN_SEC = 7; // how long a caught unit is held
 const TRAP_RADIUS = 26; // how close a foe must step to trigger it
 
@@ -627,6 +627,7 @@ export function stepSimulation(state: SimState): void {
           team,
           pos,
         }),
+      spawnTrap: (t) => state.traps.push(t),
       spawnFloatingText: (u, v, k) => spawnFloatingText(state, u, v, k),
     };
   };
@@ -722,46 +723,10 @@ export function stepSimulation(state: SimState): void {
       });
     }
 
-    // Hunter Boar Companion: keep a pet boar alive beside the Hunter. Summons one
-    // immediately at deploy (boarCooldown 0), and after the boar dies the timer
-    // (frozen while a boar lives) counts down to re-summon ~8s later.
-    if (unit.defId === "hunter") {
-      const hasBoar = state.units.some(
-        (u) => u.defId === "boar" && u.team === unit.team && u.state !== "dead"
-      );
-      if (!hasBoar) {
-        if (unit.boarCooldown > 0) unit.boarCooldown--;
-        if (unit.boarCooldown <= 0) {
-          pendingSpawns.push({
-            defId: "boar",
-            team: unit.team,
-            pos: {
-              x: unit.pos.x + (unit.team === "player" ? -30 : 30),
-              y: unit.pos.y + 12,
-            },
-          });
-          unit.boarCooldown = secToTicks(8);
-        }
-      }
-    }
-
-    // Hunter Scatter Trap: on its cooldown, lay a spread of traps on the ground
-    // ahead of it (toward the enemy). Any enemy that later steps on one is caught
-    // (stunned) and the trap is spent. First set is laid at deploy.
-    if (unit.defId === "hunter") {
-      if (unit.trapCooldown > 0) unit.trapCooldown--;
-      if (unit.trapCooldown <= 0) {
-        const forward = unit.team === "player" ? -1 : 1;
-        for (const dx of [-70, 0, 70]) {
-          state.traps.push({
-            x: clamp(unit.pos.x + dx, 20, FIELD_WIDTH - 20),
-            y: clamp(unit.pos.y + forward * 120, 20, FIELD_HEIGHT - 20),
-            team: unit.team,
-          });
-        }
-        unit.trapCooldown = secToTicks(SCATTER_TRAP_CD_SEC);
-      }
-    }
+    // (Hunter Boar Companion + Scatter Trap laying now live in kits/hunter.ts
+    // onTick — the pre-gate maintenance slot. The generic trap TRIGGER stays
+    // below in the movement step; the boar's guard-charge stays gated by defId
+    // pending the shared charge-system refactor.)
 
     // A spell cast in progress (the cast bar) is interrupted by a stun or fear —
     // the spell fizzles. Runs before the stun check so the stun can cancel it;
@@ -896,6 +861,7 @@ export function stepSimulation(state: SimState): void {
       spawnProjectile: (p) => spawnProjectile(state, p),
       spawnVfx: (v) => spawnVfx(state, v),
       spawnUnit: (defId, team, pos) => pendingSpawns.push({ defId, team, pos }),
+      spawnTrap: (t) => state.traps.push(t),
       spawnFloatingText: (u, v, k) => spawnFloatingText(state, u, v, k),
     };
     const abilityKit = getKit(unit.defId);
