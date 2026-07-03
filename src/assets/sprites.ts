@@ -234,7 +234,7 @@ export function drawUnitSprite(
       drawArcher(ctx, body, dark, light, accent, A);
       break;
     case "hunter":
-      drawEngineer(ctx, body, dark, light, accent, A);
+      drawHunter(ctx, body, dark, light, accent, A);
       break;
     case "boar":
       drawBoar(ctx, body, dark, light, accent, A);
@@ -373,21 +373,98 @@ function drawTurret(ctx: Ctx, body: string, dark: string, light: string, accent:
   ctx.fillRect(6, 1, 1.5, 1.5);
 }
 
-// Engineer — a stout figure in a hard hat shouldering a long musket. The musket
-// points forward (to the right) and flips with the unit's facing.
+// Engineer — a stout dwarven fortifier: a lamp-lit hard hat and welder goggles, a
+// steam-boiler backpack, a braided beard, and a rivet-gun that spits sparks. The
+// gun points forward (to the right) and flips with the unit's facing.
 function drawEngineer(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {
-  // Stout torso + belt.
+  const t = A.t;
+  // Steam-boiler backpack behind the shoulder (hooped tank + gauge + pipe + steam).
+  ctx.fillStyle = withShade(body, -46);
+  ctx.beginPath();
+  ctx.roundRect(-15, -3, 8, 19, 3);
+  ctx.fill();
+  ctx.strokeStyle = withShade(body, -64);
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-15, 2);
+  ctx.lineTo(-7, 2);
+  ctx.moveTo(-15, 8);
+  ctx.lineTo(-7, 8);
+  ctx.stroke();
+  ctx.fillStyle = "#d9dde2"; // pressure gauge
+  ctx.beginPath();
+  ctx.arc(-11, -1, 2.2, 0, PI2);
+  ctx.fill();
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-11, -1);
+  ctx.lineTo(-10, -2.4);
+  ctx.stroke();
+  ctx.strokeStyle = withShade(accent, -34); // pipe over the shoulder
+  ctx.lineWidth = 2.4;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(-11, -3);
+  ctx.quadraticCurveTo(-11, -13, -2, -13);
+  ctx.stroke();
+  ctx.lineCap = "butt";
+  rising(ctx, -11, 3, -3, 16, "rgba(220,224,228,0.9)", A, 4);
+  // Stout torso.
   metalBody(ctx, 26, 22, 2, body, dark, light, 5);
+  // Plate seam + riveted highlights.
+  ctx.strokeStyle = dark;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-12, 9);
+  ctx.lineTo(12, 9);
+  ctx.stroke();
+  const rivets: [number, number][] = [
+    [-10, 5],
+    [10, 5],
+    [-10, 13],
+    [10, 13],
+  ];
+  ctx.fillStyle = dark;
+  for (const [rx, ry] of rivets) {
+    ctx.beginPath();
+    ctx.arc(rx, ry, 1.5, 0, PI2);
+    ctx.fill();
+  }
+  ctx.fillStyle = light;
+  for (const [rx, ry] of rivets) {
+    ctx.beginPath();
+    ctx.arc(rx - 0.5, ry - 0.5, 0.6, 0, PI2);
+    ctx.fill();
+  }
+  // Tool belt + buckle + pouch.
   ctx.fillStyle = dark;
   ctx.fillRect(-13, 15, 26, 5);
   ctx.fillStyle = accent;
-  ctx.fillRect(-3, 15, 6, 5); // belt buckle
+  ctx.fillRect(-3, 15, 6, 5);
+  ctx.fillStyle = withShade(body, -28);
+  ctx.fillRect(6, 15, 5, 6);
   // Head.
   ctx.fillStyle = light;
   ctx.beginPath();
   ctx.arc(0, -7, 9, 0, PI2);
   ctx.fill();
-  // Hard hat (dome + brim) with shading.
+  // Braided beard with beads.
+  ctx.fillStyle = withShade(body, -18);
+  ctx.beginPath();
+  ctx.moveTo(-7, -3);
+  ctx.quadraticCurveTo(-8, 7, -3, 8);
+  ctx.quadraticCurveTo(0, 10, 3, 8);
+  ctx.quadraticCurveTo(8, 7, 7, -3);
+  ctx.quadraticCurveTo(0, 1, -7, -3);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = accent;
+  ctx.beginPath();
+  ctx.arc(-3, 7.5, 1, 0, PI2);
+  ctx.arc(3, 7.5, 1, 0, PI2);
+  ctx.fill();
+  // Hard hat (dome + brim + ridge) with shading.
   const hg = ctx.createLinearGradient(0, -18, 0, -6);
   hg.addColorStop(0, withShade(accent, 30));
   hg.addColorStop(1, accent);
@@ -396,29 +473,244 @@ function drawEngineer(ctx: Ctx, body: string, dark: string, light: string, accen
   ctx.arc(0, -9, 9, Math.PI, PI2);
   ctx.fill();
   ctx.fillRect(-11, -9, 22, 3);
-  // Goggle eyes with a glint + beard.
-  ctx.fillStyle = "#1a1a1a";
-  ctx.fillRect(-4, -7, 3, 3);
-  ctx.fillRect(2, -7, 3, 3);
-  ctx.fillStyle = "rgba(255,255,255,0.6)";
-  ctx.fillRect(-4, -7, 1, 1);
-  ctx.fillRect(2, -7, 1, 1);
-  ctx.fillStyle = dark;
-  ctx.fillRect(-6, -2, 12, 5);
-  // Musket: wooden stock, steel barrel, glowing muzzle.
+  ctx.fillStyle = withShade(accent, -22);
+  ctx.fillRect(-1, -18, 2, 9);
+  // Glowing head-lamp.
+  ctx.save();
+  ctx.shadowColor = "#fff2c0";
+  ctx.shadowBlur = 6 + A.glow * 7;
+  ctx.fillStyle = "#fff2c0";
+  ctx.beginPath();
+  ctx.arc(0, -10.5, 2.1, 0, PI2);
+  ctx.fill();
+  ctx.restore();
+  // Welder goggles (two lenses + strap + accent glint).
+  ctx.fillStyle = "#20242a";
+  ctx.beginPath();
+  ctx.arc(-3.4, -6.5, 2.7, 0, PI2);
+  ctx.arc(3.4, -6.5, 2.7, 0, PI2);
+  ctx.fill();
+  ctx.strokeStyle = withShade(accent, -8);
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(-1, -6.5);
+  ctx.lineTo(1, -6.5);
+  ctx.stroke();
+  ctx.save();
+  ctx.fillStyle = accent;
+  ctx.shadowColor = accent;
+  ctx.shadowBlur = 3 + A.glow * 3;
+  ctx.fillRect(-4.4, -7.6, 1.4, 1.4);
+  ctx.fillRect(2.6, -7.6, 1.4, 1.4);
+  ctx.restore();
+  // Wrench in the near hand.
+  ctx.save();
+  ctx.translate(-10, 10);
+  ctx.rotate(-0.55);
+  ctx.strokeStyle = "#aeb4bc";
+  ctx.lineWidth = 2.6;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(0, 1);
+  ctx.lineTo(0, 10);
+  ctx.stroke();
+  ctx.lineCap = "butt";
+  ctx.fillStyle = "#cfd4db";
+  ctx.beginPath();
+  ctx.arc(0, -1.5, 2.8, 0, PI2);
+  ctx.fill();
+  ctx.fillStyle = body;
+  ctx.beginPath();
+  ctx.arc(0, -1.5, 1.2, 0, PI2);
+  ctx.fill();
+  ctx.restore();
+  // Rivet-gun: wooden grip, boxy receiver + hopper, steel barrel, glowing muzzle.
   ctx.fillStyle = "#5a3d22";
-  ctx.fillRect(-10, 4, 13, 5);
-  const bg = ctx.createLinearGradient(1, 5, 1, 8);
+  ctx.fillRect(-9, 4, 10, 5);
+  ctx.fillStyle = withShade(body, -30);
+  ctx.beginPath();
+  ctx.roundRect(-2, 2, 9, 7, 1.5);
+  ctx.fill();
+  ctx.fillStyle = withShade(accent, -16);
+  ctx.fillRect(1, -1, 3, 4);
+  const bg = ctx.createLinearGradient(6, 4, 6, 7);
   bg.addColorStop(0, "#cfd4db");
   bg.addColorStop(1, "#8a9099");
   ctx.fillStyle = bg;
-  ctx.fillRect(1, 5, 23, 3);
+  ctx.fillRect(6, 4.5, 17, 3);
   ctx.save();
   ctx.shadowColor = accent;
-  ctx.shadowBlur = 5 + A.glow * 5;
+  ctx.shadowBlur = 6 + A.glow * 6;
   ctx.fillStyle = accent;
-  ctx.fillRect(22, 4, 4, 4);
+  ctx.fillRect(21, 4, 4, 4);
   ctx.restore();
+  // Welding sparks spraying forward (motion only).
+  if (A.live) {
+    ctx.save();
+    for (let i = 0; i < 7; i++) {
+      const life = (t * 1.5 + i * 0.8) % 1;
+      const sx = 24 + life * 11;
+      const sy = 6 + Math.sin(i * 2.3 + t * 7) * 5 * life;
+      ctx.globalAlpha = 1 - life;
+      ctx.fillStyle = i % 2 ? "#ffe08a" : accent;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 1.1 * (1 - life) + 0.4, 0, PI2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+
+// Hunter — a hooded beastmaster ranger drawing a heavy recurve longbow. The bow
+// points forward (to the right) and flips with the unit's facing. Its boar and
+// scatter traps are their own entities, so the sprite is just the archer figure.
+function drawHunter(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {
+  const t = A.t;
+  // Fur-trimmed cloak behind the shoulders (sways idly).
+  ctx.fillStyle = withShade(body, -30);
+  ctx.beginPath();
+  ctx.moveTo(-6, -9);
+  ctx.lineTo(6, -9);
+  ctx.quadraticCurveTo(12 + Math.sin(t * 1.6) * 1.5, 6, 8, 22);
+  ctx.lineTo(-8, 22);
+  ctx.quadraticCurveTo(-11, 5, -6, -9);
+  ctx.closePath();
+  ctx.fill();
+  // Quiver slung behind, arrows fletched up.
+  ctx.save();
+  ctx.rotate(-0.15);
+  ctx.fillStyle = withShade(body, -42);
+  ctx.beginPath();
+  ctx.roundRect(-12, -10, 5, 15, 2);
+  ctx.fill();
+  ctx.restore();
+  for (const dx of [-11, -9, -7]) {
+    ctx.strokeStyle = "#d8c9a8";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(dx, -9);
+    ctx.lineTo(dx - 1.5, -16);
+    ctx.stroke();
+    ctx.fillStyle = accent;
+    ctx.beginPath();
+    ctx.moveTo(dx - 1.5, -16);
+    ctx.lineTo(dx - 3.4, -15);
+    ctx.lineTo(dx - 1, -13);
+    ctx.closePath();
+    ctx.fill();
+  }
+  // Lean torso.
+  metalBody(ctx, 16, 23, -3, body, dark, light, 5);
+  // Crossed leather straps.
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = 2;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(-6, -1);
+  ctx.lineTo(6, 11);
+  ctx.moveTo(6, -1);
+  ctx.lineTo(-6, 11);
+  ctx.stroke();
+  ctx.lineCap = "butt";
+  // Belt + buckle.
+  ctx.fillStyle = withShade(body, -42);
+  ctx.fillRect(-8, 11, 16, 4);
+  ctx.fillStyle = accent;
+  ctx.fillRect(-2, 11, 4, 4);
+  // Fur ruff across the shoulders.
+  ctx.fillStyle = withShade(accent, -4);
+  for (const px of [-7, -4, -1, 2, 5]) {
+    ctx.beginPath();
+    ctx.arc(px, -6, 2.8, 0, PI2);
+    ctx.fill();
+  }
+  ctx.fillStyle = withShade(accent, 20);
+  for (const px of [-6, -2, 2]) {
+    ctx.beginPath();
+    ctx.arc(px, -7, 1.1, 0, PI2);
+    ctx.fill();
+  }
+  // Head under the hood (mostly shadowed).
+  ctx.fillStyle = "#c2a374";
+  ctx.beginPath();
+  ctx.arc(1, -12, 5.6, 0, PI2);
+  ctx.fill();
+  // Deep hood + peak.
+  ctx.fillStyle = dark;
+  ctx.beginPath();
+  ctx.moveTo(-5, -10);
+  ctx.quadraticCurveTo(-7, -22, 2, -21);
+  ctx.quadraticCurveTo(9, -20, 7, -9);
+  ctx.quadraticCurveTo(1, -13, -5, -10);
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(2, -21);
+  ctx.quadraticCurveTo(-2, -24, -5, -22);
+  ctx.quadraticCurveTo(-1, -20, 2, -20);
+  ctx.closePath();
+  ctx.fill();
+  // Face recess shadow.
+  ctx.fillStyle = "#12140e";
+  ctx.beginPath();
+  ctx.ellipse(2, -11, 3, 3.2, 0, 0, PI2);
+  ctx.fill();
+  // Glowing eyes.
+  ctx.save();
+  ctx.fillStyle = accent;
+  ctx.shadowColor = accent;
+  ctx.shadowBlur = 3 + A.glow * 3;
+  ctx.fillRect(0.4, -11.6, 1.5, 1.3);
+  ctx.fillRect(2.8, -11.6, 1.5, 1.3);
+  ctx.restore();
+  // Heavy recurve longbow (right hand) with a nocked broadhead.
+  const bg = ctx.createLinearGradient(10, -18, 10, 14);
+  bg.addColorStop(0, withShade(accent, 28));
+  bg.addColorStop(0.5, accent);
+  bg.addColorStop(1, withShade(accent, -28));
+  ctx.strokeStyle = bg;
+  ctx.lineWidth = 3;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.arc(12, -2, 17, -Math.PI / 2.5, Math.PI / 2.5);
+  ctx.stroke();
+  ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  ctx.arc(18.5, -15.8, 3, Math.PI * 0.9, Math.PI * 1.7);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(18.5, 11.8, 3, Math.PI * 0.3, Math.PI * 1.1);
+  ctx.stroke();
+  ctx.lineCap = "butt";
+  // String.
+  ctx.strokeStyle = "#eaeaea";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(18.6, -16.4);
+  ctx.lineTo(6, -2);
+  ctx.lineTo(18.6, 12.4);
+  ctx.stroke();
+  // Nocked arrow + broadhead.
+  ctx.strokeStyle = "#c9b78f";
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(3, -2);
+  ctx.lineTo(20, -2);
+  ctx.stroke();
+  ctx.fillStyle = "#e8eef2";
+  ctx.beginPath();
+  ctx.moveTo(23, -2);
+  ctx.lineTo(19, -4);
+  ctx.lineTo(19, 0);
+  ctx.closePath();
+  ctx.fill();
+  // Drawing hand at the nock.
+  ctx.fillStyle = "#a5854f";
+  ctx.beginPath();
+  ctx.arc(6, -2, 2, 0, PI2);
+  ctx.fill();
+  // Drifting motes (tan pollen/dust) — presentation only.
+  rising(ctx, 0, 9, 20, 24, accent, A, 5);
 }
 
 function drawOgre(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {
