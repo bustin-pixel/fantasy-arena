@@ -149,19 +149,21 @@ contracts, migration order) in **`docs/adr/0001-unitkit-seam.md`**.
   (`onTick` Bloodrage + `onWouldDie` Last Stand + `onKill` Bloodthirst + `onAfterAttack`
   Cleave) → **Rogue** (`onSpawn`+`onBeforeAttack`+`onAfterAttack`) → **Aegis Knight**
   (two-phase `modifyIncomingDamage` soak + `onDamaged` bank + `onAfterAttack` Backlash;
-  **Warded is now data** — `UnitDef.wardedAgainst`, read in `StatusEffectSystem`).
-- **Remaining:** Druid (`onTick` transform + `modifyIncomingHeal` + `onActTick` Rejuv +
-  `fireAbility` Summon Wolves) → Mystic/Hunter → Trickster (Shadow Step `onActTick`) →
+  **Warded is now data** — `UnitDef.wardedAgainst`, read in `StatusEffectSystem`) →
+  **Druid** (`onTick` bear transform + guard-timer, `onActTick` Rejuv, `modifyIncomingHeal`
+  bear +50%, `fireAbility` Summon Wolves — **first `onActTick` user**).
+- **Remaining:** Mystic/Hunter → Trickster (Shadow Step `onActTick`) →
   **Necromancer last** (custom dual-cast) → cleanup (delete `dispatchAbility`,
   `PASSIVE_ABILITIES`, `isActiveAbility`, `unitRoleClass` internals, all fallbacks).
   **Ice/Fire Mage** freeze/burn riders ride the projectile — deferred to the candidate-3
   projectile on-hit descriptor (ADR consequence); migrate them together.
-- **⚠ onActTick placement (unresolved, decide at the Druid):** the scaffolded `onActTick`
-  seam sits BEFORE the "target-dead → idle" check. Druid Rejuv (and Necro cast) must run
-  AFTER it (act only with a live target/cast); Arcane Blink + Trickster Shadow Step must
-  run BEFORE it (react even when the target just died). One slot can't serve both — likely
-  two call sites (pre-idle reactive vs post-idle act) or a second hook. No `onActTick` user
-  is migrated yet, so the seam can be relocated/split freely (digest-neutral until used).
+- **✓ onActTick placement (RESOLVED at the Druid):** the scaffolded pre-idle `onActTick`
+  seam was relocated to fire **POST-idle** (after the "target-dead → idle" check), where an
+  instant act needs a live target — Druid Rejuv (and later the Necro cast) hook there, and
+  it's passed the loop's `abilityCtx` so allies/enemies match the funnel exactly. The
+  **PRE-idle reactive slot** (Arcane Blink + Trickster Shadow Step, which react even when the
+  committed target just died) is a reserved, clearly-marked call site, wired when those units
+  migrate — a second call site (or hook), as anticipated.
 - **First balance dividend after the refactor** (separate commit, own spec): stun
   suppresses Raise Dead / Engineer repair / Hunter traps (move the hook past the gate).
 - Retires the `NOTES.md §2` "consider a per-unit traits field" note and the §3
