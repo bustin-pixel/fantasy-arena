@@ -72,8 +72,11 @@ server-verifiable later).
   boss **first**-kills, bestiary section/full completions, every 10th floor
   first-clear, later achievements — never from replays/farming. **The Soul Shop
   sells distinction, never battle power** (no stat boosts, no revives, no timers):
-  - **Unit skins** — palette swaps (cheap: `drawUnitSprite` derives everything from
-    `color`/`accent`, so a skin is an alternate color pair in data)
+  - **Unit skins** — palette swaps (mostly cheap: `drawUnitSprite` derives most of a
+    sprite from `color`/`accent`, so a skin is an alternate colour pair in data — but
+    the sprite glow-up added a few hardcoded literals a pure swap won't retint: the
+    knights' `KnightLivery` heraldry, per-mage element tints, and material colours like
+    bone/flame/steel. A skin for one of those units also needs its literals recoloured.)
   - **Legendary unit unlocks** — alt path alongside gold
   - **Premium chest** (guaranteed epic+ item, better unlock odds) + **chest reroll
     token** (reroll one item slot)
