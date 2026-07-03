@@ -91,8 +91,8 @@ Still gated by `defId` string literals in `CombatSystem.ts`:
   reveal + re-cloak restart, **onReactTick** Shadow Step). Added the `onReactTick` hook
   — the **pre-idle reactive act slot** (fires before the target-dead idle-out, so it
   interrupts any nearby caster even when its own target just died), the first user of the
-  slot reserved at the Druid. The Arcane Mage's Blink still uses its hardcoded block in
-  that same seam location until it migrates. The Trickster was the last stealther (Rogue
+  slot reserved at the Druid. (The Arcane Mage's Blink later joined this same seam —
+  `kits/arcaneMage.ts`.) The Trickster was the last stealther (Rogue
   already migrated), so the deploy-stealth `defId` branch in `MatchController` is now gone.
 - ~~`"warrior"` → Whirlwind: its melee swing is replaced by an AoE spin — hits every
   enemy within melee reach (`range + radius`) for its damage and applies a
@@ -144,6 +144,16 @@ Still gated by `defId` string literals in `CombatSystem.ts`:
   `barrageTargetUid`) **stays in CombatSystem** — it's field-gated on `barrageShots`,
   not `defId`, so like `stepCharge` it's engine plumbing the kit only arms (the same
   split as the Hunter's traps). Basic attack is the default ranged shot.
+- ~~`"fire_mage"` / `"ice_mage"` → every-Nth-attack burn/freeze riders (the
+  `onHitStunSec`/`onHitBurn` projectile fields set via `defId` in performBasicAttack)~~
+  — **migrated**: the casts (`fireball`/`frost_blast`) moved to `kits/fireMage.ts` /
+  `kits/iceMage.ts` (fireAbility), and the riders became **pure `UnitDef` data**
+  (`basicShotRider: { everyNthAttack, rider }`, like `wardedAgainst`). The projectile now
+  carries a generic `rider: ShotRider` descriptor — the DATA half of projectile-on-hit
+  (the Mystic's `onProjectileHit` kit hook is the CODE half) — applied generically in
+  `stepProjectiles`. The `fireball`/`frost_blast` impacts still resolve in the shared
+  `onProjectileHit` resolver, keyed on the ability tag (like `arcane_barrage`). **This was
+  the last per-unit `defId` branch — the migration is complete.**
 
 This worked but wasn't data-driven — hence the UnitKit migration above (ADR
 0001), which replaces the "consider a per-unit passive-traits field" idea with

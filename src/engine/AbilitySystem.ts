@@ -75,10 +75,6 @@ function dispatchAbility(ctx: AbilityContext): boolean {
   switch (ctx.unit.ability) {
     case "shield_block":
       return castShieldBlock(ctx);
-    case "fireball":
-      return castFireball(ctx);
-    case "frost_blast":
-      return castFrostBlast(ctx);
     case "fear_aura":
       return castFear(ctx);
     default:
@@ -146,47 +142,11 @@ function castShieldBlock(ctx: AbilityContext): boolean {
 // through the UnitKit seam; the engine keeps the cast pipeline (cooldown from
 // ABILITIES["taunt_roar"], the stun/silence gate).
 
-// --- FIRE MAGE: Fireball -----------------------------------------------------
-function castFireball(ctx: AbilityContext): boolean {
-  const { unit, unitsByUid } = ctx;
-  const target = unit.targetUid ? unitsByUid.get(unit.targetUid) : null;
-  if (!target || target.state === "dead") return false;
-
-  ctx.spawnProjectile({
-    pos: { x: unit.pos.x, y: unit.pos.y },
-    target: { x: target.pos.x, y: target.pos.y },
-    targetUid: target.uid,
-    speed: 300,
-    damage: 25,
-    team: unit.team,
-    sourceUid: unit.uid,
-    ability: "fireball",
-    color: getUnitDef(unit.defId).accent,
-    angle: 0,
-  });
-  return true;
-}
-
-// --- ICE MAGE: Frost Blast ---------------------------------------------------
-function castFrostBlast(ctx: AbilityContext): boolean {
-  const { unit, unitsByUid } = ctx;
-  const target = unit.targetUid ? unitsByUid.get(unit.targetUid) : null;
-  if (!target || target.state === "dead") return false;
-
-  ctx.spawnProjectile({
-    pos: { x: unit.pos.x, y: unit.pos.y },
-    target: { x: target.pos.x, y: target.pos.y },
-    targetUid: target.uid,
-    speed: 320,
-    damage: 20,
-    team: unit.team,
-    sourceUid: unit.uid,
-    ability: "frost_blast",
-    color: getUnitDef(unit.defId).accent,
-    angle: 0,
-  });
-  return true;
-}
+// (FIRE MAGE: Fireball + ICE MAGE: Frost Blast now live in kits/fireMage.ts and
+// kits/iceMage.ts — cast-time fireAbilities that lob the projectile; their impacts
+// still resolve in the shared onProjectileHit resolver below, keyed on the
+// "fireball"/"frost_blast" tags. The every-Nth-attack burn/freeze riders are pure
+// UnitDef data (basicShotRider), applied in stepProjectiles.)
 
 // (ARCANE MAGE: Arcane Barrage now lives in kits/arcaneMage.ts — a cast-time
 // fireAbility that ARMS a 3-missile volley on the current target; CombatSystem's
@@ -303,8 +263,8 @@ export function onProjectileHit(
   ctx.dealDamage(target, proj.damage, source);
 
   if (proj.ability === "fireball") {
-    // Fireball is now pure burst damage; the Fire Mage's burn comes from its
-    // every-third basic attack instead (see performBasicAttack / onHitBurn).
+    // Fireball is pure burst damage; the Fire Mage's burn comes from its every-3rd
+    // basic-attack rider instead (UnitDef.basicShotRider → proj.rider).
     ctx.spawnVfx({
       kind: "burn_burst",
       pos: { x: target.pos.x, y: target.pos.y },

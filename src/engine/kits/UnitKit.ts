@@ -31,8 +31,10 @@ import { clericKit } from "./cleric";
 import { druidKit } from "./druid";
 import { electricMageKit } from "./electricMage";
 import { engineerKit } from "./engineer";
+import { fireMageKit } from "./fireMage";
 import { holyKnightKit } from "./holyKnight";
 import { hunterKit } from "./hunter";
+import { iceMageKit } from "./iceMage";
 import { knightKit } from "./knight";
 import { mageKit } from "./mage";
 import { mysticArcherKit } from "./mysticArcher";
@@ -155,9 +157,11 @@ export const UNIT_KITS: UnitKitRegistry = {
   boar: boarKit,
   electric_mage: electricMageKit,
   engineer: engineerKit,
+  fire_mage: fireMageKit,
   healer: clericKit,
   holy_knight: holyKnightKit,
   hunter: hunterKit,
+  ice_mage: iceMageKit,
   knight: knightKit,
   mage: mageKit,
   mystic_archer: mysticArcherKit,

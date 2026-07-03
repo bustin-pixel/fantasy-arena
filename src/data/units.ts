@@ -127,6 +127,17 @@ export const UNITS: Record<string, UnitDef> = {
     school: "magic",
     color: "#b91c1c",
     accent: "#fb923c",
+    basicShotRider: {
+      everyNthAttack: 3,
+      rider: {
+        effectType: "burn",
+        durationSec: 3,
+        damagePerTick: 7,
+        tickIntervalSec: 1,
+        vfxKind: "burn_burst",
+        color: "#fb923c",
+      },
+    },
     traits: [
       {
         name: "Kindling",
@@ -149,6 +160,15 @@ export const UNITS: Record<string, UnitDef> = {
     school: "magic",
     color: "#2563eb",
     accent: "#7dd3fc",
+    basicShotRider: {
+      everyNthAttack: 2,
+      rider: {
+        effectType: "stun",
+        durationSec: 2,
+        vfxKind: "frost",
+        color: "#bae6fd",
+      },
+    },
     traits: [
       {
         name: "Frostbite",

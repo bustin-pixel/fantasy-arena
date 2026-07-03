@@ -117,6 +117,11 @@ export interface UnitDef {
    *  against burn/slow/poison). A static resistance, so it lives in data like
    *  `school` — StatusEffectSystem drops a warded effect at application. */
   wardedAgainst?: StatusEffectType[];
+  /** If set, this unit's basic shot plants an on-hit rider every Nth attack (the
+   *  Ice Mage's every-2nd freeze, the Fire Mage's every-3rd burn). Data, like
+   *  `wardedAgainst`: performBasicAttack attaches `rider` to the shot's projectile
+   *  and stepProjectiles applies it — no per-unit `defId` branch. */
+  basicShotRider?: { everyNthAttack: number; rider: ShotRider };
   /** Human-readable passive traits (engine-coded behaviors) for the detail UI. */
   traits?: { name: string; description: string }[];
 }
@@ -256,6 +261,22 @@ export interface Unit {
   deathFade: number;
 }
 
+/** The DATA half of projectile-on-hit: the status effect a basic shot plants on
+ *  impact, plus its impact vfx and the projectile's tint while it carries the
+ *  rider (the Ice Mage's freeze, the Fire Mage's burn). Pure data, like
+ *  `wardedAgainst` — the Mystic Archer's `onProjectileHit` kit hook is the CODE
+ *  half. `source` is filled from the firing projectile at impact. */
+export interface ShotRider {
+  effectType: StatusEffectType;
+  durationSec: number;
+  damagePerTick?: number;
+  tickIntervalSec?: number;
+  magnitude?: number;
+  vfxKind: VfxKind;
+  /** Both the projectile's tint and the impact-vfx color. */
+  color: string;
+}
+
 export interface Projectile {
   id: string;
   pos: Vec2;
@@ -270,12 +291,10 @@ export interface Projectile {
   /** rotation for rendering */
   angle: number;
   alive: boolean;
-  /** If set, the projectile applies a stun of this many seconds on impact.
-   *  Used by the Ice Mage's every-second-attack freeze. */
-  onHitStunSec?: number;
-  /** If set, the projectile applies Burn on impact.
-   *  Used by the Fire Mage's every-third-attack ignite. */
-  onHitBurn?: boolean;
+  /** On-hit rider this shot carries (Ice freeze / Fire burn), applied generically
+   *  in stepProjectiles. Attached by performBasicAttack from the source's
+   *  `UnitDef.basicShotRider`; absent for a plain shot. */
+  rider?: ShotRider;
 }
 
 export type FloatingTextKind = "damage" | "heal" | "crit";

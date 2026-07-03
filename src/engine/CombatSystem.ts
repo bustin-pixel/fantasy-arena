@@ -795,12 +795,6 @@ function performBasicAttack(
   if (kit?.onBeforeAttack) kit.onBeforeAttack(unit, target, ctx);
 
   unit.attackCount += 1;
-  // Ice Mage: every second basic attack freezes the target (2s stun).
-  const freezeThisHit =
-    unit.defId === "ice_mage" && unit.attackCount % 2 === 0;
-  // Fire Mage: every third basic attack sets the target ablaze (Burn).
-  const burnThisHit =
-    unit.defId === "fire_mage" && unit.attackCount % 3 === 0;
 
   // [seam] replace the default swing entirely (open contract 2 — Mystic / Ranger /
   // Warrior do their own thing). attackCount is already bumped, matching today.
@@ -815,7 +809,12 @@ function performBasicAttack(
   // shot below, and nukes with its active Arcane Barrage on cooldown.)
 
   if (ranged) {
-    // Ranged basic attacks spawn a simple projectile (archer arrows etc.).
+    // Ranged basic attacks spawn a simple projectile (archer arrows etc.). A unit
+    // with a basicShotRider (Ice Mage freeze / Fire Mage burn) plants its on-hit
+    // rider every Nth attack — pure UnitDef data, resolved in stepProjectiles.
+    const sr = def.basicShotRider;
+    const rider =
+      sr && unit.attackCount % sr.everyNthAttack === 0 ? sr.rider : undefined;
     spawnProjectile(state, {
       pos: { x: unit.pos.x, y: unit.pos.y },
       target: { x: target.pos.x, y: target.pos.y },
@@ -824,11 +823,10 @@ function performBasicAttack(
       damage: unit.damage,
       team: unit.team,
       sourceUid: unit.uid,
-      ability: "lifesteal", // sentinel: "basic"; no on-hit status
-      color: freezeThisHit ? "#bae6fd" : burnThisHit ? "#fb923c" : def.accent,
+      ability: "lifesteal", // sentinel: "basic"; on-hit rider carried in `rider`
+      color: rider ? rider.color : def.accent,
       angle: 0,
-      onHitStunSec: freezeThisHit ? 2 : undefined,
-      onHitBurn: burnThisHit || undefined,
+      rider,
     });
   } else {
     // [seam] Warrior Whirlwind (the AoE spin + bleed that replaces the swing) now
@@ -894,40 +892,27 @@ function stepProjectiles(
           }
         } else if (isBasic) {
           if (source) dealDamage(target, proj.damage, source);
-          // Ice Mage every-second-attack freeze.
-          if (proj.onHitStunSec) {
+          // On-hit rider (Ice freeze / Fire burn) — applied generically from the
+          // shot's data-descriptor (UnitDef.basicShotRider → proj.rider), so no
+          // per-unit defId branch lives here.
+          if (proj.rider) {
+            const r = proj.rider;
             applyEffect(
               target,
-              makeEffect("stun", {
+              makeEffect(r.effectType, {
                 source: proj.sourceUid,
-                durationSec: proj.onHitStunSec,
+                durationSec: r.durationSec,
+                damagePerTick: r.damagePerTick,
+                tickIntervalSec: r.tickIntervalSec,
+                magnitude: r.magnitude,
               })
             );
             spawnVfx(state, {
-              kind: "frost",
+              kind: r.vfxKind,
               pos: { x: target.pos.x, y: target.pos.y },
               life: secToTicks(0.4),
               maxLife: secToTicks(0.4),
-              color: "#bae6fd",
-            });
-          }
-          // Fire Mage every-third-attack burn.
-          if (proj.onHitBurn) {
-            applyEffect(
-              target,
-              makeEffect("burn", {
-                source: proj.sourceUid,
-                durationSec: 3,
-                damagePerTick: 7,
-                tickIntervalSec: 1,
-              })
-            );
-            spawnVfx(state, {
-              kind: "burn_burst",
-              pos: { x: target.pos.x, y: target.pos.y },
-              life: secToTicks(0.4),
-              maxLife: secToTicks(0.4),
-              color: "#fb923c",
+              color: r.color,
             });
           }
         } else {
