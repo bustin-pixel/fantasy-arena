@@ -2,9 +2,17 @@ import { useEffect, useRef } from "react";
 import { renderPortrait } from "@/engine/Renderer";
 import { getUnitDef } from "@/data/units";
 import { RARITIES } from "@/data/rarities";
+import { UNLOCK_PRICES } from "@/meta/economy";
 
-/** State of the quick-add button, computed by the hub from the current deck. */
-export type CardAddState = "add" | "in-deck" | "deck-full" | "legendary-max";
+/** State of the quick-add button, computed by the hub from the current deck.
+ *  "locked" = the player doesn't own the unit yet — the button shows the
+ *  price and routes to the detail panel's buy flow. */
+export type CardAddState =
+  | "add"
+  | "in-deck"
+  | "deck-full"
+  | "legendary-max"
+  | "locked";
 
 interface Props {
   defId: string;
@@ -21,6 +29,7 @@ const ADD_LABEL: Record<CardAddState, string> = {
   "in-deck": "✓",
   "deck-full": "Deck full",
   "legendary-max": "🔒",
+  locked: "", // computed per-unit (shows the price)
 };
 
 /** A small canvas-rendered card with rarity border, matching battlefield art. */
@@ -29,7 +38,11 @@ export function CardPortrait({ defId, size = 96, addState, onInfo, onToggle }: P
   const def = getUnitDef(defId);
   const rarity = RARITIES[def.rarity];
   const selected = addState === "in-deck";
+  const unowned = addState === "locked";
   const disabled = addState === "deck-full" || addState === "legendary-max";
+  const label = unowned
+    ? `🔒 ${UNLOCK_PRICES[def.rarity]}g`
+    : ADD_LABEL[addState];
 
   useEffect(() => {
     const canvas = ref.current;
@@ -40,7 +53,7 @@ export function CardPortrait({ defId, size = 96, addState, onInfo, onToggle }: P
 
   return (
     <div
-      className={`card-portrait${disabled ? " locked" : ""}`}
+      className={`card-portrait${disabled ? " locked" : ""}${unowned ? " unowned" : ""}`}
       style={{
         borderColor: rarity.color,
         boxShadow: selected
@@ -64,12 +77,14 @@ export function CardPortrait({ defId, size = 96, addState, onInfo, onToggle }: P
       <div className="card-actions">
         <button
           type="button"
-          className={`card-add${selected ? " in-deck" : ""}`}
-          onClick={onToggle}
+          className={`card-add${selected ? " in-deck" : ""}${unowned ? " price" : ""}`}
+          // A locked unit's button opens the detail panel (where Buy lives)
+          // instead of trying to deck-add it.
+          onClick={unowned ? onInfo : onToggle}
           disabled={disabled}
           aria-pressed={selected}
         >
-          {ADD_LABEL[addState]}
+          {label}
         </button>
         <button
           type="button"

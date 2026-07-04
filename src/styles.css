@@ -1458,6 +1458,43 @@ body.modal-open .pager-nav {
   padding: 6px 0;
   opacity: 0.7;
 }
+
+/* ---- Gold wallet + locked collection ------------------------------------- */
+.gold-pill {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--gold);
+  background: rgba(20, 14, 8, 0.85);
+  border: 1px solid rgba(245, 179, 1, 0.5);
+  border-radius: 999px;
+  padding: 4px 12px;
+  pointer-events: none;
+}
+.gold-pill .coin {
+  font-size: 0.7rem;
+  text-shadow: 0 0 6px rgba(245, 179, 1, 0.8);
+}
+/* A unit the player doesn't own: silhouetted art, price on the button. */
+.card-portrait.unowned .card-canvas {
+  filter: grayscale(1) brightness(0.45);
+}
+.card-portrait.unowned .card-name {
+  opacity: 0.75;
+}
+.card-add.price {
+  font-size: 0.68rem;
+  color: var(--gold);
+}
+.btn-buy {
+  white-space: nowrap;
+}
 @keyframes fade {
   from {
     opacity: 0;
