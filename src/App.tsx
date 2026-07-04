@@ -8,6 +8,7 @@ import type { BattleMode } from "@/hooks/useBattleEngine";
 function Shell() {
   const [view, setView] = useState<"shell" | "battle">("shell");
   const [battleMode, setBattleMode] = useState<BattleMode>("solo");
+  const [battleFloor, setBattleFloor] = useState(1);
   const { save } = useGameState();
   // Snapshot the deck at battle start so mid-battle edits can't mutate it.
   const [activeDeck, setActiveDeck] = useState<string[]>([]);
@@ -17,15 +18,17 @@ function Shell() {
       <BattleScreen
         deck={activeDeck}
         mode={battleMode}
+        floor={battleFloor}
         onExit={() => setView("shell")}
       />
     );
   }
   return (
     <AppShell
-      onBattle={(mode) => {
+      onBattle={(mode, floor = 1) => {
         setActiveDeck(save.deck.slice(0, 4));
         setBattleMode(mode);
+        setBattleFloor(floor);
         setView("battle");
       }}
     />

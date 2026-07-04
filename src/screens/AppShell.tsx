@@ -8,8 +8,9 @@ import { DungeonGate } from "@/components/DungeonGate";
 import type { BattleMode } from "@/hooks/useBattleEngine";
 
 interface Props {
-  /** Launch a battle in the given mode (from a Home mode card). */
-  onBattle: (mode: BattleMode) => void;
+  /** Launch a battle in the given mode (from a Home mode card). Depths
+   *  passes the floor picked in the floor sheet. */
+  onBattle: (mode: BattleMode, floor?: number) => void;
 }
 
 // Page order: Collection (0) ← Home (1) → Compendium (2). Home is the landing.

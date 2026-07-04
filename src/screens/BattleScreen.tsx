@@ -9,24 +9,32 @@ import {
   PLAYER_ZONE,
 } from "@/utils/constants";
 import { useGameState } from "@/state/GameStateContext";
+import { computeBattleRewards, type BattleRewards } from "@/meta/rewards";
+import { RewardPanel } from "@/components/RewardPanel";
+import { generateSeed } from "@/utils/rng";
 
 interface Props {
   deck: string[];
   onExit: () => void;
   /** Solo allows fast-forward; PVP hides it and locks the sim to 1×. */
   mode?: BattleMode;
+  /** Depths floor being descended (ignored outside "depths"). */
+  floor?: number;
 }
 
-export function BattleScreen({ deck, onExit, mode = "solo" }: Props) {
+export function BattleScreen({ deck, onExit, mode = "solo", floor = 1 }: Props) {
   const { canvasRef, ui, deployAt, selectCard, speed, setSpeed, pickUnitAt, inspectUnit, enemyLedger } =
-    useBattleEngine(deck, mode);
-  const { recordResult, recordBestiary } = useGameState();
+    useBattleEngine(deck, mode, undefined, floor);
+  const { save, recordResult, recordBestiary, grantBattleRewards } =
+    useGameState();
   const wrapRef = useRef<HTMLDivElement>(null);
   const recordedRef = useRef(false);
   // Timestamp of the last touch, to suppress the synthetic click a touchscreen
   // fires right after a tap (which would otherwise deploy a second unit).
   const lastTouchRef = useRef(0);
   const [showResult, setShowResult] = useState(false);
+  // The reward bundle for the overlay. Set once, alongside the grant.
+  const [rewards, setRewards] = useState<BattleRewards | null>(null);
   // uid of the unit whose stat tooltip is open (tap a combatant to inspect).
   const [inspectedUid, setInspectedUid] = useState<string | null>(null);
 
@@ -34,20 +42,46 @@ export function BattleScreen({ deck, onExit, mode = "solo" }: Props) {
   // the unit's position stay current; clears itself when the unit dies.
   const inspected = inspectedUid ? inspectUnit(inspectedUid) : null;
 
-  // Record win/loss + Compendium reveals once when the match resolves. The
-  // bestiary reads the final field from the meta layer — the sim never knows.
+  // Record win/loss + Compendium reveals + rewards once when the match
+  // resolves. The bestiary and rewards read the final field from the meta
+  // layer — the sim never knows. recordedRef makes this exactly-once (the
+  // grant re-renders via save, and StrictMode re-runs effects in dev).
   useEffect(() => {
-    const over =
-      ui.phase === "victory" || ui.phase === "defeat" || ui.phase === "draw";
-    if (over && !recordedRef.current) {
+    const outcome =
+      ui.phase === "victory" || ui.phase === "defeat" || ui.phase === "draw"
+        ? ui.phase
+        : null;
+    if (outcome && !recordedRef.current) {
       recordedRef.current = true;
-      if (ui.phase === "victory") recordResult(true);
-      else if (ui.phase === "defeat") recordResult(false);
+      if (outcome === "victory") recordResult(true);
+      else if (outcome === "defeat") recordResult(false);
       const { seen, slain } = enemyLedger();
       recordBestiary(seen, slain);
+      // Grant-then-reveal: rewards are rolled (drop-time seed) and committed
+      // to the save NOW; the overlay's chest ceremony is pure presentation,
+      // so leaving early can't lose anything.
+      const bundle = computeBattleRewards({
+        mode,
+        floor,
+        outcome,
+        unlockedUnits: save.unlockedUnits,
+        highestClearedFloor: save.depths.highestClearedFloor,
+        chestSeed: generateSeed(),
+      });
+      grantBattleRewards(bundle, { mode, floor });
+      setRewards(bundle);
       setTimeout(() => setShowResult(true), 700);
     }
-  }, [ui.phase, recordResult, recordBestiary, enemyLedger]);
+  }, [
+    ui.phase,
+    recordResult,
+    recordBestiary,
+    enemyLedger,
+    grantBattleRewards,
+    mode,
+    floor,
+    save,
+  ]);
 
   // A tap inspects a tapped unit (either team); on empty space it dismisses any
   // tooltip and deploys a reinforcement if a slot is open in the player zone.
@@ -123,6 +157,9 @@ export function BattleScreen({ deck, onExit, mode = "solo" }: Props) {
                 ? "Your warband has fallen."
                 : "Neither side could break the other."}
             </p>
+            {rewards && (
+              <RewardPanel rewards={rewards} floor={floor} mode={mode} />
+            )}
             <button className="btn btn-gold" onClick={onExit}>
               Return to Hub
             </button>

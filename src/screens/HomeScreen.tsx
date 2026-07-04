@@ -4,7 +4,7 @@ import { ArenaIcon, SwarmIcon } from "@/components/ModeIcons";
 import type { BattleMode } from "@/hooks/useBattleEngine";
 
 interface Props {
-  onBattle: (mode: BattleMode) => void;
+  onBattle: (mode: BattleMode, floor?: number) => void;
 }
 
 /**
