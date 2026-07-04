@@ -215,7 +215,29 @@ doubles as `enemyReserves`, which is what keeps a momentarily-cleared board
 from counting as victory while monsters are still waiting off-screen. It owns
 a private RNG stream, so Depths never perturbs Arena determinism.
 
-### 6. The economy is meta-layer only (and its invariants)
+### 6. Sprite art is presentation-only and portrait-stub-safe
+`assets/sprites.ts` draws every unit procedurally (no art assets), consumed only by
+the read-only `Renderer`. Sprite edits are pure presentation — they never touch
+determinism or the test surface (nothing under test imports it). Two traps when
+editing a draw routine:
+- **Portraits pass a minimal `Unit` stub.** `renderPortrait` (`Renderer.ts`) fakes a
+  unit with only `defId`/`facing`/`animState`/`animTime`/`attackSpeed`/`state` — no
+  `uid`, `effects`, `transformed`, or `mysticForm`. Guard every such read
+  (`unit.effects?.…`, `unit.mysticForm` defaulting, hashed-uid phase falling back to
+  0), or the hub/Compendium card throws and trips the app ErrorBoundary. Any new
+  per-unit field a sprite reads needs the same guard.
+- **Ambient loops use a wall clock, not `unit.animTime`.** `animTime` resets to 0 on
+  every state change (AnimationSystem), which would pop looping embers/wisps/gleams.
+  `drawUnitSprite` builds a presentation-only clock from `performance.now()` + a
+  per-unit phase hashed off `uid`; static portraits pass `live:false` to freeze it and
+  skip the particle emitters. Wall time is fine here — it never feeds back into the sim.
+
+Per-unit variation is data-in-code, not forked draw fns: the two knights share
+`drawKnight` + a `KnightLivery` colour set; the five mages share `drawMage` + an
+element tag; the Mystic Archer reads `unit.mysticForm` for its gold/violet aura.
+Shared body, per-unit colour — keep it that way.
+
+### 7. The economy is meta-layer only (and its invariants)
 Rewards/chests/unlocks (Economy slice 1) never touch the sim. Rules that keep it
 sound:
 - **Every number lives in `src/meta/economy.ts`** — prices, gold rewards, chest
