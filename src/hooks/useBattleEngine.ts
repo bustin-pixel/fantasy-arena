@@ -16,6 +16,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { MatchPhase, Rarity, StatusEffectType, Team, Vec2 } from "@/types";
 import { MatchController } from "@/engine/MatchController";
 import { renderBattle } from "@/engine/Renderer";
+import { pickArenaTheme, type ArenaThemeId } from "@/assets/arenaThemes";
 import { generateEnemyDeck } from "@/engine/AIDeck";
 import { getUnitDef } from "@/data/units";
 import { ABILITIES } from "@/data/abilities";
@@ -98,6 +99,9 @@ export function useBattleEngine(
   const accRef = useRef<number>(0);
   const lastRef = useRef<number>(0);
   const speedRef = useRef<number>(1);
+  // Backdrop for this match. Arena rotates through the fantasy themes (picked
+  // from the seed, so replays match); Depths/PVP keep the classic field.
+  const themeRef = useRef<ArenaThemeId>("grassField");
 
   const [ui, setUi] = useState<BattleUiState>({
     phase: "deployment",
@@ -141,6 +145,7 @@ export function useBattleEngine(
       const enemyDeck = generateEnemyDeck(seed);
       controllerRef.current = new MatchController(seed, playerDeck.slice(0, 4), enemyDeck);
     }
+    themeRef.current = mode === "solo" ? pickArenaTheme(seed) : "grassField";
     accRef.current = 0;
     lastRef.current = performance.now();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -171,7 +176,7 @@ export function useBattleEngine(
       const canvas = canvasRef.current;
       if (canvas) {
         const ctx = canvas.getContext("2d");
-        if (ctx) renderBattle(ctx, c.snapshot());
+        if (ctx) renderBattle(ctx, c.snapshot(), themeRef.current);
       }
 
       // Throttled UI sync (~6/s).
