@@ -16,9 +16,14 @@ import {
 import {
   DEFAULT_SAVE,
   loadSave,
+  sanitizeDeck,
   writeSave,
   type PlayerSave,
 } from "./persistence";
+import { MILESTONE_UNLOCKS, UNLOCK_PRICES } from "@/meta/economy";
+import type { BattleRewards } from "@/meta/rewards";
+import type { BattleMode } from "@/hooks/useBattleEngine";
+import { UNITS } from "@/data/units";
 
 interface GameStateValue {
   save: PlayerSave;
@@ -29,6 +34,16 @@ interface GameStateValue {
    *  against you counts as encountered; everything that died counts as
    *  defeated. Reveals only ever go forward (no un-discovering). */
   recordBestiary: (seen: string[], slain: string[]) => void;
+  /** Apply an already-computed reward bundle (gold, chest contents, Depths
+   *  progress + milestone unlock on a first clear) in ONE atomic save write.
+   *  Idempotence is the caller's job (BattleScreen's recordedRef); rolling
+   *  happens before this call so the updater stays pure under StrictMode. */
+  grantBattleRewards: (
+    rewards: BattleRewards,
+    ctx: { mode: BattleMode; floor: number }
+  ) => void;
+  /** Buy a locked unit with gold. No-op unless locked and affordable. */
+  purchaseUnit: (unitId: string) => void;
 }
 
 const GameStateContext = createContext<GameStateValue | null>(null);
@@ -40,8 +55,10 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
     writeSave(save);
   }, [save]);
 
+  // Belt-and-braces: the deck ⊆ unlocked invariant is enforced at the state
+  // boundary, not just in the UI.
   const setDeck = (deck: string[]) =>
-    setSave((s) => ({ ...s, deck }));
+    setSave((s) => ({ ...s, deck: sanitizeDeck(deck, s.unlockedUnits) }));
   const setUsername = (username: string) =>
     setSave((s) => ({ ...s, username }));
   const recordResult = (won: boolean) =>
@@ -65,9 +82,57 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       return { ...s, bestiary };
     });
 
+  // One atomic fold per battle: gold + chest gold + unlock drops + Depths
+  // progress + milestone all land in a single setSave, so a crash can never
+  // persist half a grant. The updater is pure (StrictMode runs it twice in
+  // dev) — every random roll already happened in computeBattleRewards.
+  const grantBattleRewards = (
+    rewards: BattleRewards,
+    ctx: { mode: BattleMode; floor: number }
+  ) =>
+    setSave((s) => {
+      let gold = s.gold + rewards.gold;
+      const unlocked = new Set(s.unlockedUnits);
+      for (const entry of rewards.chest?.contents ?? []) {
+        if (entry.kind === "gold") gold += entry.amount;
+        else if (entry.kind === "duplicate") gold += entry.gold;
+        else unlocked.add(entry.unitId);
+      }
+      let depths = s.depths;
+      if (ctx.mode === "depths" && rewards.firstClear) {
+        depths = {
+          highestClearedFloor: Math.max(s.depths.highestClearedFloor, ctx.floor),
+        };
+        const milestone = MILESTONE_UNLOCKS[ctx.floor];
+        if (milestone) unlocked.add(milestone);
+      }
+      return { ...s, gold, unlockedUnits: [...unlocked], depths };
+    });
+
+  const purchaseUnit = (unitId: string) =>
+    setSave((s) => {
+      const def = UNITS[unitId];
+      if (!def || s.unlockedUnits.includes(unitId)) return s;
+      const price = UNLOCK_PRICES[def.rarity];
+      if (s.gold < price) return s;
+      return {
+        ...s,
+        gold: s.gold - price,
+        unlockedUnits: [...s.unlockedUnits, unitId],
+      };
+    });
+
   return (
     <GameStateContext.Provider
-      value={{ save, setDeck, setUsername, recordResult, recordBestiary }}
+      value={{
+        save,
+        setDeck,
+        setUsername,
+        recordResult,
+        recordBestiary,
+        grantBattleRewards,
+        purchaseUnit,
+      }}
     >
       {children}
     </GameStateContext.Provider>
