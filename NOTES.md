@@ -200,6 +200,25 @@ doubles as `enemyReserves`, which is what keeps a momentarily-cleared board
 from counting as victory while monsters are still waiting off-screen. It owns
 a private RNG stream, so Depths never perturbs Arena determinism.
 
+### 6. The economy is meta-layer only (and its invariants)
+Rewards/chests/unlocks (Economy slice 1) never touch the sim. Rules that keep it
+sound:
+- **Every number lives in `src/meta/economy.ts`** — prices, gold rewards, chest
+  odds, milestone unlocks. Tune there, nowhere else. `src/meta/` must never
+  import from `state/`, `engine/`, or React (types-only imports are fine).
+- **Chest rolls are pure + seeded** (`src/meta/rewards.ts`): the drop-time seed
+  is stored on the `ChestResult`, so a server can re-roll and verify. Never
+  `Math.random()` in reward logic.
+- **Grants happen exactly once**: BattleScreen's `recordedRef` guards the
+  battle-end effect, and `grantBattleRewards` folds EVERYTHING (gold, chest
+  contents, floor progress, milestone) into ONE `setSave`. Keep `setSave`
+  updaters pure — StrictMode runs them twice in dev; roll first, then fold.
+- **deck ⊆ unlockedUnits** is enforced in `sanitizeDeck` (persistence) AND
+  `setDeck` routes through it. New units added post-v3 arrive locked for
+  everyone — only the one-time v2→v3 migration grandfathers everything.
+- **Grant-then-reveal**: rewards are committed before the results overlay
+  animates; the chest tap is ceremony, so leaving early can't lose loot.
+
 ---
 
 ## Architecture reminders (the good patterns to preserve)

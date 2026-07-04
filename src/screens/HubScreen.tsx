@@ -166,7 +166,8 @@ export function HubScreen() {
         <p className="hint-text">
           Choose up to four units — at most one Legendary per deck. Order matters:
           they deploy front-to-back as slots open, with two of yours on the field
-          at once.
+          at once. Locked units unlock with gold, from chests, or at Depths
+          milestones.
         </p>
       </section>
 
