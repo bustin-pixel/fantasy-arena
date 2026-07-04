@@ -498,8 +498,8 @@ function accentsForge(g: Ctx, t: number): void {
 }
 
 // ---------------------------------------------------------------------------
-// Depths Dungeon — torchlit stone slabs, iron grate, bones and moss.
-// Used on every floor of The Depths.
+// Dungeon — torchlit stone slabs, iron grate, bones and moss.
+// Every floor of The Depths uses it; it's also in the Arena rotation.
 // ---------------------------------------------------------------------------
 
 /** Wall-sconce torches lining the side walls (shared with `accents`). */
@@ -727,8 +727,15 @@ export const ARENA_THEMES: Record<ArenaThemeId, ArenaTheme> = {
   },
 };
 
-/** The themes Arena mode rotates through (grassField stays the Depths look). */
-const ARENA_ROTATION: ArenaThemeId[] = ["colosseum", "glade", "sanctum", "forge"];
+/** The themes Arena mode rotates through (Depths pins `dungeon`; PVP keeps
+ *  `grassField`). */
+const ARENA_ROTATION: ArenaThemeId[] = [
+  "colosseum",
+  "glade",
+  "sanctum",
+  "forge",
+  "dungeon",
+];
 
 /** Dev/testing override: set localStorage "fantasy-arena/arena-theme" to a
  *  theme id to pin the backdrop. Presentation-only, so this can't desync. */
