@@ -1,6 +1,10 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useGameState } from "@/state/GameStateContext";
 import { ArenaIcon, SwarmIcon } from "@/components/ModeIcons";
+import {
+  FloorPickerSheet,
+  MAX_FLOOR_WITH_DATA,
+} from "@/components/FloorPickerSheet";
 import type { BattleMode } from "@/hooks/useBattleEngine";
 
 interface Props {
@@ -9,12 +13,17 @@ interface Props {
 
 /**
  * The landing page — pick a game mode. Arena battles an AI-generated warband
- * (mode "solo"); The Depths is the PvE descent (mode "depths" — floor 1 for
- * now, until the floor picker + progression land).
+ * (mode "solo"); The Depths is the PvE descent (mode "depths") — its card
+ * opens the floor picker, defaulting to the next uncleared floor.
  */
 export function HomeScreen({ onBattle }: Props) {
   const { save } = useGameState();
   const ready = save.deck.length >= 2;
+  const [pickingFloor, setPickingFloor] = useState(false);
+  const nextFloor = Math.min(
+    save.depths.highestClearedFloor + 1,
+    MAX_FLOOR_WITH_DATA
+  );
 
   const winRate = useMemo(() => {
     const total = save.wins + save.losses;
@@ -61,18 +70,29 @@ export function HomeScreen({ onBattle }: Props) {
           type="button"
           className="mode-card swarm"
           disabled={!ready}
-          onClick={() => onBattle("depths")}
+          onClick={() => setPickingFloor(true)}
         >
           <SwarmIcon />
           <span className="mode-card-title">The Depths</span>
           <span className="mode-card-sub">
-            {ready ? "Descend — Floor 1" : "Build a warband to play"}
+            {ready ? `Descend — Floor ${nextFloor}` : "Build a warband to play"}
           </span>
         </button>
       </div>
 
       {!ready && (
         <p className="home-hint">← Swipe to Collection to build your warband</p>
+      )}
+
+      {pickingFloor && (
+        <FloorPickerSheet
+          highestClearedFloor={save.depths.highestClearedFloor}
+          onDescend={(floor) => {
+            setPickingFloor(false);
+            onBattle("depths", floor);
+          }}
+          onClose={() => setPickingFloor(false)}
+        />
       )}
     </div>
   );
