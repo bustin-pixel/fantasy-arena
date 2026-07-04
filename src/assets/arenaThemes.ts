@@ -19,7 +19,8 @@ export type ArenaThemeId =
   | "colosseum"
   | "glade"
   | "sanctum"
-  | "forge";
+  | "forge"
+  | "dungeon";
 
 export interface ArenaTheme {
   id: ArenaThemeId;
@@ -497,6 +498,176 @@ function accentsForge(g: Ctx, t: number): void {
 }
 
 // ---------------------------------------------------------------------------
+// Depths Dungeon — torchlit stone slabs, iron grate, bones and moss.
+// Used on every floor of The Depths.
+// ---------------------------------------------------------------------------
+
+/** Wall-sconce torches lining the side walls (shared with `accents`). */
+const DUNGEON_TORCHES: Array<[number, number]> = [
+  [16, 150], [464, 150], [16, 400], [464, 400], [16, 610], [464, 610],
+];
+
+function buildDungeon(g: Ctx): void {
+  vgrad(g, "#232228", "#2b2a31", "#1e1d23");
+
+  // Offset stone slabs with per-tile shade variation.
+  const T = 60;
+  for (let ty = 0; ty < H / T; ty++) {
+    for (let tx = 0; tx <= W / T; tx++) {
+      const r = prand(tx * 17 + ty * 43);
+      g.fillStyle = `rgba(${r > 0.5 ? "160,160,175" : "5,5,10"},${0.05 + r * 0.07})`;
+      g.fillRect(tx * T + (ty % 2 ? T / 2 : 0) - T / 2, ty * T, T, T);
+    }
+  }
+  g.strokeStyle = "rgba(8,8,12,0.55)";
+  g.lineWidth = 2;
+  for (let y = 0; y <= H; y += T) {
+    g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke();
+  }
+  for (let ty = 0; ty < H / T; ty++) {
+    for (let tx = 0; tx <= W / T; tx++) {
+      const x = tx * T + (ty % 2 ? T / 2 : 0);
+      g.beginPath(); g.moveTo(x, ty * T); g.lineTo(x, ty * T + T); g.stroke();
+    }
+  }
+
+  // Hairline cracks.
+  g.strokeStyle = "rgba(10,10,14,0.6)";
+  g.lineWidth = 1.5;
+  for (let i = 0; i < 8; i++) {
+    let x = prand(i + 60) * W;
+    let y = prand(i + 70) * H;
+    g.beginPath();
+    g.moveTo(x, y);
+    for (let s = 0; s < 4; s++) {
+      x += (prand(i * 5 + s) - 0.5) * 40;
+      y += (prand(i * 5 + s + 3) - 0.5) * 40;
+      g.lineTo(x, y);
+    }
+    g.stroke();
+  }
+
+  // Damp moss creeping out of the corners and along the walls.
+  for (const [mx, my, mr] of [
+    [10, 30, 50], [470, 60, 44], [8, 690, 56], [472, 680, 48], [240, 6, 36],
+  ]) {
+    g.fillStyle = "rgba(52,72,44,0.35)";
+    g.beginPath(); g.ellipse(mx, my, mr, mr * 0.6, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = "rgba(70,95,55,0.25)";
+    g.beginPath(); g.ellipse(mx + 6, my + 4, mr * 0.55, mr * 0.35, 0.4, 0, Math.PI * 2); g.fill();
+  }
+
+  // Shallow puddles catching a cold sheen.
+  for (const [px, py, pr] of [[130, 200, 26], [356, 560, 30], [90, 500, 18]]) {
+    g.fillStyle = "rgba(12,14,22,0.55)";
+    g.beginPath(); g.ellipse(px, py, pr, pr * 0.42, 0, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = "rgba(140,160,200,0.18)";
+    g.lineWidth = 1.5;
+    g.beginPath(); g.ellipse(px, py, pr * 0.8, pr * 0.32, 0, 0, Math.PI * 2); g.stroke();
+  }
+
+  // Central iron drain grate.
+  g.save();
+  g.translate(W / 2, H / 2);
+  g.fillStyle = "rgba(10,10,14,0.6)";
+  g.beginPath(); g.arc(0, 0, 56, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = "#4a4a52";
+  g.lineWidth = 5;
+  g.beginPath(); g.arc(0, 0, 56, 0, Math.PI * 2); g.stroke();
+  g.lineWidth = 3;
+  g.beginPath(); g.arc(0, 0, 40, 0, Math.PI * 2); g.stroke();
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI;
+    g.beginPath();
+    g.moveTo(Math.cos(a) * 54, Math.sin(a) * 54);
+    g.lineTo(-Math.cos(a) * 54, -Math.sin(a) * 54);
+    g.stroke();
+  }
+  // rivets on the outer ring
+  g.fillStyle = "#5b5b64";
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2 + Math.PI / 8;
+    g.beginPath(); g.arc(Math.cos(a) * 56, Math.sin(a) * 56, 3, 0, Math.PI * 2); g.fill();
+  }
+  g.restore();
+
+  // Scattered old bones.
+  const bone = (bx: number, by: number, rot: number) => {
+    g.save();
+    g.translate(bx, by);
+    g.rotate(rot);
+    g.strokeStyle = "#b9b3a4";
+    g.lineWidth = 3;
+    g.beginPath(); g.moveTo(-8, 0); g.lineTo(8, 0); g.stroke();
+    g.fillStyle = "#b9b3a4";
+    for (const ex of [-8, 8]) {
+      g.beginPath(); g.arc(ex, -2.5, 2.6, 0, Math.PI * 2); g.fill();
+      g.beginPath(); g.arc(ex, 2.5, 2.6, 0, Math.PI * 2); g.fill();
+    }
+    g.restore();
+  };
+  bone(88, 320, 0.6);
+  bone(402, 250, -0.9);
+  bone(150, 620, 2.2);
+  bone(340, 100, 1.4);
+  // a lone skull by the grate
+  g.fillStyle = "#c4beae";
+  g.beginPath(); g.arc(310, 396, 7, 0, Math.PI * 2); g.fill();
+  g.fillRect(306, 400, 8, 5);
+  g.fillStyle = "#1e1d23";
+  g.beginPath(); g.arc(307.5, 395, 1.8, 0, Math.PI * 2); g.fill();
+  g.beginPath(); g.arc(312.5, 395, 1.8, 0, Math.PI * 2); g.fill();
+
+  // Torch sconces: iron bracket + charred stub (the flame itself is animated).
+  for (const [tx, ty] of DUNGEON_TORCHES) {
+    g.fillStyle = "#3a3a42";
+    g.fillRect(tx - 3, ty + 4, 6, 12);
+    g.fillStyle = "#57432c";
+    g.fillRect(tx - 2.5, ty - 8, 5, 14);
+  }
+
+  speckle(g, 0.02, 0.06);
+  vignette(g, "rgba(2,2,6,1)", 0.62);
+}
+
+/** Flickering torch flames + warm breathing glow + drifting dust. */
+function accentsDungeon(g: Ctx, t: number): void {
+  g.save();
+  for (let i = 0; i < DUNGEON_TORCHES.length; i++) {
+    const [tx, ty] = DUNGEON_TORCHES[i];
+    const flick = 0.72 + 0.28 * Math.sin(t * 9 + i * 2.3) * Math.sin(t * 5.7 + i);
+    // pool of torchlight on the floor
+    const gr = g.createRadialGradient(tx, ty, 4, tx, ty, 90);
+    gr.addColorStop(0, `rgba(255,160,70,${0.13 * flick})`);
+    gr.addColorStop(1, "rgba(255,160,70,0)");
+    g.fillStyle = gr;
+    g.fillRect(tx - 90, ty - 90, 180, 180);
+    // the flame
+    g.shadowColor = "#ffa040";
+    g.shadowBlur = 12;
+    g.fillStyle = "#ff9b35";
+    g.beginPath();
+    g.ellipse(tx, ty - 12, 4 * flick + 1.5, 8 * flick + 3, Math.sin(t * 7 + i) * 0.2, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = "#ffd873";
+    g.beginPath();
+    g.ellipse(tx, ty - 10, 2 * flick + 0.8, 4 * flick + 1.5, 0, 0, Math.PI * 2);
+    g.fill();
+    g.shadowBlur = 0;
+  }
+  // Dust sifting down from the ceiling.
+  for (let i = 0; i < 12; i++) {
+    const speed = 5 + prand(i + 30) * 7;
+    const x = prand(i * 9) * W + Math.sin(t * 0.5 + i) * 6;
+    const y = ((prand(i * 9 + 4) * H + t * speed) % (H + 10)) - 5;
+    g.globalAlpha = 0.10 + 0.08 * Math.sin(t + i * 1.8);
+    g.fillStyle = "rgba(200,195,185,0.9)";
+    g.fillRect(x, y, 1.5, 1.5);
+  }
+  g.restore();
+}
+
+// ---------------------------------------------------------------------------
 // Registry + per-match selection
 // ---------------------------------------------------------------------------
 
@@ -544,6 +715,15 @@ export const ARENA_THEMES: Record<ArenaThemeId, ArenaTheme> = {
     zoneTop: "rgba(220,60,60,0.08)",
     zoneBottom: "rgba(60,140,220,0.09)",
     midline: "rgba(255,140,60,0.35)",
+  },
+  dungeon: {
+    id: "dungeon",
+    name: "The Depths",
+    build: buildDungeon,
+    accents: accentsDungeon,
+    zoneTop: "rgba(200,50,50,0.08)",
+    zoneBottom: "rgba(70,140,220,0.08)",
+    midline: "rgba(255,170,80,0.30)",
   },
 };
 

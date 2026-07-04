@@ -100,7 +100,8 @@ export function useBattleEngine(
   const lastRef = useRef<number>(0);
   const speedRef = useRef<number>(1);
   // Backdrop for this match. Arena rotates through the fantasy themes (picked
-  // from the seed, so replays match); Depths/PVP keep the classic field.
+  // from the seed, so replays match); Depths is always the torchlit dungeon;
+  // PVP keeps the classic field.
   const themeRef = useRef<ArenaThemeId>("grassField");
 
   const [ui, setUi] = useState<BattleUiState>({
@@ -145,7 +146,10 @@ export function useBattleEngine(
       const enemyDeck = generateEnemyDeck(seed);
       controllerRef.current = new MatchController(seed, playerDeck.slice(0, 4), enemyDeck);
     }
-    themeRef.current = mode === "solo" ? pickArenaTheme(seed) : "grassField";
+    themeRef.current =
+      mode === "solo" ? pickArenaTheme(seed)
+      : mode === "depths" ? "dungeon"
+      : "grassField";
     accRef.current = 0;
     lastRef.current = performance.now();
     // eslint-disable-next-line react-hooks/exhaustive-deps
