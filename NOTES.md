@@ -8,23 +8,38 @@ type-clean under strict mode, determinism verified across every unit type.
 
 ## ✅ Checklist for adding a new unit
 
-Every playable unit must surface fully in the hub click-to-view detail panel
-(`components/UnitDetail.tsx`), which is data-driven. When adding one:
+Two parts: **data** (stats + what the hub detail panel shows) and **behavior** (a
+*kit*, if the unit does anything beyond attack + move). The hub detail panel
+(`components/UnitDetail.tsx`) is data-driven, so every unit must surface fully there.
 
 1. **Stats** — define it in `data/units.ts` with full stats (hp, damage,
    attackSpeed, moveSpeed, range, role, color, accent). These render in the panel
-   automatically.
+   automatically. *Optional data-driven behavior* (no code): `basicShotRider` (an
+   every-Nth-attack on-hit rider, like the Fire/Ice mages) and `wardedAgainst`
+   (status immunities, like the Aegis Knight).
 2. **Ability** — its `ability` MUST have a matching entry in `data/abilities.ts`
-   (name / description / cooldown). The panel reads `ABILITIES[def.ability]`, so a
-   missing entry crashes it. If the ability is passive (no active cast), also add
-   it to `PASSIVE_ABILITIES` in `engine/AbilitySystem.ts`.
-3. **Traits** — add a `traits: [{ name, description }]` array for any passive or
-   hidden behavior (anything gated by `defId` in `CombatSystem.ts`, e.g. Second
-   Wind, Vanish, Frostbite) so the panel lists it. Pure-stat units can omit it.
-4. **Visibility** — non-summon units appear in the hub automatically via
+   (name / description / cooldown / `castTimeSec`). The panel reads
+   `ABILITIES[def.ability]` (a missing entry crashes it), and the engine reads the
+   cooldown + cast-time from it.
+3. **Behavior — the kit.** If the unit does anything beyond a plain attack + move,
+   write `engine/kits/<unit>.ts` and register it in `kits/UnitKit.ts` (keyed by
+   `defId`). Implement **only** the hooks it needs and declare `roleClass`. The
+   hooks: `onTick` / `onActTick` / `onReactTick`, `fireAbility` / `wantsToCast`, the
+   HP-funnel hooks (`onDamaged` / `onWouldDie` / `onKill` / `modifyIncoming*`), the
+   attack split (`onBeforeAttack` / `onBasicAttack` / `onAfterAttack`),
+   `onProjectileHit`, `onChargeContact`, `onSpawn` / `onDeath`. **Never edit
+   `CombatSystem`/`AbilitySystem` per-unit** — they have no `defId` branches, and
+   there is **no** `PASSIVE_ABILITIES` list: "passive" just means the kit defines no
+   `fireAbility`. A pure-stat unit needs no kit at all. Copy an existing kit as a
+   template; the interface lives in `kits/UnitKit.ts`, the design in `docs/adr/0001`.
+4. **Traits** — add a `traits: [{ name, description }]` array so any passive/hidden
+   behavior shows in the panel (e.g. Second Wind, Vanish, Frostbite). Pure-stat
+   units can omit it.
+5. **Test** — add or extend a spec in `engine/__tests__/<unit>.test.ts`.
+6. **Visibility** — non-summon units appear in the hub automatically via
    `DECKABLE_UNIT_IDS` (everything not in `NON_DECK_UNITS`).
-5. **Verify** — open the unit's card in the hub and confirm stats, ability, and
-   traits all show.
+7. **Verify** — `npm run typecheck` + `npm test`, then open the unit's card in the
+   hub and confirm stats, ability, and traits all show.
 
 ## ⚠️ Maintenance hazards (read before adding code)
 
@@ -199,6 +214,47 @@ deterministically from seed + floor, so replays don't need them). Its queue
 doubles as `enemyReserves`, which is what keeps a momentarily-cleared board
 from counting as victory while monsters are still waiting off-screen. It owns
 a private RNG stream, so Depths never perturbs Arena determinism.
+
+### 6. Sprite art is presentation-only and portrait-stub-safe
+`assets/sprites.ts` draws every unit procedurally (no art assets), consumed only by
+the read-only `Renderer`. Sprite edits are pure presentation — they never touch
+determinism or the test surface (nothing under test imports it). Two traps when
+editing a draw routine:
+- **Portraits pass a minimal `Unit` stub.** `renderPortrait` (`Renderer.ts`) fakes a
+  unit with only `defId`/`facing`/`animState`/`animTime`/`attackSpeed`/`state` — no
+  `uid`, `effects`, `transformed`, or `mysticForm`. Guard every such read
+  (`unit.effects?.…`, `unit.mysticForm` defaulting, hashed-uid phase falling back to
+  0), or the hub/Compendium card throws and trips the app ErrorBoundary. Any new
+  per-unit field a sprite reads needs the same guard.
+- **Ambient loops use a wall clock, not `unit.animTime`.** `animTime` resets to 0 on
+  every state change (AnimationSystem), which would pop looping embers/wisps/gleams.
+  `drawUnitSprite` builds a presentation-only clock from `performance.now()` + a
+  per-unit phase hashed off `uid`; static portraits pass `live:false` to freeze it and
+  skip the particle emitters. Wall time is fine here — it never feeds back into the sim.
+
+Per-unit variation is data-in-code, not forked draw fns: the two knights share
+`drawKnight` + a `KnightLivery` colour set; the five mages share `drawMage` + an
+element tag; the Mystic Archer reads `unit.mysticForm` for its gold/violet aura.
+Shared body, per-unit colour — keep it that way.
+
+### 7. The economy is meta-layer only (and its invariants)
+Rewards/chests/unlocks (Economy slice 1) never touch the sim. Rules that keep it
+sound:
+- **Every number lives in `src/meta/economy.ts`** — prices, gold rewards, chest
+  odds, milestone unlocks. Tune there, nowhere else. `src/meta/` must never
+  import from `state/`, `engine/`, or React (types-only imports are fine).
+- **Chest rolls are pure + seeded** (`src/meta/rewards.ts`): the drop-time seed
+  is stored on the `ChestResult`, so a server can re-roll and verify. Never
+  `Math.random()` in reward logic.
+- **Grants happen exactly once**: BattleScreen's `recordedRef` guards the
+  battle-end effect, and `grantBattleRewards` folds EVERYTHING (gold, chest
+  contents, floor progress, milestone) into ONE `setSave`. Keep `setSave`
+  updaters pure — StrictMode runs them twice in dev; roll first, then fold.
+- **deck ⊆ unlockedUnits** is enforced in `sanitizeDeck` (persistence) AND
+  `setDeck` routes through it. New units added post-v3 arrive locked for
+  everyone — only the one-time v2→v3 migration grandfathers everything.
+- **Grant-then-reveal**: rewards are committed before the results overlay
+  animates; the chest tap is ceremony, so leaving early can't lose loot.
 
 ---
 

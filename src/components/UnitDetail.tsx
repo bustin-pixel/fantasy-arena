@@ -4,6 +4,7 @@ import { RARITIES } from "@/data/rarities";
 import { ABILITIES } from "@/data/abilities";
 import { renderPortrait } from "@/engine/Renderer";
 import { FIELD_WIDTH, MAX_DECK } from "@/utils/constants";
+import { UNLOCK_PRICES } from "@/meta/economy";
 import type { UnitDef } from "@/types";
 
 interface Props {
@@ -14,6 +15,11 @@ interface Props {
   /** Compendium mode: pure lore page — hides the deck count and the
    *  add/remove footer (monsters can't join a warband anyway). */
   readonly?: boolean;
+  /** Locked-unit mode: the footer offers Unlock (at the rarity price) instead
+   *  of Add. `gold` gates affordability; `onBuy` performs the purchase. */
+  locked?: boolean;
+  gold?: number;
+  onBuy?: () => void;
 }
 
 const ART_SIZE = 120;
@@ -57,7 +63,16 @@ function StatBar({
   );
 }
 
-export function UnitDetail({ defId, deck, onToggle, onClose, readonly }: Props) {
+export function UnitDetail({
+  defId,
+  deck,
+  onToggle,
+  onClose,
+  readonly,
+  locked,
+  gold = 0,
+  onBuy,
+}: Props) {
   const def = getUnitDef(defId);
   const rarity = RARITIES[def.rarity];
   // Skip the "lifesteal" filler slot (the never-casts convention for summons
@@ -205,7 +220,18 @@ export function UnitDetail({ defId, deck, onToggle, onClose, readonly }: Props) 
           <button className="btn btn-close-ghost" onClick={onClose}>
             Close
           </button>
-          {!readonly && (
+          {!readonly && locked && (
+            <button
+              className="btn btn-add btn-buy"
+              disabled={gold < UNLOCK_PRICES[def.rarity]}
+              onClick={onBuy}
+            >
+              {gold >= UNLOCK_PRICES[def.rarity]
+                ? `Unlock — ${UNLOCK_PRICES[def.rarity]}g`
+                : `Need ${UNLOCK_PRICES[def.rarity]}g`}
+            </button>
+          )}
+          {!readonly && !locked && (
             <button
               className={addClass}
               disabled={addDisabled}

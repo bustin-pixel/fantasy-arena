@@ -5,11 +5,13 @@ import { CompendiumScreen } from "@/screens/CompendiumScreen";
 import { DungeonWall } from "@/components/DungeonWall";
 import { DungeonVines } from "@/components/DungeonVines";
 import { DungeonGate } from "@/components/DungeonGate";
+import { useGameState } from "@/state/GameStateContext";
 import type { BattleMode } from "@/hooks/useBattleEngine";
 
 interface Props {
-  /** Launch a battle in the given mode (from a Home mode card). */
-  onBattle: (mode: BattleMode) => void;
+  /** Launch a battle in the given mode (from a Home mode card). Depths
+   *  passes the floor picked in the floor sheet. */
+  onBattle: (mode: BattleMode, floor?: number) => void;
 }
 
 // Page order: Collection (0) ← Home (1) → Compendium (2). Home is the landing.
@@ -165,6 +167,8 @@ export function AppShell({ onBattle }: Props) {
 
   return (
     <div className="app-shell">
+      {/* Wallet, floating over every page (the shell has no header bar). */}
+      <GoldPill />
       <div className="shell-bg" aria-hidden="true">
         {/* One continuous hall (3 pages wide) panned 1:1 with the pager. Brick
             spans it all; the gate lives in the middle (Home) third. */}
@@ -215,6 +219,19 @@ export function AppShell({ onBattle }: Props) {
           </button>
         ))}
       </nav>
+    </div>
+  );
+}
+
+/** The player's gold, pinned to the shell's top-right corner. */
+function GoldPill() {
+  const { save } = useGameState();
+  return (
+    <div className="gold-pill" aria-label={`${save.gold} gold`}>
+      <span className="coin" aria-hidden>
+        ●
+      </span>
+      {save.gold.toLocaleString()}
     </div>
   );
 }

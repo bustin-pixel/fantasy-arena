@@ -11,8 +11,9 @@ import { generateSeed } from "@/utils/rng";
 import { useGameState } from "@/state/GameStateContext";
 
 export function HubScreen() {
-  const { save, setDeck } = useGameState();
+  const { save, setDeck, purchaseUnit } = useGameState();
   const deck = save.deck;
+  const unlockedUnits = save.unlockedUnits;
   const [detailId, setDetailId] = useState<string | null>(null);
   const [rarityFilter, setRarityFilter] = useState<Rarity | "all">("all");
 
@@ -22,7 +23,10 @@ export function HubScreen() {
     [deck]
   );
 
+  const isLocked = (id: string) => !unlockedUnits.includes(id);
+
   const toggle = (id: string) => {
+    if (isLocked(id)) return; // buy it first (detail panel)
     if (deck.includes(id)) {
       setDeck(deck.filter((d) => d !== id));
       return;
@@ -37,24 +41,30 @@ export function HubScreen() {
   // draw randomness outside the deterministic battle (like generateSeed itself).
   const autoFill = () => {
     if (deck.length >= MAX_DECK) return;
-    setDeck(generateRandomDeck(generateSeed(), MAX_DECK, deck));
+    setDeck(generateRandomDeck(generateSeed(), MAX_DECK, deck, unlockedUnits));
   };
-  const randomize = () => setDeck(generateRandomDeck(generateSeed(), MAX_DECK));
+  const randomize = () =>
+    setDeck(generateRandomDeck(generateSeed(), MAX_DECK, [], unlockedUnits));
   const clearDeck = () => setDeck([]);
 
   // Roster for the card grid: "All" shows rarest-first (Legendary > Epic > Rare;
   // ties keep their stable data order), a rarity chip narrows to that rarity.
+  // Within a band, owned units come before locked ones so the playable
+  // collection reads first.
   const rosterIds = useMemo(() => {
+    const ownedFirst = (a: string, b: string) =>
+      Number(!unlockedUnits.includes(a)) - Number(!unlockedUnits.includes(b));
     if (rarityFilter === "all") {
       return [...DECKABLE_UNIT_IDS].sort(
         (a, b) =>
-          rarityRank(getUnitDef(b).rarity) - rarityRank(getUnitDef(a).rarity)
+          rarityRank(getUnitDef(b).rarity) - rarityRank(getUnitDef(a).rarity) ||
+          ownedFirst(a, b)
       );
     }
     return DECKABLE_UNIT_IDS.filter(
       (id) => getUnitDef(id).rarity === rarityFilter
-    );
-  }, [rarityFilter]);
+    ).sort(ownedFirst);
+  }, [rarityFilter, unlockedUnits]);
 
   return (
     <div className="screen hub">
@@ -135,8 +145,10 @@ export function HubScreen() {
             const selected = deck.includes(id);
             // Mirror the add-button rules from the detail panel: in-deck toggles
             // off; otherwise a full deck or a second legendary blocks the add.
+            // Locked wins over everything — the unit must be bought first.
             let addState: CardAddState;
-            if (selected) addState = "in-deck";
+            if (isLocked(id)) addState = "locked";
+            else if (selected) addState = "in-deck";
             else if (deck.length >= MAX_DECK) addState = "deck-full";
             else if (isLegendary && hasLegendary) addState = "legendary-max";
             else addState = "add";
@@ -154,7 +166,8 @@ export function HubScreen() {
         <p className="hint-text">
           Choose up to four units — at most one Legendary per deck. Order matters:
           they deploy front-to-back as slots open, with two of yours on the field
-          at once.
+          at once. Locked units unlock with gold, from chests, or at Depths
+          milestones.
         </p>
       </section>
 
@@ -164,6 +177,9 @@ export function HubScreen() {
           deck={deck}
           onToggle={toggle}
           onClose={() => setDetailId(null)}
+          locked={isLocked(detailId)}
+          gold={save.gold}
+          onBuy={() => purchaseUnit(detailId)}
         />
       )}
     </div>

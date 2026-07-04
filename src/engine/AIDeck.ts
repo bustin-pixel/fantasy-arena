@@ -19,12 +19,15 @@ import { MAX_DECK } from "@/utils/constants";
 export function generateRandomDeck(
   seed: number,
   count = MAX_DECK,
-  existing: readonly string[] = []
+  existing: readonly string[] = [],
+  /** Candidate ids to draw from — the hub passes the player's unlocked units
+   *  so auto-fill / randomize can't roll a locked one. */
+  pool: readonly string[] = DECKABLE_UNIT_IDS
 ): string[] {
   const rng = new RNG(seed ^ 0x9e3779b9);
   // Weighted pool of candidate ids.
   const weighted: string[] = [];
-  for (const id of DECKABLE_UNIT_IDS) {
+  for (const id of pool) {
     const w = RARITIES[UNITS[id].rarity].deckWeight;
     for (let i = 0; i < w; i++) weighted.push(id);
   }
