@@ -16,6 +16,13 @@
 // ============================================================================
 
 import { isBossFloor } from "@/data/depths";
+import {
+  getAudioContext,
+  getNoiseBuffer,
+  installAudioUnlockListener,
+  isAudioUnlocked,
+  onAudioUnlocked,
+} from "@/audio/context";
 
 export type MusicTrackId =
   | "emberfall"
@@ -38,6 +45,8 @@ interface TrackDef {
 // Synth voices
 // ---------------------------------------------------------------------------
 
+// Mirrors of the shared audio context (see audio/context.ts), refreshed by
+// apply() before any scheduling so the voice helpers can assume non-null.
 let ctx: AudioContext | null = null;
 let noiseBuf: AudioBuffer | null = null;
 
@@ -286,9 +295,11 @@ const MUTED_KEY = "fantasy-arena/music-muted";
 let desired: MusicTrackId | null = null;
 let muted = false;
 let mutedLoaded = false;
-let unlocked = false;
-let unlockListenerInstalled = false;
 let playing: { id: MusicTrackId; gain: GainNode; timer: number } | null = null;
+
+// Start whatever's desired the moment audio unlocks (pure array push at module
+// scope — touches no browser APIs until the callback actually fires).
+onAudioUnlocked(() => apply());
 
 function loadMuted(): void {
   if (mutedLoaded) return;
@@ -298,38 +309,6 @@ function loadMuted(): void {
   } catch {
     muted = false;
   }
-}
-
-/** Browsers refuse audio before a user gesture: arm a one-shot listener that
- *  unlocks the context and starts whatever track is currently desired. */
-function installUnlockListener(): void {
-  if (unlockListenerInstalled || typeof window === "undefined") return;
-  unlockListenerInstalled = true;
-  const unlock = () => {
-    window.removeEventListener("pointerdown", unlock);
-    window.removeEventListener("keydown", unlock);
-    window.removeEventListener("click", unlock);
-    ensureCtx();
-    unlocked = true;
-    apply();
-  };
-  window.addEventListener("pointerdown", unlock);
-  window.addEventListener("keydown", unlock);
-  window.addEventListener("click", unlock);
-}
-
-function ensureCtx(): void {
-  if (!ctx) {
-    type AC = typeof AudioContext;
-    const Ctor: AC =
-      window.AudioContext ??
-      (window as unknown as { webkitAudioContext: AC }).webkitAudioContext;
-    ctx = new Ctor();
-    noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
-    const d = noiseBuf.getChannelData(0);
-    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-  }
-  if (ctx.state === "suspended") void ctx.resume();
 }
 
 function startTrack(id: MusicTrackId): void {
@@ -375,17 +354,19 @@ function stopCurrent(): void {
 
 function apply(): void {
   loadMuted();
+  ctx = getAudioContext();
+  noiseBuf = getNoiseBuffer();
   const target = muted ? null : desired;
   if (playing?.id === target) return;
   stopCurrent();
-  if (target && unlocked && ctx) startTrack(target);
+  if (target && isAudioUnlocked() && ctx) startTrack(target);
 }
 
 /** Declare which track should be playing (null = silence). Safe to call
  *  before any user gesture — the track starts once audio unlocks. */
 export function setMusicTrack(id: MusicTrackId | null): void {
   desired = id;
-  installUnlockListener();
+  installAudioUnlockListener();
   apply();
 }
 
