@@ -1,11 +1,14 @@
+import { useState } from "react";
 import type { BattleMode, BattleUiState } from "@/hooks/useBattleEngine";
 import { getUnitDef } from "@/data/units";
+import { getSettings, updateSettings } from "@/state/settings";
 
 interface Props {
   ui: BattleUiState;
   speed: number;
   onSpeed: (s: number) => void;
   mode: BattleMode;
+  onExit: () => void;
 }
 
 function fmtClock(sec: number): string {
@@ -14,14 +17,41 @@ function fmtClock(sec: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-export function BattleHud({ ui, speed, onSpeed, mode }: Props) {
+/** Quick mute-all for mid-battle — same setting the panel's checkbox drives. */
+function MuteButton() {
+  const [muted, setMuted] = useState(getSettings().muted);
+  return (
+    <button
+      type="button"
+      className="hud-corner-btn"
+      aria-label={muted ? "Unmute audio" : "Mute audio"}
+      aria-pressed={muted}
+      onClick={() => setMuted(updateSettings({ muted: !getSettings().muted }).muted)}
+    >
+      {muted ? "🔇" : "🔊"}
+    </button>
+  );
+}
+
+export function BattleHud({ ui, speed, onSpeed, mode, onExit }: Props) {
   const next = ui.playerNext ? getUnitDef(ui.playerNext) : null;
   return (
     <div className="hud">
+      {/* Exit and mute live INSIDE the bar so they can never cover the
+          Enemy/You counters, whatever the screen width. */}
       <div className="hud-top">
+        <button
+          type="button"
+          className="hud-corner-btn"
+          onClick={onExit}
+          aria-label="Leave battle"
+        >
+          ✕
+        </button>
         <div className="hud-pill enemy">Enemy · {ui.enemyActive}</div>
         <div className="hud-clock">{fmtClock(ui.clockSec)}</div>
         <div className="hud-pill player">You · {ui.playerActive}</div>
+        <MuteButton />
       </div>
 
       {/* Pre-battle countdown once both sides have their 2 units down. */}

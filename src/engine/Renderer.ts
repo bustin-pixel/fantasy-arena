@@ -15,65 +15,35 @@ import {
 } from "@/utils/constants";
 import { drawUnitSprite } from "@/assets/sprites";
 import { getUnitDef } from "@/data/units";
+import {
+  ARENA_THEMES,
+  type ArenaTheme,
+  type ArenaThemeId,
+} from "@/assets/arenaThemes";
+import { getSettings } from "@/state/settings";
 
 type Ctx = CanvasRenderingContext2D;
 
-let bgPattern: HTMLCanvasElement | null = null;
+// Static theme backdrops, pre-rendered once per theme to offscreen canvases.
+const bgCache = new Map<ArenaThemeId, HTMLCanvasElement>();
 
-/** Pre-render the static grass/dirt field to an offscreen canvas once. */
-function buildBackground(): HTMLCanvasElement {
-  const c = document.createElement("canvas");
-  c.width = FIELD_WIDTH;
-  c.height = FIELD_HEIGHT;
-  const g = c.getContext("2d")!;
-
-  // Grass base with subtle vertical gradient.
-  const grad = g.createLinearGradient(0, 0, 0, FIELD_HEIGHT);
-  grad.addColorStop(0, "#2f4a26");
-  grad.addColorStop(0.5, "#37562c");
-  grad.addColorStop(1, "#2f4a26");
-  g.fillStyle = grad;
-  g.fillRect(0, 0, FIELD_WIDTH, FIELD_HEIGHT);
-
-  // Grass speckle (deterministic-ish, purely decorative).
-  for (let i = 0; i < 400; i++) {
-    const x = (i * 97) % FIELD_WIDTH;
-    const y = (i * 53) % FIELD_HEIGHT;
-    g.fillStyle = i % 2 ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.05)";
-    g.fillRect(x, y, 2, 2);
+function getBackground(theme: ArenaTheme): HTMLCanvasElement {
+  let bg = bgCache.get(theme.id);
+  if (!bg) {
+    bg = document.createElement("canvas");
+    bg.width = FIELD_WIDTH;
+    bg.height = FIELD_HEIGHT;
+    theme.build(bg.getContext("2d")!);
+    bgCache.set(theme.id, bg);
   }
-
-  // Central dirt path.
-  g.fillStyle = "#5a4630";
-  g.globalAlpha = 0.55;
-  g.beginPath();
-  g.ellipse(FIELD_WIDTH / 2, FIELD_HEIGHT / 2, 70, FIELD_HEIGHT / 2.4, 0, 0, Math.PI * 2);
-  g.fill();
-  g.globalAlpha = 1;
-
-  // Decorative rocks.
-  const rocks = [
-    [60, 130], [410, 200], [90, 560], [380, 600], [240, 360],
-  ];
-  for (const [rx, ry] of rocks) {
-    g.fillStyle = "#5b5f63";
-    g.beginPath();
-    g.ellipse(rx, ry, 10, 7, 0, 0, Math.PI * 2);
-    g.fill();
-    g.fillStyle = "#73777b";
-    g.beginPath();
-    g.ellipse(rx - 2, ry - 2, 6, 4, 0, 0, Math.PI * 2);
-    g.fill();
-  }
-
-  return c;
+  return bg;
 }
 
-function drawZones(ctx: Ctx): void {
+function drawZones(ctx: Ctx, theme: ArenaTheme): void {
   ctx.save();
-  ctx.fillStyle = "rgba(180,40,40,0.06)";
+  ctx.fillStyle = theme.zoneTop;
   ctx.fillRect(0, ENEMY_ZONE.top, FIELD_WIDTH, ENEMY_ZONE.bottom - ENEMY_ZONE.top);
-  ctx.fillStyle = "rgba(60,140,220,0.06)";
+  ctx.fillStyle = theme.zoneBottom;
   ctx.fillRect(
     0,
     PLAYER_ZONE.top,
@@ -81,7 +51,7 @@ function drawZones(ctx: Ctx): void {
     PLAYER_ZONE.bottom - PLAYER_ZONE.top
   );
   // midline
-  ctx.strokeStyle = "rgba(245,179,1,0.25)";
+  ctx.strokeStyle = theme.midline;
   ctx.lineWidth = 1;
   ctx.setLineDash([6, 6]);
   ctx.beginPath();
@@ -372,10 +342,20 @@ function drawTrap(ctx: Ctx, t: BattleSnapshot["traps"][number]): void {
   ctx.restore();
 }
 
-export function renderBattle(ctx: Ctx, snap: BattleSnapshot): void {
-  if (!bgPattern) bgPattern = buildBackground();
-  ctx.drawImage(bgPattern, 0, 0);
-  drawZones(ctx);
+export function renderBattle(
+  ctx: Ctx,
+  snap: BattleSnapshot,
+  themeId: ArenaThemeId = "grassField"
+): void {
+  const theme = ARENA_THEMES[themeId];
+  ctx.drawImage(getBackground(theme), 0, 0);
+  drawZones(ctx, theme);
+
+  // Ambient theme animation (embers, fireflies, glyphs) — drawn under the
+  // units so combat readability is never compromised. Wall-clock time keeps
+  // it presentation-only, like the lightning jitter below. Skippable in
+  // settings as a courtesy to older phones (it redraws every frame).
+  if (getSettings().ambientFx) theme.accents?.(ctx, performance.now() / 1000);
 
   // Ground-level markers under the units.
   for (const t of snap.traps) drawTrap(ctx, t);

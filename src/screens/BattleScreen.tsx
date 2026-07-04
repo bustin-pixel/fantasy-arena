@@ -106,10 +106,6 @@ export function BattleScreen({ deck, onExit, mode = "solo", floor = 1 }: Props) 
 
   return (
     <div className="screen battle">
-      <button className="exit-btn" onClick={onExit} aria-label="Leave battle">
-        ✕
-      </button>
-
       <div className="field-wrap" ref={wrapRef}>
         <canvas
           ref={canvasRef}
@@ -128,7 +124,7 @@ export function BattleScreen({ deck, onExit, mode = "solo", floor = 1 }: Props) 
             if (t) handleTap(t.clientX, t.clientY);
           }}
         />
-        <BattleHud ui={ui} speed={speed} onSpeed={setSpeed} mode={mode} />
+        <BattleHud ui={ui} speed={speed} onSpeed={setSpeed} mode={mode} onExit={onExit} />
         {inspected && (
           <BattleUnitTip unit={inspected} onClose={() => setInspectedUid(null)} />
         )}

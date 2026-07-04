@@ -16,11 +16,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { MatchPhase, Rarity, StatusEffectType, Team, Vec2 } from "@/types";
 import { MatchController } from "@/engine/MatchController";
 import { renderBattle } from "@/engine/Renderer";
+import { SfxObserver } from "@/audio/sfx";
+import { pickArenaTheme, type ArenaThemeId } from "@/assets/arenaThemes";
 import { generateEnemyDeck } from "@/engine/AIDeck";
 import { getUnitDef } from "@/data/units";
 import { ABILITIES } from "@/data/abilities";
 import { DEPLOY_TIME_SEC, TICK_MS, TICK_RATE, UNIT_RADIUS } from "@/utils/constants";
 import { generateSeed } from "@/utils/rng";
+import { getSettings } from "@/state/settings";
 
 /** Battle mode. Solo allows client-side fast-forward; PVP is server-paced at 1×
  *  (a real-time match can't let one client run the sim faster than the other).
@@ -97,7 +100,15 @@ export function useBattleEngine(
   const rafRef = useRef<number>(0);
   const accRef = useRef<number>(0);
   const lastRef = useRef<number>(0);
-  const speedRef = useRef<number>(1);
+  // Matches start at the player's preferred speed (PVP is server-paced, 1×).
+  const initialSpeed = mode === "pvp" ? 1 : getSettings().defaultSpeed;
+  const speedRef = useRef<number>(initialSpeed);
+  // Backdrop for this match. Arena rotates through the fantasy themes (picked
+  // from the seed, so replays match); Depths is always the torchlit dungeon;
+  // PVP keeps the classic field.
+  const themeRef = useRef<ArenaThemeId>("grassField");
+  // Turns snapshot diffs into unit sound effects (presentation-only).
+  const sfxRef = useRef<SfxObserver>(new SfxObserver());
 
   const [ui, setUi] = useState<BattleUiState>({
     phase: "deployment",
@@ -115,7 +126,7 @@ export function useBattleEngine(
     startCountdownSec: null,
     deploySecLeft: DEPLOY_TIME_SEC,
   });
-  const [speed, setSpeedState] = useState(1);
+  const [speed, setSpeedState] = useState<number>(initialSpeed);
 
   const setSpeed = useCallback(
     (s: number) => {
@@ -141,6 +152,11 @@ export function useBattleEngine(
       const enemyDeck = generateEnemyDeck(seed);
       controllerRef.current = new MatchController(seed, playerDeck.slice(0, 4), enemyDeck);
     }
+    themeRef.current =
+      mode === "solo" ? pickArenaTheme(seed)
+      : mode === "depths" ? "dungeon"
+      : "grassField";
+    sfxRef.current = new SfxObserver();
     accRef.current = 0;
     lastRef.current = performance.now();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -167,12 +183,15 @@ export function useBattleEngine(
         steps++;
       }
 
-      // Render.
+      // Render + sound. The SfxObserver diffs consecutive snapshots to voice
+      // deaths/attacks/casts/deploys — render-side, never touching the sim.
       const canvas = canvasRef.current;
+      const frameSnap = c.snapshot();
       if (canvas) {
         const ctx = canvas.getContext("2d");
-        if (ctx) renderBattle(ctx, c.snapshot());
+        if (ctx) renderBattle(ctx, frameSnap, themeRef.current);
       }
+      sfxRef.current.observe(frameSnap);
 
       // Throttled UI sync (~6/s).
       uiThrottle += dt;

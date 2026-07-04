@@ -86,7 +86,9 @@ body {
 .btn-gold,
 .btn-battle {
   background: linear-gradient(180deg, var(--gold), var(--gold-soft));
-  box-shadow: 0 3px 0 #9c7410, 0 6px 14px rgba(0, 0, 0, 0.4);
+  /* Embossed gold: bright bevel on top, solid metal underneath. */
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 3px 0 #9c7410,
+    0 6px 14px rgba(0, 0, 0, 0.4);
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
@@ -205,9 +207,10 @@ body {
      same size even when the whole deck is cleared. */
   min-height: 104px;
   padding: 6px 4px;
-  border: 2px solid var(--stone-dark);
+  border: 2px solid #57432c;
   border-radius: 10px;
   background: linear-gradient(180deg, #2c2118, #1a140d);
+  box-shadow: inset 0 1px 0 rgba(236, 227, 207, 0.06);
   font-family: inherit;
 }
 .deck-slot.empty {
@@ -357,6 +360,28 @@ body {
     rgba(2, 4, 10, 0.76) 100%
   );
 }
+/* Warm torchlight pooling from unseen sconces above the viewport — sits under
+   the vignette and breathes slowly. Turns the cool brick amber near the top. */
+.shell-bg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(46% 34% at 10% -6%, rgba(255, 150, 50, 0.16), transparent 70%),
+    radial-gradient(46% 34% at 90% -6%, rgba(255, 150, 50, 0.16), transparent 70%),
+    linear-gradient(180deg, rgba(200, 110, 30, 0.05), transparent 45%);
+  animation: shell-torchlight 3.2s ease-in-out infinite;
+}
+@keyframes shell-torchlight {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.68;
+  }
+}
 /* The corridor: 3 pages wide, panned 1:1 with the pager via JS transform. */
 .hall {
   position: absolute;
@@ -490,13 +515,16 @@ body {
   animation-duration: 1.9s;
   animation-delay: 0.3s;
 }
+/* Iron-banded footer: warm timber-and-iron instead of the old cool blue-gray,
+   with a faint parchment highlight along the top edge (embossed metal). */
 .pager-nav {
   position: relative;
   z-index: 1;
   flex: 0 0 auto;
   display: flex;
-  background: linear-gradient(180deg, #12171c, #0a0e12);
-  border-top: 1px solid #232b32;
+  background: linear-gradient(180deg, #1b1510, #0e0a07);
+  border-top: 2px solid #57432c;
+  box-shadow: inset 0 1px 0 rgba(236, 227, 207, 0.06), 0 -6px 16px rgba(0, 0, 0, 0.4);
   padding-bottom: env(safe-area-inset-bottom);
 }
 .pager-tab {
@@ -504,18 +532,21 @@ body {
   font-family: inherit;
   font-size: 0.74rem;
   font-weight: 700;
-  letter-spacing: 0.03em;
-  color: var(--stone);
+  letter-spacing: 0.04em;
+  color: #8d8577;
   background: transparent;
   border: none;
   border-top: 2px solid transparent;
+  margin-top: -2px; /* sit on the nav's iron border so the active bar replaces it */
   padding: 12px 4px;
   cursor: pointer;
-  transition: color 0.15s ease;
+  transition: color 0.15s ease, text-shadow 0.15s ease;
 }
 .pager-tab.active {
   color: var(--gold);
   border-top-color: var(--gold);
+  text-shadow: 0 0 10px rgba(245, 179, 1, 0.5);
+  background: radial-gradient(60% 100% at 50% 0%, rgba(245, 179, 1, 0.1), transparent 75%);
 }
 
 /* ---- Home page ----------------------------------------------------------- */
@@ -530,6 +561,7 @@ body {
 }
 .home-title {
   font-size: 2.4rem;
+  text-shadow: 0 0 18px rgba(245, 179, 1, 0.28), 0 2px 4px rgba(0, 0, 0, 0.6);
 }
 .mode-cards {
   width: 100%;
@@ -546,11 +578,13 @@ body {
   gap: 4px;
   padding: 22px 16px;
   border-radius: 16px;
-  border: 2px solid var(--stone-dark);
-  background: linear-gradient(180deg, #2c2118, #1a140d);
+  border: 2px solid #57432c;
+  background: linear-gradient(180deg, #2c2118, #191209);
   color: var(--parchment);
   font-family: inherit;
   cursor: pointer;
+  /* Embossed: parchment glint along the top bevel + weight underneath. */
+  box-shadow: inset 0 1px 0 rgba(236, 227, 207, 0.08), 0 6px 14px rgba(0, 0, 0, 0.45);
   transition: transform 0.08s ease, filter 0.15s ease, border-color 0.15s ease;
 }
 .mode-card:active {
@@ -558,7 +592,8 @@ body {
 }
 .mode-card.arena {
   border-color: var(--gold);
-  box-shadow: 0 0 22px rgba(245, 179, 1, 0.18);
+  box-shadow: inset 0 1px 0 rgba(236, 227, 207, 0.08), 0 0 22px rgba(245, 179, 1, 0.22),
+    0 6px 14px rgba(0, 0, 0, 0.45);
 }
 .mode-card:disabled {
   cursor: not-allowed;
@@ -567,6 +602,7 @@ body {
 .mode-card-icon {
   font-size: 2rem;
   line-height: 1;
+  filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.55));
 }
 .mode-card-title {
   font-family: var(--font-display);
@@ -772,9 +808,12 @@ body.modal-open .pager-nav {
   max-width: 340px;
   max-height: 90dvh;
   overflow-y: auto;
-  background: #1a140d;
-  border: 2px solid var(--stone-dark);
+  background: linear-gradient(180deg, #221a11, #17110a);
+  border: 2px solid #57432c;
   border-radius: 16px;
+  /* Iron frame: dark outer ring + parchment glint on the inner bevel. */
+  box-shadow: 0 0 0 1px #120d07, inset 0 1px 0 rgba(236, 227, 207, 0.07),
+    0 14px 34px rgba(0, 0, 0, 0.65);
 }
 .detail-close {
   position: absolute;
@@ -784,7 +823,7 @@ body.modal-open .pager-nav {
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  border: 1px solid var(--stone-dark);
+  border: 1px solid #57432c;
   background: rgba(0, 0, 0, 0.5);
   color: var(--parchment);
   font-size: 0.95rem;
@@ -797,8 +836,10 @@ body.modal-open .pager-nav {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #221a10;
-  border-bottom: 1px solid var(--brown);
+  /* Torch-lit alcove behind the portrait. */
+  background: radial-gradient(75% 90% at 50% 42%, rgba(255, 160, 60, 0.14), transparent 75%),
+    #221a10;
+  border-bottom: 1px solid #57432c;
   border-radius: 14px 14px 0 0;
 }
 .detail-art canvas {
@@ -982,19 +1023,137 @@ body.modal-open .pager-nav {
   touch-action: none;
   border-radius: 6px;
 }
-.exit-btn {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  z-index: 20;
-  width: 34px;
-  height: 34px;
+/* Exit/mute buttons living inside the HUD counter bar — flex items, so they
+   can never overlap the Enemy/You pills on any width. */
+.hud-corner-btn {
+  pointer-events: auto;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   border: 1px solid var(--stone-dark);
   background: rgba(0, 0, 0, 0.6);
   color: var(--parchment);
-  font-size: 1rem;
+  font-size: 0.85rem;
+  line-height: 1;
   cursor: pointer;
+  font-family: inherit;
+}
+
+/* Settings gear — sits in the top-right cluster beside the gold pill. */
+.settings-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid #7a5c28;
+  background: linear-gradient(180deg, #241a10, #140e08);
+  box-shadow: inset 0 1px 0 rgba(236, 227, 207, 0.08), 0 3px 8px rgba(0, 0, 0, 0.5);
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* ---- Settings panel ------------------------------------------------------ */
+.settings-modal {
+  max-width: 320px;
+}
+.settings-body {
+  padding: 16px 18px 14px;
+}
+.settings-title {
+  margin: 0 0 4px;
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--gold);
+  text-align: center;
+  text-shadow: 0 0 10px rgba(245, 179, 1, 0.3);
+}
+.settings-section {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #8d8577;
+  margin: 14px 0 4px;
+  border-bottom: 1px solid #3a2f22;
+  padding-bottom: 3px;
+}
+.settings-section.danger {
+  color: #b3541e;
+  border-bottom-color: #4a2013;
+}
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 9px 0;
+  font-size: 0.82rem;
+  color: var(--parchment);
+}
+.settings-label {
+  flex: 0 0 auto;
+}
+.settings-label small {
+  color: var(--stone);
+  font-size: 0.68rem;
+}
+.settings-row input[type="range"] {
+  flex: 1;
+  accent-color: var(--gold);
+}
+.settings-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--gold);
+}
+.settings-row input:disabled {
+  opacity: 0.4;
+}
+.settings-seg {
+  display: flex;
+  border: 1px solid #57432c;
+  border-radius: 9px;
+  overflow: hidden;
+}
+.settings-seg-btn {
+  font-family: inherit;
+  font-weight: 800;
+  font-size: 0.78rem;
+  color: #8d8577;
+  background: transparent;
+  border: none;
+  padding: 6px 14px;
+  cursor: pointer;
+}
+.settings-seg-btn.active {
+  background: linear-gradient(180deg, var(--gold), var(--gold-soft));
+  color: var(--ink);
+}
+.settings-reset {
+  width: 100%;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: #e8a49a;
+  background: transparent;
+  border: 1.5px solid #8c2015;
+  border-radius: 9px;
+  padding: 9px 10px;
+  cursor: pointer;
+  margin-top: 4px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.settings-reset.armed {
+  background: #8c2015;
+  color: #ffe4dd;
+}
+.settings-version {
+  text-align: center;
+  font-size: 0.62rem;
+  color: var(--stone-dark);
+  margin-top: 12px;
 }
 
 /* ---- Card tray (battle hand) -------------------------------------------- */
@@ -1460,19 +1619,27 @@ body.modal-open .pager-nav {
 }
 
 /* ---- Gold wallet + locked collection ------------------------------------- */
-.gold-pill {
+/* Top-right cluster: settings gear + wallet, floating over every page. */
+.top-right-cluster {
   position: absolute;
   top: 10px;
   right: 12px;
   z-index: 40;
   display: flex;
   align-items: center;
+  gap: 8px;
+}
+.gold-pill {
+  display: flex;
+  align-items: center;
   gap: 6px;
   font-size: 0.85rem;
   font-weight: 700;
   color: var(--gold);
-  background: rgba(20, 14, 8, 0.85);
-  border: 1px solid rgba(245, 179, 1, 0.5);
+  text-shadow: 0 0 8px rgba(245, 179, 1, 0.35);
+  background: linear-gradient(180deg, #241a10, #140e08);
+  border: 1px solid #7a5c28;
+  box-shadow: inset 0 1px 0 rgba(236, 227, 207, 0.08), 0 3px 8px rgba(0, 0, 0, 0.5);
   border-radius: 999px;
   padding: 4px 12px;
   pointer-events: none;
