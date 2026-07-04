@@ -997,6 +997,27 @@ body.modal-open .pager-nav {
   cursor: pointer;
 }
 
+/* Music mute toggle — same corner style as .exit-btn; fixed so it floats over
+   both the shell and the battle overlay. In battle it slides right of the ✕. */
+.music-toggle {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 30;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--stone-dark);
+  background: rgba(0, 0, 0, 0.6);
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.music-toggle.in-battle {
+  left: 52px;
+}
+
 /* ---- Card tray (battle hand) -------------------------------------------- */
 .card-tray {
   flex: 0 0 auto;
