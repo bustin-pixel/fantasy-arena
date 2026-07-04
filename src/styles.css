@@ -1023,19 +1023,21 @@ body.modal-open .pager-nav {
   touch-action: none;
   border-radius: 6px;
 }
-.exit-btn {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  z-index: 20;
-  width: 34px;
-  height: 34px;
+/* Exit/mute buttons living inside the HUD counter bar — flex items, so they
+   can never overlap the Enemy/You pills on any width. */
+.hud-corner-btn {
+  pointer-events: auto;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   border: 1px solid var(--stone-dark);
   background: rgba(0, 0, 0, 0.6);
   color: var(--parchment);
-  font-size: 1rem;
+  font-size: 0.85rem;
+  line-height: 1;
   cursor: pointer;
+  font-family: inherit;
 }
 
 /* Settings gear — sits in the top-right cluster beside the gold pill. */
