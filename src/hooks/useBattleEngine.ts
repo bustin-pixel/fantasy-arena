@@ -23,6 +23,7 @@ import { getUnitDef } from "@/data/units";
 import { ABILITIES } from "@/data/abilities";
 import { DEPLOY_TIME_SEC, TICK_MS, TICK_RATE, UNIT_RADIUS } from "@/utils/constants";
 import { generateSeed } from "@/utils/rng";
+import { getSettings } from "@/state/settings";
 
 /** Battle mode. Solo allows client-side fast-forward; PVP is server-paced at 1×
  *  (a real-time match can't let one client run the sim faster than the other).
@@ -99,7 +100,9 @@ export function useBattleEngine(
   const rafRef = useRef<number>(0);
   const accRef = useRef<number>(0);
   const lastRef = useRef<number>(0);
-  const speedRef = useRef<number>(1);
+  // Matches start at the player's preferred speed (PVP is server-paced, 1×).
+  const initialSpeed = mode === "pvp" ? 1 : getSettings().defaultSpeed;
+  const speedRef = useRef<number>(initialSpeed);
   // Backdrop for this match. Arena rotates through the fantasy themes (picked
   // from the seed, so replays match); Depths is always the torchlit dungeon;
   // PVP keeps the classic field.
@@ -123,7 +126,7 @@ export function useBattleEngine(
     startCountdownSec: null,
     deploySecLeft: DEPLOY_TIME_SEC,
   });
-  const [speed, setSpeedState] = useState(1);
+  const [speed, setSpeedState] = useState<number>(initialSpeed);
 
   const setSpeed = useCallback(
     (s: number) => {

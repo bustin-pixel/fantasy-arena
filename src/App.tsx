@@ -3,7 +3,6 @@ import { GameStateProvider, useGameState } from "@/state/GameStateContext";
 import { AppShell } from "@/screens/AppShell";
 import { BattleScreen } from "@/screens/BattleScreen";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { MusicToggle } from "@/components/MusicToggle";
 import { pickDepthsTrack, setMusicTrack } from "@/audio/music";
 import type { BattleMode } from "@/hooks/useBattleEngine";
 
@@ -29,7 +28,6 @@ function Shell() {
 
   return (
     <>
-      <MusicToggle inBattle={view === "battle"} />
       {view === "battle" ? (
         <BattleScreen
           deck={activeDeck}

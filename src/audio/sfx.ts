@@ -23,23 +23,28 @@ import {
   installAudioUnlockListener,
   isAudioUnlocked,
 } from "@/audio/context";
-import { isMusicMuted } from "@/audio/music";
+import { getSettings, subscribeSettings } from "@/state/settings";
 
 // ---------------------------------------------------------------------------
 // Bus + primitives
 // ---------------------------------------------------------------------------
 
-const SFX_VOL = 0.5; // overall SFX level, sitting under the music
+const SFX_VOL = 0.5; // ceiling; the settings sfxVol slider scales under it
 
 let out: GainNode | null = null; // dry bus
 let echoSend: GainNode | null = null;
+
+// Follow the settings sfxVol slider live.
+subscribeSettings((s) => {
+  if (out) out.gain.value = SFX_VOL * s.sfxVol;
+});
 
 function ensureBus(): AudioContext | null {
   const ctx = getAudioContext();
   if (!ctx) return null;
   if (!out) {
     out = ctx.createGain();
-    out.gain.value = SFX_VOL;
+    out.gain.value = SFX_VOL * getSettings().sfxVol;
     out.connect(ctx.destination);
     // Dungeon echo: delay -> lowpass -> feedback, mixed back into the dry bus.
     const delay = ctx.createDelay(0.5);
@@ -255,7 +260,7 @@ const lastPlayed = new Map<SfxKey, number>();
 /** Fire one sound (rate-adjusted), honoring mute + throttles. */
 export function playSfx(key: SfxKey, rate = 1): void {
   installAudioUnlockListener();
-  if (!isAudioUnlocked() || isMusicMuted()) return;
+  if (!isAudioUnlocked() || getSettings().muted) return;
   if (!ensureBus()) return;
   const now = performance.now();
   const last = lastPlayed.get(key) ?? -Infinity;

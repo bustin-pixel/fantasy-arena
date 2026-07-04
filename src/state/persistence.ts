@@ -157,3 +157,13 @@ export function writeSave(save: PlayerSave): void {
     // Storage may be unavailable (private mode); fail soft.
   }
 }
+
+/** Wipe all progress (deck, gold, unlocks). Settings live under their own key
+ *  and survive. Callers should reload the app so React state re-initializes. */
+export function resetSave(): void {
+  try {
+    localStorage.removeItem(KEY);
+  } catch {
+    // Storage may be unavailable — nothing to wipe.
+  }
+}

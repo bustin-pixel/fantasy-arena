@@ -20,6 +20,7 @@ import {
   type ArenaTheme,
   type ArenaThemeId,
 } from "@/assets/arenaThemes";
+import { getSettings } from "@/state/settings";
 
 type Ctx = CanvasRenderingContext2D;
 
@@ -352,8 +353,9 @@ export function renderBattle(
 
   // Ambient theme animation (embers, fireflies, glyphs) — drawn under the
   // units so combat readability is never compromised. Wall-clock time keeps
-  // it presentation-only, like the lightning jitter below.
-  theme.accents?.(ctx, performance.now() / 1000);
+  // it presentation-only, like the lightning jitter below. Skippable in
+  // settings as a courtesy to older phones (it redraws every frame).
+  if (getSettings().ambientFx) theme.accents?.(ctx, performance.now() / 1000);
 
   // Ground-level markers under the units.
   for (const t of snap.traps) drawTrap(ctx, t);

@@ -5,6 +5,7 @@ import { CompendiumScreen } from "@/screens/CompendiumScreen";
 import { DungeonWall } from "@/components/DungeonWall";
 import { DungeonVines } from "@/components/DungeonVines";
 import { DungeonGate } from "@/components/DungeonGate";
+import { SettingsPanel } from "@/components/SettingsPanel";
 import { useGameState } from "@/state/GameStateContext";
 import type { BattleMode } from "@/hooks/useBattleEngine";
 
@@ -32,6 +33,7 @@ export function AppShell({ onBattle }: Props) {
   // Pending "restore scroll-snap" timeout from the last drag (see endDrag).
   const snapTimer = useRef<number | null>(null);
   const [page, setPage] = useState(1); // land on Home (center)
+  const [settingsOpen, setSettingsOpen] = useState(false);
   // Live drag state in a ref so pointer handlers never trigger re-renders.
   const drag = useRef({
     pending: false,
@@ -167,8 +169,19 @@ export function AppShell({ onBattle }: Props) {
 
   return (
     <div className="app-shell">
-      {/* Wallet, floating over every page (the shell has no header bar). */}
-      <GoldPill />
+      {/* Wallet + settings gear, floating over every page (no header bar). */}
+      <div className="top-right-cluster">
+        <button
+          type="button"
+          className="settings-btn"
+          aria-label="Settings"
+          onClick={() => setSettingsOpen(true)}
+        >
+          ⚙️
+        </button>
+        <GoldPill />
+      </div>
+      {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
       <div className="shell-bg" aria-hidden="true">
         {/* One continuous hall (3 pages wide) panned 1:1 with the pager. Brick
             spans it all; the gate lives in the middle (Home) third. */}

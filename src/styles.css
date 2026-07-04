@@ -1038,25 +1038,120 @@ body.modal-open .pager-nav {
   cursor: pointer;
 }
 
-/* Music mute toggle — same corner style as .exit-btn; fixed so it floats over
-   both the shell and the battle overlay. In battle it slides right of the ✕. */
-.music-toggle {
-  position: fixed;
-  top: 10px;
-  left: 10px;
-  z-index: 30;
+/* Settings gear — sits in the top-right cluster beside the gold pill. */
+.settings-btn {
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  border: 1px solid var(--stone-dark);
-  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid #7a5c28;
+  background: linear-gradient(180deg, #241a10, #140e08);
+  box-shadow: inset 0 1px 0 rgba(236, 227, 207, 0.08), 0 3px 8px rgba(0, 0, 0, 0.5);
   font-size: 0.85rem;
   line-height: 1;
   cursor: pointer;
 }
 
-.music-toggle.in-battle {
-  left: 52px;
+/* ---- Settings panel ------------------------------------------------------ */
+.settings-modal {
+  max-width: 320px;
+}
+.settings-body {
+  padding: 16px 18px 14px;
+}
+.settings-title {
+  margin: 0 0 4px;
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--gold);
+  text-align: center;
+  text-shadow: 0 0 10px rgba(245, 179, 1, 0.3);
+}
+.settings-section {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #8d8577;
+  margin: 14px 0 4px;
+  border-bottom: 1px solid #3a2f22;
+  padding-bottom: 3px;
+}
+.settings-section.danger {
+  color: #b3541e;
+  border-bottom-color: #4a2013;
+}
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 9px 0;
+  font-size: 0.82rem;
+  color: var(--parchment);
+}
+.settings-label {
+  flex: 0 0 auto;
+}
+.settings-label small {
+  color: var(--stone);
+  font-size: 0.68rem;
+}
+.settings-row input[type="range"] {
+  flex: 1;
+  accent-color: var(--gold);
+}
+.settings-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--gold);
+}
+.settings-row input:disabled {
+  opacity: 0.4;
+}
+.settings-seg {
+  display: flex;
+  border: 1px solid #57432c;
+  border-radius: 9px;
+  overflow: hidden;
+}
+.settings-seg-btn {
+  font-family: inherit;
+  font-weight: 800;
+  font-size: 0.78rem;
+  color: #8d8577;
+  background: transparent;
+  border: none;
+  padding: 6px 14px;
+  cursor: pointer;
+}
+.settings-seg-btn.active {
+  background: linear-gradient(180deg, var(--gold), var(--gold-soft));
+  color: var(--ink);
+}
+.settings-reset {
+  width: 100%;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: #e8a49a;
+  background: transparent;
+  border: 1.5px solid #8c2015;
+  border-radius: 9px;
+  padding: 9px 10px;
+  cursor: pointer;
+  margin-top: 4px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.settings-reset.armed {
+  background: #8c2015;
+  color: #ffe4dd;
+}
+.settings-version {
+  text-align: center;
+  font-size: 0.62rem;
+  color: var(--stone-dark);
+  margin-top: 12px;
 }
 
 /* ---- Card tray (battle hand) -------------------------------------------- */
@@ -1522,11 +1617,17 @@ body.modal-open .pager-nav {
 }
 
 /* ---- Gold wallet + locked collection ------------------------------------- */
-.gold-pill {
+/* Top-right cluster: settings gear + wallet, floating over every page. */
+.top-right-cluster {
   position: absolute;
   top: 10px;
   right: 12px;
   z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.gold-pill {
   display: flex;
   align-items: center;
   gap: 6px;

@@ -23,6 +23,7 @@ import {
   isAudioUnlocked,
   onAudioUnlocked,
 } from "@/audio/context";
+import { getSettings, subscribeSettings } from "@/state/settings";
 
 export type MusicTrackId =
   | "emberfall"
@@ -287,36 +288,37 @@ const TRACKS: Record<MusicTrackId, TrackDef> = {
 // Director — one playing track, crossfades, autoplay unlock, persisted mute
 // ---------------------------------------------------------------------------
 
-const MASTER_VOL = 0.9;
+const MASTER_VOL = 0.9; // ceiling; the settings musicVol slider scales under it
 const FADE_IN_SEC = 1.2;
 const FADE_OUT_SEC = 0.8;
-const MUTED_KEY = "fantasy-arena/music-muted";
 
 let desired: MusicTrackId | null = null;
-let muted = false;
-let mutedLoaded = false;
 let playing: { id: MusicTrackId; gain: GainNode; timer: number } | null = null;
+
+const musicVol = (): number => MASTER_VOL * getSettings().musicVol;
 
 // Start whatever's desired the moment audio unlocks (pure array push at module
 // scope — touches no browser APIs until the callback actually fires).
 onAudioUnlocked(() => apply());
 
-function loadMuted(): void {
-  if (mutedLoaded) return;
-  mutedLoaded = true;
-  try {
-    muted = localStorage.getItem(MUTED_KEY) === "1";
-  } catch {
-    muted = false;
+// Follow the settings live: retarget the playing track's gain on volume
+// changes; apply() handles mute flips (stop/start).
+subscribeSettings((s) => {
+  if (playing && ctx) {
+    const g = playing.gain.gain;
+    g.cancelScheduledValues(ctx.currentTime);
+    g.setValueAtTime(g.value, ctx.currentTime);
+    g.linearRampToValueAtTime(MASTER_VOL * s.musicVol, ctx.currentTime + 0.15);
   }
-}
+  apply();
+});
 
 function startTrack(id: MusicTrackId): void {
   const c = ctx!;
   const def = TRACKS[id];
   const gain = c.createGain();
   gain.gain.setValueAtTime(0.0001, c.currentTime);
-  gain.gain.linearRampToValueAtTime(MASTER_VOL, c.currentTime + FADE_IN_SEC);
+  gain.gain.linearRampToValueAtTime(Math.max(0.0001, musicVol()), c.currentTime + FADE_IN_SEC);
   gain.connect(c.destination);
 
   const st = 60 / def.bpm / 4;
@@ -353,10 +355,9 @@ function stopCurrent(): void {
 }
 
 function apply(): void {
-  loadMuted();
   ctx = getAudioContext();
   noiseBuf = getNoiseBuffer();
-  const target = muted ? null : desired;
+  const target = getSettings().muted ? null : desired;
   if (playing?.id === target) return;
   stopCurrent();
   if (target && isAudioUnlocked() && ctx) startTrack(target);
@@ -368,24 +369,6 @@ export function setMusicTrack(id: MusicTrackId | null): void {
   desired = id;
   installAudioUnlockListener();
   apply();
-}
-
-/** Flip the persisted mute toggle; returns the new muted state. */
-export function toggleMusicMuted(): boolean {
-  loadMuted();
-  muted = !muted;
-  try {
-    localStorage.setItem(MUTED_KEY, muted ? "1" : "0");
-  } catch {
-    /* private mode — the toggle still works for this session */
-  }
-  apply();
-  return muted;
-}
-
-export function isMusicMuted(): boolean {
-  loadMuted();
-  return muted;
 }
 
 /** The track currently audible (null while muted/locked/silent). Debug aid. */
