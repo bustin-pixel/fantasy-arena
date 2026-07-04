@@ -92,6 +92,15 @@ describe("migrateSave", () => {
     expect(save.unlockedUnits).not.toContain("bloater");
   });
 
+  it("never boots into an empty warband (load-time fallback only)", () => {
+    // A save whose deck sanitizes to nothing gets the owned default deck…
+    const save = migrateSave({ version: 3, deck: [], unlockedUnits: ["ogre"] });
+    expect(save.deck).toEqual(
+      DEFAULT_SAVE.deck.filter((id) => save.unlockedUnits.includes(id))
+    );
+    expect(save.deck.length).toBeGreaterThan(0);
+  });
+
   it("does not leak DEFAULT_SAVE references (mutation-safe)", () => {
     const a = migrateSave(null);
     a.unlockedUnits.push("summoner");
@@ -118,7 +127,8 @@ describe("sanitizeDeck", () => {
     expect(deck).toEqual(["summoner", "ogre", "archer"]);
   });
 
-  it("falls back to the owned part of the default deck when empty", () => {
-    expect(sanitizeDeck([], ["ogre", "archer"])).toEqual(["ogre", "archer"]);
+  it("returns [] for an empty deck — Clear must actually clear", () => {
+    expect(sanitizeDeck([], ["ogre", "archer"])).toEqual([]);
+    expect(sanitizeDeck(["summoner"], ["ogre"])).toEqual([]);
   });
 });

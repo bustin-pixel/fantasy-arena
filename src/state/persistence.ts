@@ -102,6 +102,14 @@ export function migrateSave(parsed: Partial<PlayerSave> | null): PlayerSave {
 
   merged.version = DEFAULT_SAVE.version;
   merged.deck = sanitizeDeck(merged.deck, merged.unlockedUnits);
+  // Load-time only: never boot into an empty warband — refill with whatever
+  // of the default deck the player owns (starters are always unlocked).
+  // Interactive setDeck deliberately skips this so Clear actually clears.
+  if (merged.deck.length === 0) {
+    merged.deck = DEFAULT_SAVE.deck.filter((id) =>
+      merged.unlockedUnits.includes(id)
+    );
+  }
   return merged;
 }
 
@@ -118,7 +126,9 @@ function structuredCloneSave(save: PlayerSave): PlayerSave {
 
 /** Enforce deck rules: drop unknown ids, locked units, dupes, and keep at most
  *  one Legendary. The deck ⊆ unlocked invariant lives here — grandfathered
- *  saves unlock everything first, so their decks pass through untouched. */
+ *  saves unlock everything first, so their decks pass through untouched.
+ *  May return [] (an empty warband is a valid interactive state — Clear);
+ *  the never-boot-empty fallback lives in migrateSave, not here. */
 export function sanitizeDeck(
   deck: string[],
   unlockedUnits: readonly string[]
@@ -137,10 +147,7 @@ export function sanitizeDeck(
     out.push(id);
     if (out.length >= 4) break;
   }
-  if (out.length > 0) return out;
-  // Empty fallback: whatever of the default deck the player owns (starters
-  // are always unlocked, so for a fresh save this is the full starter four).
-  return DEFAULT_SAVE.deck.filter((id) => unlockedUnits.includes(id));
+  return out;
 }
 
 export function writeSave(save: PlayerSave): void {
