@@ -296,7 +296,7 @@ export function drawUnitSprite(
       drawWolf(ctx, body, dark, light, accent, A);
       break;
     case "zombie_shambler":
-      drawOrc(ctx, body, dark, light, accent, A); // hulking humanoid, rot palette
+      drawBrute(ctx, body, dark, light, accent, A); // hulking humanoid, rot palette
       break;
     case "bloater":
       drawSlime(ctx, body, dark, light, accent, A, 1.2); // swollen pus-green blob
@@ -320,7 +320,7 @@ export function drawUnitSprite(
       drawMysticArcher(ctx, body, dark, light, accent, A, unit.mysticForm);
       break;
     default:
-      drawOrc(ctx, body, dark, light, accent, A);
+      drawBrute(ctx, body, dark, light, accent, A);
   }
 
   ctx.restore();
@@ -881,7 +881,9 @@ function drawOgre(ctx: Ctx, body: string, dark: string, light: string, accent: s
   rising(ctx, 15, 3, -5, 18, accent, A, 3);
 }
 
-function drawOrc(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {
+// Generic hulking humanoid — used by the zombie shambler (rot palette) and as
+// the fallback body for any unit without its own draw routine.
+function drawBrute(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {
   metalBody(ctx, 22, 24, -2, body, dark, light, 5);
   ctx.fillStyle = dark;
   ctx.fillRect(-11, 12, 22, 8);
@@ -914,6 +916,162 @@ function drawOrc(ctx: Ctx, body: string, dark: string, light: string, accent: st
   ctx.globalAlpha = 1;
   // big two-handed axe in the right hand
   drawBigAxe(ctx, 12, -2, 1);
+}
+
+// Orc — a bare-chested warband champion: carved abs, spiked iron pauldrons,
+// a fang necklace, and pointed ears. Big axe stays in the right hand.
+function drawOrc(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {
+  // bare muscled torso
+  metalBody(ctx, 24, 24, -2, body, dark, light, 6);
+  // pec + ab definition carved into the gradient
+  ctx.strokeStyle = withShade(body, -38);
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(-8, 2);
+  ctx.quadraticCurveTo(0, 5, 8, 2); // pec line
+  ctx.moveTo(0, 4);
+  ctx.lineTo(0, 14); // center channel
+  ctx.moveTo(-5, 7);
+  ctx.quadraticCurveTo(0, 8.5, 5, 7); // ab rows
+  ctx.moveTo(-5, 11);
+  ctx.quadraticCurveTo(0, 12.5, 5, 11);
+  ctx.stroke();
+  // embossed highlight just under each ab crease
+  ctx.strokeStyle = "rgba(255,255,255,0.14)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-4.5, 8.2);
+  ctx.quadraticCurveTo(0, 9.7, 4.5, 8.2);
+  ctx.moveTo(-4.5, 12.2);
+  ctx.quadraticCurveTo(0, 13.7, 4.5, 12.2);
+  ctx.stroke();
+  // war-paint slash across the chest
+  ctx.fillStyle = accent;
+  ctx.globalAlpha = 0.35;
+  ctx.save();
+  ctx.rotate(-0.18);
+  ctx.fillRect(-11, 0, 22, 2.4);
+  ctx.restore();
+  ctx.globalAlpha = 1;
+  // hide belt with a fang buckle
+  ctx.fillStyle = dark;
+  ctx.fillRect(-12, 15, 24, 7);
+  ctx.fillStyle = "#f3f3e0";
+  ctx.beginPath();
+  ctx.moveTo(-1.8, 16);
+  ctx.lineTo(1.8, 16);
+  ctx.lineTo(0, 20.5);
+  ctx.closePath();
+  ctx.fill();
+  // pointed ears poking out past the jaw
+  for (const side of [-1, 1] as const) {
+    ctx.fillStyle = light;
+    ctx.beginPath();
+    ctx.moveTo(side * 7, -13);
+    ctx.lineTo(side * 15, -17);
+    ctx.lineTo(side * 8, -8);
+    ctx.closePath();
+    ctx.fill();
+    // inner-ear shade
+    ctx.fillStyle = withShade(body, -20);
+    ctx.beginPath();
+    ctx.moveTo(side * 8.5, -12.5);
+    ctx.lineTo(side * 13, -15.5);
+    ctx.lineTo(side * 8.8, -9.5);
+    ctx.closePath();
+    ctx.fill();
+  }
+  // head
+  ctx.fillStyle = light;
+  ctx.beginPath();
+  ctx.arc(0, -10, 9, 0, PI2);
+  ctx.fill();
+  ctx.fillStyle = withShade(body, -15);
+  ctx.beginPath();
+  ctx.arc(0, -10, 9, 0.15 * Math.PI, 0.85 * Math.PI);
+  ctx.fill();
+  // heavy brow shadow
+  ctx.fillStyle = withShade(body, -30);
+  ctx.fillRect(-6, -14.5, 12, 2);
+  // tusks jutting up from the underbite
+  ctx.fillStyle = "#f3f3e0";
+  ctx.fillRect(-4.5, -4.5, 2.4, 5);
+  ctx.fillRect(2.1, -4.5, 2.4, 5);
+  ctx.fillStyle = "rgba(255,255,255,0.6)";
+  ctx.fillRect(-4.5, -4.5, 1, 1.6);
+  ctx.fillRect(2.1, -4.5, 1, 1.6);
+  // eyes with a faint accent glint
+  ctx.fillStyle = "#1a1a1a";
+  ctx.fillRect(-4, -12, 2, 2);
+  ctx.fillRect(2, -12, 2, 2);
+  ctx.fillStyle = accent;
+  ctx.globalAlpha = 0.6;
+  ctx.fillRect(-4, -12, 1, 1);
+  ctx.fillRect(2, -12, 1, 1);
+  ctx.globalAlpha = 1;
+  // fang necklace on a leather cord
+  ctx.strokeStyle = "#3a2a18";
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(-9, -2);
+  ctx.quadraticCurveTo(0, 4, 9, -2);
+  ctx.stroke();
+  for (const [fx, fy, fs] of [
+    [-6, -0.6, 2.6],
+    [-3, 0.8, 3.2],
+    [0, 1.4, 3.8],
+    [3, 0.8, 3.2],
+    [6, -0.6, 2.6],
+  ] as const) {
+    ctx.fillStyle = "#f3f3e0";
+    ctx.beginPath();
+    ctx.moveTo(fx - 1.4, fy);
+    ctx.lineTo(fx + 1.4, fy);
+    ctx.lineTo(fx, fy + fs);
+    ctx.closePath();
+    ctx.fill();
+  }
+  // spiked iron pauldrons capping both shoulders
+  for (const side of [-1, 1] as const) {
+    ctx.save();
+    ctx.translate(side * 12, -4);
+    ctx.scale(side, 1);
+    // bone spike jutting up and out
+    ctx.fillStyle = "#e8e6d4";
+    ctx.beginPath();
+    ctx.moveTo(1, -4);
+    ctx.lineTo(7, -11);
+    ctx.lineTo(4.5, -3);
+    ctx.closePath();
+    ctx.fill();
+    // dome plate with an iron gradient
+    const pg = ctx.createLinearGradient(0, -6, 0, 5);
+    pg.addColorStop(0, "#82868f");
+    pg.addColorStop(1, "#474a52");
+    ctx.fillStyle = pg;
+    ctx.beginPath();
+    ctx.arc(0, 1, 7.5, Math.PI, 0);
+    ctx.quadraticCurveTo(7.5, 4.5, 5, 5);
+    ctx.lineTo(-5, 5);
+    ctx.quadraticCurveTo(-7.5, 4.5, -7.5, 1);
+    ctx.closePath();
+    ctx.fill();
+    // rim + rivets
+    ctx.strokeStyle = "rgba(255,255,255,0.25)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(0, 1, 6.8, -Math.PI, -Math.PI * 0.25);
+    ctx.stroke();
+    ctx.fillStyle = "#2e3036";
+    for (const rx of [-4, 0, 4]) {
+      ctx.beginPath();
+      ctx.arc(rx, 2.2, 0.9, 0, PI2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+  // big two-handed axe in the right hand
+  drawBigAxe(ctx, 13, -2, 1);
 }
 
 function drawArcher(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {
