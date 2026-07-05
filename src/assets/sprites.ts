@@ -48,6 +48,18 @@ function phaseOf(uid: string | undefined): number {
   return (h / 1009) * PI2;
 }
 
+/** Deterministic 0/1 body-variant pick from a unit's uid, so horde units don't
+ *  all read as clones. XOR of char-code parities: real uids are sequential
+ *  ("u0","u1",…), so this alternates through a wave instead of clustering
+ *  (phaseOf's range test puts u0–u9 all on one side). Presentation-only.
+ *  Portraits (no uid) always get 0. */
+function variantOf(uid: string | undefined): 0 | 1 {
+  if (!uid) return 0;
+  let p = 0;
+  for (let i = 0; i < uid.length; i++) p ^= uid.charCodeAt(i) & 1;
+  return p as 0 | 1;
+}
+
 function withShade(hex: string, amt: number): string {
   const n = parseInt(hex.slice(1), 16);
   let r = (n >> 16) & 255,
@@ -296,7 +308,7 @@ export function drawUnitSprite(
       drawWolf(ctx, body, dark, light, accent, A);
       break;
     case "zombie_shambler":
-      drawBrute(ctx, body, dark, light, accent, A); // hulking humanoid, rot palette
+      drawZombieShambler(ctx, body, dark, light, accent, A, variantOf(unit.uid));
       break;
     case "bloater":
       drawSlime(ctx, body, dark, light, accent, A, 1.2); // swollen pus-green blob
@@ -916,6 +928,216 @@ function drawBrute(ctx: Ctx, body: string, dark: string, light: string, accent: 
   ctx.globalAlpha = 1;
   // big two-handed axe in the right hand
   drawBigAxe(ctx, 12, -2, 1);
+}
+
+// ---- zombie shambler -------------------------------------------------------
+// Two body variants picked per-unit via variantOf(uid) so Depths hordes read
+// as a mob, not clones: 0 = hunched reacher in rags, 1 = stitched gut-buster.
+// Both share the zombie head (slack jaw, empty socket, milky eye, skull crack)
+// and one arm per side. User-approved from canvas mockups.
+
+/** A drooping zombie arm from shoulder (sx,sy) to hand (ex,ey), with fingers. */
+function zombieArm(ctx: Ctx, sx: number, sy: number, ex: number, ey: number, col: string) {
+  ctx.strokeStyle = col;
+  ctx.lineWidth = 4.2;
+  ctx.lineCap = "round";
+  const mx = (sx + ex) / 2 + (ex > sx ? 1.5 : -1.5);
+  const my = (sy + ey) / 2 - 1.5;
+  ctx.beginPath();
+  ctx.moveTo(sx, sy);
+  ctx.quadraticCurveTo(mx, my, ex, ey);
+  ctx.stroke();
+  ctx.lineWidth = 1.3;
+  const d = ex > sx ? 1 : -1;
+  for (let i = 0; i < 3; i++) {
+    ctx.beginPath();
+    ctx.moveTo(ex, ey);
+    ctx.lineTo(ex + d * 2.6, ey + 0.8 + i * 1.3);
+    ctx.stroke();
+  }
+  ctx.lineCap = "butt";
+}
+
+/** Zombie head: tilted, slack hanging jaw with teeth, one empty socket, one
+ *  milky eye, sunken brow, and a skull crack. */
+function zombieHead(
+  ctx: Ctx,
+  body: string,
+  light: string,
+  accent: string,
+  hx: number,
+  hy: number,
+  tilt: number,
+  r: number
+) {
+  ctx.save();
+  ctx.translate(hx, hy);
+  ctx.rotate(tilt);
+  ctx.fillStyle = light;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, PI2);
+  ctx.fill();
+  ctx.fillStyle = withShade(body, -15);
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0.15 * Math.PI, 0.85 * Math.PI);
+  ctx.fill();
+  // sunken brow
+  ctx.fillStyle = withShade(body, -30);
+  ctx.fillRect(-r * 0.66, -r * 0.5, r * 1.32, 1.8);
+  // gaping mouth void + teeth
+  ctx.fillStyle = "#1c1713";
+  ctx.fillRect(-1, r * 0.28, r * 0.8 + 1, r * 0.42);
+  ctx.fillStyle = accent;
+  for (let i = 0; i < 3; i++) ctx.fillRect(-0.5 + i * 2.1, r * 0.28, 1.1, 1.3);
+  // slack lower jaw hanging off
+  ctx.fillStyle = withShade(body, -8);
+  ctx.beginPath();
+  ctx.roundRect(-1.5, r * 0.72, r * 0.9 + 2, 2.6, 1.2);
+  ctx.fill();
+  // left: empty socket; right: milky eye
+  ctx.fillStyle = "#161311";
+  ctx.fillRect(-r * 0.5, -r * 0.28, 2.6, 2.6);
+  ctx.fillStyle = accent;
+  ctx.beginPath();
+  ctx.arc(r * 0.34, -r * 0.1, 1.5, 0, PI2);
+  ctx.fill();
+  ctx.fillStyle = "#555";
+  ctx.beginPath();
+  ctx.arc(r * 0.34, -r * 0.1, 0.5, 0, PI2);
+  ctx.fill();
+  // skull crack
+  ctx.strokeStyle = withShade(body, -38);
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.2, -r);
+  ctx.lineTo(-r * 0.05, -r * 0.6);
+  ctx.lineTo(-r * 0.35, -r * 0.35);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** Short stitch seam at (x,y), rotated by ang, with n cross-bars. */
+function zombieStitches(ctx: Ctx, x: number, y: number, ang: number, n: number) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(ang);
+  ctx.strokeStyle = "#3c332a";
+  ctx.lineWidth = 0.9;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(n * 2.4, 0);
+  ctx.stroke();
+  for (let i = 0; i < n; i++) {
+    ctx.beginPath();
+    ctx.moveTo(1.2 + i * 2.4, -1.4);
+    ctx.lineTo(1.2 + i * 2.4, 1.4);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawZombieShambler(
+  ctx: Ctx,
+  body: string,
+  dark: string,
+  light: string,
+  accent: string,
+  A: SpriteAnim,
+  variant: 0 | 1
+) {
+  if (variant === 0) {
+    // hunched reacher: rags, ribs through a tear, one arm limp / one reaching
+    ctx.save();
+    ctx.rotate(0.07); // whole-body forward slump
+    zombieArm(ctx, -9, 0, -14, 10, withShade(body, -12)); // limp arm at its side
+    metalBody(ctx, 20, 22, -2, body, dark, light, 5);
+    // tattered shirt with a zigzag hem
+    ctx.fillStyle = withShade(body, -28);
+    ctx.beginPath();
+    ctx.moveTo(-10, 1);
+    ctx.lineTo(10, 1);
+    ctx.lineTo(10, 8);
+    ctx.lineTo(7, 13);
+    ctx.lineTo(5, 9);
+    ctx.lineTo(2, 13.5);
+    ctx.lineTo(-1, 9.5);
+    ctx.lineTo(-4, 14);
+    ctx.lineTo(-7, 9.5);
+    ctx.lineTo(-10, 12);
+    ctx.closePath();
+    ctx.fill();
+    // torn shoulder hole showing skin
+    ctx.fillStyle = light;
+    ctx.beginPath();
+    ctx.moveTo(-8, 1.5);
+    ctx.lineTo(-4.5, 1.5);
+    ctx.lineTo(-6.5, 4.5);
+    ctx.closePath();
+    ctx.fill();
+    // torn trousers
+    ctx.fillStyle = dark;
+    ctx.fillRect(-10, 14, 20, 7);
+    // ribs peeking through a side tear
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 1.1;
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath();
+      ctx.arc(-6, 4 + i * 2.6, 3, -0.5, 0.9);
+      ctx.stroke();
+    }
+    zombieStitches(ctx, 1, 6, 0.4, 3);
+    zombieHead(ctx, body, light, accent, 3.5, -11, 0.14, 8);
+    zombieArm(ctx, 9, -1, 16, 5, light); // reaching arm, dropped to mid height
+    ctx.restore();
+  } else {
+    // gut-buster: swollen stitched belly, small sunken head, knuckle-draggers
+    ctx.save();
+    ctx.rotate(0.05);
+    zombieArm(ctx, -9, -1, -15, 13, withShade(body, -12));
+    metalBody(ctx, 22, 22, -2, body, dark, light, 6);
+    // swollen belly
+    const bg = ctx.createLinearGradient(0, 2, 0, 18);
+    bg.addColorStop(0, light);
+    bg.addColorStop(1, withShade(body, -25));
+    ctx.fillStyle = bg;
+    ctx.beginPath();
+    ctx.ellipse(0.5, 10, 11, 8.5, 0, 0, PI2);
+    ctx.fill();
+    // stitched scar across it
+    ctx.strokeStyle = "#3c332a";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(-8, 7);
+    ctx.quadraticCurveTo(0, 11, 9, 8.5);
+    ctx.stroke();
+    for (let i = 0; i < 5; i++) {
+      const t = i / 4;
+      const x = -8 + t * 17;
+      const y = 7 + Math.sin(t * Math.PI) * 3.2;
+      ctx.beginPath();
+      ctx.moveTo(x, y - 1.7);
+      ctx.lineTo(x + 0.8, y + 1.7);
+      ctx.stroke();
+    }
+    // rot blotches
+    ctx.fillStyle = withShade(body, -20);
+    ctx.globalAlpha = 0.7;
+    ctx.beginPath();
+    ctx.ellipse(-5, 12.5, 2.4, 1.7, 0.4, 0, PI2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(6, 13, 1.8, 1.3, -0.3, 0, PI2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    // maggot hole
+    ctx.fillStyle = "#241d16";
+    ctx.beginPath();
+    ctx.arc(2.5, 12.6, 1.2, 0, PI2);
+    ctx.fill();
+    zombieHead(ctx, body, light, accent, 3.5, -12, 0.1, 6.8);
+    zombieArm(ctx, 10, -1, 16, 12, light);
+    ctx.restore();
+  }
 }
 
 // Orc — a bare-chested warband champion: carved abs, spiked iron pauldrons,
