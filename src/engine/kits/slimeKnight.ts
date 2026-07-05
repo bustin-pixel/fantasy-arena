@@ -27,7 +27,7 @@ const KNIGHT_BURST = 30; // the knight's own death burst
 const KNIGHT_BURST_RADIUS = 90;
 const BLOB_BURST = 18; // a blob's burst when killed en route
 const BLOB_BURST_RADIUS = 84;
-const REFORM_RADIUS = 56; // how close to the corpse counts as "home" (tuning knob)
+const REFORM_RADIUS = 32; // must ooze to ~a body-width (one unit radius) of the corpse
 const REBORN_HP_FRAC = 0.5; // reincarnate at half HP
 
 // Four fixed outward offsets (N/E/S/W). A shrinking squad takes the first N; fully
