@@ -716,7 +716,7 @@ export const UNITS: Record<string, UnitDef> = {
     hp: 40,
     damage: 0,
     attackSpeed: 2,
-    moveSpeed: 72, // quick — it's racing the enemy to the grave
+    moveSpeed: 34, // a slow, gooey crawl back to the corpse — easy to intercept
     range: MELEE,
     ability: "lifesteal", // passive filler — never casts, never attacks
     color: "#3ec46f",
