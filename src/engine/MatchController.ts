@@ -17,6 +17,7 @@ import type {
 import {
   DEPLOY_TIME_SEC,
   DEPTHS_ENEMY_ACTIVE,
+  DEPTHS_MATCH_TIME_SEC,
   DEPTHS_PLAYER_ACTIVE,
   ENEMY_ZONE,
   FIELD_WIDTH,
@@ -83,7 +84,10 @@ export class MatchController {
     this.playerDeck = playerDeck;
     this.enemyDeck = enemyDeck;
     resetUidCounter();
-    this.state = createSimState(seed, MATCH_TIME_SEC);
+    this.state = createSimState(
+      seed,
+      this.mode === "depths" ? DEPTHS_MATCH_TIME_SEC : MATCH_TIME_SEC
+    );
     if (this.mode === "depths") {
       this.state.activeCaps = {
         player: DEPTHS_PLAYER_ACTIVE,

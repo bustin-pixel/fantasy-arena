@@ -625,8 +625,8 @@ export const UNITS: Record<string, UnitDef> = {
     name: "Bloater",
     rarity: "epic",
     role: "Bloated Horror",
-    hp: 380,
-    damage: 16,
+    hp: 800, // rebalanced up from 380 — the winrate sweep had it folding to 4 units
+    damage: 28,
     attackSpeed: 2.2,
     moveSpeed: 30, // lumbering
     range: MELEE,

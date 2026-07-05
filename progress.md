@@ -24,20 +24,29 @@ A floor-based descent through the dungeon — the Home screen's gate is literall
 entrance. Each floor is a Swarm encounter; every **5th floor is a boss floor**.
 
 **Slice 1 shipped** (see the PR / git log): seeded `WaveController` + `"depths"`
-`MatchMode` (per-side `activeCaps`: player 4 / enemy 8), `data/depths.ts` tier +
+`MatchMode` (per-side `activeCaps`: player 4 / enemy 12), `data/depths.ts` tier +
 budget tables, the fodder tier (Giant Rat, Zombie Shambler, + existing Skeleton;
 boss **Bloater** with Putrid Burst). The floor picker + persisted progress
 (`depths.highestClearedFloor`, save v3) shipped with Economy slice 1.
+
+**Floor rebalance DONE (2026-07-05, on PR #46)** — floors were too easy/short.
+Now: per-floor stat multipliers (+8% HP / +5% dmg per floor, linear — so floors
+6+ escalate instead of plateauing, and future unit levels/items become the
+player counter-curve), waveBudget 25+3×floor (~28–40 bodies), 0.5s trickle,
+enemy cap 12, Depths-specific 300s clock, Bloater 800hp/28dmg, boss floors keep
+70% fodder. Tuned by headless winrate sweep (target hit: floors 1–3 comfy→
+bloodied, floor 4 77%, boss floor ≈ coin flip depending on deck). Method +
+numbers in NOTES.md hazard 4b. Gold bumped to match longer floors (15/floor
+first-clear, 30 replay, 15 loss).
 
 **Still to build:**
 - **Remaining bestiary tiers** (each needs its monsters built first):
   - **6–10** undead: Skeleton Archers, Ghouls, Bonecaller → boss **Abomination**
   - **11–15** deep crypt: Spiders, Imps, Banshee, Plague Shaman → boss **Gargoyle**
   - **16–20** the throne: elite mixes, Spore Pods, Bat Swarms → boss **Lich**
-- **Difficulty pass** once floors 2+ are reachable: floor 1 clears in ~15s for a
-  full warband (fine for the opener, but tune `waveBudget` / spawn interval /
-  monster costs in `data/depths.ts` as the curve extends). Profile before pushing
-  the enemy cap to 10–12 (`DEPTHS_ENEMY_ACTIVE`).
+- **Discrete announced waves** ("Wave 2/3" banner + lull between bursts) —
+  deliberately deferred from the rebalance to the tier-2 content drop, where a
+  mid-floor mix shift has new monsters to show off.
 - Extras: **3-star floors** (clear without losing a unit → bonus gold, slice 3);
   **boss first-kills unlock their Compendium page**; **Endless mode** after the
   campaign works (personal-best waves on Home).

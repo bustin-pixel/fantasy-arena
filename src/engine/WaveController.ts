@@ -18,6 +18,7 @@ import type { SimState } from "./CombatSystem";
 import {
   BOSS_FLOOR_FODDER_SHARE,
   WAVE_SPAWN_INTERVAL_SEC,
+  floorStatMultipliers,
   isBossFloor,
   tierForFloor,
   waveBudget,
@@ -86,7 +87,14 @@ export class WaveController {
 
     const defId = this.queue.shift()!;
     const x = this.rng.float(60, FIELD_WIDTH - 60);
-    state.units.push(createUnit(defId, "enemy", { x, y: SPAWN_Y }));
+    const unit = createUnit(defId, "enemy", { x, y: SPAWN_Y });
+    // Depth pressure: monsters (bosses included) spawn pre-scaled by floor.
+    // Applied here — not in createUnit — so summons/arena stay untouched.
+    const mult = floorStatMultipliers(this.floor);
+    unit.maxHp = Math.round(unit.maxHp * mult.hp);
+    unit.hp = unit.maxHp;
+    unit.damage = Math.round(unit.damage * mult.dmg);
+    state.units.push(unit);
     this.spawnCooldown = secToTicks(WAVE_SPAWN_INTERVAL_SEC);
   }
 }

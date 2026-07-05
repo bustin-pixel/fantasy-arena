@@ -109,12 +109,12 @@ describe("computeBattleRewards — the reward matrix", () => {
     chestSeed: 42,
   };
 
-  it("depths first clear: 50 + 10×floor gold + wooden chest", () => {
+  it("depths first clear: 50 + 15×floor gold + wooden chest", () => {
     const r = computeBattleRewards({
       ...base, mode: "depths", floor: 3, outcome: "victory",
       highestClearedFloor: 2,
     });
-    expect(r.gold).toBe(80);
+    expect(r.gold).toBe(95);
     expect(r.firstClear).toBe(true);
     expect(r.chest?.tier).toBe("wooden");
     expect(r.chest?.seed).toBe(42);
@@ -126,7 +126,7 @@ describe("computeBattleRewards — the reward matrix", () => {
       ...base, mode: "depths", floor: 5, outcome: "victory",
       highestClearedFloor: 4,
     });
-    expect(r.gold).toBe(100);
+    expect(r.gold).toBe(125);
     expect(r.chest?.tier).toBe("silver");
   });
 

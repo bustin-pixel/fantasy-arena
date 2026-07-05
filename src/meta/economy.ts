@@ -33,12 +33,13 @@ export const DUPLICATE_GOLD: Record<Rarity, number> = {
 
 /** Flat battle gold. First clears pay base + perFloor×floor; replays pay a
  *  trickle so farming is possible but descending is always optimal. Losses
- *  and draws pay a consolation — never zero. */
+ *  and draws pay a consolation — never zero. Depths payouts were bumped ~1.5–2×
+ *  with the floor rebalance (floors got 2–3× longer; keeps gold/min ≈ flat). */
 export const GOLD_REWARDS = {
   depthsFirstClearBase: 50,
-  depthsFirstClearPerFloor: 10,
-  depthsReplay: 15,
-  depthsLoss: 10,
+  depthsFirstClearPerFloor: 15,
+  depthsReplay: 30,
+  depthsLoss: 15,
   arenaWin: 40,
   arenaLoss: 10,
 } as const;
