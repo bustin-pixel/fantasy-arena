@@ -107,3 +107,30 @@ describe("Slime Blob — ignores combat, races home", () => {
     expect(blob.state).not.toBe("dead");
   });
 });
+
+describe("Slime Knight — split survives a ranged killing blow (regression)", () => {
+  it("still flings blobs and doesn't insta-end the match when a projectile lands the kill", () => {
+    const s = battleState(7);
+    // The knight is the ONLY enemy unit, finished off from range: its onDeath runs
+    // during projectile resolution — AFTER the main summon flush — so the blobs must
+    // be flushed again before the win/loss check, or the enemy is declared out first
+    // and the match ends before the knight ever splits.
+    const knight = place(s, "slime_knight", "enemy", 240, 300);
+    knight.hp = knight.maxHp = 10; // one big arrow punches through the Guard shield
+    knight.moveSpeed = 0;
+    const archer = place(s, "archer", "player", 240, 430); // in range, stationary
+    archer.damage = 200;
+    archer.hp = archer.maxHp = 100000;
+
+    for (let i = 0; i < 120; i++) {
+      stepSimulation(s);
+      if (knight.state === "dead") break;
+    }
+
+    expect(knight.state).toBe("dead");
+    // Blobs came out the SAME tick the projectile killed it...
+    expect(s.units.filter((u) => u.defId === "slime_squire").length).toBe(4);
+    // ...and the match did NOT end — the enemy still has the blobs on the board.
+    expect(s.phase).toBe("battle");
+  });
+});
