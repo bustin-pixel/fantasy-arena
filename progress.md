@@ -54,7 +54,9 @@ grandfathered with everything unlocked), the floor picker, instant-open chests
 Collection + gold purchases, milestone unlocks (floors 2–5 → Warrior/Mage/Cleric/
 Berserker), duplicate drops → gold.
 
-**Remaining economy/PvE slices, in order:**
+**Remaining economy/PvE slices, in order** (slices 2 & 3 have a build-ready
+handshake with file anchors + commit sequencing in
+[`docs/handoff-depths-slices-2-3.md`](docs/handoff-depths-slices-2-3.md)):
 1. ~~Core loop~~ — SHIPPED (this slice).
 2. **Depths content:** bestiary tiers 6–10 (undead → Abomination), 11–15 (deep
    crypt → Gargoyle), 16–20 (the throne → Lich) per the approved monster list
