@@ -231,6 +231,12 @@ editing a draw routine:
   `drawUnitSprite` builds a presentation-only clock from `performance.now()` + a
   per-unit phase hashed off `uid`; static portraits pass `live:false` to freeze it and
   skip the particle emitters. Wall time is fine here — it never feeds back into the sim.
+- **Bodies must be authored facing right (+x).** `drawUnitSprite` flips via
+  `ctx.scale(unit.facing, …)` where `facing = 1` means "my target is to my right" —
+  a body drawn head-left shows its target its tail (and its attack lunge goes
+  backwards). The rat/wolf/boar were authored head-left and are corrected with a
+  `ctx.scale(-1, 1)` mirror at the top of their draw fns; draw new bodies facing
+  right, or add the same mirror.
 
 Per-unit variation is data-in-code, not forked draw fns: the two knights share
 `drawKnight` + a `KnightLivery` colour set; the five mages share `drawMage` + an

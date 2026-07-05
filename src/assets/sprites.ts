@@ -2894,6 +2894,10 @@ function drawSummoner(ctx: Ctx, body: string, dark: string, light: string, accen
 }
 
 function drawWolf(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {
+  // Authored head-left; the renderer's facing flip assumes sprites face
+  // right — mirror so it runs at (not away from) its target.
+  ctx.save();
+  ctx.scale(-1, 1);
   // small quadruped, drawn low to the ground
   const bgd = ctx.createLinearGradient(0, 1, 0, 15);
   bgd.addColorStop(0, light);
@@ -2960,9 +2964,13 @@ function drawWolf(ctx: Ctx, body: string, dark: string, light: string, accent: s
   ctx.lineTo(20, 0);
   ctx.stroke();
   ctx.lineCap = "butt";
+  ctx.restore();
 }
 
 function drawBoar(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {
+  // Authored head-left; mirrored like the wolf so charges lead with the tusks.
+  ctx.save();
+  ctx.scale(-1, 1);
   // bulky low quadruped with a snout and tusks
   const bgd = ctx.createLinearGradient(0, -1, 0, 17);
   bgd.addColorStop(0, light);
@@ -3018,6 +3026,7 @@ function drawBoar(ctx: Ctx, body: string, dark: string, light: string, accent: s
   ctx.moveTo(7, 15);
   ctx.lineTo(7, 21);
   ctx.stroke();
+  ctx.restore();
   void A;
 }
 
@@ -3853,6 +3862,10 @@ function drawSkeleton(
 // big round pink ears, beady eye, mange patches, long segmented curling tail.
 // User-approved from canvas mockups (drawn full-size; the call site shrinks it).
 function drawGiantRat(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {
+  // The geometry below is authored head-left, but the renderer's facing flip
+  // assumes sprites face right — mirror so the rat attacks nose-first.
+  ctx.save();
+  ctx.scale(-1, 1);
   const pinkDeep = withShade(accent, -25);
   // tail behind the body
   ctx.strokeStyle = pinkDeep;
@@ -3944,6 +3957,7 @@ function drawGiantRat(ctx: Ctx, body: string, dark: string, light: string, accen
   ctx.moveTo(7, 13.5);
   ctx.lineTo(7, 18.5);
   ctx.stroke();
+  ctx.restore();
   void A;
 }
 
