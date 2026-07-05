@@ -1,5 +1,7 @@
 // Mage — Polymorph: a 1s cast (20s cooldown) that turns the nearest NON-summoned
-// enemy into a harmless sheep for 7s. Summons (wolves/skeletons/etc.) are immune.
+// enemy into a harmless sheep for 7s. Summons (wolves/skeletons/etc.) are immune;
+// Depths monsters are real enemies (sheepable); bosses are warded (never picked,
+// so the cast is never wasted).
 import { describe, it, expect } from "vitest";
 import { stepSimulation } from "@/engine/CombatSystem";
 import { secToTicks } from "@/utils/constants";
@@ -27,6 +29,29 @@ describe("Mage — Polymorph", () => {
     }
     expect(summon.effects.some((e) => e.type === "polymorph")).toBe(false);
     expect(everCast).toBe(false); // never began a cast — no legal target
+  });
+
+  it("sheeps Depths monsters — they're real enemies, not summons", () => {
+    const s = battleState(4);
+    place(s, "mage", "player", 240, 600);
+    const shambler = makeDummy(place(s, "zombie_shambler", "enemy", 240, 480));
+
+    for (let i = 0; i < 30; i++) stepSimulation(s); // past the 1s cast
+    expect(shambler.effects.some((e) => e.type === "polymorph")).toBe(true);
+  });
+
+  it("skips the polymorph-warded Bloater boss (and doesn't waste the cast)", () => {
+    const s = battleState(5);
+    const mage = place(s, "mage", "player", 240, 600);
+    const boss = makeDummy(place(s, "bloater", "enemy", 240, 480));
+
+    let everCast = false;
+    for (let i = 0; i < 30; i++) {
+      stepSimulation(s);
+      if (mage.castTicks > 0) everCast = true;
+    }
+    expect(boss.effects.some((e) => e.type === "polymorph")).toBe(false);
+    expect(everCast).toBe(false); // warded target is never picked
   });
 
   it("incapacitates the sheep, then it reverts after 7s", () => {

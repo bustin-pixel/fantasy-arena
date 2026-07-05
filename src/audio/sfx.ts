@@ -17,6 +17,7 @@
 // ============================================================================
 
 import type { BattleSnapshot, Unit } from "@/types";
+import { SUMMONED_UNIT_IDS } from "@/data/units";
 import {
   getAudioContext,
   getNoiseBuffer,
@@ -242,7 +243,7 @@ const DEATH_SOUND: Record<string, SfxKey> = {
 };
 
 /** Units whose mid-battle arrival is a summon poof, not a deploy thud. */
-const SUMMONED = new Set(["wolf", "boar", "skeleton", "slime_clone", "turret"]);
+const SUMMONED = SUMMONED_UNIT_IDS;
 
 /** Big monsters announce themselves (Depths bosses emerging). */
 const ROARS_ON_SPAWN = new Set(["bloater"]);

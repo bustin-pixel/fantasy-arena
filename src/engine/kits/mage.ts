@@ -8,7 +8,7 @@
 // target) and fireAbility (the effect on completion), plus its own target picker.
 import type { Unit } from "@/types";
 import type { UnitKit } from "./UnitKit";
-import { NON_DECK_UNITS } from "@/data/units";
+import { getUnitDef, SUMMONED_UNIT_IDS } from "@/data/units";
 import { secToTicks } from "@/utils/constants";
 import { dist } from "@/utils/math";
 import {
@@ -20,15 +20,18 @@ import {
 
 const POLYMORPH_DURATION_SEC = 7;
 
-// Nearest legal sheep target (skips summons, already-sheeped, and stealthed foes),
-// or null. Shared by wantsToCast (begin gate) and fireAbility (re-evaluated on
-// completion). Deterministic: ties broken by uid.
+// Nearest legal sheep target, or null. Skips summons (sheep the master, not the
+// minion — Depths monsters are real enemies, NOT summons), already-sheeped,
+// stealthed, and polymorph-warded foes (bosses: don't wind up a cast that
+// StatusEffectSystem would drop at application). Shared by wantsToCast (begin
+// gate) and fireAbility (re-evaluated on completion). Ties broken by uid.
 function polymorphTarget(unit: Unit, enemies: Unit[]): Unit | null {
   let best: Unit | null = null;
   let bestD = Infinity;
   for (const e of enemies) {
     if (e.state === "dead") continue;
-    if (NON_DECK_UNITS.has(e.defId)) continue; // not summoned units
+    if (SUMMONED_UNIT_IDS.has(e.defId)) continue;
+    if (getUnitDef(e.defId).wardedAgainst?.includes("polymorph")) continue;
     if (isPolymorphed(e) || isStealthed(e)) continue;
     const d = dist(unit.pos, e.pos);
     if (d < bestD || (d === bestD && best != null && e.uid < best.uid)) {
