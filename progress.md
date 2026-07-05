@@ -49,10 +49,14 @@ roll from a **drop-time seed stored on the result** (deterministic,
 server-verifiable). Every tunable number lives in `src/meta/economy.ts`; the pure
 reward matrix + chest roller are `src/meta/rewards.ts` (headless specs alongside).
 Shipped in slice 1: save v3 (`gold`, `unlockedUnits`, `depths` progress, v2 saves
-grandfathered with everything unlocked), the floor picker, instant-open chests
-(wooden/silver; gold-tier data exists but drops start with deeper bosses), locked
+grandfathered with everything unlocked), the floor picker, chests (wooden/silver
+drop today; gold data exists but drops start with deeper bosses), locked
 Collection + gold purchases, milestone unlocks (floors 2–5 → Warrior/Mage/Cleric/
-Berserker), duplicate drops → gold.
+Berserker), duplicate drops → gold. The chest tap is now a full ceremony (PR #46):
+procedural canvas sprite + rattle/lid-swing/sparkle animation + creak/jingle SFX
+per tier, and the ladder tops out at five tiers — wooden → silver → gold →
+**arcane → dragon** (the new two are data + art only; deep bosses / premium will
+drop them later).
 
 **Remaining economy/PvE slices, in order** (slices 2 & 3 have a build-ready
 handshake with file anchors + commit sequencing in
