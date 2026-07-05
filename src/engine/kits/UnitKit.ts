@@ -25,7 +25,7 @@ import { arcaneMageKit } from "./arcaneMage";
 import { archerKit } from "./archer";
 import { assassinKit } from "./assassin";
 import { berserkerKit } from "./berserker";
-import { bloaterKit } from "./bloater";
+import { bloaterKit, bloatlingKit } from "./bloater";
 import { boarKit } from "./boar";
 import { clericKit } from "./cleric";
 import { druidKit } from "./druid";
@@ -154,6 +154,7 @@ export const UNIT_KITS: UnitKitRegistry = {
   assassin: assassinKit,
   berserker: berserkerKit,
   bloater: bloaterKit,
+  bloatling: bloatlingKit,
   boar: boarKit,
   electric_mage: electricMageKit,
   engineer: engineerKit,

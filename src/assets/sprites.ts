@@ -313,6 +313,9 @@ export function drawUnitSprite(
     case "bloater":
       drawSlime(ctx, body, dark, light, accent, A, 1.2); // swollen pus-green blob
       break;
+    case "bloatling":
+      drawSlime(ctx, body, dark, light, accent, A, 0.85); // sloughed-off gobbet
+      break;
     case "berserker":
       drawBerserker(ctx, body, dark, light, accent, A);
       break;

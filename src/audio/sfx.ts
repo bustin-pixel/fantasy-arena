@@ -208,7 +208,7 @@ const RATE: Record<string, number> = {
   ogre: 0.8, bloater: 0.75, orc: 0.9, zombie_shambler: 0.85, berserker: 0.85,
   knight: 1.0, warrior: 1.05, holy_knight: 0.95, aegis_knight: 0.9,
   assassin: 1.15, rogue: 1.05, trickster: 1.2, wolf: 1.1, giant_rat: 1.4,
-  skeleton: 1.25, slime: 1.0, slime_clone: 1.3, boar: 1.0,
+  skeleton: 1.25, slime: 1.0, slime_clone: 1.3, boar: 1.0, bloatling: 1.05,
   archer: 1.0, ranger: 1.05, hunter: 0.95, mystic_archer: 1.1, turret: 1.35,
   mage: 1.0, fire_mage: 0.95, ice_mage: 1.1, electric_mage: 1.15,
   arcane_mage: 1.0, necromancer: 0.8, healer: 1.1, summoner: 0.9, engineer: 1.0,
@@ -221,7 +221,7 @@ const MELEE_SOUND: Record<string, SfxKey> = {
   berserker: "sword", orc: "sword", skeleton: "sword",
   ogre: "slam", bloater: "slam", zombie_shambler: "slam", boar: "slam", summoner: "slam",
   assassin: "dagger", rogue: "dagger", trickster: "dagger", wolf: "dagger", giant_rat: "dagger",
-  slime: "slimeSquish", slime_clone: "slimeSquish",
+  slime: "slimeSquish", slime_clone: "slimeSquish", bloatling: "slimeSquish",
 };
 
 /** Projectile-launch sound by the shooter's defId. */
@@ -239,7 +239,7 @@ const CAST_SOUND: Record<string, SfxKey> = {
 /** Death sound overrides (default is the fading sweep). */
 const DEATH_SOUND: Record<string, SfxKey> = {
   skeleton: "boneRattle", slime: "slimeSquish", slime_clone: "slimeSquish",
-  bloater: "slimeSquish",
+  bloater: "slimeSquish", bloatling: "slimeSquish",
 };
 
 /** Units whose mid-battle arrival is a summon poof, not a deploy thud. */

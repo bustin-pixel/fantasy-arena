@@ -219,6 +219,15 @@ timeout-while-outnumbered = defeat. Headless winrate sweep (starter deck,
 flip. Bloater was buffed 380hp/16 → 800hp/28 as part of this. If you retune,
 re-run a sweep like that rather than eyeballing.
 
+Sloughing Mass (2026-07-05): the Bloater then gained the Slime's split — a
+Bloatling (200hp/14dmg, `bloatling`, weaker Putrid Burst) sloughs off at each
+25% HP threshold, up to 3. That's ~600 effective HP + 3 extra bursts on top of
+the numbers above, so the floor-5 winrates in the sweep are now stale — re-run
+before retuning anything in this tier. Bloatlings spawn at BASE stats (no
+floor multiplier — the kit's `spawnUnit` path is floor-blind, same as every
+summon), and they share the slime-clone's raised summon-cap headroom (+5) in
+CombatSystem so splits aren't swallowed on a crowded boss floor.
+
 ### 5. The Depths spawns bypass the deploy() path
 `WaveController` (the PvE horde director) pushes monsters into `state.units`
 directly — no deck bookkeeping, no deployment records (waves rebuild

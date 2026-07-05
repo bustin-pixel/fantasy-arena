@@ -716,7 +716,7 @@ export function stepSimulation(state: SimState): void {
     // Summon headroom rides on the side's concurrent cap: Arena (cap 2) keeps
     // its proven 5/7 ceiling; The Depths' bigger caps scale it up so summoners
     // aren't starved on a fuller field.
-    const isClone = spawn.defId === "slime_clone";
+    const isClone = spawn.defId === "slime_clone" || spawn.defId === "bloatling";
     const cap = state.activeCaps[spawn.team] + (isClone ? 5 : 3);
     const teamCount = state.units.filter(
       (u) => u.team === spawn.team && u.state !== "dead"

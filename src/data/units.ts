@@ -641,10 +641,31 @@ export const UNITS: Record<string, UnitDef> = {
           "When it dies it ruptures — dealing 30 damage and poisoning every enemy nearby. Back away when it swells low.",
       },
       {
+        name: "Sloughing Mass",
+        description:
+          "Each time it drops past a quarter of its health, a Bloatling sloughs off (up to 3). They rupture on death too.",
+      },
+      {
         name: "Too Big to Baa",
         description: "Far too massive to polymorph — no sheep holds this much.",
       },
     ],
+  },
+  // Bloatling — sloughs off the Bloater as it's chipped down (Slime-style split).
+  // Never in a deck; terminal (doesn't split further) but ruptures on death.
+  bloatling: {
+    id: "bloatling",
+    name: "Bloatling",
+    rarity: "rare",
+    role: "Summoned",
+    hp: 200, // ~25% of the parent, mirroring the Slime→Slimeling ratio
+    damage: 14, // ~50% of the parent
+    attackSpeed: 2.2,
+    moveSpeed: 36, // less mass to lumber with
+    range: MELEE,
+    ability: "lifesteal", // passive filler — never casts
+    color: "#8a9a3b",
+    accent: "#d4e157",
   },
   // Slime clone — spawned when the original splits. Never in a deck. Doesn't
   // split further (terminal), but still bursts on death.
@@ -677,6 +698,7 @@ export const SUMMONED_UNIT_IDS = new Set<string>([
   "slime_clone",
   "turret",
   "boar",
+  "bloatling",
 ]);
 
 /** Unit ids that are NOT selectable cards (summoned at runtime only, or
