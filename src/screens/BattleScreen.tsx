@@ -12,6 +12,7 @@ import { useGameState } from "@/state/GameStateContext";
 import { computeBattleRewards, type BattleRewards } from "@/meta/rewards";
 import { RewardPanel } from "@/components/RewardPanel";
 import { generateSeed } from "@/utils/rng";
+import { playStinger, setMusicTrack } from "@/audio/music";
 
 interface Props {
   deck: string[];
@@ -53,6 +54,12 @@ export function BattleScreen({ deck, onExit, mode = "solo", floor = 1 }: Props) 
         : null;
     if (outcome && !recordedRef.current) {
       recordedRef.current = true;
+      // The battle track ends with the battle: victory/defeat play a one-shot
+      // stinger over its fade-out; a draw just falls silent. The hub theme
+      // returns via App's view effect when the player exits.
+      if (outcome === "victory") playStinger("victory");
+      else if (outcome === "defeat") playStinger("defeat");
+      else setMusicTrack(null);
       if (outcome === "victory") recordResult(true);
       else if (outcome === "defeat") recordResult(false);
       const { seen, slain } = enemyLedger();

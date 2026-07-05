@@ -33,17 +33,21 @@ export const DUPLICATE_GOLD: Record<Rarity, number> = {
 
 /** Flat battle gold. First clears pay base + perFloor×floor; replays pay a
  *  trickle so farming is possible but descending is always optimal. Losses
- *  and draws pay a consolation — never zero. */
+ *  and draws pay a consolation — never zero. Depths payouts were bumped ~1.5–2×
+ *  with the floor rebalance (floors got 2–3× longer; keeps gold/min ≈ flat). */
 export const GOLD_REWARDS = {
   depthsFirstClearBase: 50,
-  depthsFirstClearPerFloor: 10,
-  depthsReplay: 15,
-  depthsLoss: 10,
+  depthsFirstClearPerFloor: 15,
+  depthsReplay: 30,
+  depthsLoss: 15,
   arenaWin: 40,
   arenaLoss: 10,
 } as const;
 
-export type ChestTier = "wooden" | "silver" | "gold";
+/** Ascending order. Wooden/silver drop today; gold is reserved for deep
+ *  bosses (Depths slice 2); arcane and dragon are the far-future top of the
+ *  ladder (deepest bosses / premium — see progress.md slices 2 & 5). */
+export type ChestTier = "wooden" | "silver" | "gold" | "arcane" | "dragon";
 
 /** Chance a chest contains a unit unlock (rolled from the FULL deckable pool,
  *  so duplicates are possible by design — they convert to gold). */
@@ -51,6 +55,8 @@ export const CHEST_UNIT_CHANCE: Record<ChestTier, number> = {
   wooden: 0.1,
   silver: 0.25,
   gold: 0.5,
+  arcane: 0.75,
+  dragon: 1,
 };
 
 /** Bonus gold inside a chest, on top of the flat battle gold. */
@@ -58,6 +64,8 @@ export const CHEST_GOLD_RANGE: Record<ChestTier, [number, number]> = {
   wooden: [20, 40],
   silver: [60, 100],
   gold: [150, 250],
+  arcane: [350, 550],
+  dragon: [700, 1100],
 };
 
 /** Designer-controlled free unlocks: floor → unit id, granted on that floor's

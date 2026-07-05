@@ -134,30 +134,177 @@ body {
   color: var(--stone);
   font-size: 0.85rem;
 }
-.stat-block {
+/* ---- Profile plate (Home) ------------------------------------------------ */
+/* The old stat block, upgraded into the player's identity card. */
+.profile-plate {
   display: flex;
-  gap: 10px;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 300px;
   background: rgba(0, 0, 0, 0.35);
   border: 1px solid var(--brown);
   border-radius: 12px;
   padding: 8px 12px;
+  color: inherit;
+  font: inherit;
+  text-align: left;
 }
-.stat {
+.profile-plate.editable {
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+.profile-plate.editable:hover,
+.profile-plate.editable:focus-visible {
+  border-color: var(--gold-soft);
+}
+.avatar-frame {
+  display: inline-flex;
+  flex-shrink: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid var(--gold);
+  background: var(--ink);
+}
+.avatar-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.profile-plate-main {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
+  gap: 3px;
+}
+.profile-name-row {
+  display: flex;
   align-items: center;
-  min-width: 42px;
+  gap: 6px;
+  min-width: 0;
 }
-.stat-val {
-  font-size: 1.1rem;
+.profile-name {
+  font-size: 1rem;
   font-weight: 800;
-  color: var(--gold);
+  color: var(--parchment);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.stat-lbl {
-  font-size: 0.65rem;
+.profile-edit-hint {
+  font-size: 0.75rem;
+  color: var(--stone);
+}
+.profile-stats {
+  display: flex;
+  gap: 12px;
+}
+.profile-stat {
+  font-size: 0.7rem;
+  color: var(--stone);
+  white-space: nowrap;
+}
+.profile-stat b {
+  color: var(--gold);
+  font-weight: 800;
+}
+.profile-chevron {
+  font-size: 1.2rem;
+  color: var(--stone-dark);
+  flex-shrink: 0;
+}
+
+/* ---- Profile sheet (name + icon editor) ----------------------------------- */
+.profile-sheet {
+  padding: 20px;
+  width: min(340px, 92vw);
+}
+.profile-sheet-title {
+  margin: 0 0 14px;
+  text-align: center;
+  color: var(--gold);
+  font-size: 1.2rem;
+  letter-spacing: 0.05em;
+}
+.profile-field-label {
+  display: block;
+  font-size: 0.7rem;
   color: var(--stone);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+.profile-name-field {
+  display: block;
+  margin-bottom: 14px;
+}
+.profile-name-input {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid #57432c;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.45);
+  color: var(--parchment);
+  font: inherit;
+  font-weight: 700;
+  -webkit-user-select: text;
+  user-select: text;
+}
+.profile-name-input:focus {
+  outline: none;
+  border-color: var(--gold-soft);
+}
+.avatar-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+  gap: 10px;
+  max-height: 42dvh;
+  overflow-y: auto;
+  padding: 2px;
+  margin-bottom: 4px;
+}
+.avatar-cell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.avatar-cell .avatar-frame {
+  border-color: var(--brown);
+}
+.avatar-cell:hover .avatar-frame {
+  border-color: var(--gold-soft);
+}
+.avatar-cell.selected .avatar-frame {
+  border-color: var(--gold);
+  box-shadow: 0 0 10px rgba(245, 179, 1, 0.55);
+}
+.avatar-cell.locked {
+  cursor: default;
+}
+.avatar-cell.locked .avatar-frame {
+  border-color: var(--stone-dark);
+}
+.avatar-cell.locked:hover .avatar-frame {
+  border-color: var(--stone-dark);
+}
+.avatar-cell.locked .avatar-canvas {
+  filter: grayscale(1) brightness(0.55);
+}
+.avatar-lock {
+  position: absolute;
+  bottom: 0;
+  right: 2px;
+  font-size: 0.7rem;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+.profile-sheet .detail-footer .btn-gold {
+  flex: 1;
 }
 
 .deck-section {
@@ -1157,18 +1304,60 @@ body.modal-open .pager-nav {
 }
 
 /* ---- Card tray (battle hand) -------------------------------------------- */
-.card-tray {
+/* Gilded war-table treatment: a gold filigree seam with a center gem
+   separates the arena from a warm wood panel with gold side rails. Static
+   CSS on purpose — it reads the same over all five arena themes. */
+.tray-wrap {
   flex: 0 0 auto;
   width: 100%;
   max-width: 480px;
+}
+.tray-divider {
+  position: relative;
+  height: 14px;
+  background: linear-gradient(180deg, #241a0c, #15100a);
+}
+.tray-divider::before {
+  content: "";
+  position: absolute;
+  top: 6px;
+  left: 12px;
+  right: 12px;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    #b98a2e 12%,
+    #f5d576 50%,
+    #b98a2e 88%,
+    transparent
+  );
+}
+.tray-divider-gem {
+  position: absolute;
+  top: 1px;
+  left: 50%;
+  width: 12px;
+  height: 12px;
+  transform: translateX(-50%) rotate(45deg);
+  background: linear-gradient(135deg, #f5d576, #b98a2e);
+  border: 1px solid #7a5a1a;
+  box-shadow: 0 0 8px rgba(245, 213, 118, 0.7);
+}
+.card-tray {
+  width: 100%;
   height: 104px;
   display: flex;
   gap: 8px;
   justify-content: center;
   align-items: center;
   padding: 8px;
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.65));
-  border-top: 1px solid var(--brown);
+  box-sizing: border-box;
+  background: linear-gradient(180deg, #33240f, #1d1408);
+  border-left: 2px solid #8a6a24;
+  border-right: 2px solid #8a6a24;
+  box-shadow: inset 0 0 0 1px rgba(245, 213, 118, 0.15),
+    inset 0 8px 14px rgba(0, 0, 0, 0.45);
 }
 .card-tray.empty {
   justify-content: center;
@@ -1507,12 +1696,18 @@ body.modal-open .pager-nav {
   background: linear-gradient(180deg, #4a3620, #2c2118);
   border: 1px solid var(--gold);
   border-radius: 12px;
-  padding: 10px 18px;
+  padding: 6px 18px 10px;
   cursor: pointer;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 2px;
   animation: chest-pulse 1.6s ease-in-out infinite;
+}
+.reward-chest.opened {
+  animation: none;
+  cursor: default;
+  box-shadow: 0 0 10px rgba(245, 179, 1, 0.3);
 }
 @keyframes chest-pulse {
   0%,
@@ -1523,20 +1718,11 @@ body.modal-open .pager-nav {
     box-shadow: 0 0 16px rgba(245, 179, 1, 0.7);
   }
 }
-.chest-icon {
-  width: 18px;
-  height: 14px;
-  border-radius: 3px 3px 2px 2px;
-  border: 1px solid rgba(0, 0, 0, 0.5);
+.chest-sprite {
+  display: block;
 }
-.chest-icon.wooden {
-  background: linear-gradient(180deg, #8a5a2b, #5c3b1a);
-}
-.chest-icon.silver {
-  background: linear-gradient(180deg, #cfd6e0, #8c96a6);
-}
-.chest-icon.gold {
-  background: linear-gradient(180deg, #f5d34a, #b8860b);
+.reward-chest-label {
+  line-height: 1.2;
 }
 .reward-contents {
   list-style: none;

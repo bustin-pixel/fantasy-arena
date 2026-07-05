@@ -7,8 +7,9 @@ import { MatchController } from "@/engine/MatchController";
 import { WaveController } from "@/engine/WaveController";
 import { stepSimulation, type SimState } from "@/engine/CombatSystem";
 import { createSimState } from "@/engine/CombatSystem";
-import { tierForFloor, isBossFloor } from "@/data/depths";
-import { DEPTHS_ENEMY_ACTIVE } from "@/utils/constants";
+import { tierForFloor, isBossFloor, floorStatMultipliers } from "@/data/depths";
+import { getUnitDef } from "@/data/units";
+import { DEPTHS_ENEMY_ACTIVE, DEPTHS_MATCH_TIME_SEC, secToTicks } from "@/utils/constants";
 import { battleState, digest, place, makeDummy } from "./helpers";
 
 /** Run a full Depths floor with a scripted player deployment. Returns the
@@ -22,11 +23,12 @@ function runDepths(
   deck.forEach((id, i) => mc.deploy("player", id, { x: 90 + i * 100, y: 620 }));
   let peakEnemies = 0;
   let guard = 0;
+  // Guard covers the full Depths clock (300s = 6000 ticks) plus deployment.
   while (
     mc.phase !== "victory" &&
     mc.phase !== "defeat" &&
     mc.phase !== "draw" &&
-    guard < 3400
+    guard < 8000
   ) {
     mc.tick();
     peakEnemies = Math.max(peakEnemies, mc.countActive("enemy"));
@@ -74,6 +76,49 @@ describe("WaveController — wave composition", () => {
     expect(drainQueue(9, 1)).not.toContain("bloater");
   });
 
+  it("floor 1 spawns at bestiary stats; deeper floors spawn pre-scaled", () => {
+    const spawnOne = (floor: number) => {
+      const wc = new WaveController(31, floor);
+      const s: SimState = createSimState(31, 120);
+      s.activeCaps = { player: 4, enemy: 999 };
+      let guard = 0;
+      while (s.units.length === 0 && guard < 100) {
+        wc.step(s);
+        guard++;
+      }
+      return s.units[0];
+    };
+
+    const shallow = spawnOne(1);
+    const shallowDef = getUnitDef(shallow.defId);
+    expect(shallow.maxHp).toBe(shallowDef.hp);
+    expect(shallow.damage).toBe(shallowDef.damage);
+
+    const deep = spawnOne(5);
+    const deepDef = getUnitDef(deep.defId);
+    const mult = floorStatMultipliers(5);
+    expect(deep.maxHp).toBe(Math.round(deepDef.hp * mult.hp));
+    expect(deep.hp).toBe(deep.maxHp);
+    expect(deep.damage).toBe(Math.round(deepDef.damage * mult.dmg));
+    expect(deep.maxHp).toBeGreaterThan(deepDef.hp);
+  });
+
+  it("the boss scales with floor depth too", () => {
+    // Floor 5's Bloater must carry the floor multiplier, or boss floors stay soft.
+    const wc = new WaveController(9, 5);
+    const s: SimState = createSimState(9, 120);
+    s.activeCaps = { player: 4, enemy: 999 };
+    let guard = 0;
+    while (wc.remaining > 0 && guard < 5000) {
+      wc.step(s);
+      guard++;
+    }
+    const boss = s.units.find((u) => u.defId === "bloater")!;
+    const mult = floorStatMultipliers(5);
+    expect(boss.maxHp).toBe(Math.round(getUnitDef("bloater").hp * mult.hp));
+    expect(boss.damage).toBe(Math.round(getUnitDef("bloater").damage * mult.dmg));
+  });
+
   it("deeper floors roll bigger waves", () => {
     // Compare total budget spent via queue length proxy across several seeds
     // (composition is random, so assert on the average).
@@ -114,6 +159,11 @@ describe("Depths match — full-floor invariants", () => {
     const { mc } = runDepths(77, 5, ["aegis_knight", "berserker", "holy_knight", "warrior"]);
     expect(["victory", "defeat", "draw"]).toContain(mc.phase);
     expect(mc.state.units.some((u) => u.defId === "bloater")).toBe(true);
+  });
+
+  it("depths matches run on the long PvE clock", () => {
+    const mc = new MatchController(5, DECK, [], { mode: "depths", floor: 1 });
+    expect(mc.state.clockTicks).toBe(secToTicks(DEPTHS_MATCH_TIME_SEC));
   });
 
   it("monsters creep in from the top edge", () => {

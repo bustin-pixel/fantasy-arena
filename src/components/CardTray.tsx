@@ -55,25 +55,36 @@ function TrayCard({
   );
 }
 
+/** Gold filigree seam with a center gem, separating the arena from the tray. */
+function TrayDivider() {
+  return (
+    <div className="tray-divider" aria-hidden="true">
+      <span className="tray-divider-gem" />
+    </div>
+  );
+}
+
 /** The bottom hand: tap a card to choose who deploys next, then tap the field. */
 export function CardTray({ hand, canDeploy, onSelect }: Props) {
-  if (hand.length === 0) {
-    return (
-      <div className="card-tray empty">
-        <span>No reserves left</span>
-      </div>
-    );
-  }
   return (
-    <div className="card-tray">
-      {hand.map((card) => (
-        <TrayCard
-          key={card.index}
-          card={card}
-          canDeploy={canDeploy}
-          onSelect={onSelect}
-        />
-      ))}
+    <div className="tray-wrap">
+      <TrayDivider />
+      {hand.length === 0 ? (
+        <div className="card-tray empty">
+          <span>No reserves left</span>
+        </div>
+      ) : (
+        <div className="card-tray">
+          {hand.map((card) => (
+            <TrayCard
+              key={card.index}
+              card={card}
+              canDeploy={canDeploy}
+              onSelect={onSelect}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

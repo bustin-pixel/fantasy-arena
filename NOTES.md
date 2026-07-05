@@ -201,11 +201,23 @@ a bug for a deckable hero).
 `CombatSystem` enforces a per-team live-unit cap when flushing spawns, derived
 from `state.activeCaps` (the per-side concurrent caps): `activeCaps[team] + 3`,
 or `+ 5` for slime clones. Arena (caps 2/2) keeps its proven 5/7 ceiling; The
-Depths (player 4 / enemy 8, set by MatchController in `"depths"` mode) scales
-to 7/11. Audit confirmed Arena peak simultaneous units stays at 8 in
-summon-heavy matches. If you add more summoners or raise the Depths enemy cap
-(10–12 is the stretch goal), re-profile — the spec targets ~8 active units /
-60fps on mobile, and Depths already runs right at it.
+Depths (player 4 / enemy 12, set by MatchController in `"depths"` mode) scales
+to 7/15. The enemy cap was raised 8 → 12 in the floor rebalance — desktop
+preview profiled ~357fps with the horde active; re-profile on real mobile
+hardware if frame drops get reported, and drop toward 10 if needed.
+
+### 4b. Depths floor rebalance (2026-07-05) — how the difficulty is tuned
+Two dials in `data/depths.ts`: `waveBudget` (25 + 3×floor — LENGTH) and
+`floorStatMultipliers` (+8% HP / +5% dmg per floor past 1, linear — DIFFICULTY;
+applied at spawn in `WaveController`, bosses included, so bestiary stats stay
+floor-1-true). Boss floors keep 70% of budget as fodder (halving it made floor
+5 EASIER than floor 4). Depths runs on `DEPTHS_MATCH_TIME_SEC` (300s) because
+timeout-while-outnumbered = defeat. Headless winrate sweep (starter deck,
+30 seeds/floor, harness pattern: deploy 4 + tick to terminal): floor 1
+100%/82%HP → floor 3 100%/63% → floor 4 77%/34% → floor 5 80% (starter) but
+37% (knight/warrior/healer/fire_mage) — deck choice brackets the boss coin
+flip. Bloater was buffed 380hp/16 → 800hp/28 as part of this. If you retune,
+re-run a sweep like that rather than eyeballing.
 
 ### 5. The Depths spawns bypass the deploy() path
 `WaveController` (the PvE horde director) pushes monsters into `state.units`
@@ -231,6 +243,13 @@ editing a draw routine:
   `drawUnitSprite` builds a presentation-only clock from `performance.now()` + a
   per-unit phase hashed off `uid`; static portraits pass `live:false` to freeze it and
   skip the particle emitters. Wall time is fine here — it never feeds back into the sim.
+- **Bodies must be authored facing right (+x).** `drawUnitSprite` flips via
+  `ctx.scale(unit.facing, …)` where `facing = 1` means "my target is to my right" —
+  a body drawn head-left shows its target its tail (and its attack lunge goes
+  backwards). The giant rat is authored head-left and corrected with a
+  `ctx.scale(-1, 1)` mirror at the top of its draw fn (the wolf/boar were rebuilt
+  head-right in their glow-ups); draw new bodies facing right, or add the same
+  mirror.
 
 Per-unit variation is data-in-code, not forked draw fns: the two knights share
 `drawKnight` + a `KnightLivery` colour set; the five mages share `drawMage` + an

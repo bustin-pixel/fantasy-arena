@@ -24,20 +24,29 @@ A floor-based descent through the dungeon — the Home screen's gate is literall
 entrance. Each floor is a Swarm encounter; every **5th floor is a boss floor**.
 
 **Slice 1 shipped** (see the PR / git log): seeded `WaveController` + `"depths"`
-`MatchMode` (per-side `activeCaps`: player 4 / enemy 8), `data/depths.ts` tier +
+`MatchMode` (per-side `activeCaps`: player 4 / enemy 12), `data/depths.ts` tier +
 budget tables, the fodder tier (Giant Rat, Zombie Shambler, + existing Skeleton;
 boss **Bloater** with Putrid Burst). The floor picker + persisted progress
 (`depths.highestClearedFloor`, save v3) shipped with Economy slice 1.
+
+**Floor rebalance DONE (2026-07-05, on PR #46)** — floors were too easy/short.
+Now: per-floor stat multipliers (+8% HP / +5% dmg per floor, linear — so floors
+6+ escalate instead of plateauing, and future unit levels/items become the
+player counter-curve), waveBudget 25+3×floor (~28–40 bodies), 0.5s trickle,
+enemy cap 12, Depths-specific 300s clock, Bloater 800hp/28dmg, boss floors keep
+70% fodder. Tuned by headless winrate sweep (target hit: floors 1–3 comfy→
+bloodied, floor 4 77%, boss floor ≈ coin flip depending on deck). Method +
+numbers in NOTES.md hazard 4b. Gold bumped to match longer floors (15/floor
+first-clear, 30 replay, 15 loss).
 
 **Still to build:**
 - **Remaining bestiary tiers** (each needs its monsters built first):
   - **6–10** undead: Skeleton Archers, Ghouls, Bonecaller → boss **Abomination**
   - **11–15** deep crypt: Spiders, Imps, Banshee, Plague Shaman → boss **Gargoyle**
   - **16–20** the throne: elite mixes, Spore Pods, Bat Swarms → boss **Lich**
-- **Difficulty pass** once floors 2+ are reachable: floor 1 clears in ~15s for a
-  full warband (fine for the opener, but tune `waveBudget` / spawn interval /
-  monster costs in `data/depths.ts` as the curve extends). Profile before pushing
-  the enemy cap to 10–12 (`DEPTHS_ENEMY_ACTIVE`).
+- **Discrete announced waves** ("Wave 2/3" banner + lull between bursts) —
+  deliberately deferred from the rebalance to the tier-2 content drop, where a
+  mid-floor mix shift has new monsters to show off.
 - Extras: **3-star floors** (clear without losing a unit → bonus gold, slice 3);
   **boss first-kills unlock their Compendium page**; **Endless mode** after the
   campaign works (personal-best waves on Home).
@@ -49,12 +58,18 @@ roll from a **drop-time seed stored on the result** (deterministic,
 server-verifiable). Every tunable number lives in `src/meta/economy.ts`; the pure
 reward matrix + chest roller are `src/meta/rewards.ts` (headless specs alongside).
 Shipped in slice 1: save v3 (`gold`, `unlockedUnits`, `depths` progress, v2 saves
-grandfathered with everything unlocked), the floor picker, instant-open chests
-(wooden/silver; gold-tier data exists but drops start with deeper bosses), locked
+grandfathered with everything unlocked), the floor picker, chests (wooden/silver
+drop today; gold data exists but drops start with deeper bosses), locked
 Collection + gold purchases, milestone unlocks (floors 2–5 → Warrior/Mage/Cleric/
-Berserker), duplicate drops → gold.
+Berserker), duplicate drops → gold. The chest tap is now a full ceremony (PR #46):
+procedural canvas sprite + rattle/lid-swing/sparkle animation + creak/jingle SFX
+per tier, and the ladder tops out at five tiers — wooden → silver → gold →
+**arcane → dragon** (the new two are data + art only; deep bosses / premium will
+drop them later).
 
-**Remaining economy/PvE slices, in order:**
+**Remaining economy/PvE slices, in order** (slices 2 & 3 have a build-ready
+handshake with file anchors + commit sequencing in
+[`docs/handoff-depths-slices-2-3.md`](docs/handoff-depths-slices-2-3.md)):
 1. ~~Core loop~~ — SHIPPED (this slice).
 2. **Depths content:** bestiary tiers 6–10 (undead → Abomination), 11–15 (deep
    crypt → Gargoyle), 16–20 (the throne → Lich) per the approved monster list

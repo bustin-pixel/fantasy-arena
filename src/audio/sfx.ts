@@ -17,6 +17,7 @@
 // ============================================================================
 
 import type { BattleSnapshot, Unit } from "@/types";
+import { SUMMONED_UNIT_IDS } from "@/data/units";
 import {
   getAudioContext,
   getNoiseBuffer,
@@ -142,7 +143,7 @@ export type SfxKey =
   | "sword" | "slam" | "dagger" | "bow" | "mysticShot" | "bolt" | "fireWhoosh"
   | "fireBoom" | "frostShatter" | "zap" | "arcaneWarp" | "curse" | "heal"
   | "summon" | "roar" | "shieldGong" | "slimeSquish" | "boneRattle" | "death"
-  | "deploy" | "trapSet" | "trapSnap";
+  | "deploy" | "trapSet" | "trapSnap" | "chestCreak" | "chestOpen" | "polymorph";
 
 const SOUNDS: Record<SfxKey, (r: number) => void> = {
   // metallic clang (A)
@@ -189,6 +190,13 @@ const SOUNDS: Record<SfxKey, (r: number) => void> = {
   trapSet(r) { blip(r, 0, 1600, 1100, 0.03, "square", 0.08); ring(r, 0.02, [2200], 0.05, 0.03); },
   // trap sprung (round-1 keeper)
   trapSnap(r) { blip(r, 0, 2400, 900, 0.03, "square", 0.18); ring(r, 0.02, [1900], 0.09, 0.09); burst(r, 0.035, 0.06, 0.14, "highpass", 3000, 5000); },
+  // chest lid: latch click + stick-slip hinge squeaks (reward ceremony)
+  chestCreak(r) { blip(r, 0, 950, 1400, 0.035, "square", 0.11); [0.07, 0.17, 0.28].forEach((at, i) => blip(r, at, 330 - i * 45, 235 - i * 45, 0.1, "sawtooth", 0.06, 0.025)); burst(r, 0.06, 0.28, 0.045, "bandpass", 950, 480); },
+  // chest reveal: lid thump + rising sparkle + coin jingle
+  chestOpen(r) { blip(r, 0, 130, 55, 0.13, "triangle", 0.24); [1319, 1568, 2093, 2637].forEach((f, i) => blip(r, 0.05 + i * 0.05, f, f * 1.03, 0.15, "sine", 0.05, 0.008)); [0.14, 0.22, 0.3, 0.39].forEach((at, i) => ring(r, at, [3140 + i * 230, 4250 + i * 270], 0.09, 0.045)); },
+  // polymorph lands: sparkle rise, comic pop, confused double baa (variant B,
+  // widget-auditioned 2026-07-05; the bleat is the zap-style rapid-blip wobble)
+  polymorph(r) { [900, 1300, 1900].forEach((f, i) => blip(r, i * 0.05, f, f * 1.2, 0.08, "sine", 0.05)); blip(r, 0.16, 1400, 300, 0.05, "square", 0.12); for (let i = 0; i < 3; i++) blip(r, 0.26 + i * 0.04, 660 - i * 20, 600 - i * 20, 0.045, "sawtooth", 0.08, 0.008); for (let i = 0; i < 3; i++) blip(r, 0.47 + i * 0.045, 520 - i * 15, 470 - i * 15, 0.05, "sawtooth", 0.07, 0.01); },
 };
 
 // ---------------------------------------------------------------------------
@@ -235,12 +243,16 @@ const DEATH_SOUND: Record<string, SfxKey> = {
 };
 
 /** Units whose mid-battle arrival is a summon poof, not a deploy thud. */
-const SUMMONED = new Set(["wolf", "boar", "skeleton", "slime_clone", "turret"]);
+const SUMMONED = SUMMONED_UNIT_IDS;
 
 /** Big monsters announce themselves (Depths bosses emerging). */
 const ROARS_ON_SPAWN = new Set(["bloater"]);
 
 const rateFor = (defId: string): number => RATE[defId] ?? 1;
+
+/** Currently a harmless sheep (mirrors the renderer's polymorph check). */
+const sheeped = (u: Unit): boolean =>
+  u.effects?.some((e) => e.type === "polymorph") ?? false;
 
 // ---------------------------------------------------------------------------
 // Playback with throttling
@@ -277,6 +289,7 @@ interface UnitMemo {
   state: Unit["state"];
   anim: Unit["animState"];
   casting: boolean;
+  sheeped: boolean;
 }
 
 export class SfxObserver {
@@ -323,8 +336,18 @@ export class SfxObserver {
         if (casting && !memo.casting) {
           play(CAST_SOUND[u.defId] ?? "arcaneWarp", r);
         }
+        // Polymorph landing: the effect appearing on the VICTIM voices the
+        // sheep-poof, pitched by the victim's rate (an Ogre baas deeper).
+        if (sheeped(u) && !memo.sheeped) {
+          play("polymorph", r);
+        }
       }
-      this.units.set(u.uid, { state: u.state, anim: u.animState, casting: u.castTicks > 0 });
+      this.units.set(u.uid, {
+        state: u.state,
+        anim: u.animState,
+        casting: u.castTicks > 0,
+        sheeped: sheeped(u),
+      });
     }
 
     // --- projectile launches ----------------------------------------------

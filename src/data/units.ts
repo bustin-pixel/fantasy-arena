@@ -625,19 +625,24 @@ export const UNITS: Record<string, UnitDef> = {
     name: "Bloater",
     rarity: "epic",
     role: "Bloated Horror",
-    hp: 380,
-    damage: 16,
+    hp: 800, // rebalanced up from 380 — the winrate sweep had it folding to 4 units
+    damage: 28,
     attackSpeed: 2.2,
     moveSpeed: 30, // lumbering
     range: MELEE,
     ability: "lifesteal", // passive filler — never casts
     color: "#8a9a3b", // pus green
     accent: "#d4e157",
+    wardedAgainst: ["polymorph"], // bosses don't fit in a sheep
     traits: [
       {
         name: "Putrid Burst",
         description:
           "When it dies it ruptures — dealing 30 damage and poisoning every enemy nearby. Back away when it swells low.",
+      },
+      {
+        name: "Too Big to Baa",
+        description: "Far too massive to polymorph — no sheep holds this much.",
       },
     ],
   },
@@ -661,14 +666,24 @@ export const UNITS: Record<string, UnitDef> = {
 
 export const UNIT_IDS = Object.keys(UNITS);
 
-/** Unit ids that are NOT selectable cards (summoned at runtime only, or
- *  Depths monsters spawned by the WaveController). */
-export const NON_DECK_UNITS = new Set<string>([
+/** Units that only ever enter play as another unit's summon (Druid wolf,
+ *  Necromancer skeletons, slime splits, Engineer turret, Hunter boar).
+ *  This is the POLYMORPH-IMMUNITY set — sheep the master, not the minion.
+ *  Depths monsters are NOT summons: they're real enemies and fair game.
+ *  Adding a summon: put it here AND in NON_DECK_UNITS below. */
+export const SUMMONED_UNIT_IDS = new Set<string>([
   "wolf",
   "skeleton",
   "slime_clone",
   "turret",
   "boar",
+]);
+
+/** Unit ids that are NOT selectable cards (summoned at runtime only, or
+ *  Depths monsters spawned by the WaveController). Deck/hub filtering ONLY —
+ *  for "is this a summon?" semantics use SUMMONED_UNIT_IDS. */
+export const NON_DECK_UNITS = new Set<string>([
+  ...SUMMONED_UNIT_IDS,
   "giant_rat",
   "zombie_shambler",
   "bloater",
