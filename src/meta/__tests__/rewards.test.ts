@@ -48,7 +48,7 @@ describe("rollChest", () => {
   });
 
   it("always contains one gold entry within the tier's range", () => {
-    for (const tier of ["wooden", "silver", "gold"] as const) {
+    for (const tier of Object.keys(CHEST_GOLD_RANGE) as ChestTier[]) {
       const [min, max] = CHEST_GOLD_RANGE[tier];
       for (let seed = 1; seed <= 200; seed++) {
         const gold = rollChest(seed, tier, NO_UNITS).filter(
@@ -204,12 +204,20 @@ describe("economy data sanity (guards designer typos)", () => {
       expect(DUPLICATE_GOLD[rarity]).toBeGreaterThan(0);
       expect(DUPLICATE_GOLD[rarity]).toBeLessThan(UNLOCK_PRICES[rarity]);
     }
-    for (const tier of ["wooden", "silver", "gold"] as const) {
+    const tiers = Object.keys(CHEST_GOLD_RANGE) as ChestTier[];
+    let prevMax = 0;
+    let prevChance = -1;
+    for (const tier of tiers) {
       const [min, max] = CHEST_GOLD_RANGE[tier];
       expect(min).toBeGreaterThan(0);
       expect(max).toBeGreaterThanOrEqual(min);
       expect(CHEST_UNIT_CHANCE[tier]).toBeGreaterThanOrEqual(0);
       expect(CHEST_UNIT_CHANCE[tier]).toBeLessThanOrEqual(1);
+      // Tiers are declared in ascending order — better tier, better loot.
+      expect(min).toBeGreaterThan(prevMax);
+      expect(CHEST_UNIT_CHANCE[tier]).toBeGreaterThan(prevChance);
+      prevMax = max;
+      prevChance = CHEST_UNIT_CHANCE[tier];
     }
   });
 });

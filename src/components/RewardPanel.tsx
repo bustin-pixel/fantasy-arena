@@ -7,9 +7,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { BattleRewards } from "@/meta/rewards";
-import { MILESTONE_UNLOCKS } from "@/meta/economy";
+import { MILESTONE_UNLOCKS, type ChestTier } from "@/meta/economy";
 import { getUnitDef } from "@/data/units";
 import { RARITIES } from "@/data/rarities";
+import { ChestSprite } from "@/components/ChestSprite";
 
 interface Props {
   rewards: BattleRewards;
@@ -18,14 +19,19 @@ interface Props {
   mode: string;
 }
 
-const CHEST_LABEL: Record<string, string> = {
+const CHEST_LABEL: Record<ChestTier, string> = {
   wooden: "Wooden Chest",
   silver: "Silver Chest",
   gold: "Golden Chest",
+  arcane: "Arcane Chest",
+  dragon: "Dragon's Hoard",
 };
 
+/** closed → (tap) → opening (sprite animates) → open (contents revealed). */
+type ChestPhase = "closed" | "opening" | "open";
+
 export function RewardPanel({ rewards, floor, mode }: Props) {
-  const [chestOpen, setChestOpen] = useState(false);
+  const [chestPhase, setChestPhase] = useState<ChestPhase>("closed");
   const shownGold = useCountUp(rewards.gold);
 
   const milestoneId =
@@ -48,14 +54,28 @@ export function RewardPanel({ rewards, floor, mode }: Props) {
         </div>
       )}
 
-      {rewards.chest && !chestOpen && (
-        <button className="reward-chest" onClick={() => setChestOpen(true)}>
-          <span className={`chest-icon ${rewards.chest.tier}`} aria-hidden />
-          Open {CHEST_LABEL[rewards.chest.tier]}
+      {rewards.chest && (
+        <button
+          className={`reward-chest${chestPhase === "closed" ? "" : " opened"}`}
+          onClick={() =>
+            chestPhase === "closed" && setChestPhase("opening")
+          }
+          aria-label={`Open ${CHEST_LABEL[rewards.chest.tier]}`}
+        >
+          <ChestSprite
+            tier={rewards.chest.tier}
+            opening={chestPhase !== "closed"}
+            onOpened={() => setChestPhase("open")}
+          />
+          <span className="reward-chest-label">
+            {chestPhase === "closed"
+              ? `Open ${CHEST_LABEL[rewards.chest.tier]}`
+              : CHEST_LABEL[rewards.chest.tier]}
+          </span>
         </button>
       )}
 
-      {rewards.chest && chestOpen && (
+      {rewards.chest && chestPhase === "open" && (
         <ul className="reward-contents">
           {rewards.chest.contents.map((entry, i) => {
             if (entry.kind === "gold") {

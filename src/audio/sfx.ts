@@ -142,7 +142,7 @@ export type SfxKey =
   | "sword" | "slam" | "dagger" | "bow" | "mysticShot" | "bolt" | "fireWhoosh"
   | "fireBoom" | "frostShatter" | "zap" | "arcaneWarp" | "curse" | "heal"
   | "summon" | "roar" | "shieldGong" | "slimeSquish" | "boneRattle" | "death"
-  | "deploy" | "trapSet" | "trapSnap";
+  | "deploy" | "trapSet" | "trapSnap" | "chestCreak" | "chestOpen";
 
 const SOUNDS: Record<SfxKey, (r: number) => void> = {
   // metallic clang (A)
@@ -189,6 +189,10 @@ const SOUNDS: Record<SfxKey, (r: number) => void> = {
   trapSet(r) { blip(r, 0, 1600, 1100, 0.03, "square", 0.08); ring(r, 0.02, [2200], 0.05, 0.03); },
   // trap sprung (round-1 keeper)
   trapSnap(r) { blip(r, 0, 2400, 900, 0.03, "square", 0.18); ring(r, 0.02, [1900], 0.09, 0.09); burst(r, 0.035, 0.06, 0.14, "highpass", 3000, 5000); },
+  // chest lid: latch click + stick-slip hinge squeaks (reward ceremony)
+  chestCreak(r) { blip(r, 0, 950, 1400, 0.035, "square", 0.11); [0.07, 0.17, 0.28].forEach((at, i) => blip(r, at, 330 - i * 45, 235 - i * 45, 0.1, "sawtooth", 0.06, 0.025)); burst(r, 0.06, 0.28, 0.045, "bandpass", 950, 480); },
+  // chest reveal: lid thump + rising sparkle + coin jingle
+  chestOpen(r) { blip(r, 0, 130, 55, 0.13, "triangle", 0.24); [1319, 1568, 2093, 2637].forEach((f, i) => blip(r, 0.05 + i * 0.05, f, f * 1.03, 0.15, "sine", 0.05, 0.008)); [0.14, 0.22, 0.3, 0.39].forEach((at, i) => ring(r, at, [3140 + i * 230, 4250 + i * 270], 0.09, 0.045)); },
 };
 
 // ---------------------------------------------------------------------------
