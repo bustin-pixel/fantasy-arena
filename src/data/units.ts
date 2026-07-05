@@ -713,7 +713,7 @@ export const UNITS: Record<string, UnitDef> = {
     name: "Slime Blob",
     rarity: "rare",
     role: "Summoned",
-    hp: 40,
+    hp: 20, // fragile — dies in a hit or two, so splitting is a real gamble
     damage: 0,
     attackSpeed: 2,
     moveSpeed: 34, // a slow, gooey crawl back to the corpse — easy to intercept
