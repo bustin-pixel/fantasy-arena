@@ -17,11 +17,16 @@
 import type { UnitKit, KitCtx } from "./UnitKit";
 import type { Unit, Vec2 } from "@/types";
 import { getUnitDef } from "@/data/units";
-import { secToTicks } from "@/utils/constants";
-import { dist } from "@/utils/math";
+import {
+  secToTicks,
+  FIELD_WIDTH,
+  FIELD_HEIGHT,
+  UNIT_RADIUS,
+} from "@/utils/constants";
+import { clamp, dist } from "@/utils/math";
 
 const GUARD_SHIELD = 45; // Gelatinous Guard absorb granted per cast
-const BASE_BLOBS = 4; // blobs flung at rebornStage 0 (decays by stage → 4/3/2/1)
+const BASE_BLOBS = 2; // blobs flung at rebornStage 0 (decays by stage → 2/1)
 const FLING_DIST = 110; // how far outward blobs spawn from the corpse
 const KNIGHT_BURST = 30; // the knight's own death burst
 const KNIGHT_BURST_RADIUS = 90;
@@ -29,16 +34,12 @@ const BLOB_BURST = 18; // a blob's burst when killed en route
 const BLOB_BURST_RADIUS = 84;
 const REFORM_RADIUS = 32; // must ooze to ~a body-width (one unit radius) of the corpse
 const REBORN_HP_FRAC = 0.5; // reincarnate at half HP
-
-// Four fixed outward offsets (N/E/S/W). A shrinking squad takes the first N; fully
-// deterministic, so replays match. Equal distance ⇒ blobs converge on the corpse
-// together and the earliest-uid one wins the tie.
-const FLING_OFFSETS: Vec2[] = [
-  { x: 0, y: -FLING_DIST },
-  { x: FLING_DIST, y: 0 },
-  { x: 0, y: FLING_DIST },
-  { x: -FLING_DIST, y: 0 },
-];
+// Base fling direction — a diagonal, so reflecting an opposite pair off a wall can't
+// collapse the two onto each other. The squad is spread evenly around the circle from
+// here, and any blob that would land off-field is reflected back to the open side (see
+// onDeath), so it always spawns a full FLING_DIST from the grave — never clamped onto
+// it against a wall, which used to reincarnate the knight instantly.
+const BASE_FLING_ANGLE = -Math.PI / 3;
 
 function anchorsEqual(a: Vec2 | null | undefined, b: Vec2): boolean {
   return !!a && a.x === b.x && a.y === b.y;
@@ -90,11 +91,22 @@ export const slimeKnightKit: UnitKit = {
     const corpse: Vec2 = { x: unit.pos.x, y: unit.pos.y };
     const nextStage = unit.rebornStage + 1;
     for (let i = 0; i < count; i++) {
-      const off = FLING_OFFSETS[i % FLING_OFFSETS.length];
+      // Spread the squad evenly around the corpse from the base angle, then reflect
+      // any blob that would land off-field back to the open side — so it always
+      // spawns a full FLING_DIST from the grave (never clamped onto it by a wall).
+      const a = BASE_FLING_ANGLE + (i * 2 * Math.PI) / count;
+      const ox = Math.cos(a) * FLING_DIST;
+      const oy = Math.sin(a) * FLING_DIST;
+      let px = corpse.x + ox;
+      let py = corpse.y + oy;
+      if (px < UNIT_RADIUS || px > FIELD_WIDTH - UNIT_RADIUS) px = corpse.x - ox;
+      if (py < UNIT_RADIUS || py > FIELD_HEIGHT - UNIT_RADIUS) py = corpse.y - oy;
+      px = clamp(px, UNIT_RADIUS, FIELD_WIDTH - UNIT_RADIUS);
+      py = clamp(py, UNIT_RADIUS, FIELD_HEIGHT - UNIT_RADIUS);
       ctx.spawnUnit(
         "slime_squire",
         unit.team,
-        { x: corpse.x + off.x, y: corpse.y + off.y },
+        { x: px, y: py },
         (blob) => {
           blob.homeAnchor = { x: corpse.x, y: corpse.y };
           blob.rebornStage = nextStage;
