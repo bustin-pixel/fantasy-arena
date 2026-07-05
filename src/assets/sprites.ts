@@ -2893,140 +2893,227 @@ function drawSummoner(ctx: Ctx, body: string, dark: string, light: string, accen
   }
 }
 
+// Spirit Wolf — feral pounce: chest low over braced forelegs, hackles raised,
+// bushy tail up, fangs bared. Authored head-right (no facing mirror needed).
+// User-approved from canvas mockups.
 function drawWolf(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {
-  // Authored head-left; the renderer's facing flip assumes sprites face
-  // right — mirror so it runs at (not away from) its target.
-  ctx.save();
-  ctx.scale(-1, 1);
-  // small quadruped, drawn low to the ground
-  const bgd = ctx.createLinearGradient(0, 1, 0, 15);
+  // bushy raised tail
+  ctx.fillStyle = dark;
+  ctx.beginPath();
+  ctx.moveTo(-12, 6);
+  ctx.quadraticCurveTo(-20, 2, -21, -6);
+  ctx.lineTo(-17.5, -5);
+  ctx.quadraticCurveTo(-16, 1, -10, 4);
+  ctx.closePath();
+  ctx.fill();
+  // crouched body, chest dipped toward the target
+  const bgd = ctx.createLinearGradient(0, 1.5, 0, 14.5);
   bgd.addColorStop(0, light);
   bgd.addColorStop(1, dark);
   ctx.fillStyle = bgd;
   ctx.beginPath();
-  ctx.ellipse(0, 8, 14, 7, 0, 0, PI2);
-  ctx.fill(); // body
-  // fur tufts along the back
-  ctx.strokeStyle = dark;
-  ctx.lineWidth = 1.2;
+  ctx.ellipse(0, 8, 14, 6.5, -0.14, 0, PI2);
+  ctx.fill();
+  // hackle spikes along the spine
+  ctx.fillStyle = dark;
   ctx.beginPath();
-  ctx.moveTo(-4, 2);
-  ctx.lineTo(-3, -1);
-  ctx.moveTo(1, 2);
-  ctx.lineTo(2, -1);
-  ctx.moveTo(6, 3);
-  ctx.lineTo(7, 0);
+  ctx.moveTo(-9, 4.5);
+  ctx.lineTo(-7, 0.5);
+  ctx.lineTo(-4.5, 3.2);
+  ctx.lineTo(-2, -0.5);
+  ctx.lineTo(0.5, 2.4);
+  ctx.lineTo(3, -1);
+  ctx.lineTo(5, 2);
+  ctx.closePath();
+  ctx.fill();
+  // legs: rear pair coiled with bent hocks, front pair braced under the chest
+  ctx.strokeStyle = dark;
+  ctx.lineWidth = 2.4;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(-7, 9);
+  ctx.lineTo(-10, 15);
+  ctx.lineTo(-8.5, 19.5);
   ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-3, 11);
+  ctx.lineTo(-5.5, 15.5);
+  ctx.lineTo(-4.5, 19.5);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(6, 11.5);
+  ctx.lineTo(7.5, 19.5);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(9.5, 10.5);
+  ctx.lineTo(11, 19.5);
+  ctx.stroke();
+  ctx.lineCap = "butt";
+  // head with an angular muzzle
   ctx.fillStyle = light;
   ctx.beginPath();
-  ctx.arc(-12, 2, 6, 0, PI2);
-  ctx.fill(); // head
-  // ears
-  ctx.fillStyle = dark;
+  ctx.arc(12, 3, 6, 0, PI2);
+  ctx.fill();
   ctx.beginPath();
-  ctx.moveTo(-15, -3);
-  ctx.lineTo(-13, -8);
-  ctx.lineTo(-11, -3);
-  ctx.closePath();
-  ctx.moveTo(-12, -3);
-  ctx.lineTo(-10, -8);
-  ctx.lineTo(-8, -3);
+  ctx.moveTo(15, 0);
+  ctx.lineTo(22.5, 5.2);
+  ctx.lineTo(15, 8);
   ctx.closePath();
   ctx.fill();
-  // snout
+  ctx.fillStyle = "#26282c";
+  ctx.beginPath();
+  ctx.arc(22, 5.2, 1.3, 0, PI2);
+  ctx.fill(); // nose
+  // perked ears
   ctx.fillStyle = dark;
   ctx.beginPath();
-  ctx.ellipse(-17, 3, 3, 2, 0, 0, PI2);
+  ctx.moveTo(8, -1);
+  ctx.lineTo(9.5, -7.5);
+  ctx.lineTo(12.5, -1.5);
+  ctx.closePath();
   ctx.fill();
-  // glowing eye
+  ctx.beginPath();
+  ctx.moveTo(12.5, -1.5);
+  ctx.lineTo(15, -6.5);
+  ctx.lineTo(17, -0.5);
+  ctx.closePath();
+  ctx.fill();
+  // glowing spirit eye
   ctx.save();
   ctx.fillStyle = accent;
   ctx.shadowColor = accent;
   ctx.shadowBlur = 4 + A.glow * 3;
   ctx.beginPath();
-  ctx.arc(-14, 1, 1.6, 0, PI2);
+  ctx.arc(14.5, 2.5, 1.5, 0, PI2);
   ctx.fill();
   ctx.restore();
-  // legs
-  ctx.strokeStyle = dark;
-  ctx.lineWidth = 2;
+  // bared fangs + snarl line
+  ctx.fillStyle = "#f3f3e0";
   ctx.beginPath();
-  ctx.moveTo(-6, 13);
-  ctx.lineTo(-6, 19);
-  ctx.moveTo(6, 13);
-  ctx.lineTo(6, 19);
-  ctx.stroke();
-  // tail
-  ctx.lineWidth = 2.4;
-  ctx.lineCap = "round";
+  ctx.moveTo(17.5, 6.6);
+  ctx.lineTo(18.7, 6.6);
+  ctx.lineTo(18.1, 8.8);
+  ctx.closePath();
+  ctx.fill();
   ctx.beginPath();
-  ctx.moveTo(13, 6);
-  ctx.lineTo(20, 0);
+  ctx.moveTo(20, 6.4);
+  ctx.lineTo(21, 6.4);
+  ctx.lineTo(20.5, 8.2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "#26282c";
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(15.5, 8.4);
+  ctx.lineTo(20.5, 8);
   ctx.stroke();
-  ctx.lineCap = "butt";
-  ctx.restore();
+  void body;
 }
 
+// Boar — war boar: shoulder hump, mohawk bristle ridge, proper snout with
+// nostrils, four hooved legs, curly tail, angry brow, two spaced tusks.
+// Authored head-right (no facing mirror needed). User-approved from mockups.
 function drawBoar(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {
-  // Authored head-left; mirrored like the wolf so charges lead with the tusks.
-  ctx.save();
-  ctx.scale(-1, 1);
-  // bulky low quadruped with a snout and tusks
-  const bgd = ctx.createLinearGradient(0, -1, 0, 17);
+  // curly tail
+  ctx.strokeStyle = dark;
+  ctx.lineWidth = 1.8;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(-15, 4);
+  ctx.quadraticCurveTo(-19, 2, -18, -1);
+  ctx.quadraticCurveTo(-17, 1, -15.5, 0);
+  ctx.stroke();
+  ctx.lineCap = "butt";
+  // body with a heavy front shoulder hump
+  const bgd = ctx.createLinearGradient(0, -2, 0, 17);
   bgd.addColorStop(0, light);
   bgd.addColorStop(1, dark);
   ctx.fillStyle = bgd;
   ctx.beginPath();
-  ctx.ellipse(0, 8, 16, 9, 0, 0, PI2);
-  ctx.fill(); // body
-  ctx.fillStyle = dark;
-  ctx.beginPath();
-  ctx.ellipse(0, 13, 14, 5, 0, 0, PI2);
-  ctx.fill(); // belly shading
-  // bristly back ridge
-  ctx.strokeStyle = dark;
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.moveTo(-8, 0);
-  ctx.lineTo(-7, -4);
-  ctx.moveTo(-3, -1);
-  ctx.lineTo(-2, -5);
-  ctx.moveTo(2, -1);
-  ctx.lineTo(3, -5);
-  ctx.stroke();
-  // head + snout
+  ctx.ellipse(-1, 7, 15, 9, 0, 0, PI2);
+  ctx.fill();
   ctx.fillStyle = light;
   ctx.beginPath();
-  ctx.arc(-13, 4, 7, 0, PI2);
+  ctx.ellipse(6, 2.5, 8.5, 6, 0.1, 0, PI2);
   ctx.fill();
   ctx.fillStyle = dark;
   ctx.beginPath();
-  ctx.ellipse(-19, 6, 4, 3, 0, 0, PI2);
-  ctx.fill(); // snout
-  // tusks (accent glint)
+  ctx.ellipse(-1, 12.5, 13, 4.5, 0, 0, PI2);
+  ctx.fill(); // belly shading
+  // mohawk bristle ridge (head overlaps its front edge)
+  ctx.fillStyle = dark;
+  ctx.beginPath();
+  ctx.moveTo(10, -3);
+  ctx.lineTo(8, -8);
+  ctx.lineTo(5.5, -3.5);
+  ctx.lineTo(3, -7.5);
+  ctx.lineTo(0.5, -3);
+  ctx.lineTo(-2, -6.5);
+  ctx.lineTo(-4.5, -2);
+  ctx.lineTo(-7, -5);
+  ctx.lineTo(-9, -0.5);
+  ctx.lineTo(-11, 1.5);
+  ctx.closePath();
+  ctx.fill();
+  // four legs with hoof caps
+  ctx.strokeStyle = dark;
+  ctx.lineWidth = 2.8;
+  for (const x of [-10, -5, 5, 10]) {
+    ctx.beginPath();
+    ctx.moveTo(x, 14);
+    ctx.lineTo(x, 20);
+    ctx.stroke();
+  }
+  ctx.fillStyle = "#2b1c10";
+  for (const x of [-10, -5, 5, 10]) ctx.fillRect(x - 1.6, 19, 3.2, 2);
+  // head + snout with nostrils
+  ctx.fillStyle = light;
+  ctx.beginPath();
+  ctx.arc(13, 5, 7.5, 0, PI2);
+  ctx.fill();
+  ctx.fillStyle = withShade(body, 10);
+  ctx.beginPath();
+  ctx.ellipse(20, 7.5, 4, 3, 0.2, 0, PI2);
+  ctx.fill();
+  ctx.fillStyle = "#2b1c10";
+  ctx.beginPath();
+  ctx.arc(21, 7, 0.7, 0, PI2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(21.5, 8.4, 0.7, 0, PI2);
+  ctx.fill();
+  // ear
+  ctx.fillStyle = dark;
+  ctx.beginPath();
+  ctx.moveTo(9, -1.5);
+  ctx.lineTo(10.5, -6.5);
+  ctx.lineTo(13.5, -2);
+  ctx.closePath();
+  ctx.fill();
+  // angry brow + eye
+  ctx.strokeStyle = dark;
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.moveTo(12, 0.5);
+  ctx.lineTo(16.5, 2);
+  ctx.stroke();
+  ctx.fillStyle = "#1a1a1a";
+  ctx.fillRect(13.5, 2.2, 2, 2);
+  // two tusks, spaced so they read separately: a big fore tusk and a
+  // smaller rear one
   ctx.strokeStyle = accent;
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 2.4;
   ctx.lineCap = "round";
   ctx.beginPath();
-  ctx.moveTo(-19, 8);
-  ctx.lineTo(-22, 4);
-  ctx.moveTo(-17, 9);
-  ctx.lineTo(-19, 5);
+  ctx.moveTo(18.5, 9.5);
+  ctx.quadraticCurveTo(23, 7.5, 22, 3);
+  ctx.stroke();
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(15, 10.8);
+  ctx.quadraticCurveTo(17.5, 10, 17.5, 7.2);
   ctx.stroke();
   ctx.lineCap = "butt";
-  // eye
-  ctx.fillStyle = "#1a1a1a";
-  ctx.fillRect(-13, 1, 2, 2);
-  // legs
-  ctx.strokeStyle = dark;
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(-7, 15);
-  ctx.lineTo(-7, 21);
-  ctx.moveTo(7, 15);
-  ctx.lineTo(7, 21);
-  ctx.stroke();
-  ctx.restore();
   void A;
 }
 
