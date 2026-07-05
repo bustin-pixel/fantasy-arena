@@ -19,7 +19,12 @@ import {
 } from "@/meta/economy";
 import { DECKABLE_UNIT_IDS, getUnitDef } from "@/data/units";
 import { RARITY_ORDER } from "@/data/rarities";
-import { DEPTHS_TIERS } from "@/data/depths";
+import {
+  DEPTHS_TIERS,
+  QUEST_LOCKED_UNITS,
+  RARE_SPAWN_QUESTS,
+  rareSpawnQuestForFloor,
+} from "@/data/depths";
 
 const NO_UNITS: string[] = [];
 const ALL_UNITS = [...DECKABLE_UNIT_IDS];
@@ -99,6 +104,81 @@ describe("rollChest", () => {
         }
       }
     }
+  });
+
+  it("never drops quest-locked units (they're earned by their quest, not chests)", () => {
+    for (const tier of Object.keys(CHEST_UNIT_CHANCE) as ChestTier[]) {
+      for (let seed = 1; seed <= 500; seed++) {
+        for (const entry of rollChest(seed, tier, NO_UNITS)) {
+          if (entry.kind === "unit" || entry.kind === "duplicate") {
+            expect(QUEST_LOCKED_UNITS.has(entry.unitId)).toBe(false);
+          }
+        }
+      }
+    }
+  });
+});
+
+describe("computeBattleRewards — rare-spawn quest unlock", () => {
+  const quest = rareSpawnQuestForFloor(5)!; // slime → slime_knight, requires knight
+  const base = { unlockedUnits: NO_UNITS, highestClearedFloor: 0, chestSeed: 42 };
+
+  it("slaying the rare spawn while fielding the required unit unlocks its purchase", () => {
+    const r = computeBattleRewards({
+      ...base, mode: "depths", floor: quest.floor, outcome: "victory",
+      highestClearedFloor: quest.floor, // replay branch — isolates the field
+      deck: [quest.requires], slain: [quest.spawnId],
+    });
+    expect(r.questUnlock).toBe(quest.unlocks);
+  });
+
+  it("counts even on a loss — clear it during the floor", () => {
+    const r = computeBattleRewards({
+      ...base, mode: "depths", floor: quest.floor, outcome: "defeat",
+      deck: [quest.requires], slain: [quest.spawnId],
+    });
+    expect(r.questUnlock).toBe(quest.unlocks);
+  });
+
+  it("no unlock without the required unit, without the kill, or on the wrong floor", () => {
+    const noKnight = computeBattleRewards({
+      ...base, mode: "depths", floor: quest.floor, outcome: "victory",
+      deck: NO_UNITS, slain: [quest.spawnId],
+    });
+    const noKill = computeBattleRewards({
+      ...base, mode: "depths", floor: quest.floor, outcome: "victory",
+      deck: [quest.requires], slain: NO_UNITS,
+    });
+    const wrongFloor = computeBattleRewards({
+      ...base, mode: "depths", floor: quest.floor + 1, outcome: "victory",
+      deck: [quest.requires], slain: [quest.spawnId],
+    });
+    expect(noKnight.questUnlock).toBeUndefined();
+    expect(noKill.questUnlock).toBeUndefined();
+    expect(wrongFloor.questUnlock).toBeUndefined();
+  });
+
+  it("doesn't re-announce once already unlocked or owned", () => {
+    const already = computeBattleRewards({
+      ...base, mode: "depths", floor: quest.floor, outcome: "victory",
+      deck: [quest.requires], slain: [quest.spawnId],
+      questUnlocks: [quest.unlocks],
+    });
+    const owned = computeBattleRewards({
+      ...base, mode: "depths", floor: quest.floor, outcome: "victory",
+      deck: [quest.requires], slain: [quest.spawnId],
+      unlockedUnits: [quest.unlocks],
+    });
+    expect(already.questUnlock).toBeUndefined();
+    expect(owned.questUnlock).toBeUndefined();
+  });
+
+  it("arena never triggers a quest unlock (Depths only)", () => {
+    const r = computeBattleRewards({
+      ...base, mode: "solo", floor: quest.floor, outcome: "victory",
+      deck: [quest.requires], slain: [quest.spawnId],
+    });
+    expect(r.questUnlock).toBeUndefined();
   });
 });
 
@@ -195,6 +275,26 @@ describe("economy data sanity (guards designer typos)", () => {
       expect(Number(floorStr)).toBeLessThanOrEqual(maxFloorWithData);
       expect(DECKABLE_UNIT_IDS).toContain(unitId);
       expect(STARTER_UNIT_IDS).not.toContain(unitId);
+    }
+  });
+
+  it("rare-spawn quests reward a deckable non-starter unit on a floor with tier data", () => {
+    const maxFloorWithData = DEPTHS_TIERS[DEPTHS_TIERS.length - 1].floors[1];
+    for (const quest of RARE_SPAWN_QUESTS) {
+      expect(quest.floor).toBeGreaterThanOrEqual(1);
+      expect(quest.floor).toBeLessThanOrEqual(maxFloorWithData);
+      expect(quest.chance).toBeGreaterThan(0);
+      expect(quest.chance).toBeLessThanOrEqual(1);
+      expect(quest.price).toBeGreaterThan(0);
+      expect(quest.hint.trim().length).toBeGreaterThan(0);
+      // The rare enemy and the required unit must be real unit defs.
+      expect(getUnitDef(quest.spawnId).id).toBe(quest.spawnId);
+      expect(DECKABLE_UNIT_IDS).toContain(quest.requires);
+      // The reward must be a deckable non-starter (you earn it, not start with it).
+      expect(DECKABLE_UNIT_IDS).toContain(quest.unlocks);
+      expect(STARTER_UNIT_IDS).not.toContain(quest.unlocks);
+      // And it must be quest-locked (excluded from chests / grandfathering).
+      expect(QUEST_LOCKED_UNITS.has(quest.unlocks)).toBe(true);
     }
   });
 

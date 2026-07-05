@@ -89,8 +89,11 @@ handshake with file anchors + commit sequencing in
    `color`/`accent`, but the sprite glow-up added hardcoded literals — knight
    `KnightLivery` heraldry, per-mage element tints, bone/flame/steel material
    colours — that a skin for those units must also recolour); titles/flair
-   ("Lichslayer", pairs with boss first-kills); legendary unlock alt-path;
-   premium chest + reroll token.
+   ("Lichslayer", pairs with boss first-kills); more legendary unlock alt-paths
+   (the **rare-spawn quest** pattern now exists — `RARE_SPAWN_QUESTS` in
+   `data/depths.ts`, first used for the **Slime Knight**: beat the rare Floor-5
+   Slime with a Knight fielded → its purchase unlocks at a discount; add a row
+   to unlock more units this way); premium chest + reroll token.
 6. **Later:** Endless mode, per-monster kill crests, trophies/ranks → Arena
    enemy-deck budget scaling via the existing `budget` param, PvP rewards
    (server-side — PvP pays nothing today by design).

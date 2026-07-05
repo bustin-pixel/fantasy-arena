@@ -22,6 +22,9 @@ interface Props {
   onInfo: () => void;
   /** Add or remove this unit from the deck. */
   onToggle: () => void;
+  /** Overrides the locked-button label (e.g. a quest-gated unit shows a plain
+   *  lock, or its discounted price once earned). Defaults to the rarity price. */
+  lockLabel?: string;
 }
 
 const ADD_LABEL: Record<CardAddState, string> = {
@@ -33,7 +36,14 @@ const ADD_LABEL: Record<CardAddState, string> = {
 };
 
 /** A small canvas-rendered card with rarity border, matching battlefield art. */
-export function CardPortrait({ defId, size = 96, addState, onInfo, onToggle }: Props) {
+export function CardPortrait({
+  defId,
+  size = 96,
+  addState,
+  onInfo,
+  onToggle,
+  lockLabel,
+}: Props) {
   const ref = useRef<HTMLCanvasElement>(null);
   const def = getUnitDef(defId);
   const rarity = RARITIES[def.rarity];
@@ -41,7 +51,7 @@ export function CardPortrait({ defId, size = 96, addState, onInfo, onToggle }: P
   const unowned = addState === "locked";
   const disabled = addState === "deck-full" || addState === "legendary-max";
   const label = unowned
-    ? `🔒 ${UNLOCK_PRICES[def.rarity]}g`
+    ? lockLabel ?? `🔒 ${UNLOCK_PRICES[def.rarity]}g`
     : ADD_LABEL[addState];
 
   useEffect(() => {

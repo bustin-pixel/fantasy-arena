@@ -10,8 +10,14 @@ import {
   type PlayerSave,
 } from "@/state/persistence";
 import { DECKABLE_UNIT_IDS } from "@/data/units";
+import { QUEST_LOCKED_UNITS } from "@/data/depths";
 import { DEFAULT_AVATAR_ID } from "@/meta/avatars";
 import { STARTER_UNIT_IDS } from "@/meta/economy";
+
+/** Deckables minus quest-locked units — the grandfather grant withholds those. */
+const GRANDFATHERED_UNITS = DECKABLE_UNIT_IDS.filter(
+  (id) => !QUEST_LOCKED_UNITS.has(id)
+);
 
 /** A realistic pre-economy (v2) save, as written by the Compendium slice. */
 function v2Save(): Partial<PlayerSave> {
@@ -28,24 +34,37 @@ function v2Save(): Partial<PlayerSave> {
 describe("migrateSave", () => {
   it("null (new player) → defaults: starter units, 0 gold, floor 0", () => {
     const save = migrateSave(null);
-    expect(save.version).toBe(4);
+    expect(save.version).toBe(5);
     expect(save.username).toBe("Champion");
     expect(save.avatarId).toBe(DEFAULT_AVATAR_ID);
     expect(save.gold).toBe(0);
     expect(save.depths.highestClearedFloor).toBe(0);
+    expect(save.questUnlocks).toEqual([]);
     expect([...save.unlockedUnits].sort()).toEqual(
       [...STARTER_UNIT_IDS].sort()
     );
     expect(save.deck).toEqual(DEFAULT_SAVE.deck);
   });
 
-  it("grandfathers a v2 save: ALL current deckable units unlocked", () => {
+  it("grandfathers a v2 save: all deckable units EXCEPT quest-locked ones", () => {
     const save = migrateSave(v2Save());
-    expect([...save.unlockedUnits].sort()).toEqual(
-      [...DECKABLE_UNIT_IDS].sort()
-    );
+    expect([...save.unlockedUnits].sort()).toEqual([...GRANDFATHERED_UNITS].sort());
+    // Quest-locked units must still be earned via their quest, even here.
+    for (const id of QUEST_LOCKED_UNITS) {
+      expect(save.unlockedUnits).not.toContain(id);
+    }
+    expect(save.questUnlocks).toEqual([]);
     expect(save.gold).toBe(0);
     expect(save.depths.highestClearedFloor).toBe(0);
+  });
+
+  it("keeps valid questUnlocks and drops junk / non-quest ids", () => {
+    const questUnit = [...QUEST_LOCKED_UNITS][0];
+    const save = migrateSave({
+      version: 5,
+      questUnlocks: [questUnit, "ogre", "not_a_unit"],
+    });
+    expect(save.questUnlocks).toEqual([questUnit]);
   });
 
   it("keeps a grandfathered deck untouched (sanitize is a no-op)", () => {

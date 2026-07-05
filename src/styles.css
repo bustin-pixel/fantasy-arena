@@ -1142,6 +1142,16 @@ body.modal-open .pager-nav {
   cursor: not-allowed;
   opacity: 0.75;
 }
+/* Quest-gated unit: "how to earn it" note shown in place of the Unlock button. */
+.detail-lockhint {
+  flex: 1;
+  align-self: center;
+  font-size: 0.82rem;
+  font-style: italic;
+  line-height: 1.35;
+  color: #d9c9a3;
+  text-align: right;
+}
 
 /* ---- Battle -------------------------------------------------------------- */
 .battle {
@@ -1687,6 +1697,11 @@ body.modal-open .pager-nav {
 .reward-milestone {
   font-size: 0.9rem;
   color: #7dd3a0;
+}
+/* Rare-spawn quest discovery — gilded rather than the recruit-green. */
+.reward-quest {
+  color: var(--gold);
+  font-weight: 600;
 }
 .reward-chest {
   font: inherit;

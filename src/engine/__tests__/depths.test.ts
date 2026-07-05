@@ -7,7 +7,12 @@ import { MatchController } from "@/engine/MatchController";
 import { WaveController } from "@/engine/WaveController";
 import { stepSimulation, type SimState } from "@/engine/CombatSystem";
 import { createSimState } from "@/engine/CombatSystem";
-import { tierForFloor, isBossFloor, floorStatMultipliers } from "@/data/depths";
+import {
+  tierForFloor,
+  isBossFloor,
+  floorStatMultipliers,
+  rareSpawnQuestForFloor,
+} from "@/data/depths";
 import { getUnitDef } from "@/data/units";
 import { DEPTHS_ENEMY_ACTIVE, DEPTHS_MATCH_TIME_SEC, secToTicks } from "@/utils/constants";
 import { battleState, digest, place, makeDummy } from "./helpers";
@@ -59,10 +64,15 @@ describe("WaveController — wave composition", () => {
     expect(drainQueue(42, 3)).toEqual(drainQueue(42, 3));
   });
 
-  it("only spawns monsters from the floor's tier (plus its boss)", () => {
+  it("only spawns monsters from the floor's tier (plus its boss + rare spawn)", () => {
     for (const floor of [1, 2, 5]) {
       const tier = tierForFloor(floor);
-      const legal = new Set([...Object.keys(tier.monsters), tier.boss]);
+      const rare = rareSpawnQuestForFloor(floor)?.spawnId;
+      const legal = new Set([
+        ...Object.keys(tier.monsters),
+        tier.boss,
+        ...(rare ? [rare] : []),
+      ]);
       for (const id of drainQueue(7, floor)) {
         expect(legal.has(id)).toBe(true);
       }
@@ -74,6 +84,21 @@ describe("WaveController — wave composition", () => {
     expect(isBossFloor(5)).toBe(true);
     expect(floor5[floor5.length - 1]).toBe("bloater");
     expect(drainQueue(9, 1)).not.toContain("bloater");
+  });
+
+  it("floor 5 can roll the rare Slime, before the boss (boss stays last)", () => {
+    const quest = rareSpawnQuestForFloor(5)!;
+    expect(quest.spawnId).toBe("slime");
+    // Scan seeds for a run where the rare spawn rolled in (~15% each).
+    let withSlime: string[] | null = null;
+    for (let seed = 1; seed <= 500 && !withSlime; seed++) {
+      const q = drainQueue(seed, 5);
+      if (q.includes("slime")) withSlime = q;
+    }
+    expect(withSlime).not.toBeNull();
+    // The Bloater is still the finale, and the Slime emerges just before it.
+    expect(withSlime![withSlime!.length - 1]).toBe("bloater");
+    expect(withSlime!.indexOf("slime")).toBe(withSlime!.length - 2);
   });
 
   it("floor 1 spawns at bestiary stats; deeper floors spawn pre-scaled", () => {

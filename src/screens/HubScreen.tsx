@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { DECKABLE_UNIT_IDS, getUnitDef } from "@/data/units";
+import { questForUnlock } from "@/data/depths";
 import { rarityRank, RARITY_ORDER, RARITIES } from "@/data/rarities";
 import type { Rarity } from "@/types";
 import { CardPortrait, type CardAddState } from "@/components/CardPortrait";
@@ -65,6 +66,15 @@ export function HubScreen() {
       (id) => getUnitDef(id).rarity === rarityFilter
     ).sort(ownedFirst);
   }, [rarityFilter, unlockedUnits]);
+
+  // Detail-panel unlock state for a quest-gated unit (e.g. the Slime Knight):
+  // before the quest is done it shows a "how to earn it" hint instead of a Buy
+  // button; after, it buys at the quest's discounted price.
+  const detailQuest = detailId ? questForUnlock(detailId) : undefined;
+  const detailQuestDone =
+    detailQuest != null && !!detailId && save.questUnlocks.includes(detailId);
+  const detailLockHint =
+    detailQuest && !detailQuestDone ? detailQuest.hint : undefined;
 
   return (
     <div className="screen hub">
@@ -152,6 +162,15 @@ export function HubScreen() {
             else if (deck.length >= MAX_DECK) addState = "deck-full";
             else if (isLegendary && hasLegendary) addState = "legendary-max";
             else addState = "add";
+            // Quest-gated units don't show the standard rarity price: a plain
+            // lock until the quest is done, then the discounted price.
+            let lockLabel: string | undefined;
+            if (addState === "locked") {
+              const q = questForUnlock(id);
+              if (q) {
+                lockLabel = save.questUnlocks.includes(id) ? `🔒 ${q.price}g` : "🔒";
+              }
+            }
             return (
               <CardPortrait
                 key={id}
@@ -159,6 +178,7 @@ export function HubScreen() {
                 addState={addState}
                 onToggle={() => toggle(id)}
                 onInfo={() => setDetailId(id)}
+                lockLabel={lockLabel}
               />
             );
           })}
@@ -180,6 +200,8 @@ export function HubScreen() {
           locked={isLocked(detailId)}
           gold={save.gold}
           onBuy={() => purchaseUnit(detailId)}
+          unlockPrice={detailQuest?.price}
+          lockHint={detailLockHint}
         />
       )}
     </div>

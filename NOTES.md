@@ -283,6 +283,18 @@ sound:
   everyone — only the one-time v2→v3 migration grandfathers everything.
 - **Grant-then-reveal**: rewards are committed before the results overlay
   animates; the chest tap is ceremony, so leaving early can't lose loot.
+- **Quest-locked units** (`QUEST_LOCKED_UNITS`, derived from `RARE_SPAWN_QUESTS`
+  in `data/depths.ts` — a data file so the engine can read it too) are a THIRD
+  ownership state between locked and owned: `save.questUnlocks` (v5) means "the
+  quest is done → the unit is now BUYABLE" (at the quest's discounted `price`),
+  distinct from `unlockedUnits` ("owned"). They're withheld from chest drops
+  (`CHEST_POOL` filter in rewards.ts), from the grandfather grant, and from
+  `purchaseUnit` until earned. The earn signal rides the existing reward fold:
+  `computeBattleRewards` sets `questUnlock` when the fielded `deck` + battle
+  `slain` satisfy a floor's quest (Slime Knight = beat the rare Floor-5 Slime
+  with a Knight). Three UI surfaces read the state: the card badge + the detail
+  footer (`HubScreen` → `CardPortrait.lockLabel` / `UnitDetail.lockHint`+
+  `unlockPrice`) and the results callout (`RewardPanel`).
 
 ---
 

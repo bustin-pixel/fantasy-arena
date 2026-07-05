@@ -20,6 +20,7 @@ import {
   WAVE_SPAWN_INTERVAL_SEC,
   floorStatMultipliers,
   isBossFloor,
+  rareSpawnQuestForFloor,
   tierForFloor,
   waveBudget,
 } from "@/data/depths";
@@ -61,6 +62,11 @@ export class WaveController {
       queue.push(pick);
       budget -= tier.monsters[pick];
     }
+    // Rare-spawn quest: a rare legendary may crash this floor. Rolled AFTER the
+    // fodder loop (so the horde composition stays byte-identical) and inserted
+    // BEFORE the boss (so the boss remains the wave's finale). See data/depths.
+    const quest = rareSpawnQuestForFloor(this.floor);
+    if (quest && this.rng.next() < quest.chance) queue.push(quest.spawnId);
     if (boss) queue.push(tier.boss);
     return queue;
   }
