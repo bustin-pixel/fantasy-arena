@@ -1696,15 +1696,15 @@ function drawSlimeKnight(ctx: Ctx, A: SpriteAnim): void {
   // ground ooze puddle (a localized floor glow at its feet)
   ctx.save();
   ctx.shadowColor = OOZE;
-  ctx.shadowBlur = 4 + pulse * 4;
-  ctx.fillStyle = "rgba(31,122,68,0.9)";
+  ctx.shadowBlur = 6 + pulse * 7;
+  ctx.fillStyle = "rgba(31,122,68,0.95)";
   ctx.beginPath();
-  ctx.ellipse(0, 21, 11, 3, 0, 0, PI2);
+  ctx.ellipse(0, 21, 11.5, 3.2, 0, 0, PI2);
   ctx.fill();
   ctx.shadowBlur = 0;
-  ctx.fillStyle = `rgba(74,222,128,${0.45 + pulse * 0.3})`;
+  ctx.fillStyle = `rgba(90,240,150,${0.55 + pulse * 0.35})`;
   ctx.beginPath();
-  ctx.ellipse(0, 20.4, 7, 1.7, 0, 0, PI2);
+  ctx.ellipse(0, 20.4, 7, 1.8, 0, 0, PI2);
   ctx.fill();
   ctx.restore();
 
@@ -1727,6 +1727,22 @@ function drawSlimeKnight(ctx: Ctx, A: SpriteAnim): void {
   ctx.beginPath();
   ctx.roundRect(-11, -4, 22, 24, 6);
   ctx.fill();
+
+  // seams coursing with green light — drawn on the chest BEFORE the shield/sword
+  // and pauldrons, so those plates occlude the ends (no glow bleeding over the
+  // shield). Kept inside the torso width so they read as chest plating.
+  ctx.save();
+  ctx.shadowColor = OOZE;
+  ctx.shadowBlur = 3 + pulse * 5;
+  ctx.strokeStyle = `rgba(140,255,185,${0.62 + pulse * 0.38})`;
+  ctx.lineWidth = 1.3;
+  ctx.beginPath();
+  ctx.moveTo(-9, 5);
+  ctx.lineTo(9, 5);
+  ctx.moveTo(-9, 11);
+  ctx.lineTo(9, 11);
+  ctx.stroke();
+  ctx.restore();
 
   // pauldrons (both shoulders)
   for (const x of [-11, 11]) {
@@ -1837,32 +1853,18 @@ function drawSlimeKnight(ctx: Ctx, A: SpriteAnim): void {
   ctx.restore();
 
   // --- the ooze, made alive -------------------------------------------------
-  // seams coursing with green light
-  ctx.save();
-  ctx.shadowColor = OOZE;
-  ctx.shadowBlur = 2 + pulse * 3;
-  ctx.strokeStyle = `rgba(122,255,176,${0.45 + pulse * 0.5})`;
-  ctx.lineWidth = 0.9;
-  ctx.beginPath();
-  ctx.moveTo(-10, 5);
-  ctx.lineTo(10, 5);
-  ctx.moveTo(-10, 11);
-  ctx.lineTo(10, 11);
-  ctx.stroke();
-  ctx.restore();
-
   // bubbles rising inside the plate (clipped to the torso)
   if (A.live) {
     ctx.save();
     ctx.beginPath();
     ctx.roundRect(-11, -4, 22, 24, 6);
     ctx.clip();
-    ctx.fillStyle = "#bbf7d0";
-    for (let i = 0; i < 4; i++) {
+    ctx.fillStyle = "#cffde0";
+    for (let i = 0; i < 5; i++) {
       const p = (t * (0.45 + (i % 3) * 0.12) + i * 1.7) % 1;
-      ctx.globalAlpha = (1 - p) * 0.4;
+      ctx.globalAlpha = (1 - p) * 0.6;
       ctx.beginPath();
-      ctx.arc((i - 1.5) * 4, 16 - p * 22, 1.2 * (1 - p) + 0.4, 0, PI2);
+      ctx.arc((i - 2) * 3.6, 16 - p * 22, 1.5 * (1 - p) + 0.5, 0, PI2);
       ctx.fill();
     }
     ctx.restore();
@@ -1872,46 +1874,54 @@ function drawSlimeKnight(ctx: Ctx, A: SpriteAnim): void {
   // ooze glowing behind the visor slits (breathing eyes)
   ctx.save();
   ctx.shadowColor = OOZEB;
-  ctx.shadowBlur = 3 + pulse * 5;
-  ctx.fillStyle = `rgba(150,255,190,${0.7 + pulse * 0.3})`;
-  ctx.fillRect(-4.4, -13.4, 3.4, 1.8);
-  ctx.fillRect(1, -13.4, 3.4, 1.8);
+  ctx.shadowBlur = 5 + pulse * 8;
+  ctx.fillStyle = `rgba(180,255,208,${0.85 + pulse * 0.15})`;
+  ctx.fillRect(-4.6, -13.5, 3.6, 2);
+  ctx.fillRect(1, -13.5, 3.6, 2);
   ctx.shadowBlur = 0;
-  ctx.globalAlpha = 0.12 + pulse * 0.22;
+  ctx.globalAlpha = 0.2 + pulse * 0.32;
   ctx.fillStyle = OOZE;
   ctx.beginPath();
-  ctx.ellipse(0, -12.5, 6, 3.4, 0, 0, PI2);
+  ctx.ellipse(0, -12.5, 7, 4, 0, 0, PI2);
   ctx.fill();
   ctx.restore();
   ctx.globalAlpha = 1;
 
   // a bead of slime swelling and dripping from the chin
   const dp = (t * 0.45) % 1;
-  ctx.fillStyle = OOZE;
+  ctx.save();
+  ctx.shadowColor = OOZEB;
+  ctx.shadowBlur = 2 + pulse * 2;
+  ctx.fillStyle = "#5bf08e";
   if (dp < 0.72) {
-    const half = (1.5 + dp * 6.5) / 2;
+    const half = (2 + dp * 7) / 2;
     ctx.beginPath();
-    ctx.ellipse(0, -6 + half, 1.3, half + 1, 0, 0, PI2);
+    ctx.ellipse(0, -6 + half, 1.6, half + 1.2, 0, 0, PI2);
     ctx.fill();
   } else if (A.live) {
     const fp = (dp - 0.72) / 0.28;
     ctx.beginPath();
-    ctx.arc(0, fp * 24, 1.4 * (1 - fp * 0.4), 0, PI2);
+    ctx.arc(0, fp * 24, 1.7 * (1 - fp * 0.4), 0, PI2);
     ctx.fill();
   }
+  ctx.restore();
 
   // faint slime motes drifting up around it (legendary presence)
   if (A.live) {
-    ctx.fillStyle = OOZEB;
-    for (let i = 0; i < 8; i++) {
+    ctx.save();
+    ctx.shadowColor = OOZEB;
+    ctx.shadowBlur = 3;
+    ctx.fillStyle = "#a9ffcb";
+    for (let i = 0; i < 9; i++) {
       const seed = i * 2.1;
       const p = (t * (0.28 + (i % 4) * 0.03) + seed * 0.31) % 1;
-      const mx = ((i % 5) - 2) * 6 + Math.sin((p + seed) * PI2) * 1.6;
-      ctx.globalAlpha = Math.sin(p * Math.PI) * 0.5;
+      const mx = ((i % 5) - 2) * 6 + Math.sin((p + seed) * PI2) * 1.7;
+      ctx.globalAlpha = Math.sin(p * Math.PI) * 0.72;
       ctx.beginPath();
-      ctx.arc(mx, 19 - p * 46, 0.6 + (i % 3) * 0.28, 0, PI2);
+      ctx.arc(mx, 19 - p * 46, 0.85 + (i % 3) * 0.4, 0, PI2);
       ctx.fill();
     }
+    ctx.restore();
     ctx.globalAlpha = 1;
   }
 }
