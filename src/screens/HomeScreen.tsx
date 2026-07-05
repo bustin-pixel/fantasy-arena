@@ -1,10 +1,12 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useGameState } from "@/state/GameStateContext";
 import { ArenaIcon, SwarmIcon } from "@/components/ModeIcons";
 import {
   FloorPickerSheet,
   MAX_FLOOR_WITH_DATA,
 } from "@/components/FloorPickerSheet";
+import { ProfilePlate } from "@/components/ProfilePlate";
+import { ProfileSheet } from "@/components/ProfileSheet";
 import type { BattleMode } from "@/hooks/useBattleEngine";
 
 interface Props {
@@ -20,15 +22,11 @@ export function HomeScreen({ onBattle }: Props) {
   const { save } = useGameState();
   const ready = save.deck.length >= 2;
   const [pickingFloor, setPickingFloor] = useState(false);
+  const [editingProfile, setEditingProfile] = useState(false);
   const nextFloor = Math.min(
     save.depths.highestClearedFloor + 1,
     MAX_FLOOR_WITH_DATA
   );
-
-  const winRate = useMemo(() => {
-    const total = save.wins + save.losses;
-    return total === 0 ? 0 : Math.round((save.wins / total) * 100);
-  }, [save.wins, save.losses]);
 
   return (
     <div className="screen home">
@@ -37,20 +35,14 @@ export function HomeScreen({ onBattle }: Props) {
         <p className="subtitle">Deploy &amp; Conquer.</p>
       </header>
 
-      <div className="stat-block home-stats">
-        <div className="stat">
-          <span className="stat-val">{save.wins}</span>
-          <span className="stat-lbl">Wins</span>
-        </div>
-        <div className="stat">
-          <span className="stat-val">{save.losses}</span>
-          <span className="stat-lbl">Losses</span>
-        </div>
-        <div className="stat">
-          <span className="stat-val">{winRate}%</span>
-          <span className="stat-lbl">Win Rate</span>
-        </div>
-      </div>
+      {/* The old stat block, promoted into the player's identity card. */}
+      <ProfilePlate
+        name={save.username}
+        avatarId={save.avatarId}
+        wins={save.wins}
+        losses={save.losses}
+        onEdit={() => setEditingProfile(true)}
+      />
 
       <div className="mode-cards">
         <button
@@ -82,6 +74,10 @@ export function HomeScreen({ onBattle }: Props) {
 
       {!ready && (
         <p className="home-hint">← Swipe to Collection to build your warband</p>
+      )}
+
+      {editingProfile && (
+        <ProfileSheet onClose={() => setEditingProfile(false)} />
       )}
 
       {pickingFloor && (

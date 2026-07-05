@@ -2,11 +2,15 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_SAVE,
+  MAX_USERNAME_LENGTH,
   migrateSave,
+  sanitizeAvatarId,
   sanitizeDeck,
+  sanitizeUsername,
   type PlayerSave,
 } from "@/state/persistence";
 import { DECKABLE_UNIT_IDS } from "@/data/units";
+import { DEFAULT_AVATAR_ID } from "@/meta/avatars";
 import { STARTER_UNIT_IDS } from "@/meta/economy";
 
 /** A realistic pre-economy (v2) save, as written by the Compendium slice. */
@@ -24,7 +28,9 @@ function v2Save(): Partial<PlayerSave> {
 describe("migrateSave", () => {
   it("null (new player) → defaults: starter units, 0 gold, floor 0", () => {
     const save = migrateSave(null);
-    expect(save.version).toBe(3);
+    expect(save.version).toBe(4);
+    expect(save.username).toBe("Champion");
+    expect(save.avatarId).toBe(DEFAULT_AVATAR_ID);
     expect(save.gold).toBe(0);
     expect(save.depths.highestClearedFloor).toBe(0);
     expect([...save.unlockedUnits].sort()).toEqual(
@@ -101,6 +107,36 @@ describe("migrateSave", () => {
     expect(save.deck.length).toBeGreaterThan(0);
   });
 
+  it("fills avatarId for a pre-v4 save and keeps a valid owned one", () => {
+    // v3 save predates avatars → default face.
+    const migrated = migrateSave({ version: 3, unlockedUnits: ["ogre"] });
+    expect(migrated.avatarId).toBe(DEFAULT_AVATAR_ID);
+    // v4 save wearing an owned unit keeps it.
+    const kept = migrateSave({
+      version: 4,
+      avatarId: "ogre",
+      unlockedUnits: ["ogre"],
+    });
+    expect(kept.avatarId).toBe("ogre");
+  });
+
+  it("resets an unknown or locked avatarId to the default (avatar ⊆ unlocked)", () => {
+    const unknown = migrateSave({ version: 4, avatarId: "not_a_unit" });
+    expect(unknown.avatarId).toBe(DEFAULT_AVATAR_ID);
+    // summoner exists but isn't in unlockedUnits → not wearable.
+    const locked = migrateSave({
+      version: 4,
+      avatarId: "summoner",
+      unlockedUnits: ["ogre"],
+    });
+    expect(locked.avatarId).toBe(DEFAULT_AVATAR_ID);
+  });
+
+  it("sanitizes a corrupt username back to the default", () => {
+    const save = migrateSave({ version: 4, username: "   \n\t  " });
+    expect(save.username).toBe(DEFAULT_SAVE.username);
+  });
+
   it("does not leak DEFAULT_SAVE references (mutation-safe)", () => {
     const a = migrateSave(null);
     a.unlockedUnits.push("summoner");
@@ -130,5 +166,53 @@ describe("sanitizeDeck", () => {
   it("returns [] for an empty deck — Clear must actually clear", () => {
     expect(sanitizeDeck([], ["ogre", "archer"])).toEqual([]);
     expect(sanitizeDeck(["summoner"], ["ogre"])).toEqual([]);
+  });
+});
+
+describe("sanitizeUsername", () => {
+  it("trims and collapses internal whitespace runs", () => {
+    expect(sanitizeUsername("  Sky   Setter  ", "x")).toBe("Sky Setter");
+  });
+
+  it("turns newlines into word breaks and strips other control chars", () => {
+    expect(sanitizeUsername("Cham\npion", "x")).toBe("Cham pion");
+    // Bell (Cc) + zero-width space (Cf) strip outright.
+    expect(sanitizeUsername("Bad\u0007Name\u200B", "x")).toBe("BadName");
+  });
+
+  it("caps at MAX_USERNAME_LENGTH by code point (no split surrogates)", () => {
+    const long = "a".repeat(MAX_USERNAME_LENGTH + 5);
+    expect(sanitizeUsername(long, "x")).toHaveLength(MAX_USERNAME_LENGTH);
+    // 10 one-unit swords + 10 two-unit dragons: the cap lands among the
+    // dragons — the 16th code point must be a whole dragon, not half of one.
+    const capped = sanitizeUsername("⚔".repeat(10) + "🐉".repeat(10), "x");
+    expect([...capped]).toHaveLength(MAX_USERNAME_LENGTH);
+    expect(capped.slice(-2)).toBe("🐉");
+  });
+
+  it("empty (or whitespace-only) input reverts to the fallback", () => {
+    expect(sanitizeUsername("", "Previous")).toBe("Previous");
+    expect(sanitizeUsername("   ", "Previous")).toBe("Previous");
+  });
+
+  it("allows unicode names", () => {
+    expect(sanitizeUsername("爆発の騎士", "x")).toBe("爆発の騎士");
+  });
+});
+
+describe("sanitizeAvatarId", () => {
+  it("keeps an owned unit avatar", () => {
+    expect(sanitizeAvatarId("ogre", ["ogre"])).toBe("ogre");
+  });
+
+  it("falls back for unknown ids, locked units, and non-strings", () => {
+    expect(sanitizeAvatarId("not_a_unit", DECKABLE_UNIT_IDS)).toBe(
+      DEFAULT_AVATAR_ID
+    );
+    expect(sanitizeAvatarId("summoner", ["ogre"])).toBe(DEFAULT_AVATAR_ID);
+    expect(sanitizeAvatarId(42, DECKABLE_UNIT_IDS)).toBe(DEFAULT_AVATAR_ID);
+    expect(sanitizeAvatarId(undefined, DECKABLE_UNIT_IDS)).toBe(
+      DEFAULT_AVATAR_ID
+    );
   });
 });

@@ -17,9 +17,11 @@ import {
   DEFAULT_SAVE,
   loadSave,
   sanitizeDeck,
+  sanitizeUsername,
   writeSave,
   type PlayerSave,
 } from "./persistence";
+import { isAvatarUnlocked } from "@/meta/avatars";
 import { MILESTONE_UNLOCKS, UNLOCK_PRICES } from "@/meta/economy";
 import type { BattleRewards } from "@/meta/rewards";
 import type { BattleMode } from "@/hooks/useBattleEngine";
@@ -29,6 +31,8 @@ interface GameStateValue {
   save: PlayerSave;
   setDeck: (deck: string[]) => void;
   setUsername: (name: string) => void;
+  /** Change the profile icon. No-op unless the avatar is unlocked. */
+  setAvatar: (avatarId: string) => void;
   recordResult: (won: boolean) => void;
   /** Fold a battle's enemy roster into the Compendium: everything fielded
    *  against you counts as encountered; everything that died counts as
@@ -59,8 +63,15 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
   // boundary, not just in the UI.
   const setDeck = (deck: string[]) =>
     setSave((s) => ({ ...s, deck: sanitizeDeck(deck, s.unlockedUnits) }));
+  // Commit point for name edits: the sheet passes raw input; sanitize lives
+  // here (and in migrateSave) so no unclean name can reach the save file.
+  // Empty/whitespace input keeps the current name.
   const setUsername = (username: string) =>
-    setSave((s) => ({ ...s, username }));
+    setSave((s) => ({ ...s, username: sanitizeUsername(username, s.username) }));
+  const setAvatar = (avatarId: string) =>
+    setSave((s) =>
+      isAvatarUnlocked(avatarId, s.unlockedUnits) ? { ...s, avatarId } : s
+    );
   const recordResult = (won: boolean) =>
     setSave((s) => ({
       ...s,
@@ -128,6 +139,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
         save,
         setDeck,
         setUsername,
+        setAvatar,
         recordResult,
         recordBestiary,
         grantBattleRewards,
