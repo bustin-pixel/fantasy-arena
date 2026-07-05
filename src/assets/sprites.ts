@@ -1070,8 +1070,117 @@ function drawOrc(ctx: Ctx, body: string, dark: string, light: string, accent: st
     }
     ctx.restore();
   }
-  // big two-handed axe in the right hand
-  drawBigAxe(ctx, 13, -2, 1);
+  // double-bit war axe held two-handed at a diagonal ready
+  drawOrcWarAxe(ctx, body, light, accent);
+}
+
+/** The orc's double-bit battle axe: crude jagged iron bits flanking a socket
+ *  with a forward pike, a leather-wrapped haft with a bone butt-spike, and
+ *  both fists on the grip. Drawn at a diagonal two-handed carry. */
+function drawOrcWarAxe(ctx: Ctx, body: string, light: string, accent: string) {
+  ctx.save();
+  ctx.translate(0, 3.5);
+  ctx.rotate(-0.35);
+  // rough dark haft
+  ctx.strokeStyle = "#463020";
+  ctx.lineWidth = 3.4;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(-17, 0);
+  ctx.lineTo(16, 0);
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(255,255,255,0.15)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-16, -1);
+  ctx.lineTo(11, -1);
+  ctx.stroke();
+  ctx.lineCap = "butt";
+  // leather grip wraps
+  ctx.fillStyle = "#2c1f13";
+  ctx.fillRect(-10, -2.1, 4.4, 4.2);
+  ctx.fillRect(2.6, -2.1, 4.4, 4.2);
+  // bone butt-spike
+  ctx.fillStyle = "#e8e6d4";
+  ctx.beginPath();
+  ctx.moveTo(-17, -1.7);
+  ctx.lineTo(-21.5, 0);
+  ctx.lineTo(-17, 1.7);
+  ctx.closePath();
+  ctx.fill();
+  // two mirrored bits flaring off the head
+  for (const s of [-1, 1] as const) {
+    ctx.save();
+    ctx.scale(1, s);
+    const g = ctx.createLinearGradient(11, -12, 21, -2);
+    g.addColorStop(0, "#7d828c");
+    g.addColorStop(1, "#464a52");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(14.2, -2);
+    ctx.bezierCurveTo(12.5, -4.5, 11.5, -6.5, 11, -9); // concave throat toward the haft
+    ctx.lineTo(13.5, -8); // jagged, chipped cutting edge
+    ctx.lineTo(15.5, -11);
+    ctx.lineTo(18, -8.6);
+    ctx.lineTo(20.5, -10.5);
+    ctx.bezierCurveTo(21.5, -6.5, 21, -4, 19.5, -2);
+    ctx.closePath();
+    ctx.fill();
+    // chipped-edge highlight
+    ctx.strokeStyle = "rgba(255,255,255,0.6)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(11, -9);
+    ctx.lineTo(13.5, -8);
+    ctx.lineTo(15.5, -11);
+    ctx.lineTo(18, -8.6);
+    ctx.lineTo(20.5, -10.5);
+    ctx.stroke();
+    ctx.restore();
+  }
+  // iron socket band over the haft between the bits
+  ctx.fillStyle = "#33363c";
+  ctx.fillRect(13.6, -2.6, 6.6, 5.2);
+  ctx.fillStyle = "#2e3036";
+  ctx.beginPath();
+  ctx.arc(16.9, 0, 1, 0, PI2);
+  ctx.fill();
+  // forward pike between the bits
+  ctx.fillStyle = "#7d828c";
+  ctx.beginPath();
+  ctx.moveTo(20.2, -1.6);
+  ctx.lineTo(26, 0);
+  ctx.lineTo(20.2, 1.6);
+  ctx.closePath();
+  ctx.fill();
+  // war-paint slashes on the upper bit cheek
+  ctx.strokeStyle = accent;
+  ctx.globalAlpha = 0.55;
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.moveTo(14, -7.5);
+  ctx.lineTo(17.5, -3.5);
+  ctx.moveTo(16.5, -8);
+  ctx.lineTo(19, -5);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  // both fists gripping the wraps
+  for (const hx of [-7.8, 4.8]) {
+    ctx.fillStyle = light;
+    ctx.beginPath();
+    ctx.arc(hx, 0, 2.7, 0, PI2);
+    ctx.fill();
+    ctx.strokeStyle = withShade(body, -25);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(hx, 0, 2.7, 0, PI2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(hx - 2, -0.8);
+    ctx.lineTo(hx + 2, -0.8);
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 function drawArcher(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {
