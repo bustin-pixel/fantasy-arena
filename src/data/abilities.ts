@@ -150,6 +150,20 @@ export const ABILITIES: Record<AbilityId, AbilityDef> = {
       "Passive: spawns a weaker clone each time it loses 25% HP. Every slime bursts for AoE on death.",
     cooldown: 0,
   },
+  gelatinous_guard: {
+    id: "gelatinous_guard",
+    name: "Gelatinous Guard",
+    description:
+      "Sheathes itself in a rubbery ooze that absorbs the next 45 damage. Refreshes off cooldown while it fights.",
+    cooldown: 8,
+  },
+  divide_reconvene: {
+    id: "divide_reconvene",
+    name: "Divide & Reconvene",
+    description:
+      "On death it bursts and flings out 3 slime blobs that ignore the fight and ooze back to its corpse. Cut them all down before one arrives (they burst when killed) or the knight is reborn at half HP — and each rebirth flings one fewer blob (3 → 2 → 1), so a fully-intercepted knight stays dead.",
+    cooldown: 0,
+  },
   // The Mystic Archer's headline passive is now `momentum`; `mystic_shift` is kept
   // only as the projectile tag that drives the Light/Dark on-hit resolution (its
   // name/description are no longer surfaced in the UI). The Light Form / Dark Form

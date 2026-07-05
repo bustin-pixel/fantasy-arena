@@ -85,3 +85,62 @@ export function waveBudget(floor: number): number {
 export function isBossFloor(floor: number): boolean {
   return floor % BOSS_FLOOR_INTERVAL === 0;
 }
+
+// ---------------------------------------------------------------------------
+// Rare-spawn "fusion" quests — a rare legendary enemy appears on a specific
+// floor; defeating it while fielding the `requires` unit unlocks the PURCHASE
+// of the reward unit (at the discounted `price`). This is the ONLY way to make
+// the reward buyable — it never drops from chests and can't be bought before
+// the quest is done (enforced in meta/rewards + state). The spawn is pure
+// (seed, floor): the WaveController rolls `chance` per run, so a fresh match
+// seed each attempt makes it a genuine rare appearance regardless of deck.
+// ---------------------------------------------------------------------------
+
+export interface RareSpawnQuest {
+  /** Depths floor the rare enemy appears on. */
+  floor: number;
+  /** Enemy id appended to that floor's wave (rarely). */
+  spawnId: string;
+  /** Spawn probability, rolled once per run of `floor`. */
+  chance: number;
+  /** Player unit that must be in the fielded warband to earn the unlock. */
+  requires: string;
+  /** Unit id whose PURCHASE this quest unlocks. */
+  unlocks: string;
+  /** Discounted gold price once unlocked (overrides UNLOCK_PRICES). */
+  price: number;
+  /** Deliberately-vague rumor shown on the locked Collection card — a thread to
+   *  pull, NOT a checklist. Never spell out the exact floor / kill / requirement;
+   *  discovery is the point. (The 🔒 is added by the UI.) */
+  hint: string;
+}
+
+/** Knight + Slime = Slime Knight: beat the rare Slime on Floor 5 with a Knight
+ *  fielded to unlock buying the Slime Knight at a discount. */
+export const RARE_SPAWN_QUESTS: RareSpawnQuest[] = [
+  {
+    floor: 5,
+    spawnId: "slime",
+    chance: 0.15,
+    requires: "knight",
+    unlocks: "slime_knight",
+    price: 2500,
+    hint: "They say a knight who fells a rare ooze in The Depths may take on its unliving form.",
+  },
+];
+
+/** The rare-spawn quest that appears on `floor`, if any. */
+export function rareSpawnQuestForFloor(floor: number): RareSpawnQuest | undefined {
+  return RARE_SPAWN_QUESTS.find((q) => q.floor === floor);
+}
+
+/** Units whose purchase is gated behind a rare-spawn quest (never chest-dropped,
+ *  never granted by the grandfather clause, not buyable until the quest is done). */
+export const QUEST_LOCKED_UNITS = new Set<string>(
+  RARE_SPAWN_QUESTS.map((q) => q.unlocks)
+);
+
+/** The rare-spawn quest that unlocks `unitId`'s purchase, if any. */
+export function questForUnlock(unitId: string): RareSpawnQuest | undefined {
+  return RARE_SPAWN_QUESTS.find((q) => q.unlocks === unitId);
+}

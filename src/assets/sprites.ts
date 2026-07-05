@@ -240,7 +240,9 @@ export function drawUnitSprite(
       drawOrc(ctx, body, dark, light, accent, A);
       break;
     case "archer":
-      drawArcher(ctx, body, dark, light, accent, A);
+      // Shares the Ranger's deep-cowl sprite as a recolor (tan leather vs.
+      // forest green), with a single nocked arrow instead of the volley fan.
+      drawRanger(ctx, body, dark, light, accent, A, 1);
       break;
     case "ranger":
       drawRanger(ctx, body, dark, light, accent, A);
@@ -313,6 +315,9 @@ export function drawUnitSprite(
     case "bloater":
       drawSlime(ctx, body, dark, light, accent, A, 1.2); // swollen pus-green blob
       break;
+    case "bloatling":
+      drawSlime(ctx, body, dark, light, accent, A, 0.85); // sloughed-off gobbet
+      break;
     case "berserker":
       drawBerserker(ctx, body, dark, light, accent, A);
       break;
@@ -327,6 +332,14 @@ export function drawUnitSprite(
       break;
     case "slime_clone":
       drawSlime(ctx, body, dark, light, accent, A, 0.7);
+      break;
+    case "slime_knight":
+      // Green plate animated by the ooze sealed inside it (its own draw fn).
+      drawSlimeKnight(ctx, A);
+      break;
+    case "slime_squire":
+      // A little glob flung from the dying Slime Knight, racing home.
+      drawSlime(ctx, body, dark, light, accent, A, 0.6);
       break;
     case "mystic_archer":
       drawMysticArcher(ctx, body, dark, light, accent, A, unit.mysticForm);
@@ -1405,95 +1418,26 @@ function drawOrcWarAxe(ctx: Ctx, body: string, light: string, accent: string) {
   ctx.restore();
 }
 
-function drawArcher(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {
-  // quiver slung behind
-  ctx.fillStyle = withShade(body, -30);
-  ctx.beginPath();
-  ctx.roundRect(-9, -8, 5, 16, 2);
-  ctx.fill();
-  ctx.strokeStyle = accent;
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(-8, -9);
-  ctx.lineTo(-6, -14);
-  ctx.moveTo(-6, -9);
-  ctx.lineTo(-4, -14);
-  ctx.stroke();
-  metalBody(ctx, 16, 22, -2, body, dark, light, 5);
-  // face
-  ctx.fillStyle = light;
-  ctx.beginPath();
-  ctx.arc(0, -12, 6, 0, PI2);
-  ctx.fill();
-  // hood dome
-  ctx.fillStyle = dark;
-  ctx.beginPath();
-  ctx.arc(0, -13, 8, Math.PI, 0);
-  ctx.fill();
-  // face recess shadow
-  ctx.fillStyle = "#0e0e10";
-  ctx.beginPath();
-  ctx.ellipse(0, -11, 3.6, 3, 0, 0, PI2);
-  ctx.fill();
-  // glowing eyes
-  ctx.save();
-  ctx.fillStyle = accent;
-  ctx.shadowColor = accent;
-  ctx.shadowBlur = 3 + A.glow * 3;
-  ctx.fillRect(-2.6, -11.5, 1.6, 1.4);
-  ctx.fillRect(1, -11.5, 1.6, 1.4);
-  ctx.restore();
-  // bow with a gradient limb
-  const bg = ctx.createLinearGradient(6, -16, 6, 12);
-  bg.addColorStop(0, withShade(accent, 30));
-  bg.addColorStop(1, accent);
-  ctx.strokeStyle = bg;
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  ctx.arc(10, -2, 14, -Math.PI / 2.4, Math.PI / 2.4);
-  ctx.stroke();
-  // string
-  ctx.strokeStyle = "#e5e5e5";
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(15, -12);
-  ctx.lineTo(15, 8);
-  ctx.stroke();
-  // nocked arrow
-  ctx.strokeStyle = "#d8c9a8";
-  ctx.lineWidth = 1.4;
-  ctx.beginPath();
-  ctx.moveTo(3, -2);
-  ctx.lineTo(15, -2);
-  ctx.stroke();
-  ctx.fillStyle = accent;
-  ctx.beginPath();
-  ctx.moveTo(15, -2);
-  ctx.lineTo(12, -3.6);
-  ctx.lineTo(12, -0.4);
-  ctx.closePath();
-  ctx.fill();
-}
-
-// Ranger — no longer shares the Archer's sprite. A caped volley-ranger in a
-// feathered cap whose multishot is the signature: three arrows fanned from the
-// nock with glinting tips.
-function drawRanger(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {
-  // swaying cape behind
+// Ranger — the deep-cowl hooded archer sprite (2026-07-05 mockup pick B):
+// shadowed face with glowing eyes, shoulder mantle over a long swaying cape,
+// recurve wooden bow with leather wraps. The Archer draws the SAME sprite as a
+// recolor with `arrows: 1`; the Ranger's volley fan (3) stays its signature.
+function drawRanger(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim, arrows: 1 | 3 = 3) {
+  // long swaying travel cape behind (deep-cowl look, 2026-07-05 mockup pick B)
   const sway = Math.sin(A.t * 1.6) * 1.5;
   ctx.fillStyle = withShade(body, -25);
   ctx.beginPath();
   ctx.moveTo(-2, -10);
-  ctx.quadraticCurveTo(-12, -3, -10 + sway, 17);
-  ctx.lineTo(-4 + sway * 0.5, 15);
-  ctx.quadraticCurveTo(-7, 0, -1, -8);
+  ctx.quadraticCurveTo(-13, -3, -11 + sway, 21);
+  ctx.lineTo(-4 + sway * 0.5, 19);
+  ctx.quadraticCurveTo(-8, 1, -1, -8);
   ctx.closePath();
   ctx.fill();
   ctx.strokeStyle = "rgba(255,255,255,0.14)";
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(-9.6 + sway, 16);
-  ctx.lineTo(-4.4 + sway * 0.5, 14.4);
+  ctx.moveTo(-10.5 + sway, 20);
+  ctx.lineTo(-4.5 + sway * 0.5, 18.4);
   ctx.stroke();
   // hip quiver, angled, stuffed with arrows
   ctx.save();
@@ -1515,75 +1459,143 @@ function drawRanger(ctx: Ctx, body: string, dark: string, light: string, accent:
   ctx.stroke();
   ctx.restore();
   metalBody(ctx, 15, 20, -2, body, dark, light, 4.5);
-  // scarf with a trailing end
-  ctx.strokeStyle = accent;
-  ctx.lineWidth = 3;
+  // leather belt with a gold buckle
+  ctx.strokeStyle = "#795548";
+  ctx.lineWidth = 1.6;
   ctx.beginPath();
-  ctx.moveTo(-6, -6);
-  ctx.quadraticCurveTo(0, -4, 6, -6);
+  ctx.moveTo(-7, 4);
+  ctx.lineTo(7, 6.5);
   ctx.stroke();
-  ctx.strokeStyle = accent;
-  ctx.lineWidth = 2.4;
-  ctx.beginPath();
-  ctx.moveTo(5, -5.5);
-  ctx.quadraticCurveTo(7.5, -2, 7, 1);
-  ctx.stroke();
-  // face with an accent glint in the eyes
-  ctx.fillStyle = light;
-  ctx.beginPath();
-  ctx.arc(0, -12, 5.5, 0, PI2);
-  ctx.fill();
-  ctx.fillStyle = "#1a1a1a";
-  ctx.fillRect(-2.6, -12.5, 1.7, 1.5);
-  ctx.fillRect(1, -12.5, 1.7, 1.5);
-  ctx.save();
   ctx.fillStyle = accent;
-  ctx.globalAlpha = 0.7;
-  ctx.fillRect(-2.2, -12.2, 0.8, 0.8);
-  ctx.fillRect(1.4, -12.2, 0.8, 0.8);
-  ctx.restore();
-  // cap (reads different from the Archer/Hunter hoods)
-  ctx.fillStyle = withShade(body, -40);
+  ctx.fillRect(-0.8, 4.4, 2, 2);
+  // shoulder mantle layered over the cape
+  ctx.fillStyle = withShade(body, -32);
   ctx.beginPath();
-  ctx.moveTo(-6, -14);
-  ctx.quadraticCurveTo(0, -19.5, 6, -14);
-  ctx.lineTo(5, -12.2);
-  ctx.quadraticCurveTo(0, -16, -5, -12.2);
+  ctx.moveTo(-8.4, -6.4);
+  ctx.quadraticCurveTo(0, -2.4, 8.4, -6.4);
+  ctx.lineTo(7, -1.6);
+  ctx.quadraticCurveTo(0, 1.6, -7, -1.6);
   ctx.closePath();
   ctx.fill();
+  ctx.save();
+  ctx.strokeStyle = light;
+  ctx.globalAlpha = 0.45;
+  ctx.lineWidth = 0.7;
+  ctx.beginPath();
+  ctx.moveTo(-7, -1.6);
+  ctx.quadraticCurveTo(0, 1.6, 7, -1.6);
+  ctx.stroke();
+  ctx.restore();
+  // shadowed face with glowing eyes (same trick as the Rogue's hood-eyes)
+  ctx.fillStyle = "#141410";
+  ctx.beginPath();
+  ctx.arc(0, -12, 5.6, 0, PI2);
+  ctx.fill();
+  ctx.save();
+  ctx.fillStyle = accent;
+  ctx.shadowColor = accent;
+  ctx.shadowBlur = 4 + A.glow * 5;
+  ctx.fillRect(-2.8, -12.6, 1.9, 1.6);
+  ctx.fillRect(1, -12.6, 1.9, 1.6);
+  ctx.restore();
+  // deep cowl: outer shell + inner lip shading the face
+  const hd = withShade(body, -40);
+  ctx.fillStyle = hd;
+  ctx.beginPath();
+  ctx.moveTo(-6.6, -9.6);
+  ctx.quadraticCurveTo(-7.4, -19, 0, -19.8);
+  ctx.quadraticCurveTo(7.4, -19, 6.6, -9.6);
+  ctx.quadraticCurveTo(7.4, -7, 5.4, -7.6);
+  ctx.quadraticCurveTo(6, -14.8, 0, -16.4);
+  ctx.quadraticCurveTo(-6, -14.8, -5.4, -7.6);
+  ctx.quadraticCurveTo(-7.4, -7, -6.6, -9.6);
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(-5.4, -8);
+  ctx.quadraticCurveTo(-6, -15.2, 0, -16.6);
+  ctx.quadraticCurveTo(6, -15.2, 5.4, -8);
+  ctx.quadraticCurveTo(4, -15, 0, -15.4);
+  ctx.quadraticCurveTo(-4, -15, -5.4, -8);
+  ctx.closePath();
+  ctx.fill();
+  // cowl drape over the shoulders
+  ctx.beginPath();
+  ctx.moveTo(-7, -7.6);
+  ctx.quadraticCurveTo(0, -4.4, 7, -7.6);
+  ctx.quadraticCurveTo(7.6, -4.6, 6.2, -3.2);
+  ctx.quadraticCurveTo(0, -0.8, -6.2, -3.2);
+  ctx.quadraticCurveTo(-7.6, -4.6, -7, -7.6);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = withShade(body, 25);
+  ctx.lineWidth = 0.7;
+  ctx.beginPath();
+  ctx.moveTo(-6.4, -4);
+  ctx.quadraticCurveTo(0, -1.8, 6.4, -4);
+  ctx.stroke();
   ctx.strokeStyle = "rgba(255,255,255,0.18)";
   ctx.lineWidth = 0.9;
   ctx.beginPath();
-  ctx.moveTo(-5.4, -13.8);
-  ctx.quadraticCurveTo(0, -18.6, 5.4, -13.8);
+  ctx.moveTo(-5.6, -12);
+  ctx.quadraticCurveTo(0, -18.8, 5.6, -12);
   ctx.stroke();
-  // short flat bow with a gradient limb
-  const bg = ctx.createLinearGradient(6, -14, 6, 10);
-  bg.addColorStop(0, withShade(accent, 30));
-  bg.addColorStop(1, accent);
-  ctx.strokeStyle = bg;
-  ctx.lineWidth = 2.4;
+  // recurve wooden bow: dark outline, wood core, leather wraps at the limb
+  // joints and grip
+  ctx.strokeStyle = "#6b4420";
+  ctx.lineWidth = 3.1;
   ctx.beginPath();
-  ctx.arc(9, -2, 12, -Math.PI / 2.6, Math.PI / 2.6);
+  ctx.moveTo(13.4, -12.6);
+  ctx.quadraticCurveTo(15.5, -10.5, 19.5, -6.5);
+  ctx.quadraticCurveTo(22.5, -2, 19.5, 2.5);
+  ctx.quadraticCurveTo(15.5, 6.5, 13.4, 8.6);
+  ctx.stroke();
+  ctx.strokeStyle = "#8b5a2b";
+  ctx.lineWidth = 1.9;
+  ctx.beginPath();
+  ctx.moveTo(13.4, -12.6);
+  ctx.quadraticCurveTo(15.5, -10.5, 19.5, -6.5);
+  ctx.quadraticCurveTo(22.5, -2, 19.5, 2.5);
+  ctx.quadraticCurveTo(15.5, 6.5, 13.4, 8.6);
+  ctx.stroke();
+  ctx.strokeStyle = "#4e342e";
+  ctx.lineWidth = 3.4;
+  for (const [x1, y1, x2, y2] of [
+    [19.2, -6.9, 20.4, -5.3],
+    [20.4, 1.3, 19.2, 2.9],
+    [20.9, -2.8, 20.9, -1.2],
+  ]) {
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+  }
+  ctx.strokeStyle = "#795548";
+  ctx.lineWidth = 0.7;
+  ctx.beginPath();
+  ctx.moveTo(20.9, -2.6);
+  ctx.lineTo(20.9, -1.4);
   ctx.stroke();
   // string drawn to the nock
   ctx.strokeStyle = "#e5e5e5";
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(12.9, -11.2);
+  ctx.moveTo(13.4, -12.6);
   ctx.lineTo(4, -2);
-  ctx.lineTo(12.9, 7.2);
+  ctx.lineTo(13.4, 8.6);
   ctx.stroke();
-  // multishot: three arrows fanned from the nock
+  // arrows from the nock: the Ranger's volley fan, or a lone nocked arrow
   ctx.strokeStyle = "#d8c9a8";
   ctx.lineWidth = 1.2;
   ctx.beginPath();
   ctx.moveTo(4, -2);
   ctx.lineTo(16, -2);
-  ctx.moveTo(4, -2);
-  ctx.lineTo(15, -8);
-  ctx.moveTo(4, -2);
-  ctx.lineTo(15, 4);
+  if (arrows === 3) {
+    ctx.moveTo(4, -2);
+    ctx.lineTo(15, -8);
+    ctx.moveTo(4, -2);
+    ctx.lineTo(15, 4);
+  }
   ctx.stroke();
   ctx.fillStyle = accent;
   ctx.beginPath();
@@ -1592,18 +1604,20 @@ function drawRanger(ctx: Ctx, body: string, dark: string, light: string, accent:
   ctx.lineTo(14.4, -0.5);
   ctx.closePath();
   ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(16.4, -8.8);
-  ctx.lineTo(13.2, -9.2);
-  ctx.lineTo(14.6, -6.4);
-  ctx.closePath();
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(16.4, 4.8);
-  ctx.lineTo(14.6, 2.4);
-  ctx.lineTo(13.2, 5.2);
-  ctx.closePath();
-  ctx.fill();
+  if (arrows === 3) {
+    ctx.beginPath();
+    ctx.moveTo(16.4, -8.8);
+    ctx.lineTo(13.2, -9.2);
+    ctx.lineTo(14.6, -6.4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(16.4, 4.8);
+    ctx.lineTo(14.6, 2.4);
+    ctx.lineTo(13.2, 5.2);
+    ctx.closePath();
+    ctx.fill();
+  }
   // tip glints + drifting feather motes (motion only)
   if (A.live) {
     ctx.save();
@@ -1611,7 +1625,9 @@ function drawRanger(ctx: Ctx, body: string, dark: string, light: string, accent:
     ctx.shadowColor = accent;
     ctx.shadowBlur = 3 + A.glow * 4;
     ctx.globalAlpha = 0.4 + A.glow * 0.5;
-    for (const [px, py] of [[17, -2], [15.8, -8.4], [15.8, 4.4]]) {
+    const tips =
+      arrows === 3 ? [[17, -2], [15.8, -8.4], [15.8, 4.4]] : [[17, -2]];
+    for (const [px, py] of tips) {
       ctx.beginPath();
       ctx.arc(px, py, 0.9, 0, PI2);
       ctx.fill();
@@ -1665,6 +1681,250 @@ const HOLY_LIVERY: KnightLivery = {
   trim: "#c9a227",
   gem: "#fff4c2",
 };
+// Slime Knight — the "Sealed Sentinel": the Knight's green plate ANIMATED by the
+// ooze sealed inside it. Same silhouette as drawKnight, but the slime is the
+// lifeforce — it pulses behind the visor and chest seams, bubbles rise through the
+// plate, a bead drips from the chin, motes drift up, and it stands in a faint ooze
+// puddle. All glow via shadowBlur (like the Slime's core); all motion from A.t, so
+// particles are deterministic (fixed per-index seeds) and freeze on static portraits.
+function drawSlimeKnight(ctx: Ctx, A: SpriteAnim): void {
+  const t = A.t;
+  const pulse = 0.5 + 0.5 * Math.sin(t * 2.2); // ambient ooze breathing
+  const MBL = "#5fd389", MBB = "#2b9d54", MBD = "#12653a"; // metal light/body/dark
+  const OOZE = "#4ade80", OOZEB = "#7bffb0", TRIM = "#a7f3c0";
+
+  // ground ooze puddle (a localized floor glow at its feet)
+  ctx.save();
+  ctx.shadowColor = OOZE;
+  ctx.shadowBlur = 6 + pulse * 7;
+  ctx.fillStyle = "rgba(31,122,68,0.95)";
+  ctx.beginPath();
+  ctx.ellipse(0, 21, 11.5, 3.2, 0, 0, PI2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = `rgba(90,240,150,${0.55 + pulse * 0.35})`;
+  ctx.beginPath();
+  ctx.ellipse(0, 20.4, 7, 1.8, 0, 0, PI2);
+  ctx.fill();
+  ctx.restore();
+
+  // gelatinous cape peeking behind the shoulders (sways idly)
+  ctx.fillStyle = "#1f7a44";
+  ctx.beginPath();
+  ctx.moveTo(-6, -8);
+  ctx.lineTo(6, -8);
+  ctx.lineTo(10 + Math.sin(t * 2) * 1.2, 20);
+  ctx.lineTo(-10, 20);
+  ctx.closePath();
+  ctx.fill();
+
+  // torso — green-metal volume
+  const lg = ctx.createLinearGradient(0, -4, 0, 20);
+  lg.addColorStop(0, MBL);
+  lg.addColorStop(0.5, MBB);
+  lg.addColorStop(1, MBD);
+  ctx.fillStyle = lg;
+  ctx.beginPath();
+  ctx.roundRect(-11, -4, 22, 24, 6);
+  ctx.fill();
+
+  // seams coursing with green light — drawn on the chest BEFORE the shield/sword
+  // and pauldrons, so those plates occlude the ends (no glow bleeding over the
+  // shield). Kept inside the torso width so they read as chest plating.
+  ctx.save();
+  ctx.shadowColor = OOZE;
+  ctx.shadowBlur = 3 + pulse * 5;
+  ctx.strokeStyle = `rgba(140,255,185,${0.62 + pulse * 0.38})`;
+  ctx.lineWidth = 1.3;
+  ctx.beginPath();
+  ctx.moveTo(-9, 5);
+  ctx.lineTo(9, 5);
+  ctx.moveTo(-9, 11);
+  ctx.lineTo(9, 11);
+  ctx.stroke();
+  ctx.restore();
+
+  // pauldrons (both shoulders)
+  for (const x of [-11, 11]) {
+    ctx.fillStyle = MBD;
+    ctx.beginPath();
+    ctx.ellipse(x, -1, 6.5, 5.5, 0, 0, PI2);
+    ctx.fill();
+    ctx.fillStyle = MBL;
+    ctx.beginPath();
+    ctx.ellipse(x, -2.5, 5.3, 4.4, 0, 0, PI2);
+    ctx.fill();
+    ctx.fillStyle = TRIM;
+    ctx.fillRect(x - 0.8, -6, 1.6, 2);
+  }
+
+  // helm with a T-visor
+  ctx.fillStyle = MBL;
+  ctx.beginPath();
+  ctx.arc(0, -12, 8, 0, PI2);
+  ctx.fill();
+  ctx.fillStyle = MBB;
+  ctx.beginPath();
+  ctx.arc(0, -12, 8, 0.12 * Math.PI, 0.88 * Math.PI);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.45)";
+  ctx.lineWidth = 1.1;
+  ctx.beginPath();
+  ctx.arc(-2, -13, 6, Math.PI * 1.05, Math.PI * 1.5);
+  ctx.stroke();
+  ctx.fillStyle = "#0d1f16";
+  ctx.fillRect(-5, -14, 10, 3);
+  ctx.fillRect(-1.5, -14, 3, 7);
+
+  // crest plume, arcing back (gelatinous)
+  const sway = Math.sin(t * 3) * 1.6;
+  ctx.fillStyle = "#c9f9d8";
+  ctx.beginPath();
+  ctx.moveTo(0, -19);
+  ctx.quadraticCurveTo(-2, -31, -12, -31 + sway);
+  ctx.quadraticCurveTo(-6, -24, -1, -18);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "#5bbf7e";
+  ctx.beginPath();
+  ctx.moveTo(0, -19);
+  ctx.quadraticCurveTo(-3, -27, -9, -28 + sway * 0.7);
+  ctx.quadraticCurveTo(-5, -23, -1, -18);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "#c9f9d8";
+  ctx.beginPath();
+  ctx.arc(0, -19, 2, 0, PI2);
+  ctx.fill();
+
+  // heater shield (left) with a glowing cross
+  ctx.save();
+  ctx.translate(-14, 1);
+  const sf = ctx.createLinearGradient(0, -9, 0, 16);
+  sf.addColorStop(0, "#3ec46f");
+  sf.addColorStop(1, "#1f7a44");
+  ctx.fillStyle = sf;
+  ctx.beginPath();
+  ctx.moveTo(-6, -9);
+  ctx.lineTo(6, -9);
+  ctx.lineTo(6, 4);
+  ctx.quadraticCurveTo(6, 12, 0, 16);
+  ctx.quadraticCurveTo(-6, 12, -6, 4);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = TRIM;
+  ctx.lineWidth = 1.4;
+  ctx.stroke();
+  ctx.save();
+  ctx.shadowColor = TRIM;
+  ctx.shadowBlur = 2 + pulse * 3;
+  ctx.fillStyle = TRIM;
+  ctx.fillRect(-1, -6, 2, 14);
+  ctx.fillRect(-4, -2, 8, 2);
+  ctx.restore();
+  ctx.restore();
+
+  // sword (right hand) with a gem pommel
+  ctx.save();
+  ctx.translate(13, 2);
+  ctx.fillStyle = "#3a2a18";
+  ctx.fillRect(-1.6, 2, 3.2, 9);
+  ctx.fillStyle = "#d9ffe8";
+  ctx.beginPath();
+  ctx.arc(0, 12, 2.4, 0, PI2);
+  ctx.fill();
+  ctx.fillStyle = TRIM;
+  ctx.beginPath();
+  ctx.roundRect(-6, -0.5, 12, 2.5, 1.2);
+  ctx.fill();
+  const bl = ctx.createLinearGradient(-3, 0, 3, 0);
+  bl.addColorStop(0, "#9aa1ab");
+  bl.addColorStop(0.5, "#eef2f6");
+  bl.addColorStop(1, "#b7bdc6");
+  ctx.fillStyle = bl;
+  ctx.beginPath();
+  ctx.moveTo(-2.6, 0);
+  ctx.lineTo(2.6, 0);
+  ctx.lineTo(2.2, -19);
+  ctx.lineTo(0, -22);
+  ctx.lineTo(-2.2, -19);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  // --- the ooze, made alive -------------------------------------------------
+  // bubbles rising inside the plate (clipped to the torso)
+  if (A.live) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(-11, -4, 22, 24, 6);
+    ctx.clip();
+    ctx.fillStyle = "#cffde0";
+    for (let i = 0; i < 5; i++) {
+      const p = (t * (0.45 + (i % 3) * 0.12) + i * 1.7) % 1;
+      ctx.globalAlpha = (1 - p) * 0.6;
+      ctx.beginPath();
+      ctx.arc((i - 2) * 3.6, 16 - p * 22, 1.5 * (1 - p) + 0.5, 0, PI2);
+      ctx.fill();
+    }
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
+
+  // ooze glowing behind the visor slits (breathing eyes)
+  ctx.save();
+  ctx.shadowColor = OOZEB;
+  ctx.shadowBlur = 5 + pulse * 8;
+  ctx.fillStyle = `rgba(180,255,208,${0.85 + pulse * 0.15})`;
+  ctx.fillRect(-4.6, -13.5, 3.6, 2);
+  ctx.fillRect(1, -13.5, 3.6, 2);
+  ctx.shadowBlur = 0;
+  ctx.globalAlpha = 0.2 + pulse * 0.32;
+  ctx.fillStyle = OOZE;
+  ctx.beginPath();
+  ctx.ellipse(0, -12.5, 7, 4, 0, 0, PI2);
+  ctx.fill();
+  ctx.restore();
+  ctx.globalAlpha = 1;
+
+  // a bead of slime swelling and dripping from the chin
+  const dp = (t * 0.45) % 1;
+  ctx.save();
+  ctx.shadowColor = OOZEB;
+  ctx.shadowBlur = 2 + pulse * 2;
+  ctx.fillStyle = "#5bf08e";
+  if (dp < 0.72) {
+    const half = (2 + dp * 7) / 2;
+    ctx.beginPath();
+    ctx.ellipse(0, -6 + half, 1.6, half + 1.2, 0, 0, PI2);
+    ctx.fill();
+  } else if (A.live) {
+    const fp = (dp - 0.72) / 0.28;
+    ctx.beginPath();
+    ctx.arc(0, fp * 24, 1.7 * (1 - fp * 0.4), 0, PI2);
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // faint slime motes drifting up around it (legendary presence)
+  if (A.live) {
+    ctx.save();
+    ctx.shadowColor = OOZEB;
+    ctx.shadowBlur = 3;
+    ctx.fillStyle = "#a9ffcb";
+    for (let i = 0; i < 9; i++) {
+      const seed = i * 2.1;
+      const p = (t * (0.28 + (i % 4) * 0.03) + seed * 0.31) % 1;
+      const mx = ((i % 5) - 2) * 6 + Math.sin((p + seed) * PI2) * 1.7;
+      ctx.globalAlpha = Math.sin(p * Math.PI) * 0.72;
+      ctx.beginPath();
+      ctx.arc(mx, 19 - p * 46, 0.85 + (i % 3) * 0.4, 0, PI2);
+      ctx.fill();
+    }
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
+}
 
 function drawKnight(
   ctx: Ctx,

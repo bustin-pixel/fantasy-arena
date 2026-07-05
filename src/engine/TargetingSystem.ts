@@ -92,6 +92,14 @@ export function updateTarget(
   unitsByUid: Map<string, Unit>,
   enemies: Unit[]
 ): void {
+  // A homing unit (a Slime Knight split blob oozing back to the corpse) ignores
+  // combat entirely — it never picks a fight, it just races home. Clearing the
+  // target here means it also never enters attack range logic downstream.
+  if (unit.homeAnchor) {
+    unit.targetUid = null;
+    return;
+  }
+
   const current = unit.targetUid ? unitsByUid.get(unit.targetUid) : undefined;
   const rangeSq = (unit.range + unit.radius) * (unit.range + unit.radius);
 

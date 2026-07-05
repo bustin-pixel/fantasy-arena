@@ -25,7 +25,7 @@ import { arcaneMageKit } from "./arcaneMage";
 import { archerKit } from "./archer";
 import { assassinKit } from "./assassin";
 import { berserkerKit } from "./berserker";
-import { bloaterKit } from "./bloater";
+import { bloaterKit, bloatlingKit } from "./bloater";
 import { boarKit } from "./boar";
 import { clericKit } from "./cleric";
 import { druidKit } from "./druid";
@@ -44,6 +44,7 @@ import { orcKit } from "./orc";
 import { rangerKit } from "./ranger";
 import { rogueKit } from "./rogue";
 import { slimeKit, slimeCloneKit } from "./slime";
+import { slimeKnightKit, slimeBlobKit } from "./slimeKnight";
 import { tricksterKit } from "./trickster";
 import { warriorKit } from "./warrior";
 import { zombieShamblerKit } from "./zombieShambler";
@@ -154,6 +155,7 @@ export const UNIT_KITS: UnitKitRegistry = {
   assassin: assassinKit,
   berserker: berserkerKit,
   bloater: bloaterKit,
+  bloatling: bloatlingKit,
   boar: boarKit,
   electric_mage: electricMageKit,
   engineer: engineerKit,
@@ -172,6 +174,8 @@ export const UNIT_KITS: UnitKitRegistry = {
   rogue: rogueKit,
   slime: slimeKit,
   slime_clone: slimeCloneKit,
+  slime_knight: slimeKnightKit,
+  slime_squire: slimeBlobKit,
   summoner: druidKit,
   trickster: tricksterKit,
   warrior: warriorKit,

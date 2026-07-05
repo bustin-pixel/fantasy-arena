@@ -63,7 +63,9 @@ export type AbilityId =
   | "polymorph"
   | "mend_beast"
   | "scatter_trap"
-  | "summon_wolves";
+  | "summon_wolves"
+  | "gelatinous_guard"
+  | "divide_reconvene";
 
 export interface Vec2 {
   x: number;
@@ -186,6 +188,14 @@ export interface Unit {
   lastStandUsed: boolean;
   /** Number of split-clones the slime has already spawned (caps splitting). */
   splitsSpawned: number;
+  /** Slime Knight rebirth counter: 0 for a fresh knight, +1 each reincarnation.
+   *  Drives the decaying split (4 - stage blobs spawned on death) and caps it. */
+  rebornStage: number;
+  /** Set on a Slime Knight's split blob: the corpse point it oozes back toward to
+   *  reincarnate the knight. A unit with a homeAnchor ignores combat entirely
+   *  (never acquires a target, never attacks); MovementSystem walks it home and the
+   *  blob's kit resolves arrival. Null/absent for every normal unit. */
+  homeAnchor?: Vec2 | null;
   /** Mystic Archer's stance: "light" (single-target) or "dark" (chain AoE). */
   mysticForm: "light" | "dark";
   /** Mystic Archer Momentum: stacks gained per form shift (capped at 5 =

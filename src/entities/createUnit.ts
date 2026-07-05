@@ -35,6 +35,8 @@ export function createUnit(defId: string, team: Team, pos: Vec2): Unit {
     secondWindUsed: false,
     lastStandUsed: false,
     splitsSpawned: 0,
+    rebornStage: 0,
+    homeAnchor: null,
     mysticForm: "light",
     momentumStacks: 0,
     lightStacks: 0,

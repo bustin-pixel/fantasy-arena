@@ -74,6 +74,10 @@ export function BattleScreen({ deck, onExit, mode = "solo", floor = 1 }: Props) 
         unlockedUnits: save.unlockedUnits,
         highestClearedFloor: save.depths.highestClearedFloor,
         chestSeed: generateSeed(),
+        // Rare-spawn quest check: the fielded warband + which enemies died.
+        deck,
+        slain,
+        questUnlocks: save.questUnlocks,
       });
       grantBattleRewards(bundle, { mode, floor });
       setRewards(bundle);

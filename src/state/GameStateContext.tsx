@@ -23,6 +23,7 @@ import {
 } from "./persistence";
 import { isAvatarUnlocked } from "@/meta/avatars";
 import { MILESTONE_UNLOCKS, UNLOCK_PRICES } from "@/meta/economy";
+import { questForUnlock } from "@/data/depths";
 import type { BattleRewards } from "@/meta/rewards";
 import type { BattleMode } from "@/hooks/useBattleEngine";
 import { UNITS } from "@/data/units";
@@ -117,14 +118,28 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
         const milestone = MILESTONE_UNLOCKS[ctx.floor];
         if (milestone) unlocked.add(milestone);
       }
-      return { ...s, gold, unlockedUnits: [...unlocked], depths };
+      // Rare-spawn quest completion → the reward unit becomes purchasable.
+      const questUnlocks = new Set(s.questUnlocks);
+      if (rewards.questUnlock) questUnlocks.add(rewards.questUnlock);
+      return {
+        ...s,
+        gold,
+        unlockedUnits: [...unlocked],
+        depths,
+        questUnlocks: [...questUnlocks],
+      };
     });
 
   const purchaseUnit = (unitId: string) =>
     setSave((s) => {
       const def = UNITS[unitId];
       if (!def || s.unlockedUnits.includes(unitId)) return s;
-      const price = UNLOCK_PRICES[def.rarity];
+      // Quest-locked units can't be bought until their rare-spawn quest is done,
+      // and then only at the quest's discounted price. Everything else uses the
+      // standard rarity price.
+      const quest = questForUnlock(unitId);
+      if (quest && !s.questUnlocks.includes(unitId)) return s;
+      const price = quest ? quest.price : UNLOCK_PRICES[def.rarity];
       if (s.gold < price) return s;
       return {
         ...s,

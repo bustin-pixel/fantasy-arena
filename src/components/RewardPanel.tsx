@@ -54,6 +54,13 @@ export function RewardPanel({ rewards, floor, mode }: Props) {
         </div>
       )}
 
+      {rewards.questUnlock && (
+        <div className="reward-milestone reward-quest">
+          <strong>{getUnitDef(rewards.questUnlock).name}</strong> discovered —
+          recruit it in your Collection!
+        </div>
+      )}
+
       {rewards.chest && (
         <button
           className={`reward-chest${chestPhase === "closed" ? "" : " opened"}`}

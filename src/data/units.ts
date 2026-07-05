@@ -82,7 +82,7 @@ export const UNITS: Record<string, UnitDef> = {
     moveSpeed: 76,
     range: FIELD_THIRD, // one-third battlefield width, like the Archer
     ability: "multishot", // passive headline: Multishot (every 2nd shot → 3 arrows)
-    color: "#3b82f6",
+    color: "#39603a", // deep-cowl forest green (2026-07-05 sprite pick B)
     accent: "#fcd34d",
   },
   knight: {
@@ -464,6 +464,21 @@ export const UNITS: Record<string, UnitDef> = {
     color: "#16a34a",
     accent: "#86efac",
   },
+  slime_knight: {
+    id: "slime_knight",
+    name: "Slime Knight",
+    rarity: "legendary",
+    role: "Undying Bruiser",
+    hp: 230,
+    damage: 16,
+    attackSpeed: 1.7,
+    moveSpeed: 55,
+    range: MELEE,
+    ability: "gelatinous_guard",
+    abilities: ["divide_reconvene"],
+    color: "#2b9d54",
+    accent: "#a7f3c0",
+  },
   mystic_archer: {
     id: "mystic_archer",
     name: "Mystic Archer",
@@ -641,10 +656,31 @@ export const UNITS: Record<string, UnitDef> = {
           "When it dies it ruptures — dealing 30 damage and poisoning every enemy nearby. Back away when it swells low.",
       },
       {
+        name: "Sloughing Mass",
+        description:
+          "Each time it drops past a quarter of its health, a Bloatling sloughs off (up to 3). They rupture on death too.",
+      },
+      {
         name: "Too Big to Baa",
         description: "Far too massive to polymorph — no sheep holds this much.",
       },
     ],
+  },
+  // Bloatling — sloughs off the Bloater as it's chipped down (Slime-style split).
+  // Never in a deck; terminal (doesn't split further) but ruptures on death.
+  bloatling: {
+    id: "bloatling",
+    name: "Bloatling",
+    rarity: "rare",
+    role: "Summoned",
+    hp: 200, // ~25% of the parent, mirroring the Slime→Slimeling ratio
+    damage: 14, // ~50% of the parent
+    attackSpeed: 2.2,
+    moveSpeed: 36, // less mass to lumber with
+    range: MELEE,
+    ability: "lifesteal", // passive filler — never casts
+    color: "#8a9a3b",
+    accent: "#d4e157",
   },
   // Slime clone — spawned when the original splits. Never in a deck. Doesn't
   // split further (terminal), but still bursts on death.
@@ -662,6 +698,23 @@ export const UNITS: Record<string, UnitDef> = {
     color: "#22c55e",
     accent: "#bbf7d0",
   },
+  // Slime Blob — flung from a dying Slime Knight. Never in a deck; carries a
+  // homeAnchor and races back to the corpse (never fighting) to reincarnate the
+  // knight, bursting weakly if killed en route. Damage 0: it's a pure runner.
+  slime_squire: {
+    id: "slime_squire",
+    name: "Slime Blob",
+    rarity: "rare",
+    role: "Summoned",
+    hp: 20, // fragile — dies in a hit or two, so splitting is a real gamble
+    damage: 0,
+    attackSpeed: 2,
+    moveSpeed: 34, // a slow, gooey crawl back to the corpse — easy to intercept
+    range: MELEE,
+    ability: "lifesteal", // passive filler — never casts, never attacks
+    color: "#3ec46f",
+    accent: "#c9f9d8",
+  },
 };
 
 export const UNIT_IDS = Object.keys(UNITS);
@@ -675,8 +728,10 @@ export const SUMMONED_UNIT_IDS = new Set<string>([
   "wolf",
   "skeleton",
   "slime_clone",
+  "slime_squire",
   "turret",
   "boar",
+  "bloatling",
 ]);
 
 /** Unit ids that are NOT selectable cards (summoned at runtime only, or

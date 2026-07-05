@@ -20,6 +20,12 @@ interface Props {
   locked?: boolean;
   gold?: number;
   onBuy?: () => void;
+  /** Overrides the unlock price (e.g. a rare-spawn quest discount). Defaults
+   *  to the unit's rarity price. */
+  unlockPrice?: number;
+  /** When a locked unit isn't purchasable yet (its unlock quest isn't done),
+   *  this hint replaces the Unlock button and explains how to earn it. */
+  lockHint?: string;
 }
 
 const ART_SIZE = 120;
@@ -72,8 +78,11 @@ export function UnitDetail({
   locked,
   gold = 0,
   onBuy,
+  unlockPrice,
+  lockHint,
 }: Props) {
   const def = getUnitDef(defId);
+  const price = unlockPrice ?? UNLOCK_PRICES[def.rarity];
   const rarity = RARITIES[def.rarity];
   // Skip the "lifesteal" filler slot (the never-casts convention for summons
   // and Depths monsters) unless the unit actually lifesteals (the Orc pairs
@@ -220,15 +229,16 @@ export function UnitDetail({
           <button className="btn btn-close-ghost" onClick={onClose}>
             Close
           </button>
-          {!readonly && locked && (
+          {!readonly && locked && lockHint && (
+            <span className="detail-lockhint">🔒 {lockHint}</span>
+          )}
+          {!readonly && locked && !lockHint && (
             <button
               className="btn btn-add btn-buy"
-              disabled={gold < UNLOCK_PRICES[def.rarity]}
+              disabled={gold < price}
               onClick={onBuy}
             >
-              {gold >= UNLOCK_PRICES[def.rarity]
-                ? `Unlock — ${UNLOCK_PRICES[def.rarity]}g`
-                : `Need ${UNLOCK_PRICES[def.rarity]}g`}
+              {gold >= price ? `Unlock — ${price}g` : `Need ${price}g`}
             </button>
           )}
           {!readonly && !locked && (

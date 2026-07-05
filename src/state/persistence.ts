@@ -9,6 +9,7 @@
 import { DECKABLE_UNIT_IDS, UNITS } from "@/data/units";
 import { STARTER_UNIT_IDS } from "@/meta/economy";
 import { DEFAULT_AVATAR_ID, isAvatarUnlocked } from "@/meta/avatars";
+import { QUEST_LOCKED_UNITS } from "@/data/depths";
 
 /** Compendium knowledge of one unit/monster. Encountered = faced it in battle
  *  (silhouette + name); defeated = it died to you at least once (full page). */
@@ -46,6 +47,10 @@ export interface PlayerSave {
    *  they're drops/purchases, only the v2→v3 boundary grandfathers. */
   unlockedUnits: string[];
   depths: DepthsProgress;
+  /** Units whose rare-spawn quest is complete → their (discounted) purchase is
+   *  unlocked in the Collection. Distinct from unlockedUnits (owned): a quest
+   *  makes a unit BUYABLE; gold still completes the recruit. (Save v5.) */
+  questUnlocks: string[];
   // Future slices (additive, versioned-merge handles them): soulShards,
   // items inventory, per-unit loadouts.
 }
@@ -55,7 +60,7 @@ export interface PlayerSave {
 const KEY = "fantasy-arena/save/v1";
 
 export const DEFAULT_SAVE: PlayerSave = {
-  version: 4,
+  version: 5,
   username: "Champion",
   avatarId: DEFAULT_AVATAR_ID,
   deck: ["ogre", "archer", "knight", "fire_mage"],
@@ -65,6 +70,7 @@ export const DEFAULT_SAVE: PlayerSave = {
   gold: 0,
   unlockedUnits: [...STARTER_UNIT_IDS],
   depths: { highestClearedFloor: 0 },
+  questUnlocks: [],
 };
 
 export function loadSave(): PlayerSave {
@@ -89,12 +95,20 @@ export function migrateSave(parsed: Partial<PlayerSave> | null): PlayerSave {
     highestClearedFloor: Math.max(0, parsed.depths?.highestClearedFloor ?? 0),
   };
   merged.gold = Math.max(0, parsed.gold ?? 0);
+  // Quest-unlock progress — keep only ids that are still quest-locked units
+  // (defensive against removed units / hand-edited saves).
+  merged.questUnlocks = [...(parsed.questUnlocks ?? [])].filter((id) =>
+    QUEST_LOCKED_UNITS.has(id)
+  );
 
   // Grandfathering: saves from before the unlock system keep every unit that
-  // exists today. Only this one-time boundary is generous — post-v3 saves
-  // meet new units as locked drops/purchases.
+  // exists today — EXCEPT quest-locked ones, whose purchase must always be
+  // earned via the quest. Only this one-time boundary is generous; post-v3
+  // saves meet new units as locked drops/purchases.
   if ((parsed.version ?? 1) < 3) {
-    merged.unlockedUnits = [...DECKABLE_UNIT_IDS];
+    merged.unlockedUnits = DECKABLE_UNIT_IDS.filter(
+      (id) => !QUEST_LOCKED_UNITS.has(id)
+    );
   } else {
     // Defensive: drop unknown/non-deckable ids, and starters are always owned.
     const owned = new Set(
@@ -133,6 +147,7 @@ function structuredCloneSave(save: PlayerSave): PlayerSave {
     bestiary: { ...save.bestiary },
     unlockedUnits: [...save.unlockedUnits],
     depths: { ...save.depths },
+    questUnlocks: [...save.questUnlocks],
   };
 }
 
