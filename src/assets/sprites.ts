@@ -1482,21 +1482,21 @@ function drawArcher(ctx: Ctx, body: string, dark: string, light: string, accent:
 // feathered cap whose multishot is the signature: three arrows fanned from the
 // nock with glinting tips.
 function drawRanger(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {
-  // swaying cape behind
+  // long swaying travel cape behind (deep-cowl look, 2026-07-05 mockup pick B)
   const sway = Math.sin(A.t * 1.6) * 1.5;
   ctx.fillStyle = withShade(body, -25);
   ctx.beginPath();
   ctx.moveTo(-2, -10);
-  ctx.quadraticCurveTo(-12, -3, -10 + sway, 17);
-  ctx.lineTo(-4 + sway * 0.5, 15);
-  ctx.quadraticCurveTo(-7, 0, -1, -8);
+  ctx.quadraticCurveTo(-13, -3, -11 + sway, 21);
+  ctx.lineTo(-4 + sway * 0.5, 19);
+  ctx.quadraticCurveTo(-8, 1, -1, -8);
   ctx.closePath();
   ctx.fill();
   ctx.strokeStyle = "rgba(255,255,255,0.14)";
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(-9.6 + sway, 16);
-  ctx.lineTo(-4.4 + sway * 0.5, 14.4);
+  ctx.moveTo(-10.5 + sway, 20);
+  ctx.lineTo(-4.5 + sway * 0.5, 18.4);
   ctx.stroke();
   // hip quiver, angled, stuffed with arrows
   ctx.save();
@@ -1518,64 +1518,130 @@ function drawRanger(ctx: Ctx, body: string, dark: string, light: string, accent:
   ctx.stroke();
   ctx.restore();
   metalBody(ctx, 15, 20, -2, body, dark, light, 4.5);
-  // scarf with a trailing end
-  ctx.strokeStyle = accent;
-  ctx.lineWidth = 3;
+  // leather belt with a gold buckle
+  ctx.strokeStyle = "#795548";
+  ctx.lineWidth = 1.6;
   ctx.beginPath();
-  ctx.moveTo(-6, -6);
-  ctx.quadraticCurveTo(0, -4, 6, -6);
+  ctx.moveTo(-7, 4);
+  ctx.lineTo(7, 6.5);
   ctx.stroke();
-  ctx.strokeStyle = accent;
-  ctx.lineWidth = 2.4;
-  ctx.beginPath();
-  ctx.moveTo(5, -5.5);
-  ctx.quadraticCurveTo(7.5, -2, 7, 1);
-  ctx.stroke();
-  // face with an accent glint in the eyes
-  ctx.fillStyle = light;
-  ctx.beginPath();
-  ctx.arc(0, -12, 5.5, 0, PI2);
-  ctx.fill();
-  ctx.fillStyle = "#1a1a1a";
-  ctx.fillRect(-2.6, -12.5, 1.7, 1.5);
-  ctx.fillRect(1, -12.5, 1.7, 1.5);
-  ctx.save();
   ctx.fillStyle = accent;
-  ctx.globalAlpha = 0.7;
-  ctx.fillRect(-2.2, -12.2, 0.8, 0.8);
-  ctx.fillRect(1.4, -12.2, 0.8, 0.8);
-  ctx.restore();
-  // cap (reads different from the Archer/Hunter hoods)
-  ctx.fillStyle = withShade(body, -40);
+  ctx.fillRect(-0.8, 4.4, 2, 2);
+  // shoulder mantle layered over the cape
+  ctx.fillStyle = withShade(body, -32);
   ctx.beginPath();
-  ctx.moveTo(-6, -14);
-  ctx.quadraticCurveTo(0, -19.5, 6, -14);
-  ctx.lineTo(5, -12.2);
-  ctx.quadraticCurveTo(0, -16, -5, -12.2);
+  ctx.moveTo(-8.4, -6.4);
+  ctx.quadraticCurveTo(0, -2.4, 8.4, -6.4);
+  ctx.lineTo(7, -1.6);
+  ctx.quadraticCurveTo(0, 1.6, -7, -1.6);
   ctx.closePath();
   ctx.fill();
+  ctx.save();
+  ctx.strokeStyle = light;
+  ctx.globalAlpha = 0.45;
+  ctx.lineWidth = 0.7;
+  ctx.beginPath();
+  ctx.moveTo(-7, -1.6);
+  ctx.quadraticCurveTo(0, 1.6, 7, -1.6);
+  ctx.stroke();
+  ctx.restore();
+  // shadowed face with glowing eyes (same trick as the Rogue's hood-eyes)
+  ctx.fillStyle = "#141410";
+  ctx.beginPath();
+  ctx.arc(0, -12, 5.6, 0, PI2);
+  ctx.fill();
+  ctx.save();
+  ctx.fillStyle = accent;
+  ctx.shadowColor = accent;
+  ctx.shadowBlur = 4 + A.glow * 5;
+  ctx.fillRect(-2.8, -12.6, 1.9, 1.6);
+  ctx.fillRect(1, -12.6, 1.9, 1.6);
+  ctx.restore();
+  // deep cowl: outer shell + inner lip shading the face
+  const hd = withShade(body, -40);
+  ctx.fillStyle = hd;
+  ctx.beginPath();
+  ctx.moveTo(-6.6, -9.6);
+  ctx.quadraticCurveTo(-7.4, -19, 0, -19.8);
+  ctx.quadraticCurveTo(7.4, -19, 6.6, -9.6);
+  ctx.quadraticCurveTo(7.4, -7, 5.4, -7.6);
+  ctx.quadraticCurveTo(6, -14.8, 0, -16.4);
+  ctx.quadraticCurveTo(-6, -14.8, -5.4, -7.6);
+  ctx.quadraticCurveTo(-7.4, -7, -6.6, -9.6);
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(-5.4, -8);
+  ctx.quadraticCurveTo(-6, -15.2, 0, -16.6);
+  ctx.quadraticCurveTo(6, -15.2, 5.4, -8);
+  ctx.quadraticCurveTo(4, -15, 0, -15.4);
+  ctx.quadraticCurveTo(-4, -15, -5.4, -8);
+  ctx.closePath();
+  ctx.fill();
+  // cowl drape over the shoulders
+  ctx.beginPath();
+  ctx.moveTo(-7, -7.6);
+  ctx.quadraticCurveTo(0, -4.4, 7, -7.6);
+  ctx.quadraticCurveTo(7.6, -4.6, 6.2, -3.2);
+  ctx.quadraticCurveTo(0, -0.8, -6.2, -3.2);
+  ctx.quadraticCurveTo(-7.6, -4.6, -7, -7.6);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = withShade(body, 25);
+  ctx.lineWidth = 0.7;
+  ctx.beginPath();
+  ctx.moveTo(-6.4, -4);
+  ctx.quadraticCurveTo(0, -1.8, 6.4, -4);
+  ctx.stroke();
   ctx.strokeStyle = "rgba(255,255,255,0.18)";
   ctx.lineWidth = 0.9;
   ctx.beginPath();
-  ctx.moveTo(-5.4, -13.8);
-  ctx.quadraticCurveTo(0, -18.6, 5.4, -13.8);
+  ctx.moveTo(-5.6, -12);
+  ctx.quadraticCurveTo(0, -18.8, 5.6, -12);
   ctx.stroke();
-  // short flat bow with a gradient limb
-  const bg = ctx.createLinearGradient(6, -14, 6, 10);
-  bg.addColorStop(0, withShade(accent, 30));
-  bg.addColorStop(1, accent);
-  ctx.strokeStyle = bg;
-  ctx.lineWidth = 2.4;
+  // recurve wooden bow: dark outline, wood core, leather wraps at the limb
+  // joints and grip
+  ctx.strokeStyle = "#6b4420";
+  ctx.lineWidth = 3.1;
   ctx.beginPath();
-  ctx.arc(9, -2, 12, -Math.PI / 2.6, Math.PI / 2.6);
+  ctx.moveTo(13.4, -12.6);
+  ctx.quadraticCurveTo(15.5, -10.5, 19.5, -6.5);
+  ctx.quadraticCurveTo(22.5, -2, 19.5, 2.5);
+  ctx.quadraticCurveTo(15.5, 6.5, 13.4, 8.6);
+  ctx.stroke();
+  ctx.strokeStyle = "#8b5a2b";
+  ctx.lineWidth = 1.9;
+  ctx.beginPath();
+  ctx.moveTo(13.4, -12.6);
+  ctx.quadraticCurveTo(15.5, -10.5, 19.5, -6.5);
+  ctx.quadraticCurveTo(22.5, -2, 19.5, 2.5);
+  ctx.quadraticCurveTo(15.5, 6.5, 13.4, 8.6);
+  ctx.stroke();
+  ctx.strokeStyle = "#4e342e";
+  ctx.lineWidth = 3.4;
+  for (const [x1, y1, x2, y2] of [
+    [19.2, -6.9, 20.4, -5.3],
+    [20.4, 1.3, 19.2, 2.9],
+    [20.9, -2.8, 20.9, -1.2],
+  ]) {
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+  }
+  ctx.strokeStyle = "#795548";
+  ctx.lineWidth = 0.7;
+  ctx.beginPath();
+  ctx.moveTo(20.9, -2.6);
+  ctx.lineTo(20.9, -1.4);
   ctx.stroke();
   // string drawn to the nock
   ctx.strokeStyle = "#e5e5e5";
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(12.9, -11.2);
+  ctx.moveTo(13.4, -12.6);
   ctx.lineTo(4, -2);
-  ctx.lineTo(12.9, 7.2);
+  ctx.lineTo(13.4, 8.6);
   ctx.stroke();
   // multishot: three arrows fanned from the nock
   ctx.strokeStyle = "#d8c9a8";

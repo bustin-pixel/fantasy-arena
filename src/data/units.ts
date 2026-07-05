@@ -82,7 +82,7 @@ export const UNITS: Record<string, UnitDef> = {
     moveSpeed: 76,
     range: FIELD_THIRD, // one-third battlefield width, like the Archer
     ability: "multishot", // passive headline: Multishot (every 2nd shot → 3 arrows)
-    color: "#3b82f6",
+    color: "#39603a", // deep-cowl forest green (2026-07-05 sprite pick B)
     accent: "#fcd34d",
   },
   knight: {
