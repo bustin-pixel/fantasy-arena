@@ -304,8 +304,8 @@ export function drawUnitSprite(
       break;
     // Depths monsters — recolors of existing bodies (per the locked design).
     case "giant_rat":
-      ctx.scale(0.7, 0.7); // tiny vermin — a shrunken, mangy wolf
-      drawWolf(ctx, body, dark, light, accent, A);
+      ctx.scale(0.75, 0.75); // tiny vermin, low to the ground
+      drawGiantRat(ctx, body, dark, light, accent, A);
       break;
     case "zombie_shambler":
       drawZombieShambler(ctx, body, dark, light, accent, A, variantOf(unit.uid));
@@ -320,7 +320,7 @@ export function drawUnitSprite(
       drawNecromancer(ctx, body, dark, light, accent, A);
       break;
     case "skeleton":
-      drawSkeleton(ctx, body, dark, light, accent, A);
+      drawSkeleton(ctx, body, dark, light, accent, A, variantOf(unit.uid));
       break;
     case "slime":
       drawSlime(ctx, body, dark, light, accent, A, 1);
@@ -3580,81 +3580,371 @@ function drawNecromancer(ctx: Ctx, body: string, dark: string, light: string, ac
   void light;
 }
 
-function drawSkeleton(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {
-  // small bony figure
-  ctx.strokeStyle = "#e7e5e4";
-  ctx.lineWidth = 2.5;
-  // spine
+// ---- skeleton --------------------------------------------------------------
+// Two variants picked per-unit via variantOf(uid) so summoned packs vary:
+// 0 = restrung classic (bare bones + rusty sword), 1 = grave warrior (adds a
+// cracked half-helm and a bitten plank shield held in front of the bones).
+// User-approved from canvas mockups.
+
+const BONE = "#e7e5e4";
+const BONE_SHADE = "#c8c6c2";
+
+/** Skull with glowing sockets, nasal cavity, teeth, a hanging jaw (dropped by
+ *  jawDrop) and a cranium crack. */
+function skeletonSkull(ctx: Ctx, accent: string, glow: number, x: number, y: number, tilt: number, jawDrop: number) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(tilt);
+  ctx.fillStyle = BONE;
   ctx.beginPath();
-  ctx.moveTo(0, -6);
-  ctx.lineTo(0, 12);
-  ctx.stroke();
-  // ribs
-  ctx.lineWidth = 1.5;
-  for (let i = 0; i < 3; i++) {
-    const y = -2 + i * 4;
-    ctx.beginPath();
-    ctx.moveTo(-5, y);
-    ctx.lineTo(5, y);
-    ctx.stroke();
-  }
-  // pelvis
-  ctx.beginPath();
-  ctx.moveTo(-4, 11);
-  ctx.lineTo(4, 11);
-  ctx.stroke();
-  // skull
-  ctx.fillStyle = "#e7e5e4";
-  ctx.beginPath();
-  ctx.arc(0, -11, 5, 0, PI2);
+  ctx.arc(0, -1, 5.2, Math.PI, 0);
+  ctx.quadraticCurveTo(5.2, 2.5, 3.5, 3.2);
+  ctx.lineTo(-3.5, 3.2);
+  ctx.quadraticCurveTo(-5.2, 2.5, -5.2, -1);
+  ctx.closePath();
   ctx.fill();
-  ctx.fillStyle = "#c8c6c2";
+  ctx.fillStyle = BONE_SHADE;
+  ctx.fillRect(-3.5, 1.4, 7, 1.8);
+  // dark mouth gap + upper teeth
+  ctx.fillStyle = "#141216";
+  ctx.fillRect(-2.6, 3.1, 5.2, 1 + jawDrop);
+  ctx.fillStyle = "#fff";
+  for (let i = 0; i < 4; i++) ctx.fillRect(-2.4 + i * 1.4, 3.1, 0.7, 1);
+  // hanging jaw
+  ctx.fillStyle = "#dcdad6";
   ctx.beginPath();
-  ctx.arc(0, -11, 5, 0.15 * Math.PI, 0.85 * Math.PI);
+  ctx.roundRect(-2.8, 4.1 + jawDrop, 5.6, 2.2, 1);
   ctx.fill();
-  // glowing eye sockets
+  // glowing sockets
   ctx.save();
   ctx.fillStyle = accent;
   ctx.shadowColor = accent;
-  ctx.shadowBlur = 3 + A.glow * 3;
-  ctx.fillRect(-3, -12, 2, 2);
-  ctx.fillRect(1, -12, 2, 2);
+  ctx.shadowBlur = 3 + glow * 3;
+  ctx.fillRect(-3.5, -2.4, 2.3, 2.3);
+  ctx.fillRect(1.2, -2.4, 2.3, 2.3);
   ctx.restore();
-  // jaw
-  ctx.strokeStyle = "#9ca3af";
-  ctx.lineWidth = 0.6;
+  // nasal cavity
+  ctx.fillStyle = "#8f8d89";
   ctx.beginPath();
-  ctx.moveTo(-3, -8);
-  ctx.lineTo(3, -8);
-  ctx.stroke();
-  // legs
-  ctx.strokeStyle = "#e7e5e4";
-  ctx.lineWidth = 2;
+  ctx.moveTo(0, -0.2);
+  ctx.lineTo(-0.9, 1.7);
+  ctx.lineTo(0.9, 1.7);
+  ctx.closePath();
+  ctx.fill();
+  // cranium crack
+  ctx.strokeStyle = "#9a9894";
+  ctx.lineWidth = 0.8;
   ctx.beginPath();
-  ctx.moveTo(0, 12);
-  ctx.lineTo(-4, 19);
-  ctx.moveTo(0, 12);
-  ctx.lineTo(4, 19);
+  ctx.moveTo(-1.2, -6);
+  ctx.lineTo(-0.3, -3.9);
+  ctx.lineTo(-2, -2.7);
   ctx.stroke();
-  // arm + rusty blade with an accent tip
-  ctx.strokeStyle = "#cfcfca";
+  ctx.restore();
+}
+
+/** Spine, four curved rib pairs, and a pelvis with hip knobs. */
+function skeletonRibs(ctx: Ctx) {
+  ctx.strokeStyle = BONE;
+  ctx.lineWidth = 2.2;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(0, -5);
+  ctx.lineTo(0, 11);
+  ctx.stroke();
+  ctx.lineCap = "butt";
+  ctx.lineWidth = 1.4;
+  for (let i = 0; i < 4; i++) {
+    const y = -2.5 + i * 3;
+    const w = 6.2 - i * 0.8;
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.quadraticCurveTo(-w, y + 0.4, -w + 0.6, y + 2.6);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.quadraticCurveTo(w, y + 0.4, w - 0.6, y + 2.6);
+    ctx.stroke();
+  }
   ctx.lineWidth = 1.6;
   ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.lineTo(8, -4);
+  ctx.moveTo(-3.8, 11);
+  ctx.lineTo(3.8, 11);
   ctx.stroke();
-  const bg = ctx.createLinearGradient(8, -4, 14, -11);
-  bg.addColorStop(0, "#b7b0a0");
-  bg.addColorStop(1, accent);
-  ctx.strokeStyle = bg;
-  ctx.lineWidth = 2;
+  ctx.fillStyle = BONE;
   ctx.beginPath();
-  ctx.moveTo(8, -4);
-  ctx.lineTo(14, -11);
+  ctx.arc(-3.4, 11.8, 1.5, 0, PI2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(3.4, 11.8, 1.5, 0, PI2);
+  ctx.fill();
+}
+
+/** A bone limb through the given joints, with knob joints between segments. */
+function boneLimb(ctx: Ctx, pts: [number, number][], lw: number) {
+  ctx.strokeStyle = BONE;
+  ctx.lineWidth = lw;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
   ctx.stroke();
-  void light;
+  ctx.lineCap = "butt";
+  ctx.fillStyle = "#d5d3cf";
+  for (let i = 1; i < pts.length - 1; i++) {
+    ctx.beginPath();
+    ctx.arc(pts[i][0], pts[i][1], lw * 0.6, 0, PI2);
+    ctx.fill();
+  }
+}
+
+/** Three finger-bone claws splaying from (x,y) toward dir (+1 right / -1 left). */
+function boneClaws(ctx: Ctx, x: number, y: number, dir: number) {
+  ctx.strokeStyle = BONE;
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 3; i++) {
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + dir * 3, y - 1.5 + i * 1.5);
+    ctx.stroke();
+  }
+}
+
+function skeletonLegs(ctx: Ctx) {
+  boneLimb(ctx, [[0, 12], [-3, 15.5], [-4.5, 19.5]], 2);
+  boneLimb(ctx, [[0, 12], [3, 15], [4.5, 19.5]], 2);
+  ctx.strokeStyle = BONE;
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(-4.5, 19.5);
+  ctx.lineTo(-7, 19.5);
+  ctx.moveTo(4.5, 19.5);
+  ctx.lineTo(7, 19.5);
+  ctx.stroke();
+}
+
+/** Notched, rust-spotted sword gripped at (hx,hy). */
+function rustySword(ctx: Ctx, hx: number, hy: number, ang: number) {
+  ctx.save();
+  ctx.translate(hx, hy);
+  ctx.rotate(ang);
+  ctx.fillStyle = "#6b5a3a"; // grip
+  ctx.fillRect(-0.8, 1, 1.6, 3.4);
+  ctx.fillStyle = "#7d7260"; // guard
+  ctx.fillRect(-3, -0.4, 6, 1.4);
+  // notched blade
+  ctx.fillStyle = "#b9b3a6";
+  ctx.beginPath();
+  ctx.moveTo(-1.1, -0.4);
+  ctx.lineTo(-1.1, -13);
+  ctx.lineTo(0, -15.5);
+  ctx.lineTo(1.1, -13);
+  ctx.lineTo(1.1, -8.5);
+  ctx.lineTo(-0.1, -7.4);
+  ctx.lineTo(1.1, -6.2);
+  ctx.lineTo(1.1, -0.4);
+  ctx.closePath();
+  ctx.fill();
+  // rust blooms
+  ctx.fillStyle = "#8a5a3a";
+  ctx.globalAlpha = 0.75;
+  ctx.beginPath();
+  ctx.arc(-0.3, -11, 0.9, 0, PI2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(0.4, -4, 1, 0, PI2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(-0.4, -2, 0.6, 0, PI2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = "rgba(255,255,255,0.5)";
+  ctx.lineWidth = 0.6;
+  ctx.beginPath();
+  ctx.moveTo(-1.1, -1);
+  ctx.lineTo(-1.1, -13);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawSkeleton(
+  ctx: Ctx,
+  body: string,
+  dark: string,
+  light: string,
+  accent: string,
+  A: SpriteAnim,
+  variant: 0 | 1
+) {
+  if (variant === 0) {
+    // restrung classic: bare bones, off-hand claw, notched rusty sword
+    boneLimb(ctx, [[0, -3], [-6, 0], [-8.5, 4.5]], 1.8);
+    boneClaws(ctx, -8.5, 4.5, -1);
+    skeletonRibs(ctx);
+    skeletonLegs(ctx);
+    skeletonSkull(ctx, accent, A.glow, 0, -12, 0, 0.4);
+    boneLimb(ctx, [[0, -3], [6, -1], [9.5, 2]], 1.8);
+    rustySword(ctx, 9.5, 2, 0.35);
+  } else {
+    // grave warrior: cracked half-helm + bitten plank shield held in front
+    boneLimb(ctx, [[0, -3], [-6, -1], [-9, 2]], 1.8); // shield arm
+    skeletonRibs(ctx);
+    skeletonLegs(ctx);
+    skeletonSkull(ctx, accent, A.glow, 0, -12, 0, 0.4);
+    // cracked half-helm
+    ctx.fillStyle = "#7d828c";
+    ctx.beginPath();
+    ctx.arc(0, -13.5, 5.6, Math.PI, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#5d6068";
+    ctx.fillRect(-5.6, -13.8, 11.2, 1.4);
+    ctx.strokeStyle = "#494c53";
+    ctx.lineWidth = 0.9;
+    ctx.beginPath();
+    ctx.moveTo(2, -18.5);
+    ctx.lineTo(2.8, -15.8);
+    ctx.lineTo(1.2, -14.2);
+    ctx.stroke();
+    // plank shield in front of the bones, a bite missing from the top edge
+    ctx.save();
+    ctx.translate(-10, 3);
+    ctx.fillStyle = "#8a6a42";
+    ctx.beginPath();
+    ctx.arc(0, 0, 5.6, 0, PI2);
+    ctx.fill();
+    ctx.strokeStyle = "#6e5230";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(-1.8, -5.2);
+    ctx.lineTo(-1.8, 5.2);
+    ctx.moveTo(1.8, -5.2);
+    ctx.lineTo(1.8, 5.2);
+    ctx.stroke();
+    ctx.strokeStyle = "#57595e";
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.arc(0, 0, 5.6, 0, PI2);
+    ctx.stroke();
+    ctx.fillStyle = "#6a6d74";
+    ctx.beginPath();
+    ctx.arc(0, 0, 1.7, 0, PI2);
+    ctx.fill();
+    // bite gouge in the rim, clipped to the shield face (dark fill — erasing
+    // would punch a hole through the arena behind the sprite)
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(0, 0, 5.6, 0, PI2);
+    ctx.clip();
+    ctx.fillStyle = "#1a1b1e";
+    ctx.beginPath();
+    ctx.arc(4.6, -4.6, 2.4, 0, PI2);
+    ctx.fill();
+    ctx.restore();
+    ctx.restore();
+    boneLimb(ctx, [[0, -3], [6, -1], [9.5, 2]], 1.8);
+    rustySword(ctx, 9.5, 2, 0.35);
+  }
   void body;
   void dark;
+  void light;
+}
+
+// Giant rat — a proper sewer rat: pointed snout with buck teeth and whiskers,
+// big round pink ears, beady eye, mange patches, long segmented curling tail.
+// User-approved from canvas mockups (drawn full-size; the call site shrinks it).
+function drawGiantRat(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {
+  const pinkDeep = withShade(accent, -25);
+  // tail behind the body
+  ctx.strokeStyle = pinkDeep;
+  ctx.lineWidth = 1.8;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(11, 8);
+  ctx.quadraticCurveTo(21, 10, 24, 3);
+  ctx.quadraticCurveTo(25.5, -1, 22.5, -3.5);
+  ctx.stroke();
+  ctx.lineCap = "butt";
+  // tail segment ticks
+  ctx.lineWidth = 0.7;
+  ctx.strokeStyle = "rgba(0,0,0,0.25)";
+  for (const [tx, ty] of [[15, 9.3], [19, 8.2], [22.5, 5], [23.7, 0.5]] as const) {
+    ctx.beginPath();
+    ctx.moveTo(tx, ty - 1.2);
+    ctx.lineTo(tx + 0.6, ty + 1.2);
+    ctx.stroke();
+  }
+  // low teardrop body
+  const g = ctx.createLinearGradient(0, 1.5, 0, 14.5);
+  g.addColorStop(0, light);
+  g.addColorStop(1, dark);
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.ellipse(2, 8, 13, 6.5, -0.1, 0, PI2);
+  ctx.fill();
+  // mange patches
+  ctx.fillStyle = withShade(body, -18);
+  ctx.globalAlpha = 0.8;
+  ctx.beginPath();
+  ctx.ellipse(6, 5.5, 3, 2, 0.3, 0, PI2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(-1, 10, 2.2, 1.5, -0.2, 0, PI2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  // big round ears, pink inside
+  for (const [ex, ey, er] of [[-10.5, -2, 3.6], [-4.5, -3, 3.2]] as const) {
+    ctx.fillStyle = withShade(body, -22);
+    ctx.beginPath();
+    ctx.arc(ex, ey, er, 0, PI2);
+    ctx.fill();
+    ctx.fillStyle = accent;
+    ctx.beginPath();
+    ctx.arc(ex, ey + 0.3, er * 0.58, 0, PI2);
+    ctx.fill();
+  }
+  // head dome tapering to a pointed snout
+  ctx.fillStyle = light;
+  ctx.beginPath();
+  ctx.moveTo(-3, 0.5);
+  ctx.quadraticCurveTo(-9, -0.5, -19, 6.5);
+  ctx.quadraticCurveTo(-9, 10.5, -3, 9.5);
+  ctx.closePath();
+  ctx.fill();
+  // nose + buck teeth
+  ctx.fillStyle = "#3d3028";
+  ctx.beginPath();
+  ctx.arc(-19, 6.5, 1.2, 0, PI2);
+  ctx.fill();
+  ctx.fillStyle = "#f3f3e0";
+  ctx.fillRect(-17.6, 7.6, 1.5, 2.4);
+  // beady eye with a glint
+  ctx.fillStyle = "#191512";
+  ctx.beginPath();
+  ctx.arc(-11, 3, 1.4, 0, PI2);
+  ctx.fill();
+  ctx.fillStyle = "rgba(255,255,255,0.8)";
+  ctx.beginPath();
+  ctx.arc(-11.4, 2.5, 0.45, 0, PI2);
+  ctx.fill();
+  // whiskers
+  ctx.strokeStyle = "rgba(255,255,255,0.4)";
+  ctx.lineWidth = 0.7;
+  for (const dy of [-2, 0.5, 3]) {
+    ctx.beginPath();
+    ctx.moveTo(-16, 6);
+    ctx.lineTo(-21.5, 6 + dy);
+    ctx.stroke();
+  }
+  // little pink feet
+  ctx.strokeStyle = pinkDeep;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-7, 13);
+  ctx.lineTo(-7.5, 18);
+  ctx.moveTo(7, 13.5);
+  ctx.lineTo(7, 18.5);
+  ctx.stroke();
+  void A;
 }
 
 function drawSlime(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim, scale: number) {
