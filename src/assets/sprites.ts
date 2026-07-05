@@ -240,7 +240,9 @@ export function drawUnitSprite(
       drawOrc(ctx, body, dark, light, accent, A);
       break;
     case "archer":
-      drawArcher(ctx, body, dark, light, accent, A);
+      // Shares the Ranger's deep-cowl sprite as a recolor (tan leather vs.
+      // forest green), with a single nocked arrow instead of the volley fan.
+      drawRanger(ctx, body, dark, light, accent, A, 1);
       break;
     case "ranger":
       drawRanger(ctx, body, dark, light, accent, A);
@@ -1408,80 +1410,11 @@ function drawOrcWarAxe(ctx: Ctx, body: string, light: string, accent: string) {
   ctx.restore();
 }
 
-function drawArcher(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {
-  // quiver slung behind
-  ctx.fillStyle = withShade(body, -30);
-  ctx.beginPath();
-  ctx.roundRect(-9, -8, 5, 16, 2);
-  ctx.fill();
-  ctx.strokeStyle = accent;
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(-8, -9);
-  ctx.lineTo(-6, -14);
-  ctx.moveTo(-6, -9);
-  ctx.lineTo(-4, -14);
-  ctx.stroke();
-  metalBody(ctx, 16, 22, -2, body, dark, light, 5);
-  // face
-  ctx.fillStyle = light;
-  ctx.beginPath();
-  ctx.arc(0, -12, 6, 0, PI2);
-  ctx.fill();
-  // hood dome
-  ctx.fillStyle = dark;
-  ctx.beginPath();
-  ctx.arc(0, -13, 8, Math.PI, 0);
-  ctx.fill();
-  // face recess shadow
-  ctx.fillStyle = "#0e0e10";
-  ctx.beginPath();
-  ctx.ellipse(0, -11, 3.6, 3, 0, 0, PI2);
-  ctx.fill();
-  // glowing eyes
-  ctx.save();
-  ctx.fillStyle = accent;
-  ctx.shadowColor = accent;
-  ctx.shadowBlur = 3 + A.glow * 3;
-  ctx.fillRect(-2.6, -11.5, 1.6, 1.4);
-  ctx.fillRect(1, -11.5, 1.6, 1.4);
-  ctx.restore();
-  // bow with a gradient limb
-  const bg = ctx.createLinearGradient(6, -16, 6, 12);
-  bg.addColorStop(0, withShade(accent, 30));
-  bg.addColorStop(1, accent);
-  ctx.strokeStyle = bg;
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  ctx.arc(10, -2, 14, -Math.PI / 2.4, Math.PI / 2.4);
-  ctx.stroke();
-  // string
-  ctx.strokeStyle = "#e5e5e5";
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(15, -12);
-  ctx.lineTo(15, 8);
-  ctx.stroke();
-  // nocked arrow
-  ctx.strokeStyle = "#d8c9a8";
-  ctx.lineWidth = 1.4;
-  ctx.beginPath();
-  ctx.moveTo(3, -2);
-  ctx.lineTo(15, -2);
-  ctx.stroke();
-  ctx.fillStyle = accent;
-  ctx.beginPath();
-  ctx.moveTo(15, -2);
-  ctx.lineTo(12, -3.6);
-  ctx.lineTo(12, -0.4);
-  ctx.closePath();
-  ctx.fill();
-}
-
-// Ranger — no longer shares the Archer's sprite. A caped volley-ranger in a
-// feathered cap whose multishot is the signature: three arrows fanned from the
-// nock with glinting tips.
-function drawRanger(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {
+// Ranger — the deep-cowl hooded archer sprite (2026-07-05 mockup pick B):
+// shadowed face with glowing eyes, shoulder mantle over a long swaying cape,
+// recurve wooden bow with leather wraps. The Archer draws the SAME sprite as a
+// recolor with `arrows: 1`; the Ranger's volley fan (3) stays its signature.
+function drawRanger(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim, arrows: 1 | 3 = 3) {
   // long swaying travel cape behind (deep-cowl look, 2026-07-05 mockup pick B)
   const sway = Math.sin(A.t * 1.6) * 1.5;
   ctx.fillStyle = withShade(body, -25);
@@ -1643,16 +1576,18 @@ function drawRanger(ctx: Ctx, body: string, dark: string, light: string, accent:
   ctx.lineTo(4, -2);
   ctx.lineTo(13.4, 8.6);
   ctx.stroke();
-  // multishot: three arrows fanned from the nock
+  // arrows from the nock: the Ranger's volley fan, or a lone nocked arrow
   ctx.strokeStyle = "#d8c9a8";
   ctx.lineWidth = 1.2;
   ctx.beginPath();
   ctx.moveTo(4, -2);
   ctx.lineTo(16, -2);
-  ctx.moveTo(4, -2);
-  ctx.lineTo(15, -8);
-  ctx.moveTo(4, -2);
-  ctx.lineTo(15, 4);
+  if (arrows === 3) {
+    ctx.moveTo(4, -2);
+    ctx.lineTo(15, -8);
+    ctx.moveTo(4, -2);
+    ctx.lineTo(15, 4);
+  }
   ctx.stroke();
   ctx.fillStyle = accent;
   ctx.beginPath();
@@ -1661,18 +1596,20 @@ function drawRanger(ctx: Ctx, body: string, dark: string, light: string, accent:
   ctx.lineTo(14.4, -0.5);
   ctx.closePath();
   ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(16.4, -8.8);
-  ctx.lineTo(13.2, -9.2);
-  ctx.lineTo(14.6, -6.4);
-  ctx.closePath();
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(16.4, 4.8);
-  ctx.lineTo(14.6, 2.4);
-  ctx.lineTo(13.2, 5.2);
-  ctx.closePath();
-  ctx.fill();
+  if (arrows === 3) {
+    ctx.beginPath();
+    ctx.moveTo(16.4, -8.8);
+    ctx.lineTo(13.2, -9.2);
+    ctx.lineTo(14.6, -6.4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(16.4, 4.8);
+    ctx.lineTo(14.6, 2.4);
+    ctx.lineTo(13.2, 5.2);
+    ctx.closePath();
+    ctx.fill();
+  }
   // tip glints + drifting feather motes (motion only)
   if (A.live) {
     ctx.save();
@@ -1680,7 +1617,9 @@ function drawRanger(ctx: Ctx, body: string, dark: string, light: string, accent:
     ctx.shadowColor = accent;
     ctx.shadowBlur = 3 + A.glow * 4;
     ctx.globalAlpha = 0.4 + A.glow * 0.5;
-    for (const [px, py] of [[17, -2], [15.8, -8.4], [15.8, 4.4]]) {
+    const tips =
+      arrows === 3 ? [[17, -2], [15.8, -8.4], [15.8, 4.4]] : [[17, -2]];
+    for (const [px, py] of tips) {
       ctx.beginPath();
       ctx.arc(px, py, 0.9, 0, PI2);
       ctx.fill();
