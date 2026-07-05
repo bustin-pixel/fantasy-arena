@@ -1,9 +1,9 @@
 // Slime Knight behavior (kits/slimeKnight.ts) — Divide & Reconvene:
-//   1. On death it flings a shrinking squad of Slime Blobs (2 at stage 0), into open
+//   1. On death it flings a shrinking squad of Slime Blobs (3 at stage 0), into open
 //      field so a wall-hugging corpse can't clamp one straight onto the grave.
 //   2. A blob that oozes back to the corpse reincarnates the knight at half HP,
 //      one rebirth-stage higher, and dissolves the rest of the squad.
-//   3. At the final stage (2) it's terminal — no blobs, stays dead.
+//   3. At the final stage (3) it's terminal — no blobs, stays dead.
 //   4. Blobs ignore combat entirely (homeAnchor suppresses their targeting).
 // Exercises the new seam: the spawnUnit `init` stamp, the homeAnchor movement +
 // targeting suppression, and the onTick reincarnation.
@@ -23,7 +23,7 @@ function killerAt(s: ReturnType<typeof battleState>, x: number, y: number): Unit
 }
 
 describe("Slime Knight — Divide (flings blobs on death)", () => {
-  it("flings 2 blobs into open field — even against a wall, never onto the corpse", () => {
+  it("flings 3 blobs into open field — even against a wall, never onto the corpse", () => {
     const s = battleState(1);
     // Knight jammed against the TOP wall — the failure case: an offset straight up
     // would clamp the blob back down onto the grave and instantly reincarnate. The
@@ -39,7 +39,7 @@ describe("Slime Knight — Divide (flings blobs on death)", () => {
 
     expect(knight.state).toBe("dead");
     const blobs = s.units.filter((u) => u.defId === "slime_squire");
-    expect(blobs.length).toBe(2); // reduced from 4
+    expect(blobs.length).toBe(3); // was 4
     expect(blobs.every((b) => b.state !== "dead")).toBe(true);
     expect(blobs.every((b) => b.rebornStage === 1)).toBe(true);
     expect(blobs.every((b) => b.homeAnchor != null)).toBe(true);
@@ -95,10 +95,10 @@ describe("Slime Knight — Reconvene (reincarnates from a returning blob)", () =
 });
 
 describe("Slime Knight — decay is terminal", () => {
-  it("a stage-2 knight flings no blobs and stays dead", () => {
+  it("a stage-3 knight flings no blobs and stays dead", () => {
     const s = battleState(3);
     const knight = place(s, "slime_knight", "enemy", 240, 300);
-    knight.rebornStage = 2; // reborn the maximum number of times (2 → 1 → 0)
+    knight.rebornStage = 3; // reborn the maximum number of times (3 → 2 → 1 → 0)
     knight.moveSpeed = 0;
     killerAt(s, 240, 348);
 
@@ -150,7 +150,7 @@ describe("Slime Knight — split survives a ranged killing blow (regression)", (
 
     expect(knight.state).toBe("dead");
     // Blobs came out the SAME tick the projectile killed it...
-    expect(s.units.filter((u) => u.defId === "slime_squire").length).toBe(2);
+    expect(s.units.filter((u) => u.defId === "slime_squire").length).toBe(3);
     // ...and the match did NOT end — the enemy still has the blobs on the board.
     expect(s.phase).toBe("battle");
   });

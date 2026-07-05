@@ -161,7 +161,7 @@ export const ABILITIES: Record<AbilityId, AbilityDef> = {
     id: "divide_reconvene",
     name: "Divide & Reconvene",
     description:
-      "On death it bursts and flings out 2 slime blobs that ignore the fight and ooze back to its corpse. If one arrives, the knight is reborn at half HP — but each rebirth flings one fewer blob (2 → 1), so a fully-intercepted knight stays dead.",
+      "On death it bursts and flings out 3 slime blobs that ignore the fight and ooze back to its corpse. If one arrives, the knight is reborn at half HP — but each rebirth flings one fewer blob (3 → 2 → 1), so a fully-intercepted knight stays dead.",
     cooldown: 0,
   },
   // The Mystic Archer's headline passive is now `momentum`; `mystic_shift` is kept

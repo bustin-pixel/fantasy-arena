@@ -26,7 +26,7 @@ import {
 import { clamp, dist } from "@/utils/math";
 
 const GUARD_SHIELD = 45; // Gelatinous Guard absorb granted per cast
-const BASE_BLOBS = 2; // blobs flung at rebornStage 0 (decays by stage → 2/1)
+const BASE_BLOBS = 3; // blobs flung at rebornStage 0 (decays by stage → 3/2/1)
 const FLING_DIST = 110; // how far outward blobs spawn from the corpse
 const KNIGHT_BURST = 30; // the knight's own death burst
 const KNIGHT_BURST_RADIUS = 90;
