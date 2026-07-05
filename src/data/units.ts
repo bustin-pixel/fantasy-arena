@@ -478,13 +478,6 @@ export const UNITS: Record<string, UnitDef> = {
     abilities: ["divide_reconvene"],
     color: "#2b9d54",
     accent: "#a7f3c0",
-    traits: [
-      {
-        name: "Homing Blobs",
-        description:
-          "The blobs it flings on death never fight — they only ooze back toward its corpse to reincarnate it. Cut them all down before one arrives (they burst when killed) or the knight comes back at half HP.",
-      },
-    ],
   },
   mystic_archer: {
     id: "mystic_archer",
