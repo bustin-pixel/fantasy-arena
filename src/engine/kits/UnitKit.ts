@@ -44,6 +44,7 @@ import { orcKit } from "./orc";
 import { rangerKit } from "./ranger";
 import { rogueKit } from "./rogue";
 import { slimeKit, slimeCloneKit } from "./slime";
+import { slimeKnightKit, slimeBlobKit } from "./slimeKnight";
 import { tricksterKit } from "./trickster";
 import { warriorKit } from "./warrior";
 import { zombieShamblerKit } from "./zombieShambler";
@@ -173,6 +174,8 @@ export const UNIT_KITS: UnitKitRegistry = {
   rogue: rogueKit,
   slime: slimeKit,
   slime_clone: slimeCloneKit,
+  slime_knight: slimeKnightKit,
+  slime_squire: slimeBlobKit,
   summoner: druidKit,
   trickster: tricksterKit,
   warrior: warriorKit,

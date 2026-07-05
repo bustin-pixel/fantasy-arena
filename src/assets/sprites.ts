@@ -333,6 +333,14 @@ export function drawUnitSprite(
     case "slime_clone":
       drawSlime(ctx, body, dark, light, accent, A, 0.7);
       break;
+    case "slime_knight":
+      // The Knight body in oozing greens — a bruiser that dies into blobs.
+      drawKnight(ctx, body, dark, light, accent, A, SLIME_KNIGHT_LIVERY);
+      break;
+    case "slime_squire":
+      // A little glob flung from the dying Slime Knight, racing home.
+      drawSlime(ctx, body, dark, light, accent, A, 0.6);
+      break;
     case "mystic_archer":
       drawMysticArcher(ctx, body, dark, light, accent, A, unit.mysticForm);
       break;
@@ -1672,6 +1680,17 @@ const HOLY_LIVERY: KnightLivery = {
   shieldDark: "#cdd2cf",
   trim: "#c9a227",
   gem: "#fff4c2",
+};
+// The Slime Knight wears the Knight's plate recoloured in oozing greens — a
+// gelatinous cape and a mossy shield over its green-metal body.
+const SLIME_KNIGHT_LIVERY: KnightLivery = {
+  plume: "#c9f9d8",
+  plumeDark: "#5bbf7e",
+  cape: "#1f7a44",
+  shield: "#3ec46f",
+  shieldDark: "#1f7a44",
+  trim: "#a7f3c0",
+  gem: "#d9ffe8",
 };
 
 function drawKnight(

@@ -29,8 +29,16 @@ export interface AbilityContext {
   spawnProjectile: (p: Omit<Projectile, "id" | "alive">) => void;
   spawnVfx: (v: Omit<Vfx, "id">) => void;
   heal: (target: Unit, amount: number) => void;
-  /** Spawn a fresh unit into the live sim (e.g. summoner's wolves). */
-  spawnUnit: (defId: string, team: Unit["team"], pos: { x: number; y: number }) => void;
+  /** Spawn a fresh unit into the live sim (e.g. summoner's wolves). An optional
+   *  `init` stamps deterministic starting state on the newly-created unit before
+   *  it enters play — the Slime Knight seeds each split blob's homeAnchor/rebornStage
+   *  and the reincarnated knight's reduced HP this way. Keep `init` pure (no RNG). */
+  spawnUnit: (
+    defId: string,
+    team: Unit["team"],
+    pos: { x: number; y: number },
+    init?: (u: Unit) => void
+  ) => void;
   /** Lay a ground trap into the sim (Hunter's Scatter Trap). The generic trigger
    *  (stun on step-on) stays in CombatSystem; the kit just places them. */
   spawnTrap: (trap: Trap) => void;

@@ -83,8 +83,14 @@ export interface SimState {
    *  the summon flush derives its ceiling from them. */
   activeCaps: { player: number; enemy: number };
   /** Units queued to spawn from inside dealDamage (slime splits/clones).
-   *  Flushed each tick alongside ability-driven summons. */
-  damageSpawns: { defId: string; team: Team; pos: Vec2 }[];
+   *  Flushed each tick alongside ability-driven summons. `init` stamps
+   *  deterministic starting state on the created unit (Slime Knight blobs/rebirth). */
+  damageSpawns: {
+    defId: string;
+    team: Team;
+    pos: Vec2;
+    init?: (u: Unit) => void;
+  }[];
 }
 
 export function createSimState(seed: number, clockSec: number): SimState {
@@ -401,6 +407,7 @@ export function stepSimulation(state: SimState): void {
     defId: string;
     team: Unit["team"];
     pos: { x: number; y: number };
+    init?: (u: Unit) => void;
   }[] = [];
 
   // The single HP funnel, forward-declared so makeKitCtx (which a kit hook fired
@@ -428,11 +435,12 @@ export function stepSimulation(state: SimState): void {
       heal,
       spawnProjectile: (p) => spawnProjectile(state, p),
       spawnVfx: (v) => spawnVfx(state, v),
-      spawnUnit: (defId, team, pos) =>
+      spawnUnit: (defId, team, pos, init) =>
         (damageContext ? state.damageSpawns : pendingSpawns).push({
           defId,
           team,
           pos,
+          init,
         }),
       spawnTrap: (t) => state.traps.push(t),
       spawnFloatingText: (u, v, k) => spawnFloatingText(state, u, v, k),
@@ -614,7 +622,8 @@ export function stepSimulation(state: SimState): void {
       heal,
       spawnProjectile: (p) => spawnProjectile(state, p),
       spawnVfx: (v) => spawnVfx(state, v),
-      spawnUnit: (defId, team, pos) => pendingSpawns.push({ defId, team, pos }),
+      spawnUnit: (defId, team, pos, init) =>
+        pendingSpawns.push({ defId, team, pos, init }),
       spawnTrap: (t) => state.traps.push(t),
       spawnFloatingText: (u, v, k) => spawnFloatingText(state, u, v, k),
     };
@@ -716,13 +725,17 @@ export function stepSimulation(state: SimState): void {
     // Summon headroom rides on the side's concurrent cap: Arena (cap 2) keeps
     // its proven 5/7 ceiling; The Depths' bigger caps scale it up so summoners
     // aren't starved on a fuller field.
-    const isClone = spawn.defId === "slime_clone" || spawn.defId === "bloatling";
+    const isClone =
+      spawn.defId === "slime_clone" ||
+      spawn.defId === "bloatling" ||
+      spawn.defId === "slime_squire";
     const cap = state.activeCaps[spawn.team] + (isClone ? 5 : 3);
     const teamCount = state.units.filter(
       (u) => u.team === spawn.team && u.state !== "dead"
     ).length;
     if (teamCount >= cap) continue;
     const summoned = createUnit(spawn.defId, spawn.team, spawn.pos);
+    spawn.init?.(summoned); // stamp deterministic starting state (blob anchor / rebirth HP)
     state.units.push(summoned);
     byUid.set(summoned.uid, summoned);
     getKit(summoned.defId)?.onSpawn?.(summoned); // [seam] spawn hook (both spawn paths)

@@ -464,6 +464,28 @@ export const UNITS: Record<string, UnitDef> = {
     color: "#16a34a",
     accent: "#86efac",
   },
+  slime_knight: {
+    id: "slime_knight",
+    name: "Slime Knight",
+    rarity: "legendary",
+    role: "Undying Bruiser",
+    hp: 230,
+    damage: 16,
+    attackSpeed: 1.7,
+    moveSpeed: 55,
+    range: MELEE,
+    ability: "gelatinous_guard",
+    abilities: ["divide_reconvene"],
+    color: "#2b9d54",
+    accent: "#a7f3c0",
+    traits: [
+      {
+        name: "Homing Blobs",
+        description:
+          "The blobs it flings on death never fight — they only ooze back toward its corpse to reincarnate it. Cut them all down before one arrives (they burst when killed) or the knight comes back at half HP.",
+      },
+    ],
+  },
   mystic_archer: {
     id: "mystic_archer",
     name: "Mystic Archer",
@@ -683,6 +705,23 @@ export const UNITS: Record<string, UnitDef> = {
     color: "#22c55e",
     accent: "#bbf7d0",
   },
+  // Slime Blob — flung from a dying Slime Knight. Never in a deck; carries a
+  // homeAnchor and races back to the corpse (never fighting) to reincarnate the
+  // knight, bursting weakly if killed en route. Damage 0: it's a pure runner.
+  slime_squire: {
+    id: "slime_squire",
+    name: "Slime Blob",
+    rarity: "rare",
+    role: "Summoned",
+    hp: 40,
+    damage: 0,
+    attackSpeed: 2,
+    moveSpeed: 72, // quick — it's racing the enemy to the grave
+    range: MELEE,
+    ability: "lifesteal", // passive filler — never casts, never attacks
+    color: "#3ec46f",
+    accent: "#c9f9d8",
+  },
 };
 
 export const UNIT_IDS = Object.keys(UNITS);
@@ -696,6 +735,7 @@ export const SUMMONED_UNIT_IDS = new Set<string>([
   "wolf",
   "skeleton",
   "slime_clone",
+  "slime_squire",
   "turret",
   "boar",
   "bloatling",

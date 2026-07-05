@@ -92,6 +92,27 @@ export function stepMovement(ctx: MovementContext): void {
     // skip it here so the dash isn't applied twice in one tick.
     if (unit.chargeTicks > 0) continue;
 
+    // --- Homing blob: ooze toward a fixed anchor, ignoring combat ----------
+    // A Slime Knight split blob (homeAnchor set, no target) races back to the
+    // corpse to reincarnate the knight; its arrival is resolved in the kit's
+    // onTick. It idles out of the combat loop each tick (no target), so this runs
+    // ahead of the normal moving-state gate below. Stunned/dead blobs hold — the
+    // combat loop parks them in those states, which this branch declines to move.
+    if (
+      unit.homeAnchor &&
+      (unit.state === "idle" || unit.state === "moving")
+    ) {
+      const home = unit.homeAnchor;
+      const homeSpeed = unit.moveSpeed * moveSpeedMultiplier(unit) * SEC_PER_TICK;
+      if (dist(unit.pos, home) > 4) {
+        const v = dir(unit.pos, home);
+        unit.pos.x += v.x * homeSpeed;
+        unit.pos.y += v.y * homeSpeed;
+        unit.facing = v.x >= 0 ? 1 : -1;
+      }
+      continue;
+    }
+
     // Movement runs in the moving state. Ranged units are also allowed to
     // reposition while attacking, so they can kite-and-shoot rather than stand
     // and trade. Stunned / casting / dead never move.
