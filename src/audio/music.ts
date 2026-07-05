@@ -384,3 +384,66 @@ export function pickDepthsTrack(floor: number): MusicTrackId {
   const pool: MusicTrackId[] = ["longDark", "coldVigil", "catacombHymn"];
   return pool[Math.floor(Math.random() * pool.length)];
 }
+
+// ---------------------------------------------------------------------------
+// Result stingers — one-shot victory/defeat pieces outside the loop system.
+// Playing one ends the looping battle track (the battle is over); the hub
+// theme returns when the player leaves the results screen and the shell
+// declares emberfall again. Same A-rooted language as the tracks, and same
+// palette rule: drones and triangle/sine voices, no chirpy square leads.
+// ---------------------------------------------------------------------------
+
+export type StingerId = "victory" | "defeat";
+
+const STINGER_DUR: Record<StingerId, number> = { victory: 4.5, defeat: 5.5 };
+
+const STINGERS: Record<StingerId, (t0: number, out: GainNode) => void> = {
+  /** A-major sunrise: low drone, a rising triangle arpeggio, then the chord
+   *  swells and holds with one distant bell on top. Warm, not brassy. */
+  victory(t0, out) {
+    thump(t0, 0.2, out, 130, 30);
+    drone(t0, 45, 4.4, "triangle", 0.09, out); // A2 floor
+    drone(t0, 52, 4.4, "sine", 0.04, out); // E3
+    const arp = [[0, 57], [0.18, 61], [0.36, 64], [0.54, 69]]; // A C# E A
+    for (const [at, m] of arp) tone(t0 + at, m, 0.55, "triangle", 0.07, out);
+    thump(t0 + 0.72, 0.12, out, 110, 36); // land the chord
+    for (const m of [57, 61, 64]) drone(t0 + 0.72, m, 3.4, "triangle", 0.05, out);
+    tone(t0 + 1.2, 76, 1.4, "sine", 0.02, out); // E5 shimmer
+    tone(t0 + 1.7, 81, 2.2, "sine", 0.016, out); // A5 distant bell
+  },
+  /** A-minor lament: the line falls A→G→F and hangs unresolved on E over a
+   *  detuned choir, with a slow toll and wind. Somber, not punishing. */
+  defeat(t0, out) {
+    thump(t0, 0.08, out, 60, 28); // toll
+    drone(t0, 33, 5.4, "triangle", 0.11, out); // A1 floor
+    noiseHit(t0, 5.4, 0.018, out, "lowpass", 400); // wind
+    const line = [[0, 57, 0.9], [0.8, 55, 0.9], [1.6, 53, 0.9], [2.4, 52, 2.2]];
+    for (const [at, m, d] of line) tone(t0 + at, m, d, "triangle", 0.06, out);
+    for (const m of [45, 52, 60]) // Am choir, detuned pairs
+      for (const dt of [-0.07, 0.07]) drone(t0 + 1.5, m + dt, 3.8, "triangle", 0.02, out);
+    thump(t0 + 2.4, 0.06, out, 55, 26); // second, farther toll
+    tone(t0 + 3.2, 69, 1.8, "sine", 0.013, out, 66); // distant falling cry
+  },
+};
+
+/** Play a one-shot result stinger. Ends the current looping track (fade-out)
+ *  and leaves silence behind it — screens re-declare music afterwards via
+ *  setMusicTrack. Honors mute and the musicVol slider at fire time. */
+export function playStinger(id: StingerId): void {
+  desired = null; // the battle track ends with the battle
+  installAudioUnlockListener();
+  apply(); // fades out the loop and refreshes ctx/noiseBuf mirrors
+  if (!ctx || !isAudioUnlocked() || getSettings().muted) return;
+  const c = ctx;
+  const gain = c.createGain();
+  gain.gain.value = musicVol();
+  gain.connect(c.destination);
+  STINGERS[id](c.currentTime + 0.05, gain);
+  window.setTimeout(() => {
+    try {
+      gain.disconnect();
+    } catch {
+      /* already gone */
+    }
+  }, (STINGER_DUR[id] + 1) * 1000);
+}
