@@ -134,13 +134,6 @@ export function rareSpawnQuestForFloor(floor: number): RareSpawnQuest | undefine
   return RARE_SPAWN_QUESTS.find((q) => q.floor === floor);
 }
 
-/** Units whose purchase is gated behind a rare-spawn quest (never chest-dropped,
- *  never granted by the grandfather clause, not buyable until the quest is done). */
-export const QUEST_LOCKED_UNITS = new Set<string>(
-  RARE_SPAWN_QUESTS.map((q) => q.unlocks)
-);
-
-/** The rare-spawn quest that unlocks `unitId`'s purchase, if any. */
-export function questForUnlock(unitId: string): RareSpawnQuest | undefined {
-  return RARE_SPAWN_QUESTS.find((q) => q.unlocks === unitId);
-}
+// QUEST_LOCKED_UNITS and questForUnlock moved to data/dungeons.ts — they must
+// span EVERY dungeon's quest, not just The Depths'. This module stays the home
+// of the shared shapes (DepthsTier, RareSpawnQuest) + the Depths' own tuning.

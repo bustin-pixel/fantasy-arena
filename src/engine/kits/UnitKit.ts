@@ -27,6 +27,7 @@ import { assassinKit } from "./assassin";
 import { berserkerKit } from "./berserker";
 import { bloaterKit, bloatlingKit } from "./bloater";
 import { boarKit } from "./boar";
+import { bonecallerKit } from "./bonecaller";
 import { clericKit } from "./cleric";
 import { druidKit } from "./druid";
 import { electricMageKit } from "./electricMage";
@@ -43,6 +44,7 @@ import { ogreKit } from "./ogre";
 import { orcKit } from "./orc";
 import { rangerKit } from "./ranger";
 import { rogueKit } from "./rogue";
+import { runeGolemKit } from "./runeGolem";
 import { slimeKit, slimeCloneKit } from "./slime";
 import { slimeKnightKit, slimeBlobKit } from "./slimeKnight";
 import { tricksterKit } from "./trickster";
@@ -149,22 +151,34 @@ export type UnitKitRegistry = Record<string /* defId */, UnitKit>;
  *  units getKit returns undefined and the engine falls back to the old hardcoded
  *  path, so behavior — and digest() — is unchanged until a unit's kit is born. */
 export const UNIT_KITS: UnitKitRegistry = {
+  abomination: ogreKit, // Bonefields boss: Second Wind + Crushing Slam (reused)
   aegis_knight: aegisKnightKit,
+  ancient_automaton: runeGolemKit, // Deep Forge catalyst: Warded Plating (halves damage)
+  apex_beast: ogreKit, // The Wilds catalyst: a great bear — Second Wind + Slam (reused)
   arcane_mage: arcaneMageKit,
   archer: archerKit,
+  archmage: arcaneMageKit, // Sealed Vault catalyst: Arcane Barrage + Blink (reused)
   assassin: assassinKit,
   berserker: berserkerKit,
   bloater: bloaterKit,
   bloatling: bloatlingKit,
   boar: boarKit,
+  bonecaller: bonecallerKit, // Bonefields: Raise Dead (skeletons)
+  dire_alpha: berserkerKit, // The Wilds boss: Bloodrage + Cleave + Last Stand (reused)
+  dryad: clericKit, // The Overgrowth: Mend (grove healer, reused)
+  eclipse_herald: arcaneMageKit, // Eclipse Spire catalyst: Arcane Barrage + Blink (reused)
+  eclipse_warden: mysticArcherKit, // Eclipse Spire boss: Light/Dark + Momentum (reused)
+  elder_treant: ogreKit, // The Overgrowth boss: Crushing Slam + Regrowth (reused)
   electric_mage: electricMageKit,
   engineer: engineerKit,
   fire_mage: fireMageKit,
+  forge_golem: ogreKit, // Deep Forge boss: Crushing Slam + Reforge (reused)
   healer: clericKit,
   holy_knight: holyKnightKit,
   hunter: hunterKit,
   ice_mage: iceMageKit,
   knight: knightKit,
+  lich: necromancerKit, // Bonefields catalyst: raise + Curse + Terrify (reused)
   mage: mageKit,
   mystic_archer: mysticArcherKit,
   necromancer: necromancerKit,
@@ -172,6 +186,7 @@ export const UNIT_KITS: UnitKitRegistry = {
   orc: orcKit,
   ranger: rangerKit,
   rogue: rogueKit,
+  rune_golem: runeGolemKit, // Sealed Vault boss: Warded Hide (halves all damage)
   slime: slimeKit,
   slime_clone: slimeCloneKit,
   slime_knight: slimeKnightKit,
@@ -179,6 +194,7 @@ export const UNIT_KITS: UnitKitRegistry = {
   summoner: druidKit,
   trickster: tricksterKit,
   warrior: warriorKit,
+  wildheart: berserkerKit, // The Overgrowth catalyst: Wild Fury + Thrash + Ever-Green (reused)
   zombie_shambler: zombieShamblerKit,
 };
 

@@ -1,33 +1,29 @@
 // ============================================================================
-// FloorPickerSheet — choose a Depths floor before descending.
+// FloorPickerSheet — choose a floor before descending into a dungeon.
 // Selectable floors: everything cleared (replayable) plus the next uncleared
-// one, capped at the deepest floor that has tier data. Reuses the
-// detail-overlay modal pattern (AppShell exempts it from page-swipe drags).
+// one, capped at the dungeon's deepest floor. Reuses the detail-overlay modal
+// pattern (AppShell exempts it from page-swipe drags). Dungeon-driven: The
+// Depths and every themed legendary dungeon share this one sheet.
 // ============================================================================
 
 import { useEffect, useState } from "react";
-import { DEPTHS_TIERS, isBossFloor } from "@/data/depths";
+import { isBossFloorIn, type Dungeon } from "@/data/dungeons";
 import { GOLD_REWARDS } from "@/meta/economy";
 
 interface Props {
+  dungeon: Dungeon;
   highestClearedFloor: number;
   onDescend: (floor: number) => void;
   onClose: () => void;
 }
 
-/** Deepest floor the current tier tables can build a wave for. */
-export const MAX_FLOOR_WITH_DATA =
-  DEPTHS_TIERS[DEPTHS_TIERS.length - 1].floors[1];
-
 export function FloorPickerSheet({
+  dungeon,
   highestClearedFloor,
   onDescend,
   onClose,
 }: Props) {
-  const maxSelectable = Math.min(
-    highestClearedFloor + 1,
-    MAX_FLOOR_WITH_DATA
-  );
+  const maxSelectable = Math.min(highestClearedFloor + 1, dungeon.floors);
   // Default to the next uncleared floor (clamped) — descent is always optimal.
   const [selected, setSelected] = useState(maxSelectable);
 
@@ -46,6 +42,9 @@ export function FloorPickerSheet({
 
   const floors = [];
   for (let f = 1; f <= maxSelectable; f++) floors.push(f);
+  // Boss chest tier label: The Depths' bosses give silver; the themed dungeons'
+  // deep bosses give gold (mirrors the reward fold in meta/rewards.ts).
+  const bossChest = dungeon.id === "depths" ? "silver" : "gold";
 
   return (
     <div className="detail-overlay" onClick={onClose}>
@@ -58,12 +57,12 @@ export function FloorPickerSheet({
         <button className="detail-close" onClick={onClose} aria-label="Close">
           ✕
         </button>
-        <h3 className="floor-sheet-title">The Depths</h3>
+        <h3 className="floor-sheet-title">{dungeon.name}</h3>
 
         <ul className="floor-list">
           {floors.map((floor) => {
             const cleared = floor <= highestClearedFloor;
-            const boss = isBossFloor(floor);
+            const boss = isBossFloorIn(dungeon, floor);
             const firstClearGold =
               GOLD_REWARDS.depthsFirstClearBase +
               GOLD_REWARDS.depthsFirstClearPerFloor * floor;
@@ -82,13 +81,13 @@ export function FloorPickerSheet({
                   <span className="floor-reward">
                     {cleared
                       ? `✓ Replay · ${GOLD_REWARDS.depthsReplay}g`
-                      : `${firstClearGold}g + ${boss ? "silver" : "wooden"} chest`}
+                      : `${firstClearGold}g + ${boss ? bossChest : "wooden"} chest`}
                   </span>
                 </button>
               </li>
             );
           })}
-          {maxSelectable < MAX_FLOOR_WITH_DATA && (
+          {maxSelectable < dungeon.floors && (
             <li className="floor-locked" aria-hidden>
               Floor {maxSelectable + 1} — clear floor {maxSelectable} first
             </li>

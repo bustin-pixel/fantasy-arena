@@ -10,6 +10,7 @@ function Shell() {
   const [view, setView] = useState<"shell" | "battle">("shell");
   const [battleMode, setBattleMode] = useState<BattleMode>("solo");
   const [battleFloor, setBattleFloor] = useState(1);
+  const [battleDungeonId, setBattleDungeonId] = useState("depths");
   const { save } = useGameState();
   // Snapshot the deck at battle start so mid-battle edits can't mutate it.
   const [activeDeck, setActiveDeck] = useState<string[]>([]);
@@ -33,14 +34,16 @@ function Shell() {
           deck={activeDeck}
           mode={battleMode}
           floor={battleFloor}
+          dungeonId={battleDungeonId}
           onExit={() => setView("shell")}
         />
       ) : (
         <AppShell
-          onBattle={(mode, floor = 1) => {
+          onBattle={(mode, floor = 1, dungeonId = "depths") => {
             setActiveDeck(save.deck.slice(0, 4));
             setBattleMode(mode);
             setBattleFloor(floor);
+            setBattleDungeonId(dungeonId);
             setView("battle");
           }}
         />

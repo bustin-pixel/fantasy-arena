@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useGameState } from "@/state/GameStateContext";
 import { DECKABLE_UNIT_IDS, getUnitDef } from "@/data/units";
-import { DEPTHS_TIERS } from "@/data/depths";
+import { DUNGEONS } from "@/data/dungeons";
 import { RARITIES } from "@/data/rarities";
 import { renderPortrait } from "@/engine/Renderer";
 import { UnitDetail } from "@/components/UnitDetail";
@@ -28,15 +28,22 @@ const SILHOUETTE: Record<Exclude<RevealTier, "defeated">, string> = {
   encountered: "#4a4438",
 };
 
-/** The Depths bestiary roster, in tier order: each tier's monsters then its
- *  boss. Grows automatically as later tiers land in data/depths.ts. */
+/** The bestiary roster across EVERY dungeon, in tier order: each tier's monsters
+ *  then its boss, plus each dungeon's rare fusion catalyst when that catalyst
+ *  isn't itself a deckable hero (the Slime is; the Lich isn't). Grows
+ *  automatically as dungeons/tiers land in data/dungeons.ts. */
 const MONSTER_IDS: string[] = (() => {
   const out: string[] = [];
-  for (const tier of DEPTHS_TIERS) {
-    for (const id of Object.keys(tier.monsters)) {
-      if (!out.includes(id)) out.push(id);
+  const add = (id: string) => {
+    if (id && !out.includes(id)) out.push(id);
+  };
+  for (const dungeon of Object.values(DUNGEONS)) {
+    for (const tier of dungeon.tiers) {
+      for (const id of Object.keys(tier.monsters)) add(id);
+      add(tier.boss);
     }
-    if (!out.includes(tier.boss)) out.push(tier.boss);
+    const spawn = dungeon.quest?.spawnId;
+    if (spawn && !DECKABLE_UNIT_IDS.includes(spawn)) add(spawn);
   }
   return out;
 })();

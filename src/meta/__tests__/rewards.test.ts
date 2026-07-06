@@ -19,12 +19,8 @@ import {
 } from "@/meta/economy";
 import { DECKABLE_UNIT_IDS, getUnitDef } from "@/data/units";
 import { RARITY_ORDER } from "@/data/rarities";
-import {
-  DEPTHS_TIERS,
-  QUEST_LOCKED_UNITS,
-  RARE_SPAWN_QUESTS,
-  rareSpawnQuestForFloor,
-} from "@/data/depths";
+import { DEPTHS_TIERS, rareSpawnQuestForFloor } from "@/data/depths";
+import { DUNGEONS, QUEST_LOCKED_UNITS, getDungeon } from "@/data/dungeons";
 
 const NO_UNITS: string[] = [];
 const ALL_UNITS = [...DECKABLE_UNIT_IDS];
@@ -182,6 +178,39 @@ describe("computeBattleRewards — rare-spawn quest unlock", () => {
   });
 });
 
+describe("computeBattleRewards — themed dungeon quest (The Bonefields)", () => {
+  const dungeon = getDungeon("bonefields");
+  const quest = dungeon.quest!; // lich → necromancer, requires fire_mage, floor 3
+  const base = { unlockedUnits: NO_UNITS, highestClearedFloor: 0, chestSeed: 7 };
+
+  it("slaying the rare Lich with a Fire Mage fielded unlocks the Necromancer", () => {
+    const r = computeBattleRewards({
+      ...base, mode: "depths", dungeonId: "bonefields", floor: quest.floor,
+      outcome: "victory", highestClearedFloor: quest.floor, // replay isolates the field
+      deck: [quest.requires], slain: [quest.spawnId],
+    });
+    expect(r.questUnlock).toBe("necromancer");
+  });
+
+  it("a different dungeon's catalyst does NOT fire here (dungeon-scoped quests)", () => {
+    // The Slime is the Depths catalyst; slaying it inside The Bonefields is inert.
+    const r = computeBattleRewards({
+      ...base, mode: "depths", dungeonId: "bonefields", floor: quest.floor,
+      outcome: "victory", highestClearedFloor: quest.floor,
+      deck: ["knight"], slain: ["slime"],
+    });
+    expect(r.questUnlock).toBeUndefined();
+  });
+
+  it("its boss floor drops a gold chest (a deep boss), not silver", () => {
+    const r = computeBattleRewards({
+      ...base, mode: "depths", dungeonId: "bonefields", floor: dungeon.floors,
+      outcome: "victory", highestClearedFloor: 0, // first clear → chest
+    });
+    expect(r.chest?.tier).toBe("gold");
+  });
+});
+
 describe("computeBattleRewards — the reward matrix", () => {
   const base = {
     unlockedUnits: NO_UNITS,
@@ -278,11 +307,13 @@ describe("economy data sanity (guards designer typos)", () => {
     }
   });
 
-  it("rare-spawn quests reward a deckable non-starter unit on a floor with tier data", () => {
-    const maxFloorWithData = DEPTHS_TIERS[DEPTHS_TIERS.length - 1].floors[1];
-    for (const quest of RARE_SPAWN_QUESTS) {
+  it("every dungeon's rare-spawn quest is valid (real catalyst on a real floor; deckable, non-starter, quest-locked reward)", () => {
+    for (const dungeon of Object.values(DUNGEONS)) {
+      const quest = dungeon.quest;
+      if (!quest) continue;
       expect(quest.floor).toBeGreaterThanOrEqual(1);
-      expect(quest.floor).toBeLessThanOrEqual(maxFloorWithData);
+      // The catalyst must appear on a real floor of ITS OWN dungeon.
+      expect(quest.floor).toBeLessThanOrEqual(dungeon.floors);
       expect(quest.chance).toBeGreaterThan(0);
       expect(quest.chance).toBeLessThanOrEqual(1);
       expect(quest.price).toBeGreaterThan(0);

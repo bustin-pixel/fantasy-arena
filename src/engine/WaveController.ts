@@ -15,15 +15,15 @@ import { RNG } from "@/utils/rng";
 import { FIELD_WIDTH, secToTicks } from "@/utils/constants";
 import { createUnit } from "@/entities/createUnit";
 import type { SimState } from "./CombatSystem";
+import { WAVE_SPAWN_INTERVAL_SEC } from "@/data/depths";
 import {
-  BOSS_FLOOR_FODDER_SHARE,
-  WAVE_SPAWN_INTERVAL_SEC,
-  floorStatMultipliers,
-  isBossFloor,
-  rareSpawnQuestForFloor,
-  tierForFloor,
-  waveBudget,
-} from "@/data/depths";
+  floorStatMultipliersIn,
+  isBossFloorIn,
+  questForFloorIn,
+  tierForFloorIn,
+  waveBudgetIn,
+  type Dungeon,
+} from "@/data/dungeons";
 
 /** Spawn y — nudged to the top edge so monsters visibly creep in from
  *  off-screen (movement clamps them fully on-field on their first step). */
@@ -31,13 +31,15 @@ const SPAWN_Y = 18;
 
 export class WaveController {
   readonly floor: number;
+  private readonly dungeon: Dungeon;
   /** Monsters still waiting off-screen, in spawn order (boss last). */
   private queue: string[];
   private rng: RNG;
   private spawnCooldown = 0;
 
-  constructor(seed: number, floor: number) {
+  constructor(seed: number, dungeon: Dungeon, floor: number) {
     this.floor = floor;
+    this.dungeon = dungeon;
     // Mix the floor into the seed so every floor of one run rolls fresh waves.
     this.rng = new RNG((seed ^ 0x5eed50a1 ^ Math.imul(floor, 0x9e3779b9)) >>> 0);
     this.queue = this.buildQueue();
@@ -46,10 +48,14 @@ export class WaveController {
   /** Compose the floor's wave: spend the budget on tier monsters (cheap fodder
    *  naturally dominates), then append the boss on boss floors. */
   private buildQueue(): string[] {
-    const tier = tierForFloor(this.floor);
-    const boss = isBossFloor(this.floor);
-    let budget = waveBudget(this.floor);
-    if (boss) budget = Math.max(2, Math.round(budget * BOSS_FLOOR_FODDER_SHARE));
+    const tier = tierForFloorIn(this.dungeon, this.floor);
+    const boss = isBossFloorIn(this.dungeon, this.floor);
+    let budget = waveBudgetIn(this.dungeon, this.floor);
+    if (boss)
+      budget = Math.max(
+        2,
+        Math.round(budget * this.dungeon.bossFloorFodderShare)
+      );
 
     const ids = Object.keys(tier.monsters);
     const queue: string[] = [];
@@ -64,8 +70,8 @@ export class WaveController {
     }
     // Rare-spawn quest: a rare legendary may crash this floor. Rolled AFTER the
     // fodder loop (so the horde composition stays byte-identical) and inserted
-    // BEFORE the boss (so the boss remains the wave's finale). See data/depths.
-    const quest = rareSpawnQuestForFloor(this.floor);
+    // BEFORE the boss (so the boss remains the wave's finale). See data/dungeons.
+    const quest = questForFloorIn(this.dungeon, this.floor);
     if (quest && this.rng.next() < quest.chance) queue.push(quest.spawnId);
     if (boss) queue.push(tier.boss);
     return queue;
@@ -96,7 +102,7 @@ export class WaveController {
     const unit = createUnit(defId, "enemy", { x, y: SPAWN_Y });
     // Depth pressure: monsters (bosses included) spawn pre-scaled by floor.
     // Applied here — not in createUnit — so summons/arena stay untouched.
-    const mult = floorStatMultipliers(this.floor);
+    const mult = floorStatMultipliersIn(this.dungeon, this.floor);
     unit.maxHp = Math.round(unit.maxHp * mult.hp);
     unit.hp = unit.maxHp;
     unit.damage = Math.round(unit.damage * mult.dmg);

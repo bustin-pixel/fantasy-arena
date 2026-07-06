@@ -10,9 +10,15 @@ import {
   type PlayerSave,
 } from "@/state/persistence";
 import { DECKABLE_UNIT_IDS } from "@/data/units";
-import { QUEST_LOCKED_UNITS } from "@/data/depths";
+import { QUEST_LOCKED_UNITS } from "@/data/dungeons";
 import { DEFAULT_AVATAR_ID } from "@/meta/avatars";
 import { STARTER_UNIT_IDS } from "@/meta/economy";
+
+/** Legacy (pre-v6) shape: carried a single `depths` high-water mark before the
+ *  per-dungeon `dungeons` map replaced it. */
+type LegacySave = Partial<PlayerSave> & {
+  depths?: { highestClearedFloor?: number };
+};
 
 /** Deckables minus quest-locked units — the grandfather grant withholds those. */
 const GRANDFATHERED_UNITS = DECKABLE_UNIT_IDS.filter(
@@ -24,7 +30,7 @@ function v2Save(): Partial<PlayerSave> {
   return {
     version: 2,
     username: "Veteran",
-    deck: ["summoner", "warrior", "healer", "ranger"],
+    deck: ["warrior", "healer", "ranger", "berserker"],
     wins: 12,
     losses: 3,
     bestiary: { bloater: { encountered: true, defeated: true } },
@@ -34,11 +40,12 @@ function v2Save(): Partial<PlayerSave> {
 describe("migrateSave", () => {
   it("null (new player) → defaults: starter units, 0 gold, floor 0", () => {
     const save = migrateSave(null);
-    expect(save.version).toBe(5);
+    expect(save.version).toBe(6);
     expect(save.username).toBe("Champion");
     expect(save.avatarId).toBe(DEFAULT_AVATAR_ID);
     expect(save.gold).toBe(0);
-    expect(save.depths.highestClearedFloor).toBe(0);
+    expect(save.dungeons.depths.highestClearedFloor).toBe(0);
+    expect(save.dungeons.bonefields.highestClearedFloor).toBe(0);
     expect(save.questUnlocks).toEqual([]);
     expect([...save.unlockedUnits].sort()).toEqual(
       [...STARTER_UNIT_IDS].sort()
@@ -55,7 +62,7 @@ describe("migrateSave", () => {
     }
     expect(save.questUnlocks).toEqual([]);
     expect(save.gold).toBe(0);
-    expect(save.depths.highestClearedFloor).toBe(0);
+    expect(save.dungeons.depths.highestClearedFloor).toBe(0);
   });
 
   it("keeps valid questUnlocks and drops junk / non-quest ids", () => {
@@ -69,14 +76,14 @@ describe("migrateSave", () => {
 
   it("keeps a grandfathered deck untouched (sanitize is a no-op)", () => {
     const save = migrateSave(v2Save());
-    expect(save.deck).toEqual(["summoner", "warrior", "healer", "ranger"]);
+    expect(save.deck).toEqual(["warrior", "healer", "ranger", "berserker"]);
     expect(save.wins).toBe(12);
     expect(save.losses).toBe(3);
     expect(save.bestiary.bloater?.defeated).toBe(true);
   });
 
   it("passes a v3 save through, preserving economy fields", () => {
-    const v3: Partial<PlayerSave> = {
+    const v3: LegacySave = {
       version: 3,
       username: "Delver",
       deck: ["ogre", "warrior"],
@@ -86,7 +93,7 @@ describe("migrateSave", () => {
     };
     const save = migrateSave(v3);
     expect(save.gold).toBe(275);
-    expect(save.depths.highestClearedFloor).toBe(4);
+    expect(save.dungeons.depths.highestClearedFloor).toBe(4);
     expect(save.deck).toEqual(["ogre", "warrior"]);
     expect(save.unlockedUnits).toContain("warrior");
   });
@@ -110,9 +117,9 @@ describe("migrateSave", () => {
       gold: -50,
       unlockedUnits: ["ogre", "not_a_unit", "bloater"], // bloater is non-deckable
       depths: { highestClearedFloor: -2 },
-    });
+    } as LegacySave);
     expect(save.gold).toBe(0);
-    expect(save.depths.highestClearedFloor).toBe(0);
+    expect(save.dungeons.depths.highestClearedFloor).toBe(0);
     expect(save.unlockedUnits).not.toContain("not_a_unit");
     expect(save.unlockedUnits).not.toContain("bloater");
   });

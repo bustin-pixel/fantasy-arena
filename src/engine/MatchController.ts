@@ -39,6 +39,7 @@ import {
 import { getKit } from "./kits/UnitKit";
 import { WaveController } from "./WaveController";
 import { isMelee, getUnitDef } from "@/data/units";
+import { getDungeon } from "@/data/dungeons";
 
 /** Match ruleset. Arena is the symmetric 2-concurrent card battle; Depths is
  *  the PvE descent — the player fields the whole warband while a seeded
@@ -49,6 +50,8 @@ export interface MatchOptions {
   mode?: MatchMode;
   /** Depths floor number (drives wave budget/tier). Ignored in arena. */
   floor?: number;
+  /** Which dungeon to descend (defaults to "depths"). Ignored in arena. */
+  dungeonId?: string;
 }
 
 export class MatchController {
@@ -94,7 +97,11 @@ export class MatchController {
         player: DEPTHS_PLAYER_ACTIVE,
         enemy: DEPTHS_ENEMY_ACTIVE,
       };
-      this.wave = new WaveController(seed, opts.floor ?? 1);
+      this.wave = new WaveController(
+        seed,
+        getDungeon(opts.dungeonId ?? "depths"),
+        opts.floor ?? 1
+      );
     }
   }
 

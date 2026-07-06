@@ -364,6 +364,117 @@ export function drawUnitSprite(
     case "mystic_archer":
       drawMysticArcher(ctx, body, dark, light, accent, A, unit.mysticForm);
       break;
+    // The Bonefields (undead) tier — recolors of the skeleton / zombie / caster
+    // bodies (the reskin pattern; colors come from each def's color/accent).
+    case "skeleton_archer":
+      drawSkeleton(ctx, body, dark, light, accent, A, variantOf(unit.uid));
+      break;
+    case "ghoul":
+      drawZombieShambler(ctx, body, dark, light, accent, A, variantOf(unit.uid));
+      break;
+    case "bonecaller":
+    case "lich":
+      drawNecromancer(ctx, body, dark, light, accent, A);
+      break;
+    case "abomination":
+      ctx.scale(1.3, 1.3); // a hulking stitched corpse
+      drawZombieShambler(ctx, body, dark, light, accent, A, variantOf(unit.uid));
+      break;
+    // The Wilds (feral beast) tier — recolors of the wolf / boar / bear draws.
+    case "dire_wolf":
+      drawWolf(ctx, body, dark, light, accent, A);
+      break;
+    case "razorback":
+      drawBoar(ctx, body, dark, light, accent, A);
+      break;
+    case "dire_alpha":
+      ctx.scale(1.3, 1.3); // a giant pack alpha
+      drawWolf(ctx, body, dark, light, accent, A);
+      break;
+    case "grizzly":
+      ctx.scale(0.9, 0.9); // a normal bear (the Apex Beast is the giant one)
+      drawBear(ctx, body, dark, light, accent, A);
+      break;
+    case "apex_beast":
+      drawBear(ctx, body, dark, light, accent, A);
+      break;
+    // The Sealed Vault (arcane) tier — mage-robe reskins, a new wisp orb, and a
+    // rune-carved stone golem (recolored brute).
+    case "arcane_wisp":
+      drawWisp(ctx, body, dark, light, accent, A);
+      break;
+    case "imp":
+      ctx.scale(0.75, 0.75); // a little fiend
+      drawMage(ctx, body, dark, light, accent, A, "fire");
+      break;
+    case "cultist":
+      drawMage(ctx, body, dark, light, accent, A, "arcane");
+      break;
+    case "archmage":
+      ctx.scale(1.15, 1.15); // a grand caster
+      drawMage(ctx, body, dark, light, accent, A, "arcane");
+      break;
+    case "rune_golem":
+      ctx.scale(1.35, 1.35); // a hulking construct
+      drawBrute(ctx, body, dark, light, accent, A);
+      break;
+    // The Overgrowth (nature) tier — new plant sprites + a mossy-boar / dryad reskin.
+    case "thornbeast":
+      drawBoar(ctx, body, dark, light, accent, A);
+      break;
+    case "spore_pod":
+      drawSporePod(ctx, body, dark, light, accent, A);
+      break;
+    case "dryad":
+      drawHealer(ctx, body, dark, light, accent, A);
+      break;
+    case "elder_treant":
+      ctx.scale(1.4, 1.4); // a colossal ancient tree
+      drawTreant(ctx, body, dark, light, accent, A);
+      break;
+    case "wildheart":
+      ctx.scale(1.1, 1.1); // the grove's radiant heart
+      drawTreant(ctx, body, dark, light, accent, A);
+      break;
+    // The Eclipse Spire (celestial) tier — light/dark tints of the wisp / shade /
+    // mage / mystic-archer draws.
+    case "light_wisp":
+      drawWisp(ctx, body, dark, light, accent, A);
+      break;
+    case "shadow_wraith":
+      drawAssassin(ctx, body, dark, light, accent, A);
+      break;
+    case "eclipse_acolyte":
+      drawMage(ctx, body, dark, light, accent, A, "arcane");
+      break;
+    case "eclipse_warden":
+      ctx.scale(1.3, 1.3); // a towering celestial warden
+      drawMysticArcher(ctx, body, dark, light, accent, A, unit.mysticForm);
+      break;
+    case "eclipse_herald":
+      ctx.scale(1.15, 1.15); // a grand herald
+      drawMage(ctx, body, dark, light, accent, A, "arcane");
+      break;
+    // The Deep Forge (construct) tier — metal reskins of the rat / turret / knight
+    // / brute draws.
+    case "clockwork_spider":
+      ctx.scale(0.8, 0.8); // a small scuttler
+      drawGiantRat(ctx, body, dark, light, accent, A);
+      break;
+    case "sentry":
+      drawTurret(ctx, body, dark, light, accent, A);
+      break;
+    case "animated_armor":
+      drawKnight(ctx, body, dark, light, accent, A, KNIGHT_LIVERY);
+      break;
+    case "forge_golem":
+      ctx.scale(1.4, 1.4); // a molten colossus
+      drawBrute(ctx, body, dark, light, accent, A);
+      break;
+    case "ancient_automaton":
+      ctx.scale(1.2, 1.2); // a relic construct
+      drawBrute(ctx, body, dark, light, accent, A);
+      break;
     default:
       drawBrute(ctx, body, dark, light, accent, A);
   }
@@ -928,6 +1039,144 @@ function drawOgre(ctx: Ctx, body: string, dark: string, light: string, accent: s
 
 // Generic hulking humanoid — used by the zombie shambler (rot palette) and as
 // the fallback body for any unit without its own draw routine.
+// An ancient walking tree (the Overgrowth's Elder Treant / Wildheart): a tapered
+// bark trunk with root-legs + branch-arms and a leafy canopy, glowing eyes in the
+// bark. Ignores the SpriteAnim so it's portrait-stub safe.
+function drawTreant(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {
+  void A;
+  // trunk
+  ctx.fillStyle = body;
+  ctx.beginPath();
+  ctx.moveTo(-7, 20);
+  ctx.lineTo(-5, -6);
+  ctx.lineTo(5, -6);
+  ctx.lineTo(7, 20);
+  ctx.closePath();
+  ctx.fill();
+  // bark seam
+  ctx.strokeStyle = dark;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-1, 18);
+  ctx.lineTo(0, -4);
+  ctx.stroke();
+  // root legs
+  ctx.fillStyle = dark;
+  ctx.beginPath();
+  ctx.moveTo(-7, 20);
+  ctx.lineTo(-12, 26);
+  ctx.lineTo(-3, 22);
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(7, 20);
+  ctx.lineTo(12, 26);
+  ctx.lineTo(3, 22);
+  ctx.closePath();
+  ctx.fill();
+  // branch arms
+  ctx.strokeStyle = body;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(-5, 2);
+  ctx.lineTo(-14, -5);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(5, 2);
+  ctx.lineTo(14, -5);
+  ctx.stroke();
+  // canopy
+  ctx.fillStyle = accent;
+  for (const [cx, cy, r] of [
+    [-8, -14, 9],
+    [8, -14, 9],
+    [0, -21, 11],
+    [0, -11, 10],
+  ] as const) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // canopy highlight
+  ctx.fillStyle = light;
+  ctx.beginPath();
+  ctx.arc(-3, -20, 3.2, 0, Math.PI * 2);
+  ctx.fill();
+  // glowing eyes in the bark
+  ctx.fillStyle = "#fde68a";
+  ctx.beginPath();
+  ctx.arc(-3, 1, 1.6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(3, 1, 1.6, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// A swollen fungal bloom (the Overgrowth's Spore Pod): a squat stalk under a
+// bulbous spotted cap. Ignores the SpriteAnim (portrait-stub safe).
+function drawSporePod(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {
+  void A;
+  // stalk
+  ctx.fillStyle = dark;
+  ctx.fillRect(-4, 2, 8, 18);
+  // bulbous cap
+  ctx.fillStyle = body;
+  ctx.beginPath();
+  ctx.ellipse(0, -2, 16, 13, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // cap highlight
+  ctx.fillStyle = light;
+  ctx.beginPath();
+  ctx.ellipse(-5, -6, 6, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // spore spots
+  ctx.fillStyle = accent;
+  for (const [sx, sy] of [
+    [-8, -4],
+    [6, -8],
+    [9, 0],
+    [-2, 2],
+    [2, -11],
+  ] as const) {
+    ctx.beginPath();
+    ctx.arc(sx, sy, 2.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+// A drifting orb of loosed magic (the Sealed Vault's Arcane Wisp): a glowing
+// core with a soft halo and a couple of orbiting motes. Deliberately ignores the
+// SpriteAnim so it's safe in the portrait stub (no per-frame field reads).
+function drawWisp(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {
+  void dark;
+  void A;
+  // soft outer halo
+  ctx.globalAlpha = 0.3;
+  ctx.fillStyle = accent;
+  ctx.beginPath();
+  ctx.arc(0, -6, 15, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  // orb body
+  ctx.fillStyle = body;
+  ctx.beginPath();
+  ctx.arc(0, -6, 8, 0, Math.PI * 2);
+  ctx.fill();
+  // bright core
+  ctx.fillStyle = light;
+  ctx.beginPath();
+  ctx.arc(-2, -8, 3.5, 0, Math.PI * 2);
+  ctx.fill();
+  // orbiting motes
+  ctx.fillStyle = accent;
+  ctx.beginPath();
+  ctx.arc(11, -6, 2.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(-9, -1, 1.6, 0, Math.PI * 2);
+  ctx.fill();
+}
+
 function drawBrute(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {
   metalBody(ctx, 22, 24, -2, body, dark, light, 5);
   ctx.fillStyle = dark;

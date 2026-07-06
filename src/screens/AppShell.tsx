@@ -10,9 +10,9 @@ import { useGameState } from "@/state/GameStateContext";
 import type { BattleMode } from "@/hooks/useBattleEngine";
 
 interface Props {
-  /** Launch a battle in the given mode (from a Home mode card). Depths
-   *  passes the floor picked in the floor sheet. */
-  onBattle: (mode: BattleMode, floor?: number) => void;
+  /** Launch a battle in the given mode (from a Home mode card). Depths passes
+   *  the floor picked in the floor sheet + the chosen dungeon id. */
+  onBattle: (mode: BattleMode, floor?: number, dungeonId?: string) => void;
 }
 
 // Page order: Collection (0) ← Home (1) → Compendium (2). Home is the landing.

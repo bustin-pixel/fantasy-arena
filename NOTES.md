@@ -283,9 +283,9 @@ sound:
   everyone — only the one-time v2→v3 migration grandfathers everything.
 - **Grant-then-reveal**: rewards are committed before the results overlay
   animates; the chest tap is ceremony, so leaving early can't lose loot.
-- **Quest-locked units** (`QUEST_LOCKED_UNITS`, derived from `RARE_SPAWN_QUESTS`
-  in `data/depths.ts` — a data file so the engine can read it too) are a THIRD
-  ownership state between locked and owned: `save.questUnlocks` (v5) means "the
+- **Quest-locked units** (`QUEST_LOCKED_UNITS`, in `data/dungeons.ts`, derived
+  from EVERY dungeon's `quest` — data files so the engine can read them too) are a
+  THIRD ownership state between locked and owned: `save.questUnlocks` (v5) means "the
   quest is done → the unit is now BUYABLE" (at the quest's discounted `price`),
   distinct from `unlockedUnits` ("owned"). They're withheld from chest drops
   (`CHEST_POOL` filter in rewards.ts), from the grandfather grant, and from
@@ -295,6 +295,20 @@ sound:
   with a Knight). Three UI surfaces read the state: the card badge + the detail
   footer (`HubScreen` → `CardPortrait.lockLabel` / `UnitDetail.lockHint`+
   `unlockPrice`) and the results callout (`RewardPanel`).
+- **Dungeons are data** (`data/dungeons.ts`): a `Dungeon` owns its tiers/boss/
+  scaling/budget/theme/floors + one rare-spawn `quest`. The Depths is
+  `DUNGEONS.depths` (wraps the legacy `depths.ts` tuning unchanged → byte-identical
+  waves; that's why `depths.ts` still exports the Depths globals + the shared
+  `DepthsTier`/`RareSpawnQuest` shapes). WaveController, MatchController (`dungeonId`
+  opt), `computeBattleRewards` (`dungeonId`), `FloorPickerSheet`, and the new
+  `DungeonMapSheet` are all dungeon-driven; the depths branch reads `dungeon.theme`.
+  **Save v6**: `save.dungeons` (per-dungeon `{highestClearedFloor}` map, via
+  `highestClearedFloorOf`) replaced the single `save.depths`; `migrateSave` copies the
+  legacy field into `dungeons.depths`. Adding a themed dungeon = a `DUNGEONS` row + its
+  monsters (kits/sprites reuse existing draws) + a `quest` row (auto-joins
+  `QUEST_LOCKED_UNITS`, so the reward legendary becomes quest-exclusive for free).
+  Themed legendary dungeons are a phased roadmap (Bonefields→Necromancer built; see
+  the plan file / the `themed-legendary-dungeons` memory).
 
 ---
 
