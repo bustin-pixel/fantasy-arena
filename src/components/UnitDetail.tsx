@@ -94,7 +94,24 @@ export function UnitDetail({
 
   useEffect(() => {
     const ctx = canvasRef.current?.getContext("2d");
-    if (ctx) renderPortrait(ctx, defId, ART_SIZE);
+    if (!ctx) return;
+    // The Aegis Knight's shield-charge VFX is invisible at rest (it tracks real
+    // banked magic), so its detail panel plays a looping charge cycle to show it
+    // off. Every other unit keeps the cheap one-shot static portrait.
+    if (defId !== "aegis_knight") {
+      renderPortrait(ctx, defId, ART_SIZE);
+      return;
+    }
+    let raf = 0;
+    const start = performance.now();
+    const loop = (now: number) => {
+      const cyc = ((now - start) / 1000) % 4.2;
+      const charge = cyc < 3 ? cyc / 3 : 1; // fill over 3s, hold armed ~1.2s
+      renderPortrait(ctx, defId, ART_SIZE, { charge, live: true });
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
   }, [defId]);
 
   // Close on Escape.
