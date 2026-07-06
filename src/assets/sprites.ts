@@ -71,6 +71,12 @@ function withShade(hex: string, amt: number): string {
   return `rgb(${r},${g},${b})`;
 }
 
+/** Same colour at a given alpha (for glow fills / gradients). */
+function withAlpha(hex: string, a: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
+}
+
 /** Body bob/lunge offsets from animation state. */
 function animOffsets(unit: Unit): { bob: number; lunge: number; cast: number } {
   const t = unit.animTime;
@@ -259,9 +265,12 @@ export function drawUnitSprite(
     case "warrior":
       drawWarrior(ctx, body, dark, light, accent, A);
       break;
-    case "aegis_knight":
-      drawAegisKnight(ctx, body, dark, light, accent, A);
+    case "aegis_knight": {
+      const smax = unit.shieldHpMax ?? 0;
+      const charge = smax > 0 ? Math.min(1, (unit.shieldHp ?? 0) / smax) : 0;
+      drawAegisKnight(ctx, body, dark, light, accent, A, charge);
       break;
+    }
     case "holy_knight":
       drawKnight(ctx, body, dark, light, accent, A, HOLY_LIVERY);
       break;
@@ -1156,6 +1165,26 @@ function drawZombieShambler(
 // Orc — a bare-chested warband champion: carved abs, spiked iron pauldrons,
 // a fang necklace, and pointed ears. Big axe stays in the right hand.
 function drawOrc(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {
+  // Bloodlust: an ever-present red rage aura that swells on a lub-dub heartbeat.
+  // Presentation-only (from A.t); the same beat flashes the eyes and flushes the
+  // body below. Static portraits (cards) show a steady glow, not a frozen thump.
+  const bp = A.t % 1.05;
+  const pulse = Math.min(
+    1,
+    Math.exp(-Math.pow(bp * 10, 2)) + 0.7 * Math.exp(-Math.pow((bp - 0.19) * 10, 2))
+  );
+  const beat = A.live ? pulse : 0.4;
+  ctx.save();
+  const auraR = 30 * (1 + 0.05 * beat);
+  const aura = ctx.createRadialGradient(0, 3, 3, 0, 3, auraR);
+  aura.addColorStop(0, `rgba(239,68,68,${0.3 + 0.28 * beat})`);
+  aura.addColorStop(0.5, `rgba(220,38,38,${0.12 + 0.16 * beat})`);
+  aura.addColorStop(1, "rgba(127,29,29,0)");
+  ctx.fillStyle = aura;
+  ctx.beginPath();
+  ctx.ellipse(0, 3, auraR, auraR * 1.08, 0, 0, PI2);
+  ctx.fill();
+  ctx.restore();
   // bare muscled torso
   metalBody(ctx, 24, 24, -2, body, dark, light, 6);
   // pec + ab definition carved into the gradient
@@ -1235,15 +1264,18 @@ function drawOrc(ctx: Ctx, body: string, dark: string, light: string, accent: st
   ctx.fillStyle = "rgba(255,255,255,0.6)";
   ctx.fillRect(-4.5, -4.5, 1, 1.6);
   ctx.fillRect(2.1, -4.5, 1, 1.6);
-  // eyes with a faint accent glint
+  // eyes — pupils flash red with the heartbeat (bloodlust)
   ctx.fillStyle = "#1a1a1a";
   ctx.fillRect(-4, -12, 2, 2);
   ctx.fillRect(2, -12, 2, 2);
-  ctx.fillStyle = accent;
-  ctx.globalAlpha = 0.6;
-  ctx.fillRect(-4, -12, 1, 1);
-  ctx.fillRect(2, -12, 1, 1);
-  ctx.globalAlpha = 1;
+  ctx.save();
+  ctx.globalAlpha = 0.5 + 0.5 * beat;
+  ctx.fillStyle = "#ff3b30";
+  ctx.shadowColor = "#ff3b30";
+  ctx.shadowBlur = 3 + 9 * beat;
+  ctx.fillRect(-4.1, -12.2, 2.2, 2.4);
+  ctx.fillRect(1.9, -12.2, 2.2, 2.4);
+  ctx.restore();
   // fang necklace on a leather cord
   ctx.strokeStyle = "#3a2a18";
   ctx.lineWidth = 1.2;
@@ -1307,6 +1339,18 @@ function drawOrc(ctx: Ctx, body: string, dark: string, light: string, accent: st
   }
   // double-bit war axe held two-handed at a diagonal ready
   drawOrcWarAxe(ctx, body, light, accent);
+  // rage flush: the whole figure reddens on each heartbeat (additive).
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.globalAlpha = 0.06 + 0.15 * beat;
+  const flush = ctx.createRadialGradient(0, 3, 2, 0, 3, 24);
+  flush.addColorStop(0, "rgba(255,70,70,0.85)");
+  flush.addColorStop(1, "rgba(255,0,0,0)");
+  ctx.fillStyle = flush;
+  ctx.beginPath();
+  ctx.ellipse(0, 3, 22, 26, 0, 0, PI2);
+  ctx.fill();
+  ctx.restore();
 }
 
 /** The orc's double-bit battle axe: crude jagged iron bits flanking a socket
@@ -2171,7 +2215,15 @@ function drawWarrior(ctx: Ctx, body: string, dark: string, light: string, accent
   ctx.restore();
 }
 
-function drawAegisKnight(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {
+function drawAegisKnight(
+  ctx: Ctx,
+  body: string,
+  dark: string,
+  light: string,
+  accent: string,
+  A: SpriteAnim,
+  charge: number
+) {
   metalBody(ctx, 22, 26, -2, body, dark, light, 6);
   // armor seam
   ctx.strokeStyle = dark;
@@ -2216,6 +2268,27 @@ function drawAegisKnight(ctx: Ctx, body: string, dark: string, light: string, ac
   ctx.beginPath();
   ctx.roundRect(-20, -13, 13, 31, 4);
   ctx.fill();
+  // Banked magic rising inside the shield: fills bottom→top from the absorbed
+  // charge (shieldHp/shieldHpMax), so the bar visually tracks the Backlash meter.
+  if (charge > 0) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(-20, -13, 13, 31, 4);
+    ctx.clip();
+    const fh = 31 * charge;
+    const cg = ctx.createLinearGradient(0, 18, 0, 18 - fh);
+    cg.addColorStop(0, withAlpha(accent, 0.6));
+    cg.addColorStop(1, withAlpha(accent, 0.12));
+    ctx.fillStyle = cg;
+    ctx.fillRect(-20, 18 - fh, 13, fh);
+    ctx.strokeStyle = `rgba(226, 245, 255, ${0.35 + 0.4 * Math.sin(A.t * 8)})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(-20, 18 - fh);
+    ctx.lineTo(-7, 18 - fh);
+    ctx.stroke();
+    ctx.restore();
+  }
   ctx.strokeStyle = withShade(accent, -10);
   ctx.lineWidth = 1;
   ctx.strokeRect(-19.5, -12.5, 12, 30);
@@ -2223,7 +2296,7 @@ function drawAegisKnight(ctx: Ctx, body: string, dark: string, light: string, ac
   ctx.save();
   ctx.strokeStyle = accent;
   ctx.shadowColor = accent;
-  ctx.shadowBlur = 5 + A.glow * 7;
+  ctx.shadowBlur = 5 + A.glow * 7 + charge * 8;
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.moveTo(-13.5, -8);
@@ -2239,6 +2312,20 @@ function drawAegisKnight(ctx: Ctx, body: string, dark: string, light: string, ac
   ctx.closePath();
   ctx.stroke(); // diamond rune
   ctx.restore();
+  // Fully banked (Backlash armed): a pulsing halo on the shield rune.
+  if (charge >= 0.999) {
+    ctx.save();
+    const pulse = 0.5 + 0.5 * Math.sin(A.t * 6);
+    ctx.globalAlpha = 0.45 + 0.4 * pulse;
+    ctx.strokeStyle = "#e2f5ff";
+    ctx.shadowColor = accent;
+    ctx.shadowBlur = 10;
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.arc(-13.5, 2, 9 + pulse * 2, 0, PI2);
+    ctx.stroke();
+    ctx.restore();
+  }
   // sword (right hand)
   ctx.save();
   ctx.translate(12, 2);
@@ -2258,6 +2345,45 @@ function drawAegisKnight(ctx: Ctx, body: string, dark: string, light: string, ac
   ctx.closePath();
   ctx.fill();
   ctx.restore();
+  // Rising runes: absorbed magic coursing up the plate. Presentation-only
+  // (derived from A.t, no engine state); only visible while the shield holds charge.
+  if (charge > 0) {
+    for (let i = 0; i < 5; i++) {
+      const speed = 0.32 + (i % 3) * 0.07;
+      const prog = (A.t * speed + i * 0.41) % 1; // 0 at the feet → 1 overhead
+      const y = 22 - prog * 46;
+      const x = Math.sin(i * 51.2) * 8 + Math.sin(A.t * 2 + i) * 1.5;
+      let a = charge * 0.85;
+      if (prog < 0.15) a *= prog / 0.15;
+      else if (prog > 0.6) a *= (1 - prog) / 0.4;
+      if (a <= 0.02) continue;
+      const r = 2.4 + (i % 2) * 1;
+      ctx.save();
+      ctx.globalAlpha = a;
+      ctx.translate(x, y);
+      ctx.rotate(A.t * 1.5 + i);
+      ctx.strokeStyle = accent;
+      ctx.shadowColor = accent;
+      ctx.shadowBlur = 4;
+      ctx.lineWidth = 1;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      if (i % 2 === 0) {
+        ctx.moveTo(0, -r);
+        ctx.lineTo(r * 0.7, 0);
+        ctx.lineTo(0, r);
+        ctx.lineTo(-r * 0.7, 0);
+        ctx.closePath();
+      } else {
+        ctx.moveTo(0, -r);
+        ctx.lineTo(0, r);
+        ctx.moveTo(-r * 0.6, 0);
+        ctx.lineTo(r * 0.6, 0);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
 }
 
 type MageElement = "fire" | "ice" | "arcane" | "electric" | "plain";

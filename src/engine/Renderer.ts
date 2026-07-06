@@ -376,7 +376,7 @@ export function renderPortrait(
   ctx: Ctx,
   defId: string,
   size: number,
-  opts?: { silhouette?: string }
+  opts?: { silhouette?: string; charge?: number; live?: boolean }
 ): void {
   const def = getUnitDef(defId);
   ctx.clearRect(0, 0, size, size);
@@ -393,6 +393,11 @@ export function renderPortrait(
     animTime: 0,
     attackSpeed: def.attackSpeed,
     state: "idle" as const,
+    uid: 0,
+    // Optional charge showcase: fake a banked shield so a unit whose signature
+    // is a chargeable shield (Aegis Knight) can animate it in the detail panel.
+    shieldHp: (opts?.charge ?? 0) * 120,
+    shieldHpMax: opts?.charge != null ? 120 : 0,
   } as unknown as Unit;
 
   if (opts?.silhouette) {
@@ -416,6 +421,6 @@ export function renderPortrait(
 
   drawUnitSprite(ctx, fake, size / 2, size / 2 + 14, {
     scale: size / 70,
-    staticPose: true,
+    staticPose: !opts?.live,
   });
 }

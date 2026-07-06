@@ -94,7 +94,24 @@ export function UnitDetail({
 
   useEffect(() => {
     const ctx = canvasRef.current?.getContext("2d");
-    if (ctx) renderPortrait(ctx, defId, ART_SIZE);
+    if (!ctx) return;
+    // Living portrait: every unit's detail panel animates its idle sprite —
+    // glow pulses, plume/cape sway, caster orbs, ooze, etc. — via a render loop
+    // (staticPose off). The Aegis Knight additionally cycles its shield charge,
+    // whose VFX is otherwise invisible at rest.
+    let raf = 0;
+    const start = performance.now();
+    const loop = (now: number) => {
+      const opts: { live: true; charge?: number } = { live: true };
+      if (defId === "aegis_knight") {
+        const cyc = ((now - start) / 1000) % 4.2;
+        opts.charge = cyc < 3 ? cyc / 3 : 1; // fill over 3s, hold armed ~1.2s
+      }
+      renderPortrait(ctx, defId, ART_SIZE, opts);
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
   }, [defId]);
 
   // Close on Escape.
