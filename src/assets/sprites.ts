@@ -1165,6 +1165,26 @@ function drawZombieShambler(
 // Orc — a bare-chested warband champion: carved abs, spiked iron pauldrons,
 // a fang necklace, and pointed ears. Big axe stays in the right hand.
 function drawOrc(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {
+  // Bloodlust: an ever-present red rage aura that swells on a lub-dub heartbeat.
+  // Presentation-only (from A.t); the same beat flashes the eyes and flushes the
+  // body below. Static portraits (cards) show a steady glow, not a frozen thump.
+  const bp = A.t % 1.05;
+  const pulse = Math.min(
+    1,
+    Math.exp(-Math.pow(bp * 10, 2)) + 0.7 * Math.exp(-Math.pow((bp - 0.19) * 10, 2))
+  );
+  const beat = A.live ? pulse : 0.4;
+  ctx.save();
+  const auraR = 30 * (1 + 0.05 * beat);
+  const aura = ctx.createRadialGradient(0, 3, 3, 0, 3, auraR);
+  aura.addColorStop(0, `rgba(239,68,68,${0.3 + 0.28 * beat})`);
+  aura.addColorStop(0.5, `rgba(220,38,38,${0.12 + 0.16 * beat})`);
+  aura.addColorStop(1, "rgba(127,29,29,0)");
+  ctx.fillStyle = aura;
+  ctx.beginPath();
+  ctx.ellipse(0, 3, auraR, auraR * 1.08, 0, 0, PI2);
+  ctx.fill();
+  ctx.restore();
   // bare muscled torso
   metalBody(ctx, 24, 24, -2, body, dark, light, 6);
   // pec + ab definition carved into the gradient
@@ -1244,15 +1264,18 @@ function drawOrc(ctx: Ctx, body: string, dark: string, light: string, accent: st
   ctx.fillStyle = "rgba(255,255,255,0.6)";
   ctx.fillRect(-4.5, -4.5, 1, 1.6);
   ctx.fillRect(2.1, -4.5, 1, 1.6);
-  // eyes with a faint accent glint
+  // eyes — pupils flash red with the heartbeat (bloodlust)
   ctx.fillStyle = "#1a1a1a";
   ctx.fillRect(-4, -12, 2, 2);
   ctx.fillRect(2, -12, 2, 2);
-  ctx.fillStyle = accent;
-  ctx.globalAlpha = 0.6;
-  ctx.fillRect(-4, -12, 1, 1);
-  ctx.fillRect(2, -12, 1, 1);
-  ctx.globalAlpha = 1;
+  ctx.save();
+  ctx.globalAlpha = 0.5 + 0.5 * beat;
+  ctx.fillStyle = "#ff3b30";
+  ctx.shadowColor = "#ff3b30";
+  ctx.shadowBlur = 3 + 9 * beat;
+  ctx.fillRect(-4.1, -12.2, 2.2, 2.4);
+  ctx.fillRect(1.9, -12.2, 2.2, 2.4);
+  ctx.restore();
   // fang necklace on a leather cord
   ctx.strokeStyle = "#3a2a18";
   ctx.lineWidth = 1.2;
@@ -1316,6 +1339,18 @@ function drawOrc(ctx: Ctx, body: string, dark: string, light: string, accent: st
   }
   // double-bit war axe held two-handed at a diagonal ready
   drawOrcWarAxe(ctx, body, light, accent);
+  // rage flush: the whole figure reddens on each heartbeat (additive).
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.globalAlpha = 0.06 + 0.15 * beat;
+  const flush = ctx.createRadialGradient(0, 3, 2, 0, 3, 24);
+  flush.addColorStop(0, "rgba(255,70,70,0.85)");
+  flush.addColorStop(1, "rgba(255,0,0,0)");
+  ctx.fillStyle = flush;
+  ctx.beginPath();
+  ctx.ellipse(0, 3, 22, 26, 0, 0, PI2);
+  ctx.fill();
+  ctx.restore();
 }
 
 /** The orc's double-bit battle axe: crude jagged iron bits flanking a socket
