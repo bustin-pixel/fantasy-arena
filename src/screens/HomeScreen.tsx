@@ -20,7 +20,9 @@ interface Props {
  */
 export function HomeScreen({ onBattle }: Props) {
   const { save } = useGameState();
-  const ready = save.deck.length >= 2;
+  // A single unit is enough to battle — the engine fields whatever you bring
+  // (readiness is min(deckSize, activeCap)); an empty deck is the only block.
+  const ready = save.deck.length >= 1;
   const [pickingFloor, setPickingFloor] = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
   const nextFloor = Math.min(

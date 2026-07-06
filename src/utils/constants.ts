@@ -39,6 +39,11 @@ export const DEPLOY_TIME_SEC = 20; // placement timer before units auto-deploy
  *  value keeps the pacing symmetric — the balance audit showed the old split
  *  (player 2.5s vs AI 0.7s) gave the enemy a ~15-point edge in mirror matches. */
 export const REINFORCE_GRACE_SEC = 1.2;
+/** Opening ability grace: once the battle phase begins, every unit holds its
+ *  active ability casts for this long so the opening reads clearly (units still
+ *  move and basic-attack — only casts wait). MatchController arms it at battle
+ *  start; it lapses once, so mid-battle reinforcements cast immediately. */
+export const OPENING_CAST_GRACE_SEC = 3;
 
 // Collision / melee.
 export const UNIT_RADIUS = 32;

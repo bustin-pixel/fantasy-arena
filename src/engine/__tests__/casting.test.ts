@@ -5,6 +5,7 @@
 import { describe, it, expect } from "vitest";
 import { stepSimulation } from "@/engine/CombatSystem";
 import { battleState, place, makeDummy } from "./helpers";
+import { OPENING_CAST_GRACE_SEC, secToTicks } from "@/utils/constants";
 import type { Unit } from "@/types";
 
 function stun(u: Unit): void {
@@ -50,5 +51,34 @@ describe("Spell casts (cast bar)", () => {
 
     expect(mage.castTicks).toBe(0); // cancelled
     expect(seen.size).toBe(0); // no fireball ever fired (interrupted, then stunned)
+  });
+});
+
+describe("Opening ability grace", () => {
+  it("holds casts during the grace window, then releases them", () => {
+    const s = battleState(3);
+    // Arm the grace the way MatchController does at the battle-phase transition.
+    s.castGraceTicks = secToTicks(OPENING_CAST_GRACE_SEC);
+    const mage = place(s, "fire_mage", "player", 240, 600);
+    mage.moveSpeed = 0; // hold position so it stays in casting range across the window
+    makeDummy(place(s, "skeleton", "enemy", 240, 460)); // in range (same as the specs above)
+
+    // During the grace: it never begins a cast and nothing fires.
+    for (let i = 0; i < secToTicks(OPENING_CAST_GRACE_SEC); i++) {
+      stepSimulation(s);
+      expect(mage.castTicks).toBe(0);
+    }
+    expect(fireballIds(s).length).toBe(0);
+
+    // Once the grace lapses, the mage winds up a cast within a beat.
+    let began = false;
+    for (let i = 0; i < 10; i++) {
+      stepSimulation(s);
+      if (mage.castTicks > 0) {
+        began = true;
+        break;
+      }
+    }
+    expect(began).toBe(true);
   });
 });
