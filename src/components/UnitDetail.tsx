@@ -102,7 +102,18 @@ export function UnitDetail({
     let raf = 0;
     const start = performance.now();
     const loop = (now: number) => {
-      const opts: { live: true; charge?: number } = { live: true };
+      const opts: {
+        live: true;
+        charge?: number;
+        transparent: true;
+        anchorOffset: number;
+      } = {
+        live: true,
+        transparent: true,
+        // Raise the pose so the ground shadow clears the canvas bottom edge and
+        // the unit reads centred in the alcove (default anchor sits too low here).
+        anchorOffset: 1,
+      };
       if (defId === "aegis_knight") {
         const cyc = ((now - start) / 1000) % 4.2;
         opts.charge = cyc < 3 ? cyc / 3 : 1; // fill over 3s, hold armed ~1.2s

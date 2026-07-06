@@ -176,6 +176,16 @@ interface DrawOpts {
   staticPose?: boolean;
 }
 
+/** Ground-shadow ellipse at the humanoid foot line — the default for most units. */
+const DEFAULT_SHADOW = { y: 26, rx: 18, ry: 6 };
+/** Per-unit shadow tuning (keyed by `def.id`). Low or small creatures whose feet
+ *  sit higher than the humanoid default need it raised and tightened so it hugs
+ *  their feet instead of floating below as a detached puddle. */
+const SHADOW_BY_ID: Record<string, typeof DEFAULT_SHADOW> = {
+  // Rat feet bottom out at ~y18.5; the default y26 puddle reads as detached.
+  giant_rat: { y: 19.5, rx: 12, ry: 4 },
+};
+
 /**
  * Draw a unit centered at (cx, cy) in the current canvas. The shape per archetype
  * keeps each unit recognizable: ogre = bulky, knight = shielded blocky, archer =
@@ -214,11 +224,12 @@ export function drawUnitSprite(
 
   // Shadow.
   if (!opts.staticPose) {
+    const sh = SHADOW_BY_ID[def.id] ?? DEFAULT_SHADOW;
     ctx.save();
     ctx.globalAlpha = 0.25;
     ctx.fillStyle = "#000";
     ctx.beginPath();
-    ctx.ellipse(0, 26, 18, 6, 0, 0, PI2);
+    ctx.ellipse(0, sh.y, sh.rx, sh.ry, 0, 0, PI2);
     ctx.fill();
     ctx.restore();
   }

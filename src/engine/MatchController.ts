@@ -22,6 +22,7 @@ import {
   ENEMY_ZONE,
   FIELD_WIDTH,
   MATCH_TIME_SEC,
+  OPENING_CAST_GRACE_SEC,
   PLAYER_ZONE,
   REINFORCE_GRACE_SEC,
   TICK_RATE,
@@ -489,6 +490,10 @@ export class MatchController {
           this.startCountdown = secToTicks(3);
         } else if (this.startCountdown === 0) {
           this.state.phase = "battle";
+          // Opening ability grace: units hold casts for the first few seconds of
+          // combat (they still move + basic-attack). Lapses once, so mid-battle
+          // reinforcements — which arrive later — cast immediately.
+          this.state.castGraceTicks = secToTicks(OPENING_CAST_GRACE_SEC);
         } else {
           this.startCountdown--;
         }

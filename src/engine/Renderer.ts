@@ -376,15 +376,30 @@ export function renderPortrait(
   ctx: Ctx,
   defId: string,
   size: number,
-  opts?: { silhouette?: string; charge?: number; live?: boolean }
+  opts?: {
+    silhouette?: string;
+    charge?: number;
+    live?: boolean;
+    transparent?: boolean;
+    /** Vertical anchor below the canvas centre (in canvas px). Larger = the sprite
+     *  sits lower in the frame. Defaults to 2 — roughly centred, since a sprite's
+     *  origin sits near its body centre. Contexts override: the avatar raises it
+     *  for a head-focused crop; the detail panel tunes it around its ground shadow. */
+    anchorOffset?: number;
+  }
 ): void {
   const def = getUnitDef(defId);
+  const anchorY = size / 2 + (opts?.anchorOffset ?? 2);
   ctx.clearRect(0, 0, size, size);
-  const grad = ctx.createLinearGradient(0, 0, 0, size);
-  grad.addColorStop(0, "#2c2118");
-  grad.addColorStop(1, "#1a140d");
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, size, size);
+  // `transparent` leaves the canvas cleared so the sprite renders PNG-style on
+  // whatever sits behind it (the detail panel's torch-lit alcove) — no square.
+  if (!opts?.transparent) {
+    const grad = ctx.createLinearGradient(0, 0, 0, size);
+    grad.addColorStop(0, "#2c2118");
+    grad.addColorStop(1, "#1a140d");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, size);
+  }
   // Fake a unit object just for the portrait pose.
   const fake = {
     defId,
@@ -408,7 +423,7 @@ export function renderPortrait(
     off.height = size;
     const octx = off.getContext("2d");
     if (!octx) return;
-    drawUnitSprite(octx, fake, size / 2, size / 2 + 14, {
+    drawUnitSprite(octx, fake, size / 2, anchorY, {
       scale: size / 70,
       staticPose: true,
     });
@@ -419,7 +434,7 @@ export function renderPortrait(
     return;
   }
 
-  drawUnitSprite(ctx, fake, size / 2, size / 2 + 14, {
+  drawUnitSprite(ctx, fake, size / 2, anchorY, {
     scale: size / 70,
     staticPose: !opts?.live,
   });

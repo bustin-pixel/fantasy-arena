@@ -82,6 +82,10 @@ export interface SimState {
    *  them (player 4, enemy 8). MatchController sets these at match creation;
    *  the summon flush derives its ceiling from them. */
   activeCaps: { player: number; enemy: number };
+  /** Opening ability grace: ticks remaining during which units hold their active
+   *  casts (they still move + basic-attack). MatchController arms this at battle
+   *  start; a hand-built sim (tests, direct use) leaves it 0 = no grace. */
+  castGraceTicks: number;
   /** Units queued to spawn from inside dealDamage (slime splits/clones).
    *  Flushed each tick alongside ability-driven summons. `init` stamps
    *  deterministic starting state on the created unit (Slime Knight blobs/rebirth). */
@@ -111,6 +115,7 @@ export function createSimState(seed: number, clockSec: number): SimState {
       player: MAX_ACTIVE_UNITS_PER_SIDE,
       enemy: MAX_ACTIVE_UNITS_PER_SIDE,
     },
+    castGraceTicks: 0,
     damageSpawns: [],
   };
 }
@@ -665,7 +670,15 @@ export function stepSimulation(state: SimState): void {
     // on one bar) returns true, so the standard cast-handling chain below is
     // bypassed. Passes the loop's abilityCtx so allies/enemies match the funnel
     // exactly (makeKitCtx would rebuild a fresher snapshot).
-    const ownsCast = abilityKit?.onActTick?.(unit, abilityCtx);
+    // [opening grace] For the first OPENING_CAST_GRACE_SEC of battle, hold every
+    // active ability cast so the opening reads clearly — units still move and
+    // basic-attack, they just don't cast. This gates the kit-owned cast pipeline
+    // (Necromancer) here and the begin-cast/instant-fire paths below; passive and
+    // reactive kit hooks (shields, on-hit riders, Second Wind) are unaffected.
+    const inOpeningGrace = state.castGraceTicks > 0;
+    const ownsCast = inOpeningGrace
+      ? undefined
+      : abilityKit?.onActTick?.(unit, abilityCtx);
 
     // Cast handling. An in-flight cast (the cast bar) ticks down and fires its
     // spell on completion, locking the mage meanwhile. Otherwise, begin a
@@ -687,7 +700,7 @@ export function stepSimulation(state: SimState): void {
         transitionTo(unit, "casting"); // locked in place, committed
         continue;
       }
-    } else if (unit.abilityCooldown <= 0) {
+    } else if (!inOpeningGrace && unit.abilityCooldown <= 0) {
       const castTime = abilityCastTimeTicks(unit.ability);
       if (castTime > 0) {
         // Begin a cast. A stun/silence blocks the start, and some casts (Mend)
@@ -800,6 +813,9 @@ export function stepSimulation(state: SimState): void {
 
   // 6. Animation (presentation only).
   stepAnimation(state.units);
+
+  // 6b. Opening ability grace winds down (gated the cast pipeline above this tick).
+  if (state.castGraceTicks > 0) state.castGraceTicks--;
 
   // 7. Win/loss.
   evaluateOutcome(state);
