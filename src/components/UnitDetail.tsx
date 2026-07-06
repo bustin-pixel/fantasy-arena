@@ -95,19 +95,19 @@ export function UnitDetail({
   useEffect(() => {
     const ctx = canvasRef.current?.getContext("2d");
     if (!ctx) return;
-    // The Aegis Knight's shield-charge VFX is invisible at rest (it tracks real
-    // banked magic), so its detail panel plays a looping charge cycle to show it
-    // off. Every other unit keeps the cheap one-shot static portrait.
-    if (defId !== "aegis_knight") {
-      renderPortrait(ctx, defId, ART_SIZE);
-      return;
-    }
+    // Living portrait: every unit's detail panel animates its idle sprite —
+    // glow pulses, plume/cape sway, caster orbs, ooze, etc. — via a render loop
+    // (staticPose off). The Aegis Knight additionally cycles its shield charge,
+    // whose VFX is otherwise invisible at rest.
     let raf = 0;
     const start = performance.now();
     const loop = (now: number) => {
-      const cyc = ((now - start) / 1000) % 4.2;
-      const charge = cyc < 3 ? cyc / 3 : 1; // fill over 3s, hold armed ~1.2s
-      renderPortrait(ctx, defId, ART_SIZE, { charge, live: true });
+      const opts: { live: true; charge?: number } = { live: true };
+      if (defId === "aegis_knight") {
+        const cyc = ((now - start) / 1000) % 4.2;
+        opts.charge = cyc < 3 ? cyc / 3 : 1; // fill over 3s, hold armed ~1.2s
+      }
+      renderPortrait(ctx, defId, ART_SIZE, opts);
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
