@@ -23,6 +23,7 @@ import type {
   Unit,
   Vec2,
   Vfx,
+  WaveBanner,
 } from "@/types";
 import { RNG } from "@/utils/rng";
 import {
@@ -95,6 +96,9 @@ export interface SimState {
     pos: Vec2;
     init?: (u: Unit) => void;
   }[];
+  /** Boss-floor telegraph banner (rare catalyst / boss incoming), or null. Set
+   *  by the WaveController; surfaced to the HUD via the snapshot. */
+  waveBanner: WaveBanner | null;
 }
 
 export function createSimState(seed: number, clockSec: number): SimState {
@@ -117,6 +121,7 @@ export function createSimState(seed: number, clockSec: number): SimState {
     },
     castGraceTicks: 0,
     damageSpawns: [],
+    waveBanner: null,
   };
 }
 
@@ -1036,5 +1041,6 @@ export function snapshot(state: SimState): BattleSnapshot {
     vfx: state.vfx,
     traps: state.traps,
     clockTicks: state.clockTicks,
+    waveBanner: state.waveBanner,
   };
 }

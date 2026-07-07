@@ -31,6 +31,24 @@ export const BOSS_FLOOR_FODDER_SHARE = 0.7;
 export const WAVE_SPAWN_INTERVAL_SEC = 0.5;
 
 // ---------------------------------------------------------------------------
+// Boss-floor pacing. On a boss floor the fodder no longer shares the field with
+// the boss: it arrives in discrete sub-waves that must each be CLEARED before
+// the next spawns, then the rare catalyst (if it rolled), then the boss — each
+// heralded by a telegraph banner. This turns boss floors into a real climax
+// instead of a swarm. Applies to every dungeon's boss floors (incl. the Depths'
+// every-5th). Non-boss floors keep the continuous trickle above.
+// ---------------------------------------------------------------------------
+
+/** How many discrete sub-waves the boss-floor fodder is split into. */
+export const BOSS_FODDER_WAVE_COUNT = 3;
+/** Telegraph pause (seconds) between the banner appearing and the rare/boss
+ *  actually entering from the top edge. */
+export const BOSS_TELEGRAPH_SEC = 2;
+/** How long (seconds) the telegraph banner stays on screen — a touch longer
+ *  than the pause, so it lingers as the unit walks in. */
+export const BOSS_BANNER_SEC = 2.7;
+
+// ---------------------------------------------------------------------------
 // Per-floor stat scaling — the depth pressure dial. Monsters spawn with these
 // linear multipliers so floor 1 matches the bestiary exactly and every floor
 // deeper is meaner. HP climbs faster than damage on purpose: tankier monsters

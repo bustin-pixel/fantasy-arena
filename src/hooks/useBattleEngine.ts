@@ -13,7 +13,14 @@
 // ============================================================================
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { MatchPhase, Rarity, StatusEffectType, Team, Vec2 } from "@/types";
+import type {
+  MatchPhase,
+  Rarity,
+  StatusEffectType,
+  Team,
+  Vec2,
+  WaveBanner,
+} from "@/types";
 import { MatchController } from "@/engine/MatchController";
 import { renderBattle } from "@/engine/Renderer";
 import { SfxObserver } from "@/audio/sfx";
@@ -51,6 +58,8 @@ export interface BattleUiState {
   startCountdownSec: number | null;
   /** Seconds left to place units in deployment, or null when not applicable. */
   deploySecLeft: number | null;
+  /** Boss-floor telegraph banner (rare catalyst / boss incoming), or null. */
+  banner: WaveBanner | null;
 }
 
 /** Live snapshot of one combatant, for the in-battle stat tooltip. */
@@ -128,6 +137,7 @@ export function useBattleEngine(
     })),
     startCountdownSec: null,
     deploySecLeft: DEPLOY_TIME_SEC,
+    banner: null,
   });
   const [speed, setSpeedState] = useState<number>(initialSpeed);
 
@@ -213,6 +223,7 @@ export function useBattleEngine(
           hand: c.playerHand(),
           startCountdownSec: c.startCountdownSec(),
           deploySecLeft: c.deploySecLeft(),
+          banner: snap.waveBanner,
         });
       }
 

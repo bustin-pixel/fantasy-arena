@@ -51,10 +51,14 @@ function drainQueue(seed: number, floor: number): string[] {
   s.activeCaps = { player: 4, enemy: 999 };
   const out: string[] = [];
   let guard = 0;
-  while (wc.remaining > 0 && guard < 5000) {
+  while (wc.remaining > 0 && guard < 8000) {
     const before = s.units.length;
     wc.step(s);
-    if (s.units.length > before) out.push(s.units[s.units.length - 1].defId);
+    if (s.units.length > before) {
+      out.push(s.units[s.units.length - 1].defId);
+      // Clear the field so a boss floor's gated sub-waves advance.
+      s.units[s.units.length - 1].state = "dead";
+    }
     guard++;
   }
   return out;
@@ -136,8 +140,15 @@ describe("WaveController — wave composition", () => {
     const s: SimState = createSimState(9, 120);
     s.activeCaps = { player: 4, enemy: 999 };
     let guard = 0;
-    while (wc.remaining > 0 && guard < 5000) {
+    while (wc.remaining > 0 && guard < 8000) {
+      const before = s.units.length;
       wc.step(s);
+      // Clear everything BUT the boss so the gated sub-waves advance while the
+      // Bloater survives on the field for the assertion below.
+      if (s.units.length > before) {
+        const u = s.units[s.units.length - 1];
+        if (u.defId !== "bloater") u.state = "dead";
+      }
       guard++;
     }
     const boss = s.units.find((u) => u.defId === "bloater")!;
@@ -271,10 +282,15 @@ describe("WaveController — The Bonefields dungeon", () => {
     s.activeCaps = { player: 4, enemy: 999 };
     const out: string[] = [];
     let guard = 0;
-    while (wc.remaining > 0 && guard < 5000) {
+    while (wc.remaining > 0 && guard < 8000) {
       const before = s.units.length;
       wc.step(s);
-      if (s.units.length > before) out.push(s.units[s.units.length - 1].defId);
+      if (s.units.length > before) {
+        out.push(s.units[s.units.length - 1].defId);
+        // Clear the field so a boss floor's gated sub-waves / catalyst / boss
+        // advance (they only release once the prior batch is dead).
+        s.units[s.units.length - 1].state = "dead";
+      }
       guard++;
     }
     return out;
@@ -336,10 +352,15 @@ describe("WaveController — The Wilds dungeon", () => {
     s.activeCaps = { player: 4, enemy: 999 };
     const out: string[] = [];
     let guard = 0;
-    while (wc.remaining > 0 && guard < 5000) {
+    while (wc.remaining > 0 && guard < 8000) {
       const before = s.units.length;
       wc.step(s);
-      if (s.units.length > before) out.push(s.units[s.units.length - 1].defId);
+      if (s.units.length > before) {
+        out.push(s.units[s.units.length - 1].defId);
+        // Clear the field so a boss floor's gated sub-waves / catalyst / boss
+        // advance (they only release once the prior batch is dead).
+        s.units[s.units.length - 1].state = "dead";
+      }
       guard++;
     }
     return out;
@@ -398,10 +419,15 @@ describe("WaveController — The Sealed Vault dungeon", () => {
     s.activeCaps = { player: 4, enemy: 999 };
     const out: string[] = [];
     let guard = 0;
-    while (wc.remaining > 0 && guard < 5000) {
+    while (wc.remaining > 0 && guard < 8000) {
       const before = s.units.length;
       wc.step(s);
-      if (s.units.length > before) out.push(s.units[s.units.length - 1].defId);
+      if (s.units.length > before) {
+        out.push(s.units[s.units.length - 1].defId);
+        // Clear the field so a boss floor's gated sub-waves / catalyst / boss
+        // advance (they only release once the prior batch is dead).
+        s.units[s.units.length - 1].state = "dead";
+      }
       guard++;
     }
     return out;
@@ -450,10 +476,15 @@ describe("WaveController — The Overgrowth dungeon", () => {
     s.activeCaps = { player: 4, enemy: 999 };
     const out: string[] = [];
     let guard = 0;
-    while (wc.remaining > 0 && guard < 5000) {
+    while (wc.remaining > 0 && guard < 8000) {
       const before = s.units.length;
       wc.step(s);
-      if (s.units.length > before) out.push(s.units[s.units.length - 1].defId);
+      if (s.units.length > before) {
+        out.push(s.units[s.units.length - 1].defId);
+        // Clear the field so a boss floor's gated sub-waves / catalyst / boss
+        // advance (they only release once the prior batch is dead).
+        s.units[s.units.length - 1].state = "dead";
+      }
       guard++;
     }
     return out;
@@ -502,10 +533,15 @@ describe("WaveController — The Eclipse Spire dungeon", () => {
     s.activeCaps = { player: 4, enemy: 999 };
     const out: string[] = [];
     let guard = 0;
-    while (wc.remaining > 0 && guard < 5000) {
+    while (wc.remaining > 0 && guard < 8000) {
       const before = s.units.length;
       wc.step(s);
-      if (s.units.length > before) out.push(s.units[s.units.length - 1].defId);
+      if (s.units.length > before) {
+        out.push(s.units[s.units.length - 1].defId);
+        // Clear the field so a boss floor's gated sub-waves / catalyst / boss
+        // advance (they only release once the prior batch is dead).
+        s.units[s.units.length - 1].state = "dead";
+      }
       guard++;
     }
     return out;
@@ -554,10 +590,15 @@ describe("WaveController — The Deep Forge dungeon", () => {
     s.activeCaps = { player: 4, enemy: 999 };
     const out: string[] = [];
     let guard = 0;
-    while (wc.remaining > 0 && guard < 5000) {
+    while (wc.remaining > 0 && guard < 8000) {
       const before = s.units.length;
       wc.step(s);
-      if (s.units.length > before) out.push(s.units[s.units.length - 1].defId);
+      if (s.units.length > before) {
+        out.push(s.units[s.units.length - 1].defId);
+        // Clear the field so a boss floor's gated sub-waves / catalyst / boss
+        // advance (they only release once the prior batch is dead).
+        s.units[s.units.length - 1].state = "dead";
+      }
       guard++;
     }
     return out;
@@ -593,5 +634,78 @@ describe("WaveController — The Deep Forge dungeon", () => {
       "deep_forge"
     );
     expect(["victory", "defeat", "draw"]).toContain(mc.phase);
+  });
+});
+
+describe("WaveController — boss-floor pacing (sub-waves → rare → boss)", () => {
+  const dungeon = getDungeon("bonefields");
+  const BOSS = "abomination";
+  const RARE = "lich";
+
+  /** Drive a boss floor, CLEARING the field each tick, and log the spawn order
+   *  plus the telegraph banners in the order they first appeared. */
+  function simulate(seed: number): { spawns: string[]; banners: string[] } {
+    const wc = new WaveController(seed, dungeon, 5);
+    const s: SimState = createSimState(seed, 300);
+    s.activeCaps = { player: 4, enemy: 12 };
+    const spawns: string[] = [];
+    const banners: string[] = [];
+    let lastBanner: unknown = null;
+    let guard = 0;
+    while (wc.remaining > 0 && guard < 8000) {
+      const before = s.units.length;
+      wc.step(s);
+      if (s.waveBanner && s.waveBanner !== lastBanner) banners.push(s.waveBanner.kind);
+      lastBanner = s.waveBanner;
+      if (s.units.length > before) spawns.push(s.units[s.units.length - 1].defId);
+      for (const u of s.units) if (u.team === "enemy") u.state = "dead"; // clear
+      guard++;
+    }
+    return { spawns, banners };
+  }
+
+  it("splits the boss-floor fodder into multiple discrete sub-waves", () => {
+    const plan = new WaveController(1, dungeon, 5).planForTest();
+    expect(plan).not.toBeNull();
+    expect(plan!.boss).toBe(BOSS);
+    expect(plan!.waves.length).toBeGreaterThan(1); // more than one wave
+    const legal = new Set(Object.keys(dungeon.tiers[0].monsters));
+    for (const wave of plan!.waves) {
+      expect(wave.length).toBeGreaterThan(0); // never an empty wave
+      for (const id of wave) expect(legal.has(id)).toBe(true);
+    }
+    // Non-boss floors have no phased plan.
+    expect(new WaveController(1, dungeon, 1).planForTest()).toBeNull();
+  });
+
+  it("holds the boss off the field until the fodder is cleared", () => {
+    // Step a long while WITHOUT clearing: only the first sub-wave spawns, the
+    // boss never appears, and nothing is telegraphed while fodder still lives.
+    const wc = new WaveController(3, dungeon, 5);
+    const s: SimState = createSimState(3, 300);
+    s.activeCaps = { player: 4, enemy: 12 };
+    for (let i = 0; i < 800; i++) wc.step(s);
+    expect(s.units.some((u) => u.defId === BOSS)).toBe(false);
+    expect(s.waveBanner).toBeNull();
+    expect(wc.remaining).toBeGreaterThan(0); // boss (+ later waves) still pending
+  });
+
+  it("telegraphs the boss, then spawns it, once the fodder is cleared", () => {
+    // A seed WITHOUT a rare roll → the sequence is just fodder → boss.
+    let seed = 1;
+    while (new WaveController(seed, dungeon, 5).planForTest()!.catalyst) seed++;
+    const { spawns, banners } = simulate(seed);
+    expect(spawns[spawns.length - 1]).toBe(BOSS); // boss enters last
+    expect(banners).toEqual(["boss"]); // one boss telegraph, no rare
+  });
+
+  it("gives the rare catalyst its own telegraph before the boss", () => {
+    // A seed WHERE the rare rolled.
+    let seed = 1;
+    while (!new WaveController(seed, dungeon, 5).planForTest()!.catalyst) seed++;
+    const { spawns, banners } = simulate(seed);
+    expect(banners).toEqual(["rare", "boss"]); // rare telegraphed first, then boss
+    expect(spawns[spawns.length - 1]).toBe(BOSS);
+    expect(spawns[spawns.length - 2]).toBe(RARE); // rare enters just before the boss
   });
 });

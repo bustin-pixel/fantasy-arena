@@ -1533,6 +1533,64 @@ body.modal-open .pager-nav {
   text-shadow: 0 1px 4px #000;
 }
 
+/* ---- Boss-floor telegraph banner (rare catalyst / boss incoming) ---------- */
+.wave-banner {
+  position: absolute;
+  top: 33%;
+  left: 0;
+  right: 0;
+  text-align: center;
+  pointer-events: none;
+  z-index: 12;
+  animation: wave-banner-in 0.28s ease-out;
+}
+.wave-banner-headline {
+  font-size: 2.5rem;
+  font-weight: 900;
+  line-height: 1.05;
+  text-shadow: 0 2px 10px #000, 0 0 28px currentColor;
+  animation: wave-banner-pulse 0.85s ease-in-out infinite;
+}
+.wave-banner-tag {
+  margin-top: 6px;
+  font-size: 1.1rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--parchment);
+  text-shadow: 0 1px 6px #000;
+}
+/* Boss: big red "BOSS INCOMING", the boss name below. */
+.wave-banner-boss .wave-banner-headline {
+  color: #ff4d4d;
+}
+/* Rare catalyst: big gold name, violet "a rare foe stirs" tag. */
+.wave-banner-rare .wave-banner-headline {
+  color: var(--gold);
+}
+.wave-banner-rare .wave-banner-tag {
+  color: #c4b5fd;
+}
+@keyframes wave-banner-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+@keyframes wave-banner-in {
+  from {
+    opacity: 0;
+    transform: scale(0.82);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 /* ---- In-battle unit tooltip ---------------------------------------------- */
 .unit-tip {
   position: absolute;
