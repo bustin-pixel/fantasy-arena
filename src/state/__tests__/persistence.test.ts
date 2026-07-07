@@ -40,13 +40,14 @@ function v2Save(): Partial<PlayerSave> {
 describe("migrateSave", () => {
   it("null (new player) → defaults: starter units, 0 gold, floor 0", () => {
     const save = migrateSave(null);
-    expect(save.version).toBe(6);
+    expect(save.version).toBe(7);
     expect(save.username).toBe("Champion");
     expect(save.avatarId).toBe(DEFAULT_AVATAR_ID);
     expect(save.gold).toBe(0);
     expect(save.dungeons.depths.highestClearedFloor).toBe(0);
     expect(save.dungeons.bonefields.highestClearedFloor).toBe(0);
     expect(save.questUnlocks).toEqual([]);
+    expect(save.endless.bestWave).toBe(0);
     expect([...save.unlockedUnits].sort()).toEqual(
       [...STARTER_UNIT_IDS].sort()
     );
@@ -96,6 +97,18 @@ describe("migrateSave", () => {
     expect(save.dungeons.depths.highestClearedFloor).toBe(4);
     expect(save.deck).toEqual(["ogre", "warrior"]);
     expect(save.unlockedUnits).toContain("warrior");
+  });
+
+  it("defaults endless.bestWave to 0 for a pre-v7 save", () => {
+    const save = migrateSave({ version: 6, gold: 100 });
+    expect(save.endless.bestWave).toBe(0);
+  });
+
+  it("preserves a v7 endless.bestWave and clamps a negative one", () => {
+    expect(migrateSave({ version: 7, endless: { bestWave: 13 } }).endless.bestWave).toBe(13);
+    expect(
+      migrateSave({ version: 7, endless: { bestWave: -4 } }).endless.bestWave
+    ).toBe(0);
   });
 
   it("strips locked units from a v3 deck and always owns the starters", () => {

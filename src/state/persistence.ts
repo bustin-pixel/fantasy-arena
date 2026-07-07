@@ -40,6 +40,16 @@ export function highestClearedFloorOf(
   return save.dungeons[dungeonId]?.highestClearedFloor ?? 0;
 }
 
+/** Endless survival progress. Just the deepest wave ever reached, for now. */
+export interface EndlessProgress {
+  bestWave: number;
+}
+
+/** The player's best endless wave (0 if never played). */
+export function endlessBestWave(save: PlayerSave): number {
+  return save.endless?.bestWave ?? 0;
+}
+
 export interface PlayerSave {
   version: number;
   username: string;
@@ -68,6 +78,8 @@ export interface PlayerSave {
    *  unlocked in the Collection. Distinct from unlockedUnits (owned): a quest
    *  makes a unit BUYABLE; gold still completes the recruit. (Save v5.) */
   questUnlocks: string[];
+  /** Endless survival high-water mark. (Save v7.) */
+  endless: EndlessProgress;
   // Future slices (additive, versioned-merge handles them): soulShards,
   // items inventory, per-unit loadouts.
 }
@@ -77,7 +89,7 @@ export interface PlayerSave {
 const KEY = "fantasy-arena/save/v1";
 
 export const DEFAULT_SAVE: PlayerSave = {
-  version: 6,
+  version: 7,
   username: "Champion",
   avatarId: DEFAULT_AVATAR_ID,
   deck: ["ogre", "archer", "knight", "fire_mage"],
@@ -88,6 +100,7 @@ export const DEFAULT_SAVE: PlayerSave = {
   unlockedUnits: [...STARTER_UNIT_IDS],
   dungeons: freshDungeonProgress(),
   questUnlocks: [],
+  endless: { bestWave: 0 },
 };
 
 export function loadSave(): PlayerSave {
@@ -131,6 +144,8 @@ export function migrateSave(parsed: Partial<PlayerSave> | null): PlayerSave {
   merged.questUnlocks = [...(parsed.questUnlocks ?? [])].filter((id) =>
     QUEST_LOCKED_UNITS.has(id)
   );
+  // v7: endless survival high-water mark (defaults to 0 for older saves).
+  merged.endless = { bestWave: Math.max(0, parsed.endless?.bestWave ?? 0) };
 
   // Grandfathering: saves from before the unlock system keep every unit that
   // exists today — EXCEPT quest-locked ones, whose purchase must always be
@@ -181,6 +196,7 @@ function structuredCloneSave(save: PlayerSave): PlayerSave {
       Object.entries(save.dungeons).map(([id, p]) => [id, { ...p }])
     ),
     questUnlocks: [...save.questUnlocks],
+    endless: { ...save.endless },
   };
 }
 

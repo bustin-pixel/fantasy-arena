@@ -22,7 +22,11 @@ function Shell() {
       setMusicTrack(
         battleMode === "depths"
           ? pickDungeonTrack(battleDungeonId, battleFloor)
-          : "blackblade"
+          : // Endless borrows the Depths soundtrack for now (per-cycle track
+            // rotation is a later polish pass); Arena keeps its groove.
+            battleMode === "endless"
+            ? pickDungeonTrack("depths", 1)
+            : "blackblade"
       );
     } else {
       setMusicTrack("emberfall");

@@ -22,6 +22,7 @@ import type {
   WaveBanner,
 } from "@/types";
 import { MatchController } from "@/engine/MatchController";
+import type { BoonOffer, BoonTally } from "@/engine/EndlessController";
 import { renderBattle } from "@/engine/Renderer";
 import { SfxObserver } from "@/audio/sfx";
 import { pickArenaTheme, type ArenaThemeId } from "@/assets/arenaThemes";
@@ -35,8 +36,9 @@ import { getSettings } from "@/state/settings";
 
 /** Battle mode. Solo allows client-side fast-forward; PVP is server-paced at 1×
  *  (a real-time match can't let one client run the sim faster than the other).
- *  Depths is the PvE descent — a WaveController horde instead of an AI deck. */
-export type BattleMode = "solo" | "pvp" | "depths";
+ *  Depths is the PvE descent; Endless is the survival wave loop with between-wave
+ *  boon picks — both field the whole warband and run a wave director. */
+export type BattleMode = "solo" | "pvp" | "depths" | "endless";
 
 export interface HandCard {
   index: number;
@@ -60,6 +62,12 @@ export interface BattleUiState {
   deploySecLeft: number | null;
   /** Boss-floor telegraph banner (rare catalyst / boss incoming), or null. */
   banner: WaveBanner | null;
+  /** Endless: the current wave number, or null outside endless. */
+  waveNumber: number | null;
+  /** Endless: the live between-wave boon pick, or null when a wave is running. */
+  intermission: { wave: number; offers: BoonOffer[] } | null;
+  /** Endless: the boons picked so far this run (for the "your boons" strip). */
+  boonsPicked: BoonTally[];
 }
 
 /** Live snapshot of one combatant, for the in-battle stat tooltip. */
@@ -96,6 +104,10 @@ export interface UseBattleEngine {
   /** The enemy roster this match actually fielded, for the Compendium: every
    *  enemy defId that appeared (`seen`) and the subset that died (`slain`). */
   enemyLedger: () => { seen: string[]; slain: string[] };
+  /** Endless: apply the boon at `offerIndex` from the current intermission. */
+  pickBoon: (offerIndex: number) => void;
+  /** Endless: waves fully cleared this run (0 outside endless). */
+  wavesSurvived: () => number;
 }
 
 export function useBattleEngine(
@@ -138,6 +150,9 @@ export function useBattleEngine(
     startCountdownSec: null,
     deploySecLeft: DEPLOY_TIME_SEC,
     banner: null,
+    waveNumber: mode === "endless" ? 1 : null,
+    intermission: null,
+    boonsPicked: [],
   });
   const [speed, setSpeedState] = useState<number>(initialSpeed);
 
@@ -154,11 +169,11 @@ export function useBattleEngine(
   // (Re)initialize a match whenever the deck, seed or mode changes.
   useEffect(() => {
     const seed = seedOverride ?? generateSeed();
-    if (mode === "depths") {
-      // No enemy deck — the WaveController inside the controller builds the
-      // floor's horde from the seed.
+    if (mode === "depths" || mode === "endless") {
+      // No enemy deck — the wave director inside the controller builds the horde
+      // from the seed (a floor for Depths, an unbounded loop for Endless).
       controllerRef.current = new MatchController(seed, playerDeck.slice(0, 4), [], {
-        mode: "depths",
+        mode,
         floor,
         dungeonId,
       });
@@ -169,6 +184,7 @@ export function useBattleEngine(
     themeRef.current =
       mode === "solo" ? pickArenaTheme(seed)
       : mode === "depths" ? getDungeon(dungeonId).theme
+      : mode === "endless" ? "dungeon"
       : "grassField";
     sfxRef.current = new SfxObserver();
     accRef.current = 0;
@@ -212,6 +228,7 @@ export function useBattleEngine(
       if (uiThrottle >= 160) {
         uiThrottle = 0;
         const snap = c.snapshot();
+        const est = c.endlessStatus();
         setUi({
           phase: snap.phase,
           tick: snap.tick,
@@ -224,6 +241,9 @@ export function useBattleEngine(
           startCountdownSec: c.startCountdownSec(),
           deploySecLeft: c.deploySecLeft(),
           banner: snap.waveBanner,
+          waveNumber: est ? est.wave : null,
+          intermission: est?.intermission ?? null,
+          boonsPicked: est?.boonsPicked ?? [],
         });
       }
 
@@ -300,6 +320,10 @@ export function useBattleEngine(
 
   const enemyLedger = useCallback((): { seen: string[]; slain: string[] } => {
     const c = controllerRef.current;
+    // Endless prunes dead-enemy corpses between waves, so scanning the live unit
+    // list would miss most of the roster — the controller keeps the run ledger.
+    const endless = c?.endlessLedger();
+    if (endless) return endless;
     const seen = new Set<string>();
     const slain = new Set<string>();
     if (c) {
@@ -312,6 +336,25 @@ export function useBattleEngine(
     return { seen: [...seen], slain: [...slain] };
   }, []);
 
+  const pickBoon = useCallback((offerIndex: number) => {
+    const c = controllerRef.current;
+    if (!c) return;
+    c.pickBoon(offerIndex);
+    // Reflect the pick immediately (close the overlay, start the next wave)
+    // rather than waiting for the throttled sync.
+    const est = c.endlessStatus();
+    setUi((prev) => ({
+      ...prev,
+      waveNumber: est ? est.wave : prev.waveNumber,
+      intermission: est?.intermission ?? null,
+      boonsPicked: est?.boonsPicked ?? prev.boonsPicked,
+    }));
+  }, []);
+
+  const wavesSurvived = useCallback((): number => {
+    return controllerRef.current?.wavesSurvived() ?? 0;
+  }, []);
+
   return {
     canvasRef,
     ui,
@@ -322,6 +365,8 @@ export function useBattleEngine(
     pickUnitAt,
     inspectUnit,
     enemyLedger,
+    pickBoon,
+    wavesSurvived,
   };
 }
 

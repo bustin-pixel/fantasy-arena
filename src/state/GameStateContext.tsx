@@ -45,7 +45,13 @@ interface GameStateValue {
    *  happens before this call so the updater stays pure under StrictMode. */
   grantBattleRewards: (
     rewards: BattleRewards,
-    ctx: { mode: BattleMode; floor: number; dungeonId: string }
+    ctx: {
+      mode: BattleMode;
+      floor: number;
+      dungeonId: string;
+      /** Endless: waves cleared this run, folded into the best-wave record. */
+      wavesSurvived?: number;
+    }
   ) => void;
   /** Buy a locked unit with gold. No-op unless locked and affordable. */
   purchaseUnit: (unitId: string) => void;
@@ -100,7 +106,12 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
   // dev) — every random roll already happened in computeBattleRewards.
   const grantBattleRewards = (
     rewards: BattleRewards,
-    ctx: { mode: BattleMode; floor: number; dungeonId: string }
+    ctx: {
+      mode: BattleMode;
+      floor: number;
+      dungeonId: string;
+      wavesSurvived?: number;
+    }
   ) =>
     setSave((s) => {
       let gold = s.gold + rewards.gold;
@@ -110,6 +121,11 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
         else if (entry.kind === "duplicate") gold += entry.gold;
         else unlocked.add(entry.unitId);
       }
+      // Endless: fold the run's depth into the best-wave high-water mark.
+      const endless =
+        ctx.mode === "endless"
+          ? { bestWave: Math.max(s.endless.bestWave, ctx.wavesSurvived ?? 0) }
+          : s.endless;
       let dungeons = s.dungeons;
       if (ctx.mode === "depths" && rewards.firstClear) {
         const prev = s.dungeons[ctx.dungeonId]?.highestClearedFloor ?? 0;
@@ -133,6 +149,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
         unlockedUnits: [...unlocked],
         dungeons,
         questUnlocks: [...questUnlocks],
+        endless,
       };
     });
 

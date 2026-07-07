@@ -49,7 +49,13 @@ export function BattleHud({ ui, speed, onSpeed, mode, onExit }: Props) {
           ✕
         </button>
         <div className="hud-pill enemy">Enemy · {ui.enemyActive}</div>
-        <div className="hud-clock">{fmtClock(ui.clockSec)}</div>
+        {/* Endless shows the wave number (its clock is just a per-wave stalemate
+            backstop, not a player-facing countdown). */}
+        {mode === "endless" && ui.waveNumber != null ? (
+          <div className="hud-clock hud-wave">Wave {ui.waveNumber}</div>
+        ) : (
+          <div className="hud-clock">{fmtClock(ui.clockSec)}</div>
+        )}
         <div className="hud-pill player">You · {ui.playerActive}</div>
         <MuteButton />
       </div>
@@ -64,14 +70,18 @@ export function BattleHud({ ui, speed, onSpeed, mode, onExit }: Props) {
         </div>
       )}
 
-      {/* Boss-floor telegraph: the rare quest catalyst / the boss walking in. */}
+      {/* Telegraph banners: a boss/rare walking in, or (Endless) a new wave. */}
       {ui.phase === "battle" && ui.banner && (
         <div className={`wave-banner wave-banner-${ui.banner.kind}`} role="alert">
           <div className="wave-banner-headline">
             {ui.banner.kind === "boss" ? "☠ Boss Incoming ☠" : ui.banner.name}
           </div>
           <div className="wave-banner-tag">
-            {ui.banner.kind === "boss" ? ui.banner.name : "✦ A rare foe stirs ✦"}
+            {ui.banner.kind === "boss"
+              ? ui.banner.name
+              : ui.banner.kind === "wave"
+              ? "The horde advances"
+              : "✦ A rare foe stirs ✦"}
           </div>
         </div>
       )}

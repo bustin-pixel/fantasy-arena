@@ -38,13 +38,20 @@ import {
 } from "./CombatSystem";
 import { getKit } from "./kits/UnitKit";
 import { WaveController } from "./WaveController";
+import { EndlessController, type EndlessStatus } from "./EndlessController";
 import { isMelee, getUnitDef } from "@/data/units";
 import { getDungeon } from "@/data/dungeons";
+import {
+  ENDLESS_ENEMY_ACTIVE,
+  ENDLESS_PLAYER_ACTIVE,
+  ENDLESS_WAVE_TIME_SEC,
+} from "@/data/endless";
 
-/** Match ruleset. Arena is the symmetric 2-concurrent card battle; Depths is
- *  the PvE descent — the player fields the whole warband while a seeded
- *  WaveController trickles the floor's horde in from the top edge. */
-export type MatchMode = "arena" | "depths";
+/** Match ruleset. Arena is the symmetric 2-concurrent card battle; Depths is the
+ *  PvE descent (WaveController trickles a floor's horde in). Endless is the
+ *  survival mode — an unbounded escalating wave loop with between-wave boon picks,
+ *  driven by an EndlessController. Depths + Endless both field the whole warband. */
+export type MatchMode = "arena" | "depths" | "endless";
 
 export interface MatchOptions {
   mode?: MatchMode;
@@ -52,6 +59,14 @@ export interface MatchOptions {
   floor?: number;
   /** Which dungeon to descend (defaults to "depths"). Ignored in arena. */
   dungeonId?: string;
+}
+
+/** The match clock for a mode. Endless resets its clock per wave (a stalemate
+ *  backstop), so it starts on the per-wave budget rather than a total-match one. */
+function matchClockSec(mode: MatchMode): number {
+  if (mode === "depths") return DEPTHS_MATCH_TIME_SEC;
+  if (mode === "endless") return ENDLESS_WAVE_TIME_SEC;
+  return MATCH_TIME_SEC;
 }
 
 export class MatchController {
@@ -74,8 +89,12 @@ export class MatchController {
   private autoDeployCountdown = 0;
   readonly seed: number;
   readonly mode: MatchMode;
-  /** The Depths' horde director (null in arena). */
+  /** The Depths' horde director (null outside depths). */
   private wave: WaveController | null = null;
+  /** The survival-mode director (null outside endless). */
+  private endless: EndlessController | null = null;
+  /** Ordered boon-pick offer indices — an input log, like `deployments`. */
+  private pickIndices: number[] = [];
 
   constructor(
     seed: number,
@@ -88,10 +107,7 @@ export class MatchController {
     this.playerDeck = playerDeck;
     this.enemyDeck = enemyDeck;
     resetUidCounter();
-    this.state = createSimState(
-      seed,
-      this.mode === "depths" ? DEPTHS_MATCH_TIME_SEC : MATCH_TIME_SEC
-    );
+    this.state = createSimState(seed, matchClockSec(this.mode));
     if (this.mode === "depths") {
       this.state.activeCaps = {
         player: DEPTHS_PLAYER_ACTIVE,
@@ -102,6 +118,14 @@ export class MatchController {
         getDungeon(opts.dungeonId ?? "depths"),
         opts.floor ?? 1
       );
+    } else if (this.mode === "endless") {
+      // Whole warband down, but a SMALLER horde cap than Depths — no reserves
+      // means the swarm has to stay a fair fight.
+      this.state.activeCaps = {
+        player: ENDLESS_PLAYER_ACTIVE,
+        enemy: ENDLESS_ENEMY_ACTIVE,
+      };
+      this.endless = new EndlessController(seed);
     }
   }
 
@@ -227,7 +251,9 @@ export class MatchController {
     const playerReady =
       this.countActive("player") >=
       Math.min(this.playerDeck.length, this.state.activeCaps.player);
-    if (this.mode === "depths") return playerReady;
+    // Depths + Endless: only the player has an opening hand (the horde arrives
+    // once the battle starts), so enemy readiness never gates the countdown.
+    if (this.mode !== "arena") return playerReady;
     return (
       playerReady && this.countActive("enemy") >= this.state.activeCaps.enemy
     );
@@ -508,6 +534,29 @@ export class MatchController {
       return;
     }
     if (this.state.phase === "battle") {
+      if (this.mode === "endless") {
+        // Survival: between waves the run FREEZES for a boon pick — no spawns, no
+        // sim step, no clock decrement (the whole run is then a pure function of
+        // seed + deployments + pick indices, immune to human decision time).
+        if (this.endless!.inIntermission) {
+          this.state.playerReserves = 0;
+          this.state.enemyReserves = this.endless!.reservesSentinel;
+          return;
+        }
+        this.endless!.step(this.state);
+        // Whole warband is fielded once and deaths are final — no reserves.
+        this.state.playerReserves = 0;
+        this.state.enemyReserves = this.endless!.reservesSentinel;
+        // Wave clock ran out → the run is over. Intercept BEFORE stepSimulation so
+        // the timeout never reaches evaluateOutcome's survivor comparison (which
+        // could otherwise call an endless run a "victory").
+        if (this.state.clockTicks <= 1) {
+          this.state.phase = "defeat";
+          return;
+        }
+        stepSimulation(this.state);
+        return;
+      }
       if (this.mode === "depths") {
         // The horde: the WaveController trickles the floor's queue in from the
         // top edge whenever the enemy side has room. Its queue doubles as the
@@ -531,6 +580,33 @@ export class MatchController {
     }
   }
 
+  /** Endless: apply the boon at `offerIndex` from the current intermission offer.
+   *  Returns false (no-op) outside endless or when not in an intermission — the
+   *  same idempotent-input discipline as `deploy`. Records the index for replay. */
+  pickBoon(offerIndex: number): boolean {
+    if (this.mode !== "endless" || !this.endless) return false;
+    const ok = this.endless.pickBoon(this.state, offerIndex);
+    if (ok) this.pickIndices.push(offerIndex);
+    return ok;
+  }
+
+  /** Endless read-model for the UI (wave number, live intermission offers, boon
+   *  tally), or null outside endless. */
+  endlessStatus(): EndlessStatus | null {
+    return this.endless ? this.endless.status() : null;
+  }
+
+  /** Waves fully cleared this run (the endless score), 0 outside endless. */
+  wavesSurvived(): number {
+    return this.endless ? this.endless.wavesSurvived : 0;
+  }
+
+  /** Endless compendium ledger (seen/slain), or null outside endless — the
+   *  controller keeps it because corpse pruning empties the live unit list. */
+  endlessLedger(): { seen: string[]; slain: string[] } | null {
+    return this.endless ? this.endless.ledger() : null;
+  }
+
   snapshot() {
     return snapshot(this.state);
   }
@@ -541,6 +617,7 @@ export class MatchController {
       deployments: this.deployments.slice(),
       playerDeck: this.playerDeck.slice(),
       enemyDeck: this.enemyDeck.slice(),
+      picks: this.pickIndices.slice(),
     };
   }
 }

@@ -186,6 +186,9 @@ export interface Unit {
   secondWindUsed: boolean;
   /** True once the Berserker's Last Stand death-cheat has been spent this life. */
   lastStandUsed: boolean;
+  /** Endless "Last Breath" boon: a per-wave cheat-death charge. The controller
+   *  refreshes it each wave start; the damage funnel consumes it on a fatal blow. */
+  cheatDeathReady: boolean;
   /** Number of split-clones the slime has already spawned (caps splitting). */
   splitsSpawned: number;
   /** Slime Knight rebirth counter: 0 for a fresh knight, +1 each reincarnation.
@@ -352,7 +355,9 @@ export interface Trap {
  *  the snapshot. `ticks` counts down (cleared at 0), so it lingers briefly as the
  *  unit walks in. Null on every non-boss floor / in the Arena. */
 export interface WaveBanner {
-  kind: "rare" | "boss";
+  /** "rare"/"boss" telegraph an incoming unit; "wave" announces a new Endless
+   *  wave starting (name carries the headline, e.g. "Wave 7"). */
+  kind: "rare" | "boss" | "wave";
   /** Display name of the incoming unit (e.g. "Lich", "Abomination"). */
   name: string;
   /** Display ticks remaining. */
@@ -386,4 +391,7 @@ export interface ReplayData {
   deployments: DeploymentRecord[];
   playerDeck: string[];
   enemyDeck: string[];
+  /** Endless mode: ordered boon-pick offer indices (the between-wave inputs).
+   *  Absent/empty for Arena and Depths. */
+  picks?: number[];
 }

@@ -250,9 +250,10 @@ export function onProjectileHit(
 export function applyLifesteal(
   attacker: Unit,
   damageDealt: number,
-  heal: (u: Unit, amt: number) => void
+  heal: (u: Unit, amt: number) => void,
+  bonus = 0
 ): void {
-  const frac = getUnitDef(attacker.defId).lifesteal ?? 0;
+  const frac = (getUnitDef(attacker.defId).lifesteal ?? 0) + bonus;
   if (frac > 0) {
     heal(attacker, Math.round(damageDealt * frac));
   }

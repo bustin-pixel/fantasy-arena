@@ -34,6 +34,7 @@ export function createUnit(defId: string, team: Team, pos: Vec2): Unit {
     ambushReady: def.ability === "ambush",
     secondWindUsed: false,
     lastStandUsed: false,
+    cheatDeathReady: false,
     splitsSpawned: 0,
     rebornStage: 0,
     homeAnchor: null,

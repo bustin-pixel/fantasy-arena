@@ -1,13 +1,17 @@
 import { useState } from "react";
 import { useGameState } from "@/state/GameStateContext";
-import { ArenaIcon, SwarmIcon } from "@/components/ModeIcons";
+import { ArenaIcon, EndlessIcon, SwarmIcon } from "@/components/ModeIcons";
 import { FloorPickerSheet } from "@/components/FloorPickerSheet";
 import { DungeonMapSheet } from "@/components/DungeonMapSheet";
 import { ProfilePlate } from "@/components/ProfilePlate";
 import { ProfileSheet } from "@/components/ProfileSheet";
 import { getDungeon } from "@/data/dungeons";
-import { highestClearedFloorOf } from "@/state/persistence";
+import { endlessBestWave, highestClearedFloorOf } from "@/state/persistence";
 import type { BattleMode } from "@/hooks/useBattleEngine";
+
+/** Endless unlocks once the player has cleared the fifth Depths floor — the same
+ *  gate the themed legendary dungeons use. */
+const ENDLESS_GATE_FLOOR = 5;
 
 interface Props {
   onBattle: (mode: BattleMode, floor?: number, dungeonId?: string) => void;
@@ -23,6 +27,9 @@ export function HomeScreen({ onBattle }: Props) {
   // A single unit is enough to battle — the engine fields whatever you bring
   // (readiness is min(deckSize, activeCap)); an empty deck is the only block.
   const ready = save.deck.length >= 1;
+  const endlessUnlocked =
+    highestClearedFloorOf(save, "depths") >= ENDLESS_GATE_FLOOR;
+  const bestWave = endlessBestWave(save);
   const [mapOpen, setMapOpen] = useState(false);
   const [pickDungeonId, setPickDungeonId] = useState<string | null>(null);
   const [editingProfile, setEditingProfile] = useState(false);
@@ -68,6 +75,25 @@ export function HomeScreen({ onBattle }: Props) {
           <span className="mode-card-title">Dungeons</span>
           <span className="mode-card-sub">
             {ready ? "Descend for gold & legends" : "Build a warband to play"}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          className="mode-card endless"
+          disabled={!ready || !endlessUnlocked}
+          onClick={() => onBattle("endless")}
+        >
+          <EndlessIcon />
+          <span className="mode-card-title">Endless</span>
+          <span className="mode-card-sub">
+            {!ready
+              ? "Build a warband to play"
+              : !endlessUnlocked
+              ? "Clear Depths floor 5 to unlock"
+              : bestWave > 0
+              ? `Best: Wave ${bestWave}`
+              : "Survive the endless horde"}
           </span>
         </button>
       </div>
