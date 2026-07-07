@@ -20,6 +20,8 @@ import {
   CHEST_GOLD_RANGE,
   CHEST_UNIT_CHANCE,
   DUPLICATE_GOLD,
+  ENDLESS_GOLD,
+  endlessMilestoneChestTier,
   GOLD_REWARDS,
   type ChestTier,
 } from "./economy";
@@ -112,6 +114,10 @@ export function computeBattleRewards(input: {
   slain?: readonly string[];
   /** Rare-spawn quests already completed, so a repeat kill doesn't re-announce. */
   questUnlocks?: readonly string[];
+  /** Endless: waves fully cleared this run (the score). */
+  wavesSurvived?: number;
+  /** Endless: the player's previous best wave, for the milestone-chest check. */
+  bestWave?: number;
 }): BattleRewards {
   const {
     mode,
@@ -124,11 +130,27 @@ export function computeBattleRewards(input: {
     deck = [],
     slain = [],
     questUnlocks = [],
+    wavesSurvived = 0,
+    bestWave = 0,
   } = input;
   const none: BattleRewards = { gold: 0, chest: null, firstClear: false };
 
   // PvP is scaffolding only; server-authoritative rewards replace this later.
   if (mode === "pvp") return none;
+
+  // Endless: gold scales with waves survived (paid regardless of the eventual
+  // wipe), plus a chest the first time a run crosses a new 5-wave milestone.
+  // `firstClear` doubles as "new best wave" for the results copy.
+  if (mode === "endless") {
+    const tier = endlessMilestoneChestTier(bestWave, wavesSurvived);
+    return {
+      gold: ENDLESS_GOLD.base + ENDLESS_GOLD.perWave * wavesSurvived,
+      chest: tier
+        ? { tier, seed: chestSeed, contents: rollChest(chestSeed, tier, unlockedUnits) }
+        : null,
+      firstClear: wavesSurvived > bestWave,
+    };
+  }
 
   if (mode === "depths") {
     const dungeon = getDungeon(dungeonId);

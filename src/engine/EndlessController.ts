@@ -114,6 +114,9 @@ export class EndlessController {
   private picks: string[] = [];
   /** Enemy defIds encountered this run (ledger; survives corpse pruning). */
   private bestiary = new Set<string>();
+  /** Enemy defIds that DIED this run — recorded as corpses are pruned, since the
+   *  compendium can't scan them off the field afterward. */
+  private bestiaryDefeated = new Set<string>();
 
   constructor(seed: number) {
     // Own stream, xor-mixed so it never shares draws with the sim RNG.
@@ -138,9 +141,11 @@ export class EndlessController {
   get reservesSentinel(): number {
     return 1;
   }
-  /** Enemy defIds seen this run (for the compendium; pruning-safe). */
-  bestiaryList(): string[] {
-    return [...this.bestiary];
+  /** The run's compendium ledger: everything encountered (`seen`) and the subset
+   *  that died to you (`slain`). Accumulated as we spawn + prune, so it survives
+   *  corpse pruning that a live-unit scan would miss. */
+  ledger(): { seen: string[]; slain: string[] } {
+    return { seen: [...this.bestiary], slain: [...this.bestiaryDefeated] };
   }
 
   status(): EndlessStatus {
@@ -368,6 +373,9 @@ export class EndlessController {
   }
 
   private pruneDeadEnemies(state: SimState): void {
+    for (const u of state.units) {
+      if (u.team === "enemy" && u.state === "dead") this.bestiaryDefeated.add(u.defId);
+    }
     state.units = state.units.filter(
       (u) => !(u.team === "enemy" && u.state === "dead")
     );

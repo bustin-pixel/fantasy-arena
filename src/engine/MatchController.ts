@@ -601,6 +601,12 @@ export class MatchController {
     return this.endless ? this.endless.wavesSurvived : 0;
   }
 
+  /** Endless compendium ledger (seen/slain), or null outside endless — the
+   *  controller keeps it because corpse pruning empties the live unit list. */
+  endlessLedger(): { seen: string[]; slain: string[] } | null {
+    return this.endless ? this.endless.ledger() : null;
+  }
+
   snapshot() {
     return snapshot(this.state);
   }

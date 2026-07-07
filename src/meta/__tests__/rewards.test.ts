@@ -11,6 +11,8 @@ import {
   CHEST_GOLD_RANGE,
   CHEST_UNIT_CHANCE,
   DUPLICATE_GOLD,
+  ENDLESS_GOLD,
+  endlessMilestoneChestTier,
   GOLD_REWARDS,
   MILESTONE_UNLOCKS,
   STARTER_UNIT_IDS,
@@ -350,5 +352,48 @@ describe("economy data sanity (guards designer typos)", () => {
       prevMax = max;
       prevChance = CHEST_UNIT_CHANCE[tier];
     }
+  });
+});
+
+describe("endless rewards", () => {
+  const base = {
+    mode: "endless" as const,
+    floor: 1,
+    outcome: "defeat" as const,
+    unlockedUnits: NO_UNITS,
+    highestClearedFloor: 0,
+    chestSeed: 42,
+  };
+
+  it("pays base + perWave gold regardless of the (always) defeat outcome", () => {
+    const r = computeBattleRewards({ ...base, wavesSurvived: 7, bestWave: 0 });
+    expect(r.gold).toBe(ENDLESS_GOLD.base + ENDLESS_GOLD.perWave * 7);
+  });
+
+  it("flags a new best wave via firstClear", () => {
+    expect(computeBattleRewards({ ...base, wavesSurvived: 9, bestWave: 6 }).firstClear).toBe(true);
+    expect(computeBattleRewards({ ...base, wavesSurvived: 4, bestWave: 6 }).firstClear).toBe(false);
+  });
+
+  it("drops a milestone chest only when a NEW 5-wave milestone is crossed", () => {
+    // First run to wave 5 → a silver chest.
+    expect(computeBattleRewards({ ...base, wavesSurvived: 5, bestWave: 0 }).chest?.tier).toBe("silver");
+    // Wave 4 has crossed no milestone → no chest.
+    expect(computeBattleRewards({ ...base, wavesSurvived: 4, bestWave: 0 }).chest).toBeNull();
+    // Already banked wave 5 before; reaching 7 stays in the same milestone → none.
+    expect(computeBattleRewards({ ...base, wavesSurvived: 7, bestWave: 5 }).chest).toBeNull();
+    // Pushing from best 7 to 12 crosses the 10 milestone → gold.
+    expect(computeBattleRewards({ ...base, wavesSurvived: 12, bestWave: 7 }).chest?.tier).toBe("gold");
+  });
+});
+
+describe("endlessMilestoneChestTier", () => {
+  it("returns the fresh milestone tier, or null when none is newly crossed", () => {
+    expect(endlessMilestoneChestTier(0, 4)).toBeNull();
+    expect(endlessMilestoneChestTier(0, 5)).toBe("silver");
+    expect(endlessMilestoneChestTier(5, 9)).toBeNull(); // still in the 5-milestone
+    expect(endlessMilestoneChestTier(7, 10)).toBe("gold");
+    expect(endlessMilestoneChestTier(14, 15)).toBe("gold");
+    expect(endlessMilestoneChestTier(15, 22)).toBe("arcane");
   });
 });

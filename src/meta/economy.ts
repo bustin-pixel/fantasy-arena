@@ -44,6 +44,29 @@ export const GOLD_REWARDS = {
   arenaLoss: 10,
 } as const;
 
+/** Endless survival payout: a flat base plus per-wave-survived gold, granted
+ *  regardless of the (always-eventual) wipe. Comparable gold/min to Depths. */
+export const ENDLESS_GOLD = {
+  base: 20,
+  perWave: 8,
+} as const;
+
+/** The chest tier for crossing a NEW best-wave milestone (every 5 waves), or null
+ *  if this run didn't push past a milestone the player had already banked. One
+ *  chest per run at most: the highest fresh multiple of 5 in (prevBest, survived].
+ *  Deeper milestones give fatter chests. */
+export function endlessMilestoneChestTier(
+  prevBest: number,
+  wavesSurvived: number
+): ChestTier | null {
+  const milestone = Math.floor(wavesSurvived / 5) * 5; // 0, 5, 10, 15, …
+  if (milestone <= 0) return null;
+  if (milestone <= Math.floor(prevBest / 5) * 5) return null; // already banked
+  if (milestone >= 20) return "arcane";
+  if (milestone >= 10) return "gold";
+  return "silver"; // milestone === 5
+}
+
 /** Ascending order. Wooden/silver drop today; gold is reserved for deep
  *  bosses (Depths slice 2); arcane and dragon are the far-future top of the
  *  ladder (deepest bosses / premium — see progress.md slices 2 & 5). */
