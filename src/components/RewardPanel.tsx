@@ -39,7 +39,11 @@ export function RewardPanel({ rewards, floor, mode }: Props) {
 
   return (
     <div className="reward-panel">
-      {rewards.firstClear && <div className="reward-badge">First clear!</div>}
+      {rewards.firstClear && (
+        <div className="reward-badge">
+          {mode === "endless" ? "New best!" : "First clear!"}
+        </div>
+      )}
 
       <div className="reward-gold">
         <span className="coin" aria-hidden>

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useBattleEngine, type BattleMode } from "@/hooks/useBattleEngine";
 import { BattleHud } from "@/components/BattleHud";
 import { BattleUnitTip } from "@/components/BattleUnitTip";
+import { BoonPickOverlay } from "@/components/BoonPickOverlay";
 import { CardTray } from "@/components/CardTray";
 import {
   FIELD_HEIGHT,
@@ -9,7 +10,7 @@ import {
   PLAYER_ZONE,
 } from "@/utils/constants";
 import { useGameState } from "@/state/GameStateContext";
-import { highestClearedFloorOf } from "@/state/persistence";
+import { endlessBestWave, highestClearedFloorOf } from "@/state/persistence";
 import { computeBattleRewards, type BattleRewards } from "@/meta/rewards";
 import { RewardPanel } from "@/components/RewardPanel";
 import { generateSeed } from "@/utils/rng";
@@ -33,8 +34,19 @@ export function BattleScreen({
   floor = 1,
   dungeonId = "depths",
 }: Props) {
-  const { canvasRef, ui, deployAt, selectCard, speed, setSpeed, pickUnitAt, inspectUnit, enemyLedger } =
-    useBattleEngine(deck, mode, undefined, floor, dungeonId);
+  const {
+    canvasRef,
+    ui,
+    deployAt,
+    selectCard,
+    speed,
+    setSpeed,
+    pickUnitAt,
+    inspectUnit,
+    enemyLedger,
+    pickBoon,
+    wavesSurvived,
+  } = useBattleEngine(deck, mode, undefined, floor, dungeonId);
   const { save, recordResult, recordBestiary, grantBattleRewards } =
     useGameState();
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -45,6 +57,8 @@ export function BattleScreen({
   const [showResult, setShowResult] = useState(false);
   // The reward bundle for the overlay. Set once, alongside the grant.
   const [rewards, setRewards] = useState<BattleRewards | null>(null);
+  // Endless: waves cleared this run, captured for the results screen.
+  const [endlessWaves, setEndlessWaves] = useState(0);
   // uid of the unit whose stat tooltip is open (tap a combatant to inspect).
   const [inspectedUid, setInspectedUid] = useState<string | null>(null);
 
@@ -63,14 +77,21 @@ export function BattleScreen({
         : null;
     if (outcome && !recordedRef.current) {
       recordedRef.current = true;
+      const isEndless = mode === "endless";
+      const survived = isEndless ? wavesSurvived() : 0;
+      if (isEndless) setEndlessWaves(survived);
       // The battle track ends with the battle: victory/defeat play a one-shot
       // stinger over its fade-out; a draw just falls silent. The hub theme
       // returns via App's view effect when the player exits.
       if (outcome === "victory") playStinger("victory");
       else if (outcome === "defeat") playStinger("defeat");
       else setMusicTrack(null);
-      if (outcome === "victory") recordResult(true);
-      else if (outcome === "defeat") recordResult(false);
+      // Endless runs are a survival score, not a win/loss — don't touch the W/L
+      // tally (every run "ends" in a wipe).
+      if (!isEndless) {
+        if (outcome === "victory") recordResult(true);
+        else if (outcome === "defeat") recordResult(false);
+      }
       const { seen, slain } = enemyLedger();
       recordBestiary(seen, slain);
       // Grant-then-reveal: rewards are rolled (drop-time seed) and committed
@@ -88,8 +109,15 @@ export function BattleScreen({
         deck,
         slain,
         questUnlocks: save.questUnlocks,
+        wavesSurvived: survived,
+        bestWave: endlessBestWave(save),
       });
-      grantBattleRewards(bundle, { mode, floor, dungeonId });
+      grantBattleRewards(bundle, {
+        mode,
+        floor,
+        dungeonId,
+        wavesSurvived: survived,
+      });
       setRewards(bundle);
       setTimeout(() => setShowResult(true), 700);
     }
@@ -99,6 +127,7 @@ export function BattleScreen({
     recordBestiary,
     enemyLedger,
     grantBattleRewards,
+    wavesSurvived,
     mode,
     floor,
     dungeonId,
@@ -158,23 +187,45 @@ export function BattleScreen({
         onSelect={selectCard}
       />
 
+      {/* Endless: the between-wave boon pick. The sim is frozen behind it. */}
+      {mode === "endless" && ui.intermission && (
+        <BoonPickOverlay
+          wave={ui.intermission.wave}
+          offers={ui.intermission.offers}
+          boonsPicked={ui.boonsPicked}
+          onPick={pickBoon}
+        />
+      )}
+
       {showResult && (
         <div className="result-overlay">
-          <div className={`result-card ${ui.phase}`}>
-            <h2>
-              {ui.phase === "victory"
-                ? "Victory"
-                : ui.phase === "defeat"
-                ? "Defeat"
-                : "Draw"}
-            </h2>
-            <p>
-              {ui.phase === "victory"
-                ? "Your warband stands triumphant."
-                : ui.phase === "defeat"
-                ? "Your warband has fallen."
-                : "Neither side could break the other."}
-            </p>
+          <div className={`result-card ${mode === "endless" ? "defeat" : ui.phase}`}>
+            {mode === "endless" ? (
+              <>
+                <h2>Run Over</h2>
+                <p>
+                  Your warband survived <strong>{endlessWaves}</strong>{" "}
+                  {endlessWaves === 1 ? "wave" : "waves"}.
+                </p>
+              </>
+            ) : (
+              <>
+                <h2>
+                  {ui.phase === "victory"
+                    ? "Victory"
+                    : ui.phase === "defeat"
+                    ? "Defeat"
+                    : "Draw"}
+                </h2>
+                <p>
+                  {ui.phase === "victory"
+                    ? "Your warband stands triumphant."
+                    : ui.phase === "defeat"
+                    ? "Your warband has fallen."
+                    : "Neither side could break the other."}
+                </p>
+              </>
+            )}
             {rewards && (
               <RewardPanel rewards={rewards} floor={floor} mode={mode} />
             )}

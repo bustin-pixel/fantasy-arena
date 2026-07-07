@@ -32,6 +32,32 @@ export function ArenaIcon() {
   );
 }
 
+/** Infinity loop over a rising blade — the Endless survival mode. */
+export function EndlessIcon() {
+  return (
+    <svg
+      className="mode-card-icon"
+      viewBox="0 0 40 40"
+      width="44"
+      height="44"
+      aria-hidden="true"
+    >
+      <g transform="translate(20 20)">
+        {/* Infinity ribbon */}
+        <path
+          d="M-13 0 C-13 -7 -3 -7 0 0 C3 7 13 7 13 0 C13 -7 3 -7 0 0 C-3 7 -13 7 -13 0 Z"
+          fill="none"
+          stroke="#f5b301"
+          strokeWidth="3"
+          strokeLinecap="round"
+        />
+        {/* Small upward chevrons — escalating waves */}
+        <path d="M-4 12 L0 8 L4 12" fill="none" stroke="#cdd2d8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </g>
+    </svg>
+  );
+}
+
 /** Skull — the Swarm / PvE mode. */
 export function SwarmIcon() {
   return (
