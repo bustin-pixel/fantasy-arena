@@ -13,11 +13,19 @@
 // ============================================================================
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { MatchPhase, Rarity, StatusEffectType, Team, Vec2 } from "@/types";
+import type {
+  MatchPhase,
+  Rarity,
+  StatusEffectType,
+  Team,
+  Vec2,
+  WaveBanner,
+} from "@/types";
 import { MatchController } from "@/engine/MatchController";
 import { renderBattle } from "@/engine/Renderer";
 import { SfxObserver } from "@/audio/sfx";
 import { pickArenaTheme, type ArenaThemeId } from "@/assets/arenaThemes";
+import { getDungeon } from "@/data/dungeons";
 import { generateEnemyDeck } from "@/engine/AIDeck";
 import { getUnitDef } from "@/data/units";
 import { ABILITIES } from "@/data/abilities";
@@ -50,6 +58,8 @@ export interface BattleUiState {
   startCountdownSec: number | null;
   /** Seconds left to place units in deployment, or null when not applicable. */
   deploySecLeft: number | null;
+  /** Boss-floor telegraph banner (rare catalyst / boss incoming), or null. */
+  banner: WaveBanner | null;
 }
 
 /** Live snapshot of one combatant, for the in-battle stat tooltip. */
@@ -93,7 +103,9 @@ export function useBattleEngine(
   mode: BattleMode = "solo",
   seedOverride?: number,
   /** Depths floor to descend to (ignored outside "depths" mode). */
-  floor: number = 1
+  floor: number = 1,
+  /** Which dungeon to descend (ignored outside "depths" mode). */
+  dungeonId: string = "depths"
 ): UseBattleEngine {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const controllerRef = useRef<MatchController | null>(null);
@@ -125,6 +137,7 @@ export function useBattleEngine(
     })),
     startCountdownSec: null,
     deploySecLeft: DEPLOY_TIME_SEC,
+    banner: null,
   });
   const [speed, setSpeedState] = useState<number>(initialSpeed);
 
@@ -147,6 +160,7 @@ export function useBattleEngine(
       controllerRef.current = new MatchController(seed, playerDeck.slice(0, 4), [], {
         mode: "depths",
         floor,
+        dungeonId,
       });
     } else {
       const enemyDeck = generateEnemyDeck(seed);
@@ -154,13 +168,13 @@ export function useBattleEngine(
     }
     themeRef.current =
       mode === "solo" ? pickArenaTheme(seed)
-      : mode === "depths" ? "dungeon"
+      : mode === "depths" ? getDungeon(dungeonId).theme
       : "grassField";
     sfxRef.current = new SfxObserver();
     accRef.current = 0;
     lastRef.current = performance.now();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playerDeck.join(","), seedOverride, mode, floor]);
+  }, [playerDeck.join(","), seedOverride, mode, floor, dungeonId]);
 
   // The combined loop.
   useEffect(() => {
@@ -209,6 +223,7 @@ export function useBattleEngine(
           hand: c.playerHand(),
           startCountdownSec: c.startCountdownSec(),
           deploySecLeft: c.deploySecLeft(),
+          banner: snap.waveBanner,
         });
       }
 
@@ -218,7 +233,7 @@ export function useBattleEngine(
     rafRef.current = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(rafRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playerDeck.join(","), seedOverride, mode, floor]);
+  }, [playerDeck.join(","), seedOverride, mode, floor, dungeonId]);
 
   const deployAt = useCallback((pos: Vec2) => {
     const c = controllerRef.current;

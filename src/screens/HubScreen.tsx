@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { DECKABLE_UNIT_IDS, getUnitDef } from "@/data/units";
-import { questForUnlock } from "@/data/depths";
+import { questForUnlock } from "@/data/dungeons";
 import { rarityRank, RARITY_ORDER, RARITIES } from "@/data/rarities";
 import type { Rarity } from "@/types";
 import { CardPortrait, type CardAddState } from "@/components/CardPortrait";

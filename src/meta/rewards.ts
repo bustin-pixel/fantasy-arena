@@ -10,10 +10,11 @@ import type { BattleMode } from "@/hooks/useBattleEngine"; // type-only: erased 
 import { DECKABLE_UNIT_IDS, getUnitDef } from "@/data/units";
 import { RARITIES } from "@/data/rarities";
 import {
-  isBossFloor,
+  getDungeon,
+  isBossFloorIn,
   QUEST_LOCKED_UNITS,
-  rareSpawnQuestForFloor,
-} from "@/data/depths";
+  questForFloorIn,
+} from "@/data/dungeons";
 import { RNG } from "@/utils/rng";
 import {
   CHEST_GOLD_RANGE,
@@ -99,6 +100,8 @@ function pickWeightedUnit(rng: RNG): string {
 export function computeBattleRewards(input: {
   mode: BattleMode;
   floor: number;
+  /** Which dungeon this Depths battle ran in (defaults to "depths"). */
+  dungeonId?: string;
   outcome: "victory" | "defeat" | "draw";
   unlockedUnits: readonly string[];
   highestClearedFloor: number;
@@ -113,6 +116,7 @@ export function computeBattleRewards(input: {
   const {
     mode,
     floor,
+    dungeonId = "depths",
     outcome,
     unlockedUnits,
     highestClearedFloor,
@@ -127,10 +131,11 @@ export function computeBattleRewards(input: {
   if (mode === "pvp") return none;
 
   if (mode === "depths") {
+    const dungeon = getDungeon(dungeonId);
     // Rare-spawn "fusion" quest: clearing the rare enemy while fielding the
     // required unit unlocks the reward's PURCHASE. Counts on a loss too — "clear
     // it during the floor". Announced once: skip if already unlocked or owned.
-    const quest = rareSpawnQuestForFloor(floor);
+    const quest = questForFloorIn(dungeon, floor);
     const questUnlock =
       quest &&
       slain.includes(quest.spawnId) &&
@@ -147,7 +152,13 @@ export function computeBattleRewards(input: {
     if (!firstClear) {
       return { ...none, gold: GOLD_REWARDS.depthsReplay, questUnlock };
     }
-    const tier: ChestTier = isBossFloor(floor) ? "silver" : "wooden";
+    // Boss floors drop a chest: The Depths' bosses give silver; the themed
+    // legendary dungeons are "deep bosses" and give gold (progress.md slice 2).
+    const tier: ChestTier = isBossFloorIn(dungeon, floor)
+      ? dungeonId === "depths"
+        ? "silver"
+        : "gold"
+      : "wooden";
     return {
       gold:
         GOLD_REWARDS.depthsFirstClearBase +

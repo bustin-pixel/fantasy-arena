@@ -23,7 +23,7 @@ import {
 } from "./persistence";
 import { isAvatarUnlocked } from "@/meta/avatars";
 import { MILESTONE_UNLOCKS, UNLOCK_PRICES } from "@/meta/economy";
-import { questForUnlock } from "@/data/depths";
+import { questForUnlock } from "@/data/dungeons";
 import type { BattleRewards } from "@/meta/rewards";
 import type { BattleMode } from "@/hooks/useBattleEngine";
 import { UNITS } from "@/data/units";
@@ -45,7 +45,7 @@ interface GameStateValue {
    *  happens before this call so the updater stays pure under StrictMode. */
   grantBattleRewards: (
     rewards: BattleRewards,
-    ctx: { mode: BattleMode; floor: number }
+    ctx: { mode: BattleMode; floor: number; dungeonId: string }
   ) => void;
   /** Buy a locked unit with gold. No-op unless locked and affordable. */
   purchaseUnit: (unitId: string) => void;
@@ -100,7 +100,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
   // dev) — every random roll already happened in computeBattleRewards.
   const grantBattleRewards = (
     rewards: BattleRewards,
-    ctx: { mode: BattleMode; floor: number }
+    ctx: { mode: BattleMode; floor: number; dungeonId: string }
   ) =>
     setSave((s) => {
       let gold = s.gold + rewards.gold;
@@ -110,13 +110,19 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
         else if (entry.kind === "duplicate") gold += entry.gold;
         else unlocked.add(entry.unitId);
       }
-      let depths = s.depths;
+      let dungeons = s.dungeons;
       if (ctx.mode === "depths" && rewards.firstClear) {
-        depths = {
-          highestClearedFloor: Math.max(s.depths.highestClearedFloor, ctx.floor),
+        const prev = s.dungeons[ctx.dungeonId]?.highestClearedFloor ?? 0;
+        dungeons = {
+          ...s.dungeons,
+          [ctx.dungeonId]: { highestClearedFloor: Math.max(prev, ctx.floor) },
         };
-        const milestone = MILESTONE_UNLOCKS[ctx.floor];
-        if (milestone) unlocked.add(milestone);
+        // Milestone unlocks are a Depths-only ladder reward (the themed dungeons
+        // reward their legendary via the quest, not per-floor milestones).
+        if (ctx.dungeonId === "depths") {
+          const milestone = MILESTONE_UNLOCKS[ctx.floor];
+          if (milestone) unlocked.add(milestone);
+        }
       }
       // Rare-spawn quest completion → the reward unit becomes purchasable.
       const questUnlocks = new Set(s.questUnlocks);
@@ -125,7 +131,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
         ...s,
         gold,
         unlockedUnits: [...unlocked],
-        depths,
+        dungeons,
         questUnlocks: [...questUnlocks],
       };
     });

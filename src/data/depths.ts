@@ -31,6 +31,22 @@ export const BOSS_FLOOR_FODDER_SHARE = 0.7;
 export const WAVE_SPAWN_INTERVAL_SEC = 0.5;
 
 // ---------------------------------------------------------------------------
+// Boss-floor pacing. On a boss floor the fodder no longer shares the field with
+// the boss: the whole fodder pool must be CLEARED first, then the rare catalyst
+// (if it rolled), then the boss — each heralded by a telegraph banner. This
+// turns boss floors into a real climax instead of a swarm. Applies to every
+// dungeon's boss floors (incl. the Depths' every-5th). Non-boss floors keep the
+// continuous trickle above.
+// ---------------------------------------------------------------------------
+
+/** Telegraph pause (seconds) between the banner appearing and the rare/boss
+ *  actually entering from the top edge. */
+export const BOSS_TELEGRAPH_SEC = 2;
+/** How long (seconds) the telegraph banner stays on screen — a touch longer
+ *  than the pause, so it lingers as the unit walks in. */
+export const BOSS_BANNER_SEC = 2.7;
+
+// ---------------------------------------------------------------------------
 // Per-floor stat scaling — the depth pressure dial. Monsters spawn with these
 // linear multipliers so floor 1 matches the bestiary exactly and every floor
 // deeper is meaner. HP climbs faster than damage on purpose: tankier monsters
@@ -134,13 +150,6 @@ export function rareSpawnQuestForFloor(floor: number): RareSpawnQuest | undefine
   return RARE_SPAWN_QUESTS.find((q) => q.floor === floor);
 }
 
-/** Units whose purchase is gated behind a rare-spawn quest (never chest-dropped,
- *  never granted by the grandfather clause, not buyable until the quest is done). */
-export const QUEST_LOCKED_UNITS = new Set<string>(
-  RARE_SPAWN_QUESTS.map((q) => q.unlocks)
-);
-
-/** The rare-spawn quest that unlocks `unitId`'s purchase, if any. */
-export function questForUnlock(unitId: string): RareSpawnQuest | undefined {
-  return RARE_SPAWN_QUESTS.find((q) => q.unlocks === unitId);
-}
+// QUEST_LOCKED_UNITS and questForUnlock moved to data/dungeons.ts — they must
+// span EVERY dungeon's quest, not just The Depths'. This module stays the home
+// of the shared shapes (DepthsTier, RareSpawnQuest) + the Depths' own tuning.

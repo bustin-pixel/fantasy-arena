@@ -682,6 +682,699 @@ export const UNITS: Record<string, UnitDef> = {
     color: "#8a9a3b",
     accent: "#d4e157",
   },
+  // -------------------------------------------------------------------------
+  // The Bonefields — undead tier (the Necromancer's dungeon; see data/dungeons).
+  // Gated behind Depths floor 5; its boss floor hosts the rare Lich fusion quest
+  // (Fire Mage + Lich → Necromancer). Sprites recolor the skeleton / zombie /
+  // brute bodies (the reskin pattern); the Lich reuses the Necromancer kit and
+  // the Abomination reuses the Ogre kit — no new engine branches, no new abilities.
+  // -------------------------------------------------------------------------
+  skeleton_archer: {
+    id: "skeleton_archer",
+    name: "Skeleton Archer",
+    rarity: "rare",
+    role: "Undead Ranged",
+    hp: 40,
+    damage: 9,
+    attackSpeed: 1.3,
+    moveSpeed: 70,
+    range: FIELD_WIDTH * 0.32, // plain arrows, no rider
+    ability: "lifesteal", // passive filler — never casts
+    color: "#d8d2c2", // bleached bone
+    accent: "#9bd0ff", // cold blue fletching
+  },
+  ghoul: {
+    id: "ghoul",
+    name: "Ghoul",
+    rarity: "rare",
+    role: "Ravenous Dead",
+    hp: 70,
+    damage: 12,
+    attackSpeed: 1.0,
+    moveSpeed: 95, // lunges — far faster than a shambler
+    range: MELEE,
+    ability: "lifesteal", // passive filler — never casts
+    color: "#8a9b7a", // grave-rot grey-green
+    accent: "#e0c48a", // jaundiced claws
+  },
+  bonecaller: {
+    id: "bonecaller",
+    name: "Bonecaller",
+    rarity: "epic",
+    role: "Undead Summoner",
+    hp: 95,
+    damage: 8,
+    attackSpeed: 1.9,
+    moveSpeed: 50, // hangs back and raises the dead
+    range: FIELD_WIDTH * 0.28,
+    ability: "lifesteal", // Raise Dead is a passive (kit onTick), not a cast
+    school: "magic",
+    color: "#4b3f6b", // violet grave-robes
+    accent: "#c4b5fd",
+    traits: [
+      {
+        name: "Raise Dead",
+        description:
+          "Every 5s it claws a fresh skeleton up from the ground to fight for it, up to the battlefield's summon cap.",
+      },
+    ],
+  },
+  // Abomination — the Bonefields boss. A hulking stitched-together corpse: huge
+  // HP, a crushing slam, and one refusal to die (reuses the Ogre kit).
+  abomination: {
+    id: "abomination",
+    name: "Abomination",
+    rarity: "epic",
+    role: "Undead Horror",
+    hp: 900,
+    damage: 30,
+    attackSpeed: 2.2,
+    moveSpeed: 30, // lumbering
+    range: MELEE,
+    ability: "crushing_slam",
+    wardedAgainst: ["polymorph"], // bosses don't fit in a sheep
+    color: "#6f7a58", // grey-green stitched flesh
+    accent: "#b7c48a",
+    traits: [
+      {
+        name: "Crushing Slam",
+        description:
+          "Periodically caves in its target for heavy damage and a stun.",
+      },
+      {
+        name: "Refuses to Die",
+        description:
+          "Once per battle, a blow that would fell it instead heaves it back to full health.",
+      },
+      {
+        name: "Too Big to Baa",
+        description: "Far too massive to polymorph — no sheep holds this much.",
+      },
+    ],
+  },
+  // Lich — the rare Bonefields catalyst (the fusion quest's spawn). A deathless
+  // lord that curses, terrifies, and raises the dead (reuses the Necromancer
+  // kit). Fell it with a Fire Mage fielded to earn the Necromancer.
+  lich: {
+    id: "lich",
+    name: "Lich",
+    rarity: "legendary",
+    role: "Deathless Lord",
+    hp: 300,
+    damage: 14,
+    attackSpeed: 2.0,
+    moveSpeed: 52,
+    range: FIELD_WIDTH * 0.32,
+    ability: "curse", // signature single-target DoT
+    abilities: ["fear_aura"], // Terrify — its AoE second cast
+    school: "magic",
+    wardedAgainst: ["polymorph"],
+    color: "#2a2140", // black-violet bone
+    accent: "#a78bfa",
+    traits: [
+      {
+        name: "Raise Dead",
+        description: "Every 5s it raises a skeleton to bolster its host.",
+      },
+      {
+        name: "Curse",
+        description: "Lays a heavy decaying curse on a single foe.",
+      },
+      {
+        name: "Terrify",
+        description: "Wails to send nearby enemies fleeing in fear.",
+      },
+    ],
+  },
+  // -------------------------------------------------------------------------
+  // The Wilds — feral beast tier (the Hunter's dungeon; see data/dungeons).
+  // Gated behind Depths floor 5; its boss floor hosts the rare Apex Beast fusion
+  // quest (Archer + Apex Beast → Hunter). Sprites reuse the wolf / boar / bear
+  // draws; the boss reuses the Berserker kit and the Apex Beast the Ogre kit.
+  // -------------------------------------------------------------------------
+  dire_wolf: {
+    id: "dire_wolf",
+    name: "Dire Wolf",
+    rarity: "rare",
+    role: "Pack Hunter",
+    hp: 55,
+    damage: 11,
+    attackSpeed: 1.0,
+    moveSpeed: 100, // runs the field down
+    range: MELEE,
+    ability: "lifesteal", // passive filler — never casts
+    color: "#5b6470", // slate-grey pelt
+    accent: "#c7ccd4",
+  },
+  razorback: {
+    id: "razorback",
+    name: "Razorback",
+    rarity: "rare",
+    role: "Charging Brute",
+    hp: 150,
+    damage: 16,
+    attackSpeed: 1.6,
+    moveSpeed: 70,
+    range: MELEE,
+    ability: "lifesteal", // passive filler — never casts
+    color: "#5a3f2c", // bristly brown hide
+    accent: "#d9c2a3", // tusks
+  },
+  grizzly: {
+    id: "grizzly",
+    name: "Grizzly",
+    rarity: "rare",
+    role: "Woodland Bruiser",
+    hp: 110,
+    damage: 15,
+    attackSpeed: 1.5,
+    moveSpeed: 60,
+    range: MELEE,
+    ability: "lifesteal", // passive filler — never casts
+    color: "#7a5a34", // brown bear
+    accent: "#e8d3ad",
+  },
+  // Dire Alpha — the Wilds boss. A pack leader that turns berserk as it's
+  // wounded and cleaves the whole line (reuses the Berserker kit).
+  dire_alpha: {
+    id: "dire_alpha",
+    name: "Dire Alpha",
+    rarity: "epic",
+    role: "Pack Alpha",
+    hp: 850,
+    damage: 26,
+    attackSpeed: 1.3,
+    moveSpeed: 78, // fast for its size
+    range: MELEE,
+    ability: "bloodrage",
+    wardedAgainst: ["polymorph"], // bosses don't fit in a sheep
+    color: "#3f4550", // near-black dire pelt
+    accent: "#ef4444", // blood-red eyes
+    traits: [
+      {
+        name: "Bloodrage",
+        description:
+          "The more wounded it is, the harder and faster it strikes.",
+      },
+      {
+        name: "Cleave",
+        description: "Each swing also mauls every other enemy in reach.",
+      },
+      {
+        name: "Last Stand",
+        description:
+          "Once per battle, a killing blow leaves it at 1 HP and unkillable for 5s.",
+      },
+    ],
+  },
+  // Apex Beast — the rare Wilds catalyst (the fusion quest's spawn). A colossal
+  // bear that slams and refuses to fall (reuses the Ogre kit). Fell it with an
+  // Archer fielded to earn the Hunter.
+  apex_beast: {
+    id: "apex_beast",
+    name: "Apex Beast",
+    rarity: "legendary",
+    role: "Great Predator",
+    hp: 320,
+    damage: 20,
+    attackSpeed: 1.7,
+    moveSpeed: 66,
+    range: MELEE,
+    ability: "crushing_slam",
+    wardedAgainst: ["polymorph"],
+    color: "#6b4a2a", // great brown bear
+    accent: "#f5e0b8",
+    traits: [
+      {
+        name: "Crushing Slam",
+        description: "Periodically caves in its prey for heavy damage and a stun.",
+      },
+      {
+        name: "Apex",
+        description:
+          "Once per battle, a blow that would fell it instead heaves it back to full.",
+      },
+    ],
+  },
+  // -------------------------------------------------------------------------
+  // The Sealed Vault — arcane tier (the Aegis Knight's dungeon; see data/dungeons).
+  // Gated behind Depths floor 5; its whole horde is `school: "magic"`, so the
+  // Aegis Knight's magic soak is the answer. Boss floor hosts the rare Archmage
+  // fusion quest (Knight + Archmage → Aegis Knight). Casters reuse the mage
+  // draws; the Archmage reuses the Arcane Mage kit; the Rune Golem gets a small
+  // damage-reduction kit; the Wisp gets a new orb sprite.
+  // -------------------------------------------------------------------------
+  arcane_wisp: {
+    id: "arcane_wisp",
+    name: "Arcane Wisp",
+    rarity: "rare",
+    role: "Loosed Magic",
+    hp: 30,
+    damage: 10,
+    attackSpeed: 1.2,
+    moveSpeed: 82, // drifts fast
+    range: FIELD_WIDTH * 0.3,
+    ability: "lifesteal", // passive filler — never casts
+    school: "magic",
+    color: "#7c5cff", // violet mote
+    accent: "#c4b5fd",
+  },
+  imp: {
+    id: "imp",
+    name: "Imp",
+    rarity: "rare",
+    role: "Arcane Vermin",
+    hp: 48,
+    damage: 11,
+    attackSpeed: 1.1,
+    moveSpeed: 76,
+    range: FIELD_WIDTH * 0.28,
+    ability: "lifesteal", // passive filler — never casts
+    school: "magic",
+    color: "#b91c1c", // red imp
+    accent: "#fb923c", // ember
+  },
+  cultist: {
+    id: "cultist",
+    name: "Vault Cultist",
+    rarity: "rare",
+    role: "Arcane Caster",
+    hp: 75,
+    damage: 9,
+    attackSpeed: 1.6,
+    moveSpeed: 55,
+    range: FIELD_WIDTH * 0.3,
+    ability: "lifesteal", // passive filler — never casts
+    school: "magic",
+    color: "#3b2a52", // dark robe
+    accent: "#a78bfa",
+  },
+  // Rune Golem — the Sealed Vault boss. A warded construct that halves ALL
+  // incoming damage (its own damage-reduction kit) — a slow, grinding wall.
+  rune_golem: {
+    id: "rune_golem",
+    name: "Rune Golem",
+    rarity: "epic",
+    role: "Warded Construct",
+    hp: 750,
+    damage: 24,
+    attackSpeed: 1.8,
+    moveSpeed: 34, // lumbering
+    range: MELEE,
+    ability: "lifesteal", // no active — damage reduction is the mechanic (kit)
+    wardedAgainst: ["polymorph"], // bosses don't fit in a sheep
+    color: "#4a5568", // rune-carved stone
+    accent: "#38bdf8", // glowing glyphs
+    traits: [
+      {
+        name: "Warded Hide",
+        description:
+          "Ancient runes halve every hit it takes — physical or magical alike.",
+      },
+      {
+        name: "Too Big to Baa",
+        description: "Far too massive to polymorph — no sheep holds this much.",
+      },
+    ],
+  },
+  // Archmage — the rare Sealed Vault catalyst (the fusion quest's spawn). A
+  // slippery burst caster that blinks from melee and looses arcane volleys
+  // (reuses the Arcane Mage kit). Fell it with a Knight fielded to earn the
+  // Aegis Knight.
+  archmage: {
+    id: "archmage",
+    name: "Archmage",
+    rarity: "legendary",
+    role: "Master of the Arcane",
+    hp: 280,
+    damage: 16,
+    attackSpeed: 2.0,
+    moveSpeed: 52,
+    range: FIELD_WIDTH * 0.34,
+    ability: "arcane_barrage",
+    school: "magic",
+    wardedAgainst: ["polymorph"],
+    color: "#1e3a8a", // deep arcane blue
+    accent: "#fcd34d", // gold filigree
+    traits: [
+      {
+        name: "Arcane Barrage",
+        description: "Looses a volley of three homing arcane missiles.",
+      },
+      {
+        name: "Blink",
+        description: "Teleports away the instant a melee attacker closes in.",
+      },
+    ],
+  },
+  // -------------------------------------------------------------------------
+  // The Overgrowth — nature tier (the Druid's dungeon; see data/dungeons).
+  // Gated behind Depths floor 5; boss floor hosts the rare Wildheart fusion quest
+  // (Cleric + Wildheart → Druid). Dryads reuse the Cleric kit (Mend); the Elder
+  // Treant reuses the Ogre kit and the Wildheart the Berserker kit; new plant
+  // sprites (drawTreant / drawSporePod) + a mossy-boar reskin.
+  // -------------------------------------------------------------------------
+  thornbeast: {
+    id: "thornbeast",
+    name: "Thornbeast",
+    rarity: "rare",
+    role: "Bramble Charger",
+    hp: 90,
+    damage: 13,
+    attackSpeed: 1.4,
+    moveSpeed: 65,
+    range: MELEE,
+    ability: "lifesteal", // passive filler — never casts
+    color: "#3f6b2f", // mossy green hide
+    accent: "#8fae52", // thorns
+  },
+  spore_pod: {
+    id: "spore_pod",
+    name: "Spore Pod",
+    rarity: "rare",
+    role: "Rooted Bloom",
+    hp: 130,
+    damage: 9,
+    attackSpeed: 2.0,
+    moveSpeed: 24, // barely creeps
+    range: MELEE,
+    ability: "lifesteal", // passive filler — never casts
+    color: "#6b7f3a", // fungal cap
+    accent: "#d9f99d", // spores
+    traits: [
+      {
+        name: "Rooted",
+        description: "A slow, swollen bloom that soaks hits at the front of the grove.",
+      },
+    ],
+  },
+  dryad: {
+    id: "dryad",
+    name: "Dryad",
+    rarity: "epic",
+    role: "Grove Healer",
+    hp: 85,
+    damage: 8,
+    attackSpeed: 1.8,
+    moveSpeed: 55,
+    range: FIELD_WIDTH * 0.3,
+    ability: "mend", // Cleric kit — heals the most-wounded ally in range
+    color: "#2f6b4a", // deep leaf-green
+    accent: "#bbf7d0",
+    traits: [
+      {
+        name: "Mend",
+        description: "Channels nature's vigor to heal the most-wounded creature nearby.",
+      },
+    ],
+  },
+  // Elder Treant — the Overgrowth boss. An ancient walking tree: colossal HP, a
+  // crushing slam, and one regrowth from the brink (reuses the Ogre kit).
+  elder_treant: {
+    id: "elder_treant",
+    name: "Elder Treant",
+    rarity: "epic",
+    role: "Ancient Guardian",
+    hp: 1000,
+    damage: 26,
+    attackSpeed: 2.0,
+    moveSpeed: 28, // ponderous
+    range: MELEE,
+    ability: "crushing_slam",
+    wardedAgainst: ["polymorph"], // bosses don't fit in a sheep
+    color: "#5b4327", // bark brown
+    accent: "#4d7c0f", // canopy green
+    traits: [
+      {
+        name: "Crushing Slam",
+        description: "Periodically brings a massive limb down for heavy damage and a stun.",
+      },
+      {
+        name: "Regrowth",
+        description:
+          "Once per battle, a blow that would fell it instead surges it back to full.",
+      },
+      {
+        name: "Too Big to Baa",
+        description: "Far too massive to polymorph — no sheep holds this much.",
+      },
+    ],
+  },
+  // Wildheart — the rare Overgrowth catalyst (the fusion quest's spawn). The
+  // grove's beating heart, a treant-spirit that rages harder as it's wounded and
+  // cleaves the line (reuses the Berserker kit). Fell it with a Cleric fielded to
+  // earn the Druid.
+  wildheart: {
+    id: "wildheart",
+    name: "Wildheart",
+    rarity: "legendary",
+    role: "Heart of the Grove",
+    hp: 300,
+    damage: 18,
+    attackSpeed: 1.7,
+    moveSpeed: 40,
+    range: MELEE,
+    ability: "bloodrage",
+    wardedAgainst: ["polymorph"],
+    color: "#6b5327", // radiant heartwood
+    accent: "#facc15", // golden sap-glow
+    traits: [
+      {
+        name: "Wild Fury",
+        description: "The more wounded it is, the harder and faster it lashes out.",
+      },
+      {
+        name: "Thrash",
+        description: "Each swing also rends every other enemy in reach.",
+      },
+      {
+        name: "Ever-Green",
+        description:
+          "Once per battle, a killing blow leaves it at 1 HP and unkillable for 5s.",
+      },
+    ],
+  },
+  // -------------------------------------------------------------------------
+  // The Eclipse Spire — celestial light/dark tier (the Mystic Archer's dungeon;
+  // see data/dungeons). Gated behind Depths floor 5; boss floor hosts the rare
+  // Eclipse Herald fusion quest (Mage + Herald → Mystic Archer). All school
+  // magic. Sprites reuse the wisp / assassin / mage / mystic-archer draws (light
+  // & dark tints); the Warden reuses the Mystic Archer kit and the Herald the
+  // Arcane Mage kit — no new sprites or kits.
+  // -------------------------------------------------------------------------
+  light_wisp: {
+    id: "light_wisp",
+    name: "Light Wisp",
+    rarity: "rare",
+    role: "Radiant Mote",
+    hp: 32,
+    damage: 11,
+    attackSpeed: 1.1,
+    moveSpeed: 82,
+    range: FIELD_WIDTH * 0.3,
+    ability: "lifesteal", // passive filler — never casts
+    school: "magic",
+    color: "#fcd34d", // radiant gold
+    accent: "#fffbeb",
+  },
+  shadow_wraith: {
+    id: "shadow_wraith",
+    name: "Shadow Wraith",
+    rarity: "rare",
+    role: "Creeping Dark",
+    hp: 55,
+    damage: 13,
+    attackSpeed: 1.0,
+    moveSpeed: 92, // slips across the field
+    range: MELEE,
+    ability: "lifesteal", // passive filler — never casts
+    school: "magic",
+    color: "#2a2140", // umbral shade
+    accent: "#7c3aed",
+  },
+  eclipse_acolyte: {
+    id: "eclipse_acolyte",
+    name: "Eclipse Acolyte",
+    rarity: "rare",
+    role: "Twilight Caster",
+    hp: 75,
+    damage: 9,
+    attackSpeed: 1.6,
+    moveSpeed: 55,
+    range: FIELD_WIDTH * 0.3,
+    ability: "lifesteal", // passive filler — never casts
+    school: "magic",
+    color: "#4c1d95", // twilight violet
+    accent: "#c4b5fd",
+  },
+  // Eclipse Warden — the Spire boss. A celestial archer that shifts between Light
+  // and Dark, marking and detonating its targets and ramping ever faster (reuses
+  // the Mystic Archer kit).
+  eclipse_warden: {
+    id: "eclipse_warden",
+    name: "Eclipse Warden",
+    rarity: "epic",
+    role: "Warden of Dusk",
+    hp: 680,
+    damage: 20,
+    attackSpeed: 1.2,
+    moveSpeed: 55,
+    range: FIELD_WIDTH * 0.34,
+    ability: "momentum",
+    school: "magic",
+    wardedAgainst: ["polymorph"], // bosses don't fit in a sheep
+    color: "#3730a3", // deep indigo
+    accent: "#fcd34d",
+    traits: [
+      {
+        name: "Light & Dark",
+        description:
+          "Its shots mark foes; at three marks they detonate and it flips form — Light single-target, Dark chaining wide.",
+      },
+      {
+        name: "Momentum",
+        description: "Every form shift makes it permanently faster.",
+      },
+    ],
+  },
+  // Eclipse Herald — the rare Spire catalyst (the fusion quest's spawn). A herald
+  // of twin light that looses arcane volleys and blinks from melee (reuses the
+  // Arcane Mage kit). Fell it with a Mage fielded to earn the Mystic Archer.
+  eclipse_herald: {
+    id: "eclipse_herald",
+    name: "Eclipse Herald",
+    rarity: "legendary",
+    role: "Herald of Twin Light",
+    hp: 280,
+    damage: 16,
+    attackSpeed: 2.0,
+    moveSpeed: 52,
+    range: FIELD_WIDTH * 0.34,
+    ability: "arcane_barrage",
+    school: "magic",
+    wardedAgainst: ["polymorph"],
+    color: "#0ea5e9", // dawn-blue
+    accent: "#fde68a",
+    traits: [
+      {
+        name: "Arcane Barrage",
+        description: "Looses a volley of three homing missiles of light.",
+      },
+      {
+        name: "Blink",
+        description: "Steps through shadow the instant a melee attacker closes in.",
+      },
+    ],
+  },
+  // -------------------------------------------------------------------------
+  // The Deep Forge — construct tier (the Engineer's dungeon; see data/dungeons).
+  // Gated behind Depths floor 5; boss floor hosts the rare Ancient Automaton
+  // fusion quest (Ogre + Automaton → Engineer). Sprites reuse the turret / rat /
+  // knight / brute draws (metal tints); the Forge Golem reuses the Ogre kit and
+  // the Ancient Automaton the Rune Golem kit — no new sprites or kits.
+  // -------------------------------------------------------------------------
+  clockwork_spider: {
+    id: "clockwork_spider",
+    name: "Clockwork Spider",
+    rarity: "rare",
+    role: "Skittering Construct",
+    hp: 40,
+    damage: 10,
+    attackSpeed: 0.9,
+    moveSpeed: 100, // scuttles fast
+    range: MELEE,
+    ability: "lifesteal", // passive filler — never casts
+    color: "#71717a", // gunmetal
+    accent: "#fcd34d", // brass joints
+  },
+  sentry: {
+    id: "sentry",
+    name: "Forge Sentry",
+    rarity: "rare",
+    role: "Ranged Construct",
+    hp: 60,
+    damage: 12,
+    attackSpeed: 1.4,
+    moveSpeed: 45, // trundles slowly
+    range: FIELD_WIDTH * 0.32,
+    ability: "lifesteal", // passive filler — never casts
+    color: "#8a6a3d", // dwarven brass
+    accent: "#f59e0b", // amber spark
+  },
+  animated_armor: {
+    id: "animated_armor",
+    name: "Animated Armor",
+    rarity: "rare",
+    role: "Empty Suit",
+    hp: 130,
+    damage: 15,
+    attackSpeed: 1.6,
+    moveSpeed: 55,
+    range: MELEE,
+    ability: "lifesteal", // passive filler — never casts
+    color: "#52525b", // dark steel
+    accent: "#a1a1aa",
+  },
+  // Forge Golem — the Deep Forge boss. A colossal molten construct: huge HP, a
+  // crushing slam, and one reforge from the brink (reuses the Ogre kit).
+  forge_golem: {
+    id: "forge_golem",
+    name: "Forge Golem",
+    rarity: "epic",
+    role: "Molten Colossus",
+    hp: 900,
+    damage: 28,
+    attackSpeed: 2.0,
+    moveSpeed: 30, // lumbering
+    range: MELEE,
+    ability: "crushing_slam",
+    wardedAgainst: ["polymorph"], // bosses don't fit in a sheep
+    color: "#7c2d12", // fire-blackened iron
+    accent: "#f97316", // molten glow
+    traits: [
+      {
+        name: "Crushing Slam",
+        description: "Periodically brings a molten fist down for heavy damage and a stun.",
+      },
+      {
+        name: "Reforge",
+        description:
+          "Once per battle, a blow that would break it instead reforges it to full.",
+      },
+      {
+        name: "Too Big to Baa",
+        description: "Far too massive to polymorph — no sheep holds this much.",
+      },
+    ],
+  },
+  // Ancient Automaton — the rare Deep Forge catalyst (the fusion quest's spawn).
+  // A relic construct sheathed in warded plating that halves every hit (reuses
+  // the Rune Golem kit). Wreck it with an Ogre fielded to earn the Engineer.
+  ancient_automaton: {
+    id: "ancient_automaton",
+    name: "Ancient Automaton",
+    rarity: "legendary",
+    role: "Relic Construct",
+    hp: 320,
+    damage: 18,
+    attackSpeed: 1.8,
+    moveSpeed: 40,
+    range: MELEE,
+    ability: "lifesteal", // no active — warded plating is the mechanic (kit)
+    wardedAgainst: ["polymorph"],
+    color: "#78350f", // ancient bronze
+    accent: "#fde68a", // gold filigree
+    traits: [
+      {
+        name: "Warded Plating",
+        description: "Age-old wards halve every hit it takes — physical or magical alike.",
+      },
+      {
+        name: "Relic",
+        description: "A construct from a forgotten age, built to outlast armies.",
+      },
+    ],
+  },
   // Slime clone — spawned when the original splits. Never in a deck. Doesn't
   // split further (terminal), but still bursts on death.
   slime_clone: {
@@ -742,6 +1435,42 @@ export const NON_DECK_UNITS = new Set<string>([
   "giant_rat",
   "zombie_shambler",
   "bloater",
+  // The Bonefields (undead) tier.
+  "skeleton_archer",
+  "ghoul",
+  "bonecaller",
+  "abomination",
+  "lich",
+  // The Wilds (feral beast) tier.
+  "dire_wolf",
+  "razorback",
+  "grizzly",
+  "dire_alpha",
+  "apex_beast",
+  // The Sealed Vault (arcane) tier.
+  "arcane_wisp",
+  "imp",
+  "cultist",
+  "rune_golem",
+  "archmage",
+  // The Overgrowth (nature) tier.
+  "thornbeast",
+  "spore_pod",
+  "dryad",
+  "elder_treant",
+  "wildheart",
+  // The Eclipse Spire (celestial) tier.
+  "light_wisp",
+  "shadow_wraith",
+  "eclipse_acolyte",
+  "eclipse_warden",
+  "eclipse_herald",
+  // The Deep Forge (construct) tier.
+  "clockwork_spider",
+  "sentry",
+  "animated_armor",
+  "forge_golem",
+  "ancient_automaton",
 ]);
 
 /** Units that can appear in a player/AI deck or the hub card grid. */

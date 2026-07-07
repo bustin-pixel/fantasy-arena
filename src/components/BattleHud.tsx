@@ -64,6 +64,18 @@ export function BattleHud({ ui, speed, onSpeed, mode, onExit }: Props) {
         </div>
       )}
 
+      {/* Boss-floor telegraph: the rare quest catalyst / the boss walking in. */}
+      {ui.phase === "battle" && ui.banner && (
+        <div className={`wave-banner wave-banner-${ui.banner.kind}`} role="alert">
+          <div className="wave-banner-headline">
+            {ui.banner.kind === "boss" ? "☠ Boss Incoming ☠" : ui.banner.name}
+          </div>
+          <div className="wave-banner-tag">
+            {ui.banner.kind === "boss" ? ui.banner.name : "✦ A rare foe stirs ✦"}
+          </div>
+        </div>
+      )}
+
       <div className="hud-bottom">
         {ui.phase === "deployment" && ui.canDeploy && next && (
           <div className="deploy-bar">

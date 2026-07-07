@@ -228,6 +228,26 @@ floor multiplier — the kit's `spawnUnit` path is floor-blind, same as every
 summon), and they share the slime-clone's raised summon-cap headroom (+5) in
 CombatSystem so splits aren't swallowed on a crowded boss floor.
 
+### 4c. Boss-floor wave gating (2026-07-06) — the boss is a climax, not a swarm
+On a boss floor the fodder no longer shares the field with the boss. The
+`WaveController` (`engine/WaveController.ts`) is a small state machine for boss
+floors: the whole fodder pool must be fully CLEARED (no living enemies) before
+anything else; then the rare quest catalyst (if it rolled) enters ALONE, then the
+boss. The rare
+and the boss are each preceded by a ~2s telegraph banner (`BOSS_TELEGRAPH_SEC` /
+`BOSS_BANNER_SEC`, `data/depths.ts`): `state.waveBanner` (a `WaveBanner`) rides the
+snapshot to `BattleHud`'s centered `.wave-banner` overlay. Non-boss floors keep the
+continuous trickle (`stepTrickle`). Invariants preserved: monster composition +
+spawn positions are byte-identical to the old single-queue build (SAME RNG call
+order — only the pacing changed), and the un-spawned boss still counts as an
+`enemyReserve`, so the win check never fires during the telegraph lull. Applies to
+every dungeon's boss floors, the Depths included. Knobs: `BOSS_TELEGRAPH_SEC` /
+`BOSS_BANNER_SEC`. Tests: the `depths.test.ts` boss-floor drain helpers now CLEAR
+the field each step so the gated fodder pool / rare / boss advance (a static drain
+stalls forever); the "boss-floor pacing" describe covers the gated pool +
+rare→boss telegraph order. ⚠ Banner display is timed in SIM TICKS, so at
+3× the on-screen flash is ~1/3 the wall-clock time (a screenshot-capture gotcha).
+
 ### 5. The Depths spawns bypass the deploy() path
 `WaveController` (the PvE horde director) pushes monsters into `state.units`
 directly — no deck bookkeeping, no deployment records (waves rebuild
@@ -283,9 +303,9 @@ sound:
   everyone — only the one-time v2→v3 migration grandfathers everything.
 - **Grant-then-reveal**: rewards are committed before the results overlay
   animates; the chest tap is ceremony, so leaving early can't lose loot.
-- **Quest-locked units** (`QUEST_LOCKED_UNITS`, derived from `RARE_SPAWN_QUESTS`
-  in `data/depths.ts` — a data file so the engine can read it too) are a THIRD
-  ownership state between locked and owned: `save.questUnlocks` (v5) means "the
+- **Quest-locked units** (`QUEST_LOCKED_UNITS`, in `data/dungeons.ts`, derived
+  from EVERY dungeon's `quest` — data files so the engine can read them too) are a
+  THIRD ownership state between locked and owned: `save.questUnlocks` (v5) means "the
   quest is done → the unit is now BUYABLE" (at the quest's discounted `price`),
   distinct from `unlockedUnits` ("owned"). They're withheld from chest drops
   (`CHEST_POOL` filter in rewards.ts), from the grandfather grant, and from
@@ -295,6 +315,20 @@ sound:
   with a Knight). Three UI surfaces read the state: the card badge + the detail
   footer (`HubScreen` → `CardPortrait.lockLabel` / `UnitDetail.lockHint`+
   `unlockPrice`) and the results callout (`RewardPanel`).
+- **Dungeons are data** (`data/dungeons.ts`): a `Dungeon` owns its tiers/boss/
+  scaling/budget/theme/floors + one rare-spawn `quest`. The Depths is
+  `DUNGEONS.depths` (wraps the legacy `depths.ts` tuning unchanged → byte-identical
+  waves; that's why `depths.ts` still exports the Depths globals + the shared
+  `DepthsTier`/`RareSpawnQuest` shapes). WaveController, MatchController (`dungeonId`
+  opt), `computeBattleRewards` (`dungeonId`), `FloorPickerSheet`, and the new
+  `DungeonMapSheet` are all dungeon-driven; the depths branch reads `dungeon.theme`.
+  **Save v6**: `save.dungeons` (per-dungeon `{highestClearedFloor}` map, via
+  `highestClearedFloorOf`) replaced the single `save.depths`; `migrateSave` copies the
+  legacy field into `dungeons.depths`. Adding a themed dungeon = a `DUNGEONS` row + its
+  monsters (kits/sprites reuse existing draws) + a `quest` row (auto-joins
+  `QUEST_LOCKED_UNITS`, so the reward legendary becomes quest-exclusive for free).
+  Themed legendary dungeons are a phased roadmap (Bonefields→Necromancer built; see
+  the plan file / the `themed-legendary-dungeons` memory).
 
 ---
 

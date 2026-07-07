@@ -347,6 +347,18 @@ export interface Trap {
   team: Team;
 }
 
+/** A transient boss-floor callout. On a boss floor the WaveController telegraphs
+ *  the rare catalyst and the boss with a flashing banner; the HUD reads this off
+ *  the snapshot. `ticks` counts down (cleared at 0), so it lingers briefly as the
+ *  unit walks in. Null on every non-boss floor / in the Arena. */
+export interface WaveBanner {
+  kind: "rare" | "boss";
+  /** Display name of the incoming unit (e.g. "Lich", "Abomination"). */
+  name: string;
+  /** Display ticks remaining. */
+  ticks: number;
+}
+
 export interface BattleSnapshot {
   tick: number;
   phase: MatchPhase;
@@ -357,6 +369,8 @@ export interface BattleSnapshot {
   traps: Trap[];
   /** ticks remaining on the 2:00 match clock */
   clockTicks: number;
+  /** Boss-floor telegraph banner, or null. */
+  waveBanner: WaveBanner | null;
 }
 
 /** Recorded inputs sufficient to replay a match deterministically. */

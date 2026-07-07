@@ -9,6 +9,7 @@ import {
   PLAYER_ZONE,
 } from "@/utils/constants";
 import { useGameState } from "@/state/GameStateContext";
+import { highestClearedFloorOf } from "@/state/persistence";
 import { computeBattleRewards, type BattleRewards } from "@/meta/rewards";
 import { RewardPanel } from "@/components/RewardPanel";
 import { generateSeed } from "@/utils/rng";
@@ -21,11 +22,19 @@ interface Props {
   mode?: BattleMode;
   /** Depths floor being descended (ignored outside "depths"). */
   floor?: number;
+  /** Which dungeon is being descended (ignored outside "depths"). */
+  dungeonId?: string;
 }
 
-export function BattleScreen({ deck, onExit, mode = "solo", floor = 1 }: Props) {
+export function BattleScreen({
+  deck,
+  onExit,
+  mode = "solo",
+  floor = 1,
+  dungeonId = "depths",
+}: Props) {
   const { canvasRef, ui, deployAt, selectCard, speed, setSpeed, pickUnitAt, inspectUnit, enemyLedger } =
-    useBattleEngine(deck, mode, undefined, floor);
+    useBattleEngine(deck, mode, undefined, floor, dungeonId);
   const { save, recordResult, recordBestiary, grantBattleRewards } =
     useGameState();
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -70,16 +79,17 @@ export function BattleScreen({ deck, onExit, mode = "solo", floor = 1 }: Props) 
       const bundle = computeBattleRewards({
         mode,
         floor,
+        dungeonId,
         outcome,
         unlockedUnits: save.unlockedUnits,
-        highestClearedFloor: save.depths.highestClearedFloor,
+        highestClearedFloor: highestClearedFloorOf(save, dungeonId),
         chestSeed: generateSeed(),
         // Rare-spawn quest check: the fielded warband + which enemies died.
         deck,
         slain,
         questUnlocks: save.questUnlocks,
       });
-      grantBattleRewards(bundle, { mode, floor });
+      grantBattleRewards(bundle, { mode, floor, dungeonId });
       setRewards(bundle);
       setTimeout(() => setShowResult(true), 700);
     }
@@ -91,6 +101,7 @@ export function BattleScreen({ deck, onExit, mode = "solo", floor = 1 }: Props) 
     grantBattleRewards,
     mode,
     floor,
+    dungeonId,
     save,
   ]);
 

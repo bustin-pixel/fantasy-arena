@@ -42,6 +42,8 @@ first-clear, 30 replay, 15 loss).
 **Still to build:**
 - **Remaining bestiary tiers** (each needs its monsters built first):
   - **6–10** undead: Skeleton Archers, Ghouls, Bonecaller → boss **Abomination**
+    (these monsters + a rare **Lich** are now BUILT — in the separate **Bonefields**
+    dungeon, below — so reuse them if The Depths itself extends to these floors)
   - **11–15** deep crypt: Spiders, Imps, Banshee, Plague Shaman → boss **Gargoyle**
   - **16–20** the throne: elite mixes, Spore Pods, Bat Swarms → boss **Lich**
 - **Discrete announced waves** ("Wave 2/3" banner + lull between bursts) —
@@ -89,11 +91,16 @@ handshake with file anchors + commit sequencing in
    `color`/`accent`, but the sprite glow-up added hardcoded literals — knight
    `KnightLivery` heraldry, per-mage element tints, bone/flame/steel material
    colours — that a skin for those units must also recolour); titles/flair
-   ("Lichslayer", pairs with boss first-kills); more legendary unlock alt-paths
-   (the **rare-spawn quest** pattern now exists — `RARE_SPAWN_QUESTS` in
-   `data/depths.ts`, first used for the **Slime Knight**: beat the rare Floor-5
-   Slime with a Knight fielded → its purchase unlocks at a discount; add a row
-   to unlock more units this way); premium chest + reroll token.
+   ("Lichslayer", pairs with boss first-kills); **themed legendary dungeons** —
+   each existing legendary gets its own SEPARATE themed dungeon whose rare-spawn
+   fusion quest unlocks it, quest-exclusive (`data/dungeons.ts`; the Slime Knight
+   quest is now `DUNGEONS.depths.quest`). Each dungeon is **5 floors** (boss +
+   catalyst on floor 5) with its own themed roster. **ALL SIX BUILT (uncommitted):**
+   Bonefields → Necromancer, Wilds → Hunter, Sealed Vault → Aegis Knight, Overgrowth
+   → Druid, Eclipse Spire → Mystic Archer, Deep Forge → Engineer. Every existing
+   legendary is now quest-exclusive. Full
+   6-dungeon spec in the plan file + the `themed-legendary-dungeons` memory. Premium
+   chest + reroll token.
 6. **Later:** Endless mode, per-monster kill crests, trophies/ranks → Arena
    enemy-deck budget scaling via the existing `budget` param, PvP rewards
    (server-side — PvP pays nothing today by design).

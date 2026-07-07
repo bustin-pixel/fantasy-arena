@@ -9,7 +9,7 @@
 import { DECKABLE_UNIT_IDS, UNITS } from "@/data/units";
 import { STARTER_UNIT_IDS } from "@/meta/economy";
 import { DEFAULT_AVATAR_ID, isAvatarUnlocked } from "@/meta/avatars";
-import { QUEST_LOCKED_UNITS } from "@/data/depths";
+import { DUNGEON_IDS, DUNGEONS, QUEST_LOCKED_UNITS } from "@/data/dungeons";
 
 /** Compendium knowledge of one unit/monster. Encountered = faced it in battle
  *  (silhouette + name); defeated = it died to you at least once (full page). */
@@ -18,11 +18,26 @@ export interface BestiaryEntry {
   defeated: boolean;
 }
 
-/** PvE campaign progress. Floors are linear, so one high-water mark is enough:
- *  floor N is a "first clear" iff N > highestClearedFloor. */
-export interface DepthsProgress {
-  /** Highest floor with a recorded victory; 0 = none yet. */
+/** Per-dungeon PvE progress. Floors are linear within a dungeon, so one
+ *  high-water mark each: floor N is a "first clear" iff N > highestClearedFloor. */
+export interface DungeonProgress {
+  /** Highest floor with a recorded victory in this dungeon; 0 = none yet. */
   highestClearedFloor: number;
+}
+
+/** A fresh progress map: every known dungeon at floor 0. */
+function freshDungeonProgress(): Record<string, DungeonProgress> {
+  const out: Record<string, DungeonProgress> = {};
+  for (const id of DUNGEON_IDS) out[id] = { highestClearedFloor: 0 };
+  return out;
+}
+
+/** A dungeon's cleared-floor high-water mark (0 if never played). */
+export function highestClearedFloorOf(
+  save: PlayerSave,
+  dungeonId: string
+): number {
+  return save.dungeons[dungeonId]?.highestClearedFloor ?? 0;
 }
 
 export interface PlayerSave {
@@ -46,7 +61,9 @@ export interface PlayerSave {
    *  four; units added to the game AFTER a save reaches v3 arrive locked —
    *  they're drops/purchases, only the v2→v3 boundary grandfathers. */
   unlockedUnits: string[];
-  depths: DepthsProgress;
+  /** Per-dungeon PvE progress, keyed by dungeonId (includes "depths"). Replaces
+   *  the single `depths` high-water mark once multiple dungeons exist. (Save v6.) */
+  dungeons: Record<string, DungeonProgress>;
   /** Units whose rare-spawn quest is complete → their (discounted) purchase is
    *  unlocked in the Collection. Distinct from unlockedUnits (owned): a quest
    *  makes a unit BUYABLE; gold still completes the recruit. (Save v5.) */
@@ -60,7 +77,7 @@ export interface PlayerSave {
 const KEY = "fantasy-arena/save/v1";
 
 export const DEFAULT_SAVE: PlayerSave = {
-  version: 5,
+  version: 6,
   username: "Champion",
   avatarId: DEFAULT_AVATAR_ID,
   deck: ["ogre", "archer", "knight", "fire_mage"],
@@ -69,7 +86,7 @@ export const DEFAULT_SAVE: PlayerSave = {
   bestiary: {},
   gold: 0,
   unlockedUnits: [...STARTER_UNIT_IDS],
-  depths: { highestClearedFloor: 0 },
+  dungeons: freshDungeonProgress(),
   questUnlocks: [],
 };
 
@@ -91,9 +108,23 @@ export function migrateSave(parsed: Partial<PlayerSave> | null): PlayerSave {
   }
   const merged: PlayerSave = { ...structuredCloneSave(DEFAULT_SAVE), ...parsed };
   merged.bestiary = { ...(parsed.bestiary ?? {}) };
-  merged.depths = {
-    highestClearedFloor: Math.max(0, parsed.depths?.highestClearedFloor ?? 0),
-  };
+  // v6: per-dungeon progress map. Migrate the legacy single Depths high-water
+  // mark (parsed.depths, pre-v6) into dungeons.depths; drop unknown ids.
+  const dungeons = freshDungeonProgress();
+  const legacyDepths = (parsed as { depths?: { highestClearedFloor?: number } })
+    .depths?.highestClearedFloor;
+  if (typeof legacyDepths === "number") {
+    dungeons.depths.highestClearedFloor = Math.max(0, legacyDepths);
+  }
+  for (const [id, prog] of Object.entries(parsed.dungeons ?? {})) {
+    if (id in DUNGEONS) {
+      dungeons[id] = {
+        highestClearedFloor: Math.max(0, prog?.highestClearedFloor ?? 0),
+      };
+    }
+  }
+  merged.dungeons = dungeons;
+  delete (merged as unknown as { depths?: unknown }).depths; // drop legacy field
   merged.gold = Math.max(0, parsed.gold ?? 0);
   // Quest-unlock progress — keep only ids that are still quest-locked units
   // (defensive against removed units / hand-edited saves).
@@ -146,7 +177,9 @@ function structuredCloneSave(save: PlayerSave): PlayerSave {
     deck: [...save.deck],
     bestiary: { ...save.bestiary },
     unlockedUnits: [...save.unlockedUnits],
-    depths: { ...save.depths },
+    dungeons: Object.fromEntries(
+      Object.entries(save.dungeons).map(([id, p]) => [id, { ...p }])
+    ),
     questUnlocks: [...save.questUnlocks],
   };
 }
