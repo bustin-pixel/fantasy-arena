@@ -7,11 +7,11 @@
 // Two shapes:
 //  • Normal floors — a flat queue that TRICKLES in from the top edge whenever the
 //    enemy side has room, so the simultaneous count stays bounded.
-//  • Boss floors — a phased CLIMAX: the fodder arrives in discrete sub-waves, each
-//    of which must be CLEARED (no enemies left alive) before the next spawns; then
-//    the rare quest catalyst (if it rolled) enters alone; then the boss. The rare
-//    and the boss are each preceded by a telegraph banner (state.waveBanner). This
-//    stops the boss from sharing the field with the whole horde.
+//  • Boss floors — a phased CLIMAX: the fodder pool pours in (bounded by the enemy
+//    cap) and must be fully CLEARED (no enemies left alive) before anything else;
+//    then the rare quest catalyst (if it rolled) enters alone; then the boss. The
+//    rare and the boss are each preceded by a telegraph banner (state.waveBanner).
+//    This stops the boss from sharing the field with the whole horde.
 //
 // Determinism: it owns its own seeded RNG (separate stream from the sim RNG, so a
 // dungeon never perturbs Arena battles). The monster composition + spawn positions
@@ -26,7 +26,6 @@ import { getUnitDef } from "@/data/units";
 import type { SimState } from "./CombatSystem";
 import {
   BOSS_BANNER_SEC,
-  BOSS_FODDER_WAVE_COUNT,
   BOSS_TELEGRAPH_SEC,
   WAVE_SPAWN_INTERVAL_SEC,
 } from "@/data/depths";
@@ -64,12 +63,11 @@ export class WaveController {
   private queue: string[] = [];
 
   // -- Boss-floor state: a phased plan + a small state machine. --
-  private waves: string[][] = []; // fodder split into sub-waves
+  private fodder: string[] = []; // the whole boss-floor fodder pool
   private catalyst: string | null = null; // rolled rare quest spawn, or null
   private boss = "";
   private phase: BossPhase = "fodder";
-  private waveIndex = 0;
-  /** Monsters of the CURRENT batch (sub-wave / [catalyst] / [boss]) still to spawn. */
+  /** Monsters of the CURRENT batch (fodder pool / [catalyst] / [boss]) still to spawn. */
   private pending: string[] = [];
   private telegraphTicks = 0;
   private total = 0; // total monsters in the plan (for `remaining`)
@@ -103,7 +101,7 @@ export class WaveController {
     return out;
   }
 
-  /** Compose the boss floor: fodder → sub-waves, roll the rare catalyst, then the
+  /** Compose the boss floor: one fodder pool, roll the rare catalyst, then the
    *  boss. The fodder loop + catalyst roll happen in the SAME order as the old
    *  build, so the composition stays byte-identical; only the pacing is new. */
   private buildBossPlan(): void {
@@ -112,19 +110,18 @@ export class WaveController {
       2,
       Math.round(waveBudgetIn(this.dungeon, this.floor) * this.dungeon.bossFloorFodderShare)
     );
-    const fodder = this.buildFodder(fodderBudget);
-    this.waves = chunk(fodder, BOSS_FODDER_WAVE_COUNT);
+    this.fodder = this.buildFodder(fodderBudget);
 
     const quest = questForFloorIn(this.dungeon, this.floor);
     if (quest && this.rng.next() < quest.chance) this.catalyst = quest.spawnId;
     this.boss = tier.boss;
-    this.total = fodder.length + (this.catalyst ? 1 : 0) + 1; // +1 boss
+    this.total = this.fodder.length + (this.catalyst ? 1 : 0) + 1; // +1 boss
 
-    // Kick off the first fodder sub-wave (or skip straight to the climax if a
-    // floor somehow has no fodder).
-    if (this.waves.length > 0) {
+    // Kick off the fodder pool (or skip straight to the climax if a floor somehow
+    // has no fodder). `pending` is a copy so `fodder` stays intact for planForTest.
+    if (this.fodder.length > 0) {
       this.phase = "fodder";
-      this.pending = this.waves[0];
+      this.pending = this.fodder.slice();
     } else if (this.catalyst) {
       this.beginTelegraph(null, "rare_telegraph");
     } else {
@@ -157,7 +154,7 @@ export class WaveController {
     this.spawnMonster(state, this.queue.shift()!);
   }
 
-  // -- Boss floor: sub-waves → rare → boss, gated on clearing each batch. ----
+  // -- Boss floor: fodder pool → rare → boss, gated on clearing each batch. ----
   private stepBoss(state: SimState): void {
     // Publish any banner staged before we held a state ref (no-fodder edge case).
     if (this.pendingBanner) {
@@ -203,15 +200,9 @@ export class WaveController {
     this.advance(state);
   }
 
-  /** The batch just cleared — move to the next sub-wave, or the rare, or the boss. */
+  /** The batch just cleared — move on to the rare, or the boss, or finish. */
   private advance(state: SimState): void {
     if (this.phase === "fodder") {
-      this.waveIndex++;
-      if (this.waveIndex < this.waves.length) {
-        this.pending = this.waves[this.waveIndex];
-        this.spawnCooldown = 0;
-        return;
-      }
       // Fodder cleared → the rare (if it rolled), else straight to the boss.
       if (this.catalyst) this.beginTelegraph(state, "rare_telegraph");
       else this.beginTelegraph(state, "boss_telegraph");
@@ -263,22 +254,10 @@ export class WaveController {
     this.spawnCooldown = secToTicks(WAVE_SPAWN_INTERVAL_SEC);
   }
 
-  /** For tests: the boss-floor plan (fodder sub-waves, rolled catalyst, boss).
-   *  Null on non-boss floors. Lets specs assert composition without simulating a
-   *  full clear. */
-  planForTest(): { waves: string[][]; catalyst: string | null; boss: string } | null {
+  /** For tests: the boss-floor plan (fodder pool, rolled catalyst, boss). Null on
+   *  non-boss floors. Lets specs assert composition without simulating a clear. */
+  planForTest(): { fodder: string[]; catalyst: string | null; boss: string } | null {
     if (!this.isBoss) return null;
-    return { waves: this.waves, catalyst: this.catalyst, boss: this.boss };
+    return { fodder: this.fodder, catalyst: this.catalyst, boss: this.boss };
   }
-}
-
-/** Split `arr` into up to `parts` roughly-equal, order-preserving chunks. Fewer
- *  than `parts` chunks if the array is short (never empty chunks). */
-function chunk<T>(arr: T[], parts: number): T[][] {
-  if (arr.length === 0) return [];
-  const n = Math.min(parts, arr.length);
-  const size = Math.ceil(arr.length / n);
-  const out: T[][] = [];
-  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
-  return out;
 }

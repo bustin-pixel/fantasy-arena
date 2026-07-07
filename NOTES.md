@@ -231,9 +231,9 @@ CombatSystem so splits aren't swallowed on a crowded boss floor.
 ### 4c. Boss-floor wave gating (2026-07-06) — the boss is a climax, not a swarm
 On a boss floor the fodder no longer shares the field with the boss. The
 `WaveController` (`engine/WaveController.ts`) is a small state machine for boss
-floors: the fodder is split into `BOSS_FODDER_WAVE_COUNT` (3) discrete sub-waves,
-each of which must be fully CLEARED (no living enemies) before the next spawns;
-then the rare quest catalyst (if it rolled) enters ALONE, then the boss. The rare
+floors: the whole fodder pool must be fully CLEARED (no living enemies) before
+anything else; then the rare quest catalyst (if it rolled) enters ALONE, then the
+boss. The rare
 and the boss are each preceded by a ~2s telegraph banner (`BOSS_TELEGRAPH_SEC` /
 `BOSS_BANNER_SEC`, `data/depths.ts`): `state.waveBanner` (a `WaveBanner`) rides the
 snapshot to `BattleHud`'s centered `.wave-banner` overlay. Non-boss floors keep the
@@ -241,11 +241,11 @@ continuous trickle (`stepTrickle`). Invariants preserved: monster composition +
 spawn positions are byte-identical to the old single-queue build (SAME RNG call
 order — only the pacing changed), and the un-spawned boss still counts as an
 `enemyReserve`, so the win check never fires during the telegraph lull. Applies to
-every dungeon's boss floors, the Depths included. Knobs: `BOSS_FODDER_WAVE_COUNT`,
-`BOSS_TELEGRAPH_SEC`, `BOSS_BANNER_SEC`. Tests: the `depths.test.ts` boss-floor
-drain helpers now CLEAR the field each step so gated waves advance (a static drain
-stalls forever); the "boss-floor pacing" describe covers the sub-wave split +
-gating + rare→boss telegraph order. ⚠ Banner display is timed in SIM TICKS, so at
+every dungeon's boss floors, the Depths included. Knobs: `BOSS_TELEGRAPH_SEC` /
+`BOSS_BANNER_SEC`. Tests: the `depths.test.ts` boss-floor drain helpers now CLEAR
+the field each step so the gated fodder pool / rare / boss advance (a static drain
+stalls forever); the "boss-floor pacing" describe covers the gated pool +
+rare→boss telegraph order. ⚠ Banner display is timed in SIM TICKS, so at
 3× the on-screen flash is ~1/3 the wall-clock time (a screenshot-capture gotcha).
 
 ### 5. The Depths spawns bypass the deploy() path

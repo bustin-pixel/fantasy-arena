@@ -637,7 +637,7 @@ describe("WaveController — The Deep Forge dungeon", () => {
   });
 });
 
-describe("WaveController — boss-floor pacing (sub-waves → rare → boss)", () => {
+describe("WaveController — boss-floor pacing (fodder pool → rare → boss)", () => {
   const dungeon = getDungeon("bonefields");
   const BOSS = "abomination";
   const RARE = "lich";
@@ -664,16 +664,13 @@ describe("WaveController — boss-floor pacing (sub-waves → rare → boss)", (
     return { spawns, banners };
   }
 
-  it("splits the boss-floor fodder into multiple discrete sub-waves", () => {
+  it("gathers the boss-floor fodder into one gated pool (no sub-waves)", () => {
     const plan = new WaveController(1, dungeon, 5).planForTest();
     expect(plan).not.toBeNull();
     expect(plan!.boss).toBe(BOSS);
-    expect(plan!.waves.length).toBeGreaterThan(1); // more than one wave
+    expect(plan!.fodder.length).toBeGreaterThan(0);
     const legal = new Set(Object.keys(dungeon.tiers[0].monsters));
-    for (const wave of plan!.waves) {
-      expect(wave.length).toBeGreaterThan(0); // never an empty wave
-      for (const id of wave) expect(legal.has(id)).toBe(true);
-    }
+    for (const id of plan!.fodder) expect(legal.has(id)).toBe(true);
     // Non-boss floors have no phased plan.
     expect(new WaveController(1, dungeon, 1).planForTest()).toBeNull();
   });

@@ -32,15 +32,13 @@ export const WAVE_SPAWN_INTERVAL_SEC = 0.5;
 
 // ---------------------------------------------------------------------------
 // Boss-floor pacing. On a boss floor the fodder no longer shares the field with
-// the boss: it arrives in discrete sub-waves that must each be CLEARED before
-// the next spawns, then the rare catalyst (if it rolled), then the boss — each
-// heralded by a telegraph banner. This turns boss floors into a real climax
-// instead of a swarm. Applies to every dungeon's boss floors (incl. the Depths'
-// every-5th). Non-boss floors keep the continuous trickle above.
+// the boss: the whole fodder pool must be CLEARED first, then the rare catalyst
+// (if it rolled), then the boss — each heralded by a telegraph banner. This
+// turns boss floors into a real climax instead of a swarm. Applies to every
+// dungeon's boss floors (incl. the Depths' every-5th). Non-boss floors keep the
+// continuous trickle above.
 // ---------------------------------------------------------------------------
 
-/** How many discrete sub-waves the boss-floor fodder is split into. */
-export const BOSS_FODDER_WAVE_COUNT = 3;
 /** Telegraph pause (seconds) between the banner appearing and the rare/boss
  *  actually entering from the top edge. */
 export const BOSS_TELEGRAPH_SEC = 2;
