@@ -18,7 +18,7 @@
 // ============================================================================
 
 import { RNG } from "@/utils/rng";
-import { FIELD_WIDTH, secToTicks } from "@/utils/constants";
+import { FIELD_HEIGHT, FIELD_WIDTH, TICK_RATE, secToTicks } from "@/utils/constants";
 import { createUnit } from "@/entities/createUnit";
 import { getUnitDef } from "@/data/units";
 import type { Unit, WaveBanner } from "@/types";
@@ -28,6 +28,7 @@ import {
   type SimState,
   type TeamMods,
 } from "./CombatSystem";
+import { getKit } from "./kits/UnitKit";
 import { applyEffect, makeEffect } from "./StatusEffectSystem";
 import { buildFodderQueue } from "./WaveController";
 import {
@@ -44,7 +45,10 @@ import {
 } from "@/data/boons";
 import {
   ENDLESS_INTERMISSION_HEAL,
+  ENDLESS_MOMENTUM_PER_WAVE,
   ENDLESS_RARE_POOL,
+  ENDLESS_RHYTHM_MAX,
+  ENDLESS_RHYTHM_PER_SEC,
   ENDLESS_ROTATION_BASE,
   ENDLESS_WAVE_TIME_SEC,
   dungeonForCycle,
@@ -109,6 +113,15 @@ export class EndlessController {
   private intermissionHealPct = ENDLESS_INTERMISSION_HEAL;
   private regenPerSec = 0;
   private shieldPerWave = 0;
+  /** Berserker's Rhythm active + its live ramp (ticks since this wave began). */
+  private rhythmActive = false;
+  private rhythmTicks = 0;
+  /** Momentum active — bumps team damage each clean-wave clear. */
+  private momentumActive = false;
+  /** Wave-start summon orders (Kennel Master wolves, War Machine turret). */
+  private summons: { defId: string; count: number }[] = [];
+  /** uids of the pets summoned last wave, cleared + respawned each wave. */
+  private petUids = new Set<string>();
 
   /** Ordered boon ids picked (for the tally + replay parity). */
   private picks: string[] = [];
@@ -189,6 +202,15 @@ export class EndlessController {
 
     if (this.phase === "intermission") return; // frozen (guard; shouldn't be reached)
 
+    // Berserker's Rhythm: ramp the live attack-speed bonus up over the wave.
+    if (this.rhythmActive) {
+      this.rhythmTicks++;
+      state.teamMods.player.rhythmBonus = Math.min(
+        ENDLESS_RHYTHM_MAX,
+        ENDLESS_RHYTHM_PER_SEC * (this.rhythmTicks / TICK_RATE)
+      );
+    }
+
     if (this.phase === "telegraph") {
       if (this.telegraphTicks > 0) {
         this.telegraphTicks--;
@@ -254,6 +276,15 @@ export class EndlessController {
     this.wavesCleared = this.wave;
     this.pruneDeadEnemies(state);
 
+    // Momentum: a clean wave (no warband death) grants a permanent damage bump.
+    // Checked before the heal so a dead unit still counts as a death this wave.
+    if (
+      this.momentumActive &&
+      this.warbandUnits(state).every((u) => u.state !== "dead")
+    ) {
+      state.teamMods.player.dmgMult *= 1 + ENDLESS_MOMENTUM_PER_WAVE;
+    }
+
     // Baseline (+ Field Medicine) recovery on the living warband.
     for (const u of this.warbandUnits(state)) {
       if (u.state === "dead") continue;
@@ -308,6 +339,50 @@ export class EndlessController {
         case "revive":
           this.reviveLowest(state, eff.hpPct);
           break;
+        // --- slice-2 proc / mechanic boons ---
+        case "execute":
+          state.teamMods.player.executeBonus += eff.bonus;
+          break;
+        case "thorns":
+          state.teamMods.player.thornsFrac += eff.frac;
+          break;
+        case "killHeal":
+          state.teamMods.player.killHeal += eff.amount;
+          break;
+        case "bounty":
+          state.teamMods.player.bountyHp += eff.hp;
+          break;
+        case "overheal":
+          state.teamMods.player.overheal = true;
+          break;
+        case "lastBreath":
+          state.teamMods.player.lastBreath = true;
+          break;
+        case "crit":
+          state.teamMods.player.critEveryNth = eff.everyNth;
+          break;
+        case "rangedLifesteal":
+          state.teamMods.player.rangedLifesteal += eff.frac;
+          break;
+        case "rhythm":
+          this.rhythmActive = true;
+          break;
+        case "momentum":
+          this.momentumActive = true;
+          break;
+        case "onHitRider":
+          state.teamMods.player.onHitRiders.push({
+            effectType: eff.effectType,
+            everyNth: eff.everyNth,
+            durationSec: eff.durationSec,
+            magnitude: eff.magnitude,
+            damagePerTick: eff.damagePerTick,
+            tickIntervalSec: eff.tickIntervalSec,
+          });
+          break;
+        case "waveSummon":
+          this.summons.push({ defId: eff.defId, count: eff.count });
+          break;
       }
     }
   }
@@ -329,12 +404,14 @@ export class EndlessController {
     if (dead.length > 0) reviveUnit(state, dead[0], hpFrac);
   }
 
-  /** Wave-start boons: refresh shields and (re)apply the regen HoT to the living
-   *  warband. Called at the top of every wave. */
+  /** Wave-start boons on the living warband: refresh shields, (re)apply the regen
+   *  HoT, and arm the Last Breath charge. Also resets the rhythm ramp and summons
+   *  fresh pets. Called at the top of every wave. */
   private applyWaveStartBoons(state: SimState): void {
-    if (this.shieldPerWave <= 0 && this.regenPerSec <= 0) return;
+    const lastBreath = state.teamMods.player.lastBreath;
     for (const u of this.warbandUnits(state)) {
       if (u.state === "dead") continue;
+      if (lastBreath) u.cheatDeathReady = true;
       if (this.shieldPerWave > 0) {
         u.shieldHp = Math.max(u.shieldHp, this.shieldPerWave);
         u.shieldHpMax = Math.max(u.shieldHpMax, this.shieldPerWave);
@@ -349,6 +426,36 @@ export class EndlessController {
             durationSec: ENDLESS_WAVE_TIME_SEC,
           })
         );
+      }
+    }
+    // Fresh rhythm ramp for the new wave.
+    this.rhythmTicks = 0;
+    if (this.rhythmActive) state.teamMods.player.rhythmBonus = 0;
+    // Summon this wave's pets (clearing last wave's survivors first).
+    this.spawnPets(state);
+  }
+
+  /** Summon the boon pets for this wave (Kennel Master wolves, War Machine turret),
+   *  clearing any that survived the last wave so they never accumulate. Pet HP
+   *  scales with the wave curve so they keep soaking; damage stays base + team
+   *  boons. */
+  private spawnPets(state: SimState): void {
+    if (this.summons.length === 0) return;
+    if (this.petUids.size > 0) {
+      state.units = state.units.filter((u) => !this.petUids.has(u.uid));
+      this.petUids.clear();
+    }
+    const mult = endlessWaveStatMultipliers(this.wave);
+    for (const order of this.summons) {
+      for (let i = 0; i < order.count; i++) {
+        const x = this.rng.float(80, FIELD_WIDTH - 80);
+        const y = this.rng.float(FIELD_HEIGHT - 90, FIELD_HEIGHT - 40);
+        const unit = createUnit(order.defId, "player", { x, y });
+        unit.maxHp = Math.round(unit.maxHp * mult.hp);
+        unit.hp = unit.maxHp;
+        getKit(order.defId)?.onSpawn?.(unit);
+        state.units.push(unit);
+        this.petUids.add(unit.uid);
       }
     }
   }

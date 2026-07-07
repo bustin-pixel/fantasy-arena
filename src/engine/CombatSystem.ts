@@ -39,6 +39,7 @@ import {
 } from "@/utils/constants";
 import { clamp, dir, dist } from "@/utils/math";
 import { getUnitDef } from "@/data/units";
+import { EXECUTE_THRESHOLD } from "@/data/boons";
 import { createUnit } from "@/entities/createUnit";
 import {
   abilityCastTimeTicks,
@@ -69,6 +70,17 @@ import { stepAnimation } from "./AnimationSystem";
  *  fold into the player's set. Reading these at the funnels (rather than mutating
  *  per-unit stats) means the mods survive kits that recompute stats every tick and
  *  cover summoned units for free. */
+/** An every-Nth-attack status rider granted by a boon (Thunderclap stun, Venom
+ *  poison). Applied to the target in performBasicAttack. */
+export interface TeamRider {
+  effectType: import("@/types").StatusEffectType;
+  everyNth: number;
+  durationSec: number;
+  magnitude?: number;
+  damagePerTick?: number;
+  tickIntervalSec?: number;
+}
+
 export interface TeamMods {
   /** Outgoing damage multiplier. */
   dmgMult: number;
@@ -78,8 +90,29 @@ export interface TeamMods {
   moveSpeedMult: number;
   /** Incoming damage multiplier (<1 = takes less). */
   damageTakenMult: number;
-  /** Additive lifesteal fraction on top of a unit's own. */
+  /** Additive lifesteal fraction on top of a unit's own (melee). */
   lifestealBonus: number;
+  // --- proc / mechanic mods (Endless slice-2 boons; all identity by default) ---
+  /** Executioner: +frac damage vs enemies below EXECUTE_THRESHOLD. */
+  executeBonus: number;
+  /** Thornmail: reflect this fraction of incoming damage at the attacker. */
+  thornsFrac: number;
+  /** Bloodfeast: heal the whole team this many HP per kill. */
+  killHeal: number;
+  /** Bounty Hunter: killer gains this much permanent max HP per kill. */
+  bountyHp: number;
+  /** Overheal Ward: overheal banks as shield. */
+  overheal: boolean;
+  /** Last Breath: once-per-wave cheat death (consumes unit.cheatDeathReady). */
+  lastBreath: boolean;
+  /** Overkill: every Nth attack deals double (0 = off). */
+  critEveryNth: number;
+  /** Marksman's Focus: ranged basics lifesteal this fraction. */
+  rangedLifesteal: number;
+  /** Berserker's Rhythm: live attack-speed bonus, ramped by the controller. */
+  rhythmBonus: number;
+  /** Thunderclap / Venom Coating on-hit riders. */
+  onHitRiders: TeamRider[];
 }
 
 export function identityTeamMods(): TeamMods {
@@ -89,6 +122,16 @@ export function identityTeamMods(): TeamMods {
     moveSpeedMult: 1,
     damageTakenMult: 1,
     lifestealBonus: 0,
+    executeBonus: 0,
+    thornsFrac: 0,
+    killHeal: 0,
+    bountyHp: 0,
+    overheal: false,
+    lastBreath: false,
+    critEveryNth: 0,
+    rangedLifesteal: 0,
+    rhythmBonus: 0,
+    onHitRiders: [],
   };
 }
 
@@ -168,7 +211,8 @@ function nextId(state: SimState, prefix: string): string {
 
 function makeDamageDealer(
   state: SimState,
-  makeKitCtx: (subject: Unit, damageContext?: boolean) => KitCtx
+  makeKitCtx: (subject: Unit, damageContext?: boolean) => KitCtx,
+  heal: (target: Unit, amount: number) => void
 ) {
   return function dealDamage(target: Unit, amount: number, source: Unit): void {
     if (target.state === "dead") return;
@@ -193,9 +237,18 @@ function makeDamageDealer(
     // Team-wide combat mods: the source's outgoing multiplier and the target's
     // incoming multiplier fold in alongside the unit's own damageTakenMult.
     // Identity (×1) in Arena/Depths, so those runs stay byte-identical.
+    const srcMods = state.teamMods[source.team];
+    // Executioner: bonus damage vs a target already below the execute threshold.
+    const execMult =
+      srcMods.executeBonus > 0 &&
+      target.maxHp > 0 &&
+      target.hp / target.maxHp < EXECUTE_THRESHOLD
+        ? 1 + srcMods.executeBonus
+        : 1;
     const scaled =
       effAmount *
-      state.teamMods[source.team].dmgMult *
+      srcMods.dmgMult *
+      execMult *
       target.damageTakenMult *
       state.teamMods[target.team].damageTakenMult;
     let dmg = Math.max(0, Math.round(scaled));
@@ -231,6 +284,14 @@ function makeDamageDealer(
       if (kit?.onWouldDie && kit.onWouldDie(target, source, makeKitCtx(target, true))) {
         return;
       }
+      // Last Breath boon (Endless): once per wave, a fatal blow leaves the unit at
+      // 1 HP. Consumes the per-wave charge the controller refreshes.
+      if (state.teamMods[target.team].lastBreath && target.cheatDeathReady) {
+        target.cheatDeathReady = false;
+        target.hp = 1;
+        spawnFloatingText(state, target, "Last Breath!", "heal");
+        return;
+      }
       // Death-immunity window (e.g. Assassin's Vanish): clamp to 1 HP and survive.
       // (Vanish + Berserker Last Stand now live in their kits' onWouldDie, above.)
       if (hasEffect(target, "death_immune")) {
@@ -244,6 +305,23 @@ function makeDamageDealer(
         const srcKit = getKit(source.defId);
         if (srcKit?.onKill && source !== target && source.state !== "dead") {
           srcKit.onKill(source, target, makeKitCtx(source, true));
+        }
+
+        // Team on-kill boons (Endless): Bounty Hunter grows the killer, Bloodfeast
+        // heals the whole warband. Identity when both are 0.
+        if (source !== target && source.state !== "dead") {
+          const km = state.teamMods[source.team];
+          if (km.bountyHp > 0) {
+            source.maxHp += km.bountyHp;
+            source.hp += km.bountyHp; // grow into the new max
+          }
+          if (km.killHeal > 0) {
+            for (const ally of state.units) {
+              if (ally.team === source.team && ally.state !== "dead") {
+                heal(ally, km.killHeal);
+              }
+            }
+          }
         }
 
         spawnVfx(state, {
@@ -264,6 +342,15 @@ function makeDamageDealer(
         // ctx.dealDamage on the same-tick damage funnel.)
       }
     }
+
+    // Thornmail (Endless): after the hit fully resolves, reflect a fraction of it
+    // back at the attacker. One level deep only — the reflected hit lands on an
+    // enemy (thornsFrac 0), so it can't re-reflect. Identity when thornsFrac is 0.
+    const thorns = state.teamMods[target.team].thornsFrac;
+    if (thorns > 0 && source !== target && source.state !== "dead" && shown > 0) {
+      const back = Math.round(shown * thorns);
+      if (back > 0) dealDamage(source, back, target);
+    }
   };
 }
 
@@ -281,7 +368,15 @@ function makeHealer(
       amt = kit.modifyIncomingHeal(target, amount, makeKitCtx(target, true));
     }
     const before = target.hp;
-    target.hp = Math.min(target.maxHp, target.hp + Math.round(amt));
+    const raw = before + Math.round(amt);
+    target.hp = Math.min(target.maxHp, raw);
+    // Overheal Ward (Endless): overflow past max HP banks as shield (capped at
+    // one max-HP bar). Identity when the boon isn't owned.
+    if (state.teamMods[target.team].overheal && raw > target.maxHp) {
+      const overflow = raw - target.maxHp;
+      target.shieldHp = Math.min(target.maxHp, target.shieldHp + overflow);
+      target.shieldHpMax = Math.max(target.shieldHpMax, target.shieldHp);
+    }
     const gained = target.hp - before;
     if (gained > 0) spawnFloatingText(state, target, `+${gained}`, "heal");
   };
@@ -557,8 +652,8 @@ export function stepSimulation(state: SimState): void {
     };
   };
 
-  dealDamage = makeDamageDealer(state, makeKitCtx);
   heal = makeHealer(state, makeKitCtx);
+  dealDamage = makeDamageDealer(state, makeKitCtx, heal);
 
   // 1. Status effect timers + DoT / HoT.
   const { dots, hots } = tickEffects(living);
@@ -825,10 +920,12 @@ export function stepSimulation(state: SimState): void {
       unit.facing = target.pos.x >= unit.pos.x ? 1 : -1;
       if (unit.attackCooldown <= 0) {
         performBasicAttack(state, unit, target, byUid, dealDamage, heal, abilityCtx);
+        // Berserker's Rhythm (Endless): the live rhythm bonus shrinks the delay on
+        // top of the flat attack-speed mod. Identity when rhythmBonus is 0.
+        const tm = state.teamMods[unit.team];
         const delay =
-          unit.attackSpeed *
-          attackDelayMultiplier(unit) *
-          state.teamMods[unit.team].atkDelayMult;
+          (unit.attackSpeed * attackDelayMultiplier(unit) * tm.atkDelayMult) /
+          (1 + tm.rhythmBonus);
         unit.attackCooldown = secToTicks(delay);
       }
     } else {
@@ -876,7 +973,7 @@ export function stepSimulation(state: SimState): void {
   }
 
   // 5b. Projectiles.
-  stepProjectiles(state, byUid, dealDamage, makeKitCtx);
+  stepProjectiles(state, byUid, dealDamage, heal, makeKitCtx);
 
   // 5b-ii. A unit finished off by a projectile THIS tick (a ranged blow killing a
   // Slime Knight) queued its onDeath summons into damageSpawns AFTER the flush above.
@@ -926,6 +1023,27 @@ function performBasicAttack(
 
   unit.attackCount += 1;
 
+  // Team on-hit boons (Endless): every-Nth-attack status riders (Thunderclap stun,
+  // Venom poison) apply to the primary target on any swing; Overkill's crit doubles
+  // the default swing below. Both are no-ops when the team has none.
+  const tmods = state.teamMods[unit.team];
+  for (const r of tmods.onHitRiders) {
+    if (unit.attackCount % r.everyNth === 0) {
+      applyEffect(
+        target,
+        makeEffect(r.effectType, {
+          source: unit.uid,
+          durationSec: r.durationSec,
+          magnitude: r.magnitude,
+          damagePerTick: r.damagePerTick,
+          tickIntervalSec: r.tickIntervalSec,
+        })
+      );
+    }
+  }
+  const critMult =
+    tmods.critEveryNth > 0 && unit.attackCount % tmods.critEveryNth === 0 ? 2 : 1;
+
   // [seam] replace the default swing entirely (open contract 2 — Mystic / Ranger /
   // Warrior do their own thing). attackCount is already bumped, matching today.
   // Mystic Archer fires its form-tagged shot here (kits/mysticArcher.ts
@@ -950,7 +1068,7 @@ function performBasicAttack(
       target: { x: target.pos.x, y: target.pos.y },
       targetUid: target.uid,
       speed: 380,
-      damage: unit.damage,
+      damage: unit.damage * critMult,
       team: unit.team,
       sourceUid: unit.uid,
       ability: "lifesteal", // sentinel: "basic"; on-hit rider carried in `rider`
@@ -961,8 +1079,8 @@ function performBasicAttack(
   } else {
     // [seam] Warrior Whirlwind (the AoE spin + bleed that replaces the swing) now
     // lives in kits/warrior.ts onBasicAttack, fired above.
-    dealDamage(target, unit.damage, unit);
-    applyLifesteal(unit, unit.damage, heal, state.teamMods[unit.team].lifestealBonus);
+    dealDamage(target, unit.damage * critMult, unit);
+    applyLifesteal(unit, unit.damage * critMult, heal, tmods.lifestealBonus);
 
     // [seam] after the default melee swing lands (open contract 2). Zombie
     // Shambler's Numbing Bite now lives in its kit (kits/zombieShambler.ts);
@@ -987,6 +1105,7 @@ function stepProjectiles(
   state: SimState,
   byUid: Map<string, Unit>,
   dealDamage: (t: Unit, amt: number, s: Unit) => void,
+  heal: (t: Unit, amt: number) => void,
   makeKitCtx: (subject: Unit, damageContext?: boolean) => KitCtx
 ): void {
   for (const proj of state.projectiles) {
@@ -1021,7 +1140,12 @@ function stepProjectiles(
             );
           }
         } else if (isBasic) {
-          if (source) dealDamage(target, proj.damage, source);
+          if (source) {
+            dealDamage(target, proj.damage, source);
+            // Marksman's Focus (Endless): ranged basics lifesteal. No-op at 0.
+            const rl = state.teamMods[source.team].rangedLifesteal;
+            if (rl > 0) heal(source, Math.round(proj.damage * rl));
+          }
           // On-hit rider (Ice freeze / Fire burn) — applied generically from the
           // shot's data-descriptor (UnitDef.basicShotRider → proj.rider), so no
           // per-unit defId branch lives here.

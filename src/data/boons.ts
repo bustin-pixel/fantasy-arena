@@ -15,12 +15,18 @@
 // ============================================================================
 
 import { RNG } from "@/utils/rng";
+import type { StatusEffectType } from "@/types";
 
 export type BoonRarity = "common" | "rare" | "epic";
 
+/** Enemies at or below this HP fraction take the Executioner bonus. */
+export const EXECUTE_THRESHOLD = 0.25;
+
 /** SimState.teamMods fields a boon can move. `value` is always the buff MAGNITUDE
  *  (a positive fraction); the controller knows the correct fold per field (e.g.
- *  attack-speed shrinks the delay, damage-reduction shrinks the taken-mult). */
+ *  attack-speed shrinks the delay, damage-reduction shrinks the taken-mult). A
+ *  NEGATIVE value flips the direction — Reckless raises damage-taken with a
+ *  negative reduction. */
 export type TeamModField =
   | "dmgMult"
   | "atkDelayMult"
@@ -34,7 +40,40 @@ export type BoonEffect =
   | { type: "intermissionHeal"; addPct: number }
   | { type: "regen"; hpPerSec: number }
   | { type: "waveShield"; amount: number }
-  | { type: "revive"; hpPct: number };
+  | { type: "revive"; hpPct: number }
+  // --- proc / mechanic effects (slice 2) ---
+  /** Executioner: +frac damage vs enemies below EXECUTE_THRESHOLD. */
+  | { type: "execute"; bonus: number }
+  /** Thornmail: reflect `frac` of incoming damage back at the attacker. */
+  | { type: "thorns"; frac: number }
+  /** Bloodfeast: each kill heals the whole warband this many HP. */
+  | { type: "killHeal"; amount: number }
+  /** Bounty Hunter: each kill grants the killer this much permanent max HP. */
+  | { type: "bounty"; hp: number }
+  /** Overheal Ward: healing past max HP banks as shield. */
+  | { type: "overheal" }
+  /** Last Breath: once per wave, a fatal blow leaves the unit at 1 HP. */
+  | { type: "lastBreath" }
+  /** Overkill: every Nth attack deals double. */
+  | { type: "crit"; everyNth: number }
+  /** Marksman's Focus: ranged basic attacks lifesteal this fraction. */
+  | { type: "rangedLifesteal"; frac: number }
+  /** Berserker's Rhythm: attack speed ramps over a wave, resets each wave. */
+  | { type: "rhythm" }
+  /** Momentum: +5% damage for the run each wave cleared with no death. */
+  | { type: "momentum" }
+  /** Thunderclap / Venom Coating: every Nth attack plants a status rider. */
+  | {
+      type: "onHitRider";
+      effectType: StatusEffectType;
+      everyNth: number;
+      durationSec: number;
+      magnitude?: number;
+      damagePerTick?: number;
+      tickIntervalSec?: number;
+    }
+  /** Kennel Master / War Machine: summon companions at the start of each wave. */
+  | { type: "waveSummon"; defId: string; count: number };
 
 export interface BoonDef {
   id: string;
@@ -172,6 +211,130 @@ export const BOONS: Record<string, BoonDef> = {
     rarity: "epic",
     description: "+25% attack damage to the whole warband.",
     effects: [{ type: "teamMod", field: "dmgMult", value: 0.25 }],
+  },
+
+  // -- Slice 2: proc / mechanic boons (build-defining). --------------------
+  // Rare — one mechanic each.
+  marksmans_focus: {
+    id: "marksmans_focus",
+    name: "Marksman's Focus",
+    rarity: "rare",
+    description: "Ranged attacks heal for 8% of the damage dealt.",
+    effects: [{ type: "rangedLifesteal", frac: 0.08 }],
+  },
+  venom_coating: {
+    id: "venom_coating",
+    name: "Venom Coating",
+    rarity: "rare",
+    description: "Every 2nd attack poisons the target (6 dmg/sec for 4s).",
+    effects: [
+      {
+        type: "onHitRider",
+        effectType: "poison",
+        everyNth: 2,
+        durationSec: 4,
+        damagePerTick: 6,
+        tickIntervalSec: 1,
+      },
+    ],
+  },
+  bloodfeast: {
+    id: "bloodfeast",
+    name: "Bloodfeast",
+    rarity: "rare",
+    description: "Each kill heals the whole warband for 12 HP.",
+    effects: [{ type: "killHeal", amount: 12 }],
+  },
+  thornmail: {
+    id: "thornmail",
+    name: "Thornmail",
+    rarity: "rare",
+    description: "Reflect 20% of the damage your warband takes back at attackers.",
+    effects: [{ type: "thorns", frac: 0.2 }],
+  },
+  reckless: {
+    id: "reckless",
+    name: "Reckless",
+    rarity: "rare",
+    description: "+30% damage, but your warband takes 15% more damage.",
+    effects: [
+      { type: "teamMod", field: "dmgMult", value: 0.3 },
+      { type: "teamMod", field: "damageTakenMult", value: -0.15 },
+    ],
+  },
+  overkill: {
+    id: "overkill",
+    name: "Overkill",
+    rarity: "rare",
+    description: "Every 4th attack strikes for double damage.",
+    effects: [{ type: "crit", everyNth: 4 }],
+  },
+  kennel_master: {
+    id: "kennel_master",
+    name: "Kennel Master",
+    rarity: "rare",
+    description: "Start each wave with two spirit wolves at your side.",
+    effects: [{ type: "waveSummon", defId: "wolf", count: 2 }],
+  },
+
+  // Epic — build payoffs.
+  thunderclap: {
+    id: "thunderclap",
+    name: "Thunderclap",
+    rarity: "epic",
+    description: "Every 5th attack stuns the target.",
+    effects: [
+      { type: "onHitRider", effectType: "stun", everyNth: 5, durationSec: 0.6 },
+    ],
+  },
+  executioner: {
+    id: "executioner",
+    name: "Executioner",
+    rarity: "epic",
+    description: "+40% damage to enemies below 25% HP.",
+    effects: [{ type: "execute", bonus: 0.4 }],
+  },
+  bounty_hunter: {
+    id: "bounty_hunter",
+    name: "Bounty Hunter",
+    rarity: "epic",
+    description: "Each kill grants the slayer +2 permanent max HP.",
+    effects: [{ type: "bounty", hp: 2 }],
+  },
+  last_breath: {
+    id: "last_breath",
+    name: "Last Breath",
+    rarity: "epic",
+    description: "Once per wave, a fatal blow leaves a unit at 1 HP instead.",
+    effects: [{ type: "lastBreath" }],
+  },
+  overheal_ward: {
+    id: "overheal_ward",
+    name: "Overheal Ward",
+    rarity: "epic",
+    description: "Healing beyond max HP banks as a damage-soaking shield.",
+    effects: [{ type: "overheal" }],
+  },
+  berserkers_rhythm: {
+    id: "berserkers_rhythm",
+    name: "Berserker's Rhythm",
+    rarity: "epic",
+    description: "Attack speed climbs the longer a wave lasts, resetting each wave.",
+    effects: [{ type: "rhythm" }],
+  },
+  momentum: {
+    id: "momentum",
+    name: "Momentum",
+    rarity: "epic",
+    description: "+5% damage for the rest of the run each wave cleared with no death.",
+    effects: [{ type: "momentum" }],
+  },
+  war_machine: {
+    id: "war_machine",
+    name: "War Machine",
+    rarity: "epic",
+    description: "Deploy an automated turret at the start of each wave.",
+    effects: [{ type: "waveSummon", defId: "turret", count: 1 }],
   },
 };
 

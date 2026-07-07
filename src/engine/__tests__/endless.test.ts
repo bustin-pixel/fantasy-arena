@@ -282,3 +282,217 @@ describe("endless — boon offer gating", () => {
     expect(new Set(withDead).size).toBe(3);
   });
 });
+
+describe("endless — proc boon mechanics (via teamMods funnels)", () => {
+  /** Step until `target`'s HP first changes, returning the amount lost. */
+  function firstHpLoss(s: ReturnType<typeof battleState>, target: { hp: number }) {
+    const start = target.hp;
+    let guard = 0;
+    while (target.hp === start && guard < 300) {
+      stepSimulation(s);
+      guard++;
+    }
+    return start - target.hp;
+  }
+
+  it("Executioner adds damage only vs targets below the execute threshold", () => {
+    const hit = (bonus: number, hpFrac: number): number => {
+      const s = battleState(31);
+      s.teamMods.player.executeBonus = bonus;
+      place(s, "berserker", "player", 200, 300); // base 14 dmg at full HP
+      const dummy = place(s, "skeleton", "enemy", 200, 350);
+      dummy.moveSpeed = 0;
+      dummy.damage = 0;
+      dummy.maxHp = 1000;
+      dummy.hp = Math.round(1000 * hpFrac);
+      return firstHpLoss(s, dummy);
+    };
+    // Healthy target (80% HP): the execute bonus does nothing.
+    expect(hit(1, 0.8)).toBe(hit(0, 0.8));
+    // Low target (20% HP): +100% execute doubles the hit.
+    const base = hit(0, 0.2);
+    expect(hit(1, 0.2)).toBe(base * 2);
+  });
+
+  it("Overkill's crit doubles the marked swing", () => {
+    const hit = (everyNth: number): number => {
+      const s = battleState(32);
+      s.teamMods.player.critEveryNth = everyNth;
+      place(s, "berserker", "player", 200, 300);
+      const dummy = makeDummy(place(s, "skeleton", "enemy", 200, 350));
+      return firstHpLoss(s, dummy);
+    };
+    const base = hit(0);
+    expect(base).toBeGreaterThan(0);
+    expect(hit(1)).toBe(base * 2); // every attack crits
+  });
+
+  it("Thornmail reflects a fraction of damage taken back at the attacker", () => {
+    const s = battleState(33);
+    s.teamMods.player.thornsFrac = 0.5;
+    // Player victim soaks hits and deals none; enemy attacker takes reflect.
+    const victim = place(s, "skeleton", "player", 200, 340);
+    victim.moveSpeed = 0;
+    victim.damage = 0;
+    victim.maxHp = victim.hp = 100000;
+    const attacker = place(s, "berserker", "enemy", 200, 300);
+    attacker.moveSpeed = 0;
+    const loss = firstHpLoss(s, attacker); // only source of loss is thorns
+    expect(loss).toBeGreaterThan(0);
+  });
+
+  it("an on-hit rider stuns the target every Nth attack", () => {
+    const s = battleState(34);
+    s.teamMods.player.onHitRiders = [
+      { effectType: "stun", everyNth: 1, durationSec: 1 },
+    ];
+    place(s, "berserker", "player", 200, 300);
+    const dummy = makeDummy(place(s, "skeleton", "enemy", 200, 350));
+    let guard = 0;
+    while (!dummy.effects.some((e) => e.type === "stun") && guard < 200) {
+      stepSimulation(s);
+      guard++;
+    }
+    expect(dummy.effects.some((e) => e.type === "stun")).toBe(true);
+  });
+
+  it("Bloodfeast heals the whole warband on a kill", () => {
+    const s = battleState(35);
+    s.teamMods.player.killHeal = 20;
+    place(s, "berserker", "player", 200, 300); // the slayer
+    // A wounded, idle ally that should be topped up by the kill.
+    const ally = place(s, "skeleton", "player", 100, 300);
+    ally.moveSpeed = 0;
+    ally.damage = 0;
+    ally.maxHp = 1000;
+    ally.hp = 10;
+    const prey = place(s, "skeleton", "enemy", 200, 350);
+    prey.moveSpeed = 0;
+    prey.damage = 0;
+    prey.hp = prey.maxHp = 5; // one berserker swing kills it
+    let guard = 0;
+    while (prey.state !== "dead" && guard < 200) {
+      stepSimulation(s);
+      guard++;
+    }
+    expect(prey.state).toBe("dead");
+    expect(ally.hp).toBe(30); // 10 + 20 killHeal
+  });
+
+  it("Bounty Hunter grows the slayer's max HP on a kill", () => {
+    const s = battleState(36);
+    s.teamMods.player.bountyHp = 5;
+    const slayer = place(s, "berserker", "player", 200, 300);
+    const startMax = slayer.maxHp;
+    const prey = place(s, "skeleton", "enemy", 200, 350);
+    prey.moveSpeed = 0;
+    prey.damage = 0;
+    prey.hp = prey.maxHp = 5;
+    let guard = 0;
+    while (prey.state !== "dead" && guard < 200) {
+      stepSimulation(s);
+      guard++;
+    }
+    expect(prey.state).toBe("dead");
+    expect(slayer.maxHp).toBe(startMax + 5);
+  });
+
+  it("Last Breath cheats a fatal blow once, then is spent", () => {
+    const s = battleState(37);
+    s.teamMods.player.lastBreath = true;
+    const victim = place(s, "skeleton", "player", 200, 340);
+    victim.moveSpeed = 0;
+    victim.damage = 0;
+    victim.hp = victim.maxHp = 10;
+    victim.cheatDeathReady = true;
+    const attacker = place(s, "berserker", "enemy", 200, 300); // ~14 dmg, lethal
+    attacker.moveSpeed = 0;
+    // First lethal blow: survives at 1 HP, charge consumed.
+    let guard = 0;
+    while (victim.cheatDeathReady && guard < 200) {
+      stepSimulation(s);
+      guard++;
+    }
+    expect(victim.state).not.toBe("dead");
+    expect(victim.hp).toBe(1);
+    expect(victim.cheatDeathReady).toBe(false);
+    // Next lethal blow finishes it (charge is spent).
+    guard = 0;
+    while (victim.state !== "dead" && guard < 200) {
+      stepSimulation(s);
+      guard++;
+    }
+    expect(victim.state).toBe("dead");
+  });
+
+  it("Overheal Ward banks lifesteal overflow as shield", () => {
+    const s = battleState(38);
+    s.teamMods.player.overheal = true;
+    s.teamMods.player.lifestealBonus = 3; // heals 3x damage — guaranteed overflow
+    const zerk = place(s, "berserker", "player", 200, 300); // spawns at full HP
+    const dummy = makeDummy(place(s, "skeleton", "enemy", 200, 350));
+    let guard = 0;
+    while (zerk.shieldHp === 0 && guard < 200) {
+      stepSimulation(s);
+      guard++;
+    }
+    expect(zerk.shieldHp).toBeGreaterThan(0);
+  });
+
+  it("Marksman's Focus heals a ranged attacker on hit", () => {
+    const s = battleState(39);
+    s.teamMods.player.rangedLifesteal = 0.5;
+    const archer = place(s, "archer", "player", 200, 300);
+    archer.hp = 10; // wounded so the heal is observable
+    const dummy = makeDummy(place(s, "skeleton", "enemy", 200, 380));
+    let guard = 0;
+    while (archer.hp === 10 && guard < 200) {
+      stepSimulation(s);
+      guard++;
+    }
+    expect(archer.hp).toBeGreaterThan(10);
+  });
+
+  it("Kennel Master / War Machine summon defIds are real units", () => {
+    expect(() => getUnitDef("wolf")).not.toThrow();
+    expect(() => getUnitDef("turret")).not.toThrow();
+  });
+
+  it("picking a summon boon puts pets on the field at the next wave", () => {
+    // God-mode survival so the run reaches deep-enough offers to be shown a summon
+    // boon, then pick it and confirm wolves/turrets appear on the player team.
+    const mc = new MatchController(9182, DECK, [], { mode: "endless" });
+    let guard = 0;
+    let pickedSummon = false;
+    let sawPet = false;
+    while (guard < 40000) {
+      mc.tick();
+      guard++;
+      for (const u of mc.state.units) {
+        if (u.team === "player" && u.state !== "dead") metaHeal(mc.state, u, u.maxHp);
+      }
+      if (
+        mc.state.units.some(
+          (u) => u.team === "player" && (u.defId === "wolf" || u.defId === "turret")
+        )
+      ) {
+        sawPet = true;
+        break;
+      }
+      const st = mc.endlessStatus();
+      if (st?.intermission) {
+        const idx = st.intermission.offers.findIndex(
+          (o) => o.id === "kennel_master" || o.id === "war_machine"
+        );
+        if (idx >= 0) {
+          mc.pickBoon(idx);
+          pickedSummon = true;
+        } else {
+          mc.pickBoon(0);
+        }
+      }
+    }
+    expect(pickedSummon).toBe(true);
+    expect(sawPet).toBe(true);
+  });
+});

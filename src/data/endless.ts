@@ -33,6 +33,14 @@ export const ENDLESS_WAVE_TIME_SEC = 120;
  *  Field Medicine boon raises it). */
 export const ENDLESS_INTERMISSION_HEAL = 0.3;
 
+/** Berserker's Rhythm: attack-speed bonus gained per second in a wave, and the
+ *  cap. Resets to 0 at each wave start. */
+export const ENDLESS_RHYTHM_PER_SEC = 0.04;
+export const ENDLESS_RHYTHM_MAX = 0.6;
+
+/** Momentum: damage multiplier gained per wave cleared without a warband death. */
+export const ENDLESS_MOMENTUM_PER_WAVE = 0.05;
+
 /** The approved themed-dungeon rare minibosses (wave 3 of each cycle). */
 export const ENDLESS_RARE_POOL: readonly string[] = [
   "lich",
