@@ -64,6 +64,34 @@ import {
 } from "./StatusEffectSystem";
 import { stepAnimation } from "./AnimationSystem";
 
+/** Team-wide combat multipliers, read at the funnel sites. Identity by default
+ *  (all 1s / lifesteal 0) so Arena/Depths are unaffected; Endless mode's boons
+ *  fold into the player's set. Reading these at the funnels (rather than mutating
+ *  per-unit stats) means the mods survive kits that recompute stats every tick and
+ *  cover summoned units for free. */
+export interface TeamMods {
+  /** Outgoing damage multiplier. */
+  dmgMult: number;
+  /** Attack-cooldown multiplier (<1 = faster attacks). */
+  atkDelayMult: number;
+  /** Move-speed multiplier. */
+  moveSpeedMult: number;
+  /** Incoming damage multiplier (<1 = takes less). */
+  damageTakenMult: number;
+  /** Additive lifesteal fraction on top of a unit's own. */
+  lifestealBonus: number;
+}
+
+export function identityTeamMods(): TeamMods {
+  return {
+    dmgMult: 1,
+    atkDelayMult: 1,
+    moveSpeedMult: 1,
+    damageTakenMult: 1,
+    lifestealBonus: 0,
+  };
+}
+
 export interface SimState {
   tick: number;
   phase: MatchPhase;
@@ -99,6 +127,10 @@ export interface SimState {
   /** Boss-floor telegraph banner (rare catalyst / boss incoming), or null. Set
    *  by the WaveController; surfaced to the HUD via the snapshot. */
   waveBanner: WaveBanner | null;
+  /** Per-team combat multipliers (Endless boons fold into `player`; identity in
+   *  Arena/Depths). Read at the damage / attack-speed / movement / lifesteal
+   *  funnels. */
+  teamMods: { player: TeamMods; enemy: TeamMods };
 }
 
 export function createSimState(seed: number, clockSec: number): SimState {
@@ -122,6 +154,7 @@ export function createSimState(seed: number, clockSec: number): SimState {
     castGraceTicks: 0,
     damageSpawns: [],
     waveBanner: null,
+    teamMods: { player: identityTeamMods(), enemy: identityTeamMods() },
   };
 }
 
@@ -157,7 +190,16 @@ function makeDamageDealer(
       effAmount = kit.modifyIncomingDamage(target, effAmount, source, makeKitCtx(target, true));
     }
 
-    let dmg = Math.max(0, Math.round(effAmount * target.damageTakenMult));
+    // Team-wide combat mods: the source's outgoing multiplier and the target's
+    // incoming multiplier fold in alongside the unit's own damageTakenMult.
+    // Identity (×1) in Arena/Depths, so those runs stay byte-identical.
+    const scaled =
+      effAmount *
+      state.teamMods[source.team].dmgMult *
+      target.damageTakenMult *
+      state.teamMods[target.team].damageTakenMult;
+    let dmg = Math.max(0, Math.round(scaled));
+    const shown = dmg; // pre-absorb hit shown as the floating number
 
     // Absorb shield (overhealth) soaks damage before HP.
     if (target.shieldHp > 0 && dmg > 0) {
@@ -170,7 +212,7 @@ function makeDamageDealer(
     target.hp = Math.max(0, target.hp - dmg);
     target.hitFlash = HIT_FLASH_TICKS;
     target.attackedByUid = source.uid;
-    spawnFloatingText(state, target, `-${Math.round(effAmount * target.damageTakenMult)}`, "damage");
+    spawnFloatingText(state, target, `-${shown}`, "damage");
 
     // [seam] kit post-hit reaction on a surviving target — gets the ORIGINAL
     // incoming amount (Slime split reads hp thresholds; the Aegis magic bank needs
@@ -243,6 +285,35 @@ function makeHealer(
     const gained = target.hp - before;
     if (gained > 0) spawnFloatingText(state, target, `+${gained}`, "heal");
   };
+}
+
+/** Out-of-combat heal used by the EndlessController between waves. Clamps to
+ *  maxHp and shows a heal number. Deliberately bypasses kit `modifyIncomingHeal`
+ *  (it's a meta recovery, not a Cleric cast) and only ever runs while the sim is
+ *  frozen for an intermission — never inside the tick loop. */
+export function metaHeal(state: SimState, unit: Unit, amount: number): void {
+  if (unit.state === "dead" || amount <= 0) return;
+  const before = unit.hp;
+  unit.hp = Math.min(unit.maxHp, unit.hp + Math.round(amount));
+  const gained = unit.hp - before;
+  if (gained > 0) spawnFloatingText(state, unit, `+${gained}`, "heal");
+}
+
+/** Bring a fallen unit back at a fraction of max HP (Endless "Second Chance"
+ *  boon). `transitionTo` treats "dead" as terminal, so this restores the state
+ *  fields directly and clears the stale target/effect bookkeeping a corpse holds. */
+export function reviveUnit(state: SimState, unit: Unit, hpFrac: number): void {
+  if (unit.state !== "dead") return;
+  unit.state = "idle";
+  unit.animState = "idle";
+  unit.hp = Math.max(1, Math.round(unit.maxHp * hpFrac));
+  unit.effects = [];
+  unit.targetUid = null;
+  unit.attackedByUid = null;
+  unit.tauntedByUid = null;
+  unit.deathFade = 0;
+  unit.hitFlash = 0;
+  spawnFloatingText(state, unit, "Revived!", "heal");
 }
 
 function spawnFloatingText(
@@ -754,7 +825,10 @@ export function stepSimulation(state: SimState): void {
       unit.facing = target.pos.x >= unit.pos.x ? 1 : -1;
       if (unit.attackCooldown <= 0) {
         performBasicAttack(state, unit, target, byUid, dealDamage, heal, abilityCtx);
-        const delay = unit.attackSpeed * attackDelayMultiplier(unit);
+        const delay =
+          unit.attackSpeed *
+          attackDelayMultiplier(unit) *
+          state.teamMods[unit.team].atkDelayMult;
         unit.attackCooldown = secToTicks(delay);
       }
     } else {
@@ -768,7 +842,11 @@ export function stepSimulation(state: SimState): void {
   state.damageSpawns = [];
 
   // 5a. Movement + collisions.
-  stepMovement({ units: state.units, unitsByUid: byUid });
+  stepMovement({
+    units: state.units,
+    unitsByUid: byUid,
+    teamMods: state.teamMods,
+  });
 
   // 5a-ii. Scatter Traps: an enemy of the trap's owner that has stepped onto it is
   // caught (stunned) and the trap is spent. Checked after movement so it fires the
@@ -884,7 +962,7 @@ function performBasicAttack(
     // [seam] Warrior Whirlwind (the AoE spin + bleed that replaces the swing) now
     // lives in kits/warrior.ts onBasicAttack, fired above.
     dealDamage(target, unit.damage, unit);
-    applyLifesteal(unit, unit.damage, heal);
+    applyLifesteal(unit, unit.damage, heal, state.teamMods[unit.team].lifestealBonus);
 
     // [seam] after the default melee swing lands (open contract 2). Zombie
     // Shambler's Numbing Bite now lives in its kit (kits/zombieShambler.ts);

@@ -352,7 +352,9 @@ export interface Trap {
  *  the snapshot. `ticks` counts down (cleared at 0), so it lingers briefly as the
  *  unit walks in. Null on every non-boss floor / in the Arena. */
 export interface WaveBanner {
-  kind: "rare" | "boss";
+  /** "rare"/"boss" telegraph an incoming unit; "wave" announces a new Endless
+   *  wave starting (name carries the headline, e.g. "Wave 7"). */
+  kind: "rare" | "boss" | "wave";
   /** Display name of the incoming unit (e.g. "Lich", "Abomination"). */
   name: string;
   /** Display ticks remaining. */
@@ -386,4 +388,7 @@ export interface ReplayData {
   deployments: DeploymentRecord[];
   playerDeck: string[];
   enemyDeck: string[];
+  /** Endless mode: ordered boon-pick offer indices (the between-wave inputs).
+   *  Absent/empty for Arena and Depths. */
+  picks?: number[];
 }

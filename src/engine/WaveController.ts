@@ -42,6 +42,28 @@ import {
  *  off-screen (movement clamps them fully on-field on their first step). */
 const SPAWN_Y = 18;
 
+/** Spend `budget` on a cost-weighted monster pool (cheap fodder dominates). Pure
+ *  + deterministic in `rng`'s call order — shared by the WaveController's floor
+ *  builds and the EndlessController's fodder waves so both compose identically. */
+export function buildFodderQueue(
+  rng: RNG,
+  monsters: Record<string, number>,
+  budget: number
+): string[] {
+  const ids = Object.keys(monsters);
+  const out: string[] = [];
+  let guard = 0;
+  while (budget > 0 && guard < 500) {
+    guard++;
+    const affordable = ids.filter((id) => monsters[id] <= budget);
+    if (affordable.length === 0) break;
+    const pick = rng.pick(affordable);
+    out.push(pick);
+    budget -= monsters[pick];
+  }
+  return out;
+}
+
 /** Boss-floor phases, in order:
  *  fodder → (rare_telegraph → rare)? → boss_telegraph → boss → done. */
 type BossPhase =
@@ -83,22 +105,11 @@ export class WaveController {
     else this.queue = this.buildFodder(waveBudgetIn(dungeon, floor));
   }
 
-  /** Spend `budget` on tier monsters (cheap fodder naturally dominates). Shared by
-   *  both floor shapes — identical RNG call order to the old single-queue build. */
+  /** Spend `budget` on this floor's tier monsters (cheap fodder dominates). Wraps
+   *  the shared pure builder — identical RNG call order to the old inline loop. */
   private buildFodder(budget: number): string[] {
     const tier = tierForFloorIn(this.dungeon, this.floor);
-    const ids = Object.keys(tier.monsters);
-    const out: string[] = [];
-    let guard = 0;
-    while (budget > 0 && guard < 500) {
-      guard++;
-      const affordable = ids.filter((id) => tier.monsters[id] <= budget);
-      if (affordable.length === 0) break;
-      const pick = this.rng.pick(affordable);
-      out.push(pick);
-      budget -= tier.monsters[pick];
-    }
-    return out;
+    return buildFodderQueue(this.rng, tier.monsters, budget);
   }
 
   /** Compose the boss floor: one fodder pool, roll the rare catalyst, then the

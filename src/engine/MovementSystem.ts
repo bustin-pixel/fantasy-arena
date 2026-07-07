@@ -7,7 +7,7 @@
 // Deterministic: processes units in a fixed order, no randomness.
 // ============================================================================
 
-import type { Unit } from "@/types";
+import type { Team, Unit } from "@/types";
 import {
   FIELD_HEIGHT,
   FIELD_WIDTH,
@@ -16,6 +16,7 @@ import {
 } from "@/utils/constants";
 import { clamp, dir, dist } from "@/utils/math";
 import { isStealthed, moveSpeedMultiplier } from "./StatusEffectSystem";
+import type { TeamMods } from "./CombatSystem";
 
 // Overlap (px) left uncorrected by collision resolution, so units at rest in a
 // crowd don't get shoved a sub-pixel amount every tick (which looked like jitter).
@@ -78,6 +79,16 @@ function resolveCollisions(units: Unit[]): void {
 export interface MovementContext {
   units: Unit[];
   unitsByUid: Map<string, Unit>;
+  /** Per-team move-speed mods (Endless boons). Identity/undefined = no change. */
+  teamMods?: { player: TeamMods; enemy: TeamMods };
+}
+
+/** Team move-speed multiplier for a unit (1 when no mods are supplied). */
+function teamMoveMult(
+  team: Team,
+  teamMods: MovementContext["teamMods"]
+): number {
+  return teamMods ? teamMods[team].moveSpeedMult : 1;
 }
 
 /**
@@ -85,7 +96,7 @@ export interface MovementContext {
  * state (the CombatSystem decides state each tick before this runs).
  */
 export function stepMovement(ctx: MovementContext): void {
-  const { units, unitsByUid } = ctx;
+  const { units, unitsByUid, teamMods } = ctx;
 
   for (const unit of units) {
     // An Orc mid-charge has its movement driven by CombatSystem (stepCharge);
@@ -103,7 +114,11 @@ export function stepMovement(ctx: MovementContext): void {
       (unit.state === "idle" || unit.state === "moving")
     ) {
       const home = unit.homeAnchor;
-      const homeSpeed = unit.moveSpeed * moveSpeedMultiplier(unit) * SEC_PER_TICK;
+      const homeSpeed =
+        unit.moveSpeed *
+        moveSpeedMultiplier(unit) *
+        teamMoveMult(unit.team, teamMods) *
+        SEC_PER_TICK;
       if (dist(unit.pos, home) > 4) {
         const v = dir(unit.pos, home);
         unit.pos.x += v.x * homeSpeed;
@@ -121,7 +136,11 @@ export function stepMovement(ctx: MovementContext): void {
       unit.state === "moving" || (ranged && unit.state === "attacking");
     if (!canMove) continue;
 
-    const speed = unit.moveSpeed * moveSpeedMultiplier(unit) * SEC_PER_TICK;
+    const speed =
+      unit.moveSpeed *
+      moveSpeedMultiplier(unit) *
+      teamMoveMult(unit.team, teamMods) *
+      SEC_PER_TICK;
 
     // --- Fear: flee from the source of terror -----------------------------
     const fearEffect = unit.effects.find((e) => e.type === "fear");
