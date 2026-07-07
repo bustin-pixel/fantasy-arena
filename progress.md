@@ -148,6 +148,23 @@ automatically) and Heroes of the Arena (all deckables).
   tuned so torches flank on narrow screens; the battle canvas is capped at 480px, safe
   to scale up on desktop since the 480×720 sim is display-independent).
 
+### The Hunter's Library — 5-system meta expansion (concept APPROVED 2026-07-07)
+Five interlocking systems designed together — full concept in
+[`docs/design/hunters-library.md`](docs/design/hunters-library.md). One loop:
+the Library tells you what to hunt, the hunt makes you a master, mastery fills
+the Library. The systems: **Tendencies** (fixed per-unit targeting personalities
+— Rogue hunts the backline; taunt stays absolute), the **Huntmaster's Board**
+(3 seeded daily kill-writs, ~310 gold/day cap, derived from `DUNGEONS` so new
+dungeons auto-feed), the **Library** (Compendium reskinned as a bookshelf — one
+tome per dungeon, monster pages with mastery bars + lore), **Relics** (seeded
+collectables under animated floor hatches that open for short tap windows
+mid-battle; unseal each book's appendix pages), and **Monster Mastery**
+(per-defId kill counts → 5 ranks → +2%/rank dmg vs that monster capped at +10%,
+plus gold/lore/gilding). Build order = 5 PRs, meta-first: (1) save v7 + kill
+ledger + mastery ranks + bookshelf, (2) dailies, (3) relics, (4) Tendencies
+(engine, digest-affecting, ships alone), (5) mastery damage bonus (engine).
+Save v7 is ONE consolidated migration shipped in PR 1.
+
 ### Engine architecture — UnitKit seam ✅ SHIPPED (PR #41 merged 2026-07-03)
 All per-unit behavior lives in one stateless kit per `defId` under
 `src/engine/kits/` (registry `kits/UnitKit.ts`); zero `defId` branches remain in
