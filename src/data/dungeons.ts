@@ -151,7 +151,7 @@ export const DUNGEONS: Record<string, Dungeon> = {
   bonefields: {
     id: "bonefields",
     name: "The Bonefields",
-    theme: "dungeon",
+    theme: "bonefields",
     floors: 5,
     tiers: [
       {
@@ -174,7 +174,7 @@ export const DUNGEONS: Record<string, Dungeon> = {
   wilds: {
     id: "wilds",
     name: "The Wilds",
-    theme: "glade",
+    theme: "huntingGrounds",
     floors: 5,
     tiers: [
       {
@@ -197,7 +197,7 @@ export const DUNGEONS: Record<string, Dungeon> = {
   sealed_vault: {
     id: "sealed_vault",
     name: "The Sealed Vault",
-    theme: "sanctum",
+    theme: "sealedVault",
     floors: 5,
     tiers: [
       {
@@ -220,7 +220,7 @@ export const DUNGEONS: Record<string, Dungeon> = {
   overgrowth: {
     id: "overgrowth",
     name: "The Overgrowth",
-    theme: "glade",
+    theme: "overgrowth",
     floors: 5,
     tiers: [
       {
@@ -243,7 +243,7 @@ export const DUNGEONS: Record<string, Dungeon> = {
   eclipse_spire: {
     id: "eclipse_spire",
     name: "The Eclipse Spire",
-    theme: "sanctum",
+    theme: "eclipseSpire",
     floors: 5,
     tiers: [
       {
@@ -266,7 +266,7 @@ export const DUNGEONS: Record<string, Dungeon> = {
   deep_forge: {
     id: "deep_forge",
     name: "The Deep Forge",
-    theme: "forge",
+    theme: "deepForge",
     floors: 5,
     tiers: [
       {
