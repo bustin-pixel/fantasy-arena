@@ -31,8 +31,9 @@ boss **Bloater** with Putrid Burst). The floor picker + persisted progress
 
 **Floor rebalance DONE (2026-07-05, on PR #46)** — floors were too easy/short.
 Now: per-floor stat multipliers (+8% HP / +5% dmg per floor, linear — so floors
-6+ escalate instead of plateauing, and future unit levels/items become the
-player counter-curve), waveBudget 25+3×floor (~28–40 bodies), 0.5s trickle,
+6+ escalate instead of plateauing; **unit levels are now that player
+counter-curve — BUILT, see "Unit leveling" below**; items are the second lever),
+waveBudget 25+3×floor (~28–40 bodies), 0.5s trickle,
 enemy cap 12, Depths-specific 300s clock, Bloater 800hp/28dmg, boss floors keep
 70% fodder. Tuned by headless winrate sweep (target hit: floors 1–3 comfy→
 bloodied, floor 4 77%, boss floor ≈ coin flip depending on deck). Method +
@@ -66,8 +67,58 @@ Collection + gold purchases, milestone unlocks (floors 2–5 → Warrior/Mage/Cl
 Berserker), duplicate drops → gold. The chest tap is now a full ceremony (PR #46):
 procedural canvas sprite + rattle/lid-swing/sparkle animation + creak/jingle SFX
 per tier, and the ladder tops out at five tiers — wooden → silver → gold →
-**arcane → dragon** (the new two are data + art only; deep bosses / premium will
-drop them later).
+**arcane → dragon** (now dropped by the chain capstones: Deep Forge / Eclipse
+Spire boss first-clears, plus arcane from deep endless milestones).
+
+#### Unit leveling — BUILT (2026-07-08, feat/unit-leveling)
+
+Per-unit XP/levels, the player counter-curve to floor scaling. Cap 10;
++5% HP / +3% dmg per level (max +45%/+27% vs floor-5 enemies' +32%/+20%),
+hp/dmg only — the exact mirror of what enemy floors bake. Whole deck earns
+full XP from every mode (dungeon wins 20+10×floor, replays pay full, losses
+40%, endless 10+8×wave, arena 25/10); rising cost curve 25·(L−1)·L (cap at
+2250 total ≈ clearing all content + some endless). No catch-up mechanic.
+Arena AI mirrors the player's average deck level. Save v8 (`unitXp`, level
+always derived). All numbers in `src/meta/leveling.ts`; pacing targets are an
+executable spec. Summons inherit their creator's level (NOTES hazard 8).
+Surfaced: results-screen XP bars + LEVEL UP flash/stinger + stat deltas, hub
+card badges, detail-panel level chip/XP bar/leveled stats, in-battle badge by
+the HP bar. Design decisions in the plan file
+(`plan-how-units-level-keen-dijkstra.md`) + the `unit-leveling-built` memory.
+
+#### Dungeon monster levels + ordered chain — BUILT (2026-07-08, feat/unit-leveling)
+
+The dungeons now form a hard gated chain (each requires the previous one's
+floor 5): Depths → Bonefields → Wilds → Overgrowth → Sealed Vault → Deep Forge
+→ Eclipse Spire. Monsters carry REAL visible levels through the same createUnit
+bake as players (ladder 1/3/5/6/7/8/9 ≈ your arrival level walking the chain,
+one level hot from the Sealed Vault on; bosses + rare catalysts +1, so the
+Eclipse Warden caps at Lv 10). Floor multipliers still layer on top; Endless
+stays Lv 1 (its own curve). The gate never re-locks a dungeon with its own
+progress (legacy out-of-order saves). Chest capstones: Deep Forge boss
+first-clear → **arcane**, Eclipse Spire → **dragon** (first wiring of the top
+two tiers). Dungeon map shows "Lv N foes" chips + your warband level with an
+under-leveled warning; floor picker shows the boss level + the real chest tier.
+Numbers in `data/dungeons.ts` (`monsterLevel`, `ELITE_LEVEL_BONUS`, `gate`) and
+`meta/rewards.ts` (`bossChestTierFor`); ladder/gate specs in
+`meta/__tests__/dungeons.test.ts`. No XP retune — the leveling pacing spec
+still holds.
+
+#### Creature tags + Slime Knight anti-horde rework — BUILT (2026-07-08, feat/unit-leveling)
+
+`UnitDef.tags` creature types ("undead"/"skeleton"; skeletons carry both) —
+pure data like `wardedAgainst`, tagged across the whole undead roster. The
+Slime Knight gained the counter package for the Bonefields' skeleton hordes:
+**Caustic Aura** (once a second, 30% of its damage in acid to every enemy
+within 90px — but a SKELETON loses 90% of its remaining hp per pulse; scales
+with level, silent while stunned/feared/polymorphed) and **Absorb Bones**
+(any ENEMY skeleton dying inside the aura is slurped for 20 HP, whoever
+landed the kill; shown as ONE merged "Caustic Aura" panel trait). Built on a
+new reusable kit seam:
+`onUnitDeath` death-observer hook (fired on every other living unit from the
+HP-funnel death branch, after the victim's own `onDeath`). Unlock price stays
+2500g — he's a strong optional answer to the Bonefields, not a required key.
+Specs in `slimeKnight.test.ts`; panel traits added.
 
 **Remaining economy/PvE slices, in order** (slices 2 & 3 have a build-ready
 handshake with file anchors + commit sequencing in

@@ -1,16 +1,18 @@
 // ============================================================================
 // DungeonMapSheet — choose which dungeon to descend.
-// Lists The Depths + the themed legendary dungeons. A themed dungeon is locked
-// until its `gate` (Depths floors cleared) is met, and shows the legendary its
-// rare-spawn quest unlocks (dimmed until owned) plus a vague lore blurb. Picking
-// an unlocked dungeon hands off to the FloorPickerSheet. Reuses the detail-
-// overlay modal pattern (AppShell exempts it from page-swipe drags).
+// Lists the dungeons in gate-chain order. A dungeon is locked until its `gate`
+// (the previous dungeon's last floor) is met — see isDungeonUnlocked for the
+// never-re-lock rule — and shows the legendary its rare-spawn quest unlocks
+// (dimmed until owned), its monster level vs your warband's, plus a vague lore
+// blurb. Picking an unlocked dungeon hands off to the FloorPickerSheet. Reuses
+// the detail-overlay modal pattern (AppShell exempts it from page-swipe drags).
 // ============================================================================
 
 import { useEffect } from "react";
-import { DUNGEONS } from "@/data/dungeons";
+import { DUNGEONS, getDungeon, isDungeonUnlocked } from "@/data/dungeons";
 import { getUnitDef } from "@/data/units";
 import { RARITIES } from "@/data/rarities";
+import { averageDeckLevel, levelFromXp } from "@/meta/leveling";
 import { highestClearedFloorOf, type PlayerSave } from "@/state/persistence";
 
 interface Props {
@@ -33,7 +35,12 @@ export function DungeonMapSheet({ save, onPick, onClose }: Props) {
     };
   }, [onClose]);
 
-  const depthsCleared = highestClearedFloorOf(save, "depths");
+  const warbandLv = averageDeckLevel(
+    save.deck,
+    Object.fromEntries(
+      save.deck.map((id) => [id, levelFromXp(save.unitXp[id] ?? 0)])
+    )
+  );
 
   return (
     <div className="detail-overlay" onClick={onClose}>
@@ -47,20 +54,32 @@ export function DungeonMapSheet({ save, onPick, onClose }: Props) {
           ✕
         </button>
         <h3 className="floor-sheet-title">Dungeons</h3>
+        <div
+          style={{
+            fontSize: "0.78rem",
+            opacity: 0.75,
+            margin: "-4px 0 6px",
+          }}
+        >
+          Your warband: Lv {warbandLv}
+        </div>
 
         <ul className="floor-list">
           {Object.values(DUNGEONS).map((d) => {
-            const gate = d.gate?.depthsFloor ?? 0;
-            const locked = depthsCleared < gate;
+            const locked = !isDungeonUnlocked(d, (id) =>
+              highestClearedFloorOf(save, id)
+            );
             const cleared = highestClearedFloorOf(save, d.id);
+            const underleveled = warbandLv < d.monsterLevel;
             const reward = d.quest ? getUnitDef(d.quest.unlocks) : null;
             const owned = reward
               ? save.unlockedUnits.includes(reward.id)
               : false;
             // Status line: gate hint when locked; the legendary it unlocks when
             // themed; plain progress for The Depths.
+            // (`locked` implies `gate` exists — gateless dungeons never lock.)
             const status = locked
-              ? `Clear Depths floor ${gate} to unlock`
+              ? `Clear ${getDungeon(d.gate!.dungeonId).name} floor ${d.gate!.floor} to unlock`
               : reward
                 ? `Unlocks ${reward.name}${owned ? " ✓" : ""}`
                 : cleared > 0
@@ -85,6 +104,18 @@ export function DungeonMapSheet({ save, onPick, onClose }: Props) {
                   <span className="floor-num">
                     {locked ? "🔒 " : ""}
                     {d.name}
+                    <span
+                      style={{
+                        marginLeft: 8,
+                        fontSize: "0.7rem",
+                        fontWeight: 600,
+                        // Warn when the warband is under the dungeon's level.
+                        color: underleveled ? "#e08a3c" : "#c9b26b",
+                        opacity: locked ? 0.8 : 1,
+                      }}
+                    >
+                      Lv {d.monsterLevel} foes{underleveled ? " ⚠" : ""}
+                    </span>
                   </span>
                   <span
                     className="floor-reward"

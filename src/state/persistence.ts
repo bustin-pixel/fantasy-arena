@@ -8,6 +8,7 @@
 
 import { DECKABLE_UNIT_IDS, UNITS } from "@/data/units";
 import { STARTER_UNIT_IDS } from "@/meta/economy";
+import { TOTAL_XP_CAP } from "@/meta/leveling";
 import { DEFAULT_AVATAR_ID, isAvatarUnlocked } from "@/meta/avatars";
 import { DUNGEON_IDS, DUNGEONS, QUEST_LOCKED_UNITS } from "@/data/dungeons";
 
@@ -80,6 +81,10 @@ export interface PlayerSave {
   questUnlocks: string[];
   /** Endless survival high-water mark. (Save v7.) */
   endless: EndlessProgress;
+  /** Total battle XP per deckable unit id. LEVEL IS ALWAYS DERIVED from this
+   *  via meta/leveling.levelFromXp — never store a level, so the two can't
+   *  desync. Missing id = 0 XP = level 1. Clamped to TOTAL_XP_CAP. (Save v8.) */
+  unitXp: Record<string, number>;
   // Future slices (additive, versioned-merge handles them): soulShards,
   // items inventory, per-unit loadouts.
 }
@@ -89,7 +94,7 @@ export interface PlayerSave {
 const KEY = "fantasy-arena/save/v1";
 
 export const DEFAULT_SAVE: PlayerSave = {
-  version: 7,
+  version: 8,
   username: "Champion",
   avatarId: DEFAULT_AVATAR_ID,
   deck: ["ogre", "archer", "knight", "fire_mage"],
@@ -101,6 +106,7 @@ export const DEFAULT_SAVE: PlayerSave = {
   dungeons: freshDungeonProgress(),
   questUnlocks: [],
   endless: { bestWave: 0 },
+  unitXp: {},
 };
 
 export function loadSave(): PlayerSave {
@@ -146,6 +152,15 @@ export function migrateSave(parsed: Partial<PlayerSave> | null): PlayerSave {
   );
   // v7: endless survival high-water mark (defaults to 0 for older saves).
   merged.endless = { bestWave: Math.max(0, parsed.endless?.bestWave ?? 0) };
+  // v8: per-unit XP — keep only deckable ids with finite values, floored and
+  // clamped to [0, TOTAL_XP_CAP] (defensive against hand-edited saves).
+  const unitXp: Record<string, number> = {};
+  for (const [id, xp] of Object.entries(parsed.unitXp ?? {})) {
+    if (!DECKABLE_UNIT_IDS.includes(id)) continue;
+    if (typeof xp !== "number" || !Number.isFinite(xp)) continue;
+    unitXp[id] = Math.min(TOTAL_XP_CAP, Math.max(0, Math.floor(xp)));
+  }
+  merged.unitXp = unitXp;
 
   // Grandfathering: saves from before the unlock system keep every unit that
   // exists today — EXCEPT quest-locked ones, whose purchase must always be
@@ -197,6 +212,7 @@ function structuredCloneSave(save: PlayerSave): PlayerSave {
     ),
     questUnlocks: [...save.questUnlocks],
     endless: { ...save.endless },
+    unitXp: { ...save.unitXp },
   };
 }
 

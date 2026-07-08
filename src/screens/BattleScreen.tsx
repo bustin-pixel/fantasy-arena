@@ -12,6 +12,7 @@ import {
 import { useGameState } from "@/state/GameStateContext";
 import { endlessBestWave, highestClearedFloorOf } from "@/state/persistence";
 import { computeBattleRewards, type BattleRewards } from "@/meta/rewards";
+import { addXp, levelFromXp } from "@/meta/leveling";
 import { RewardPanel } from "@/components/RewardPanel";
 import { generateSeed } from "@/utils/rng";
 import { playStinger, setMusicTrack } from "@/audio/music";
@@ -34,6 +35,18 @@ export function BattleScreen({
   floor = 1,
   dungeonId = "depths",
 }: Props) {
+  const { save, recordResult, recordBestiary, grantBattleRewards } =
+    useGameState();
+  // Frozen at mount (useState initializers): the pre-battle XP snapshot and
+  // the level map the match runs at. MUST NOT re-derive from live `save` —
+  // the post-battle XP grant would change them and re-create the match under
+  // the results screen. xpAtStart also feeds the RewardPanel's bar animation.
+  const [xpAtStart] = useState<Record<string, number>>(() =>
+    Object.fromEntries(deck.map((id) => [id, save.unitXp[id] ?? 0]))
+  );
+  const [unitLevels] = useState<Record<string, number>>(() =>
+    Object.fromEntries(deck.map((id) => [id, levelFromXp(save.unitXp[id] ?? 0)]))
+  );
   const {
     canvasRef,
     ui,
@@ -46,9 +59,7 @@ export function BattleScreen({
     enemyLedger,
     pickBoon,
     wavesSurvived,
-  } = useBattleEngine(deck, mode, undefined, floor, dungeonId);
-  const { save, recordResult, recordBestiary, grantBattleRewards } =
-    useGameState();
+  } = useBattleEngine(deck, mode, undefined, floor, dungeonId, unitLevels);
   const wrapRef = useRef<HTMLDivElement>(null);
   const recordedRef = useRef(false);
   // Timestamp of the last touch, to suppress the synthetic click a touchscreen
@@ -117,6 +128,7 @@ export function BattleScreen({
         floor,
         dungeonId,
         wavesSurvived: survived,
+        deck,
       });
       setRewards(bundle);
       setTimeout(() => setShowResult(true), 700);
@@ -227,7 +239,19 @@ export function BattleScreen({
               </>
             )}
             {rewards && (
-              <RewardPanel rewards={rewards} floor={floor} mode={mode} />
+              <RewardPanel
+                rewards={rewards}
+                floor={floor}
+                mode={mode}
+                // Grant-then-reveal: the save already holds the new XP; the
+                // panel animates the frozen pre-grant snapshot forward with
+                // the SAME addXp clamp, so the preview matches what persisted.
+                xpGains={deck.map((id) => ({
+                  defId: id,
+                  before: xpAtStart[id] ?? 0,
+                  after: addXp(xpAtStart[id] ?? 0, rewards.xp),
+                }))}
+              />
             )}
             <button className="btn btn-gold" onClick={onExit}>
               Return to Hub

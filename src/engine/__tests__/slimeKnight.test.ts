@@ -9,6 +9,8 @@
 // targeting suppression, and the onTick reincarnation.
 import { describe, it, expect } from "vitest";
 import { stepSimulation } from "@/engine/CombatSystem";
+import { applyEffect, makeEffect } from "@/engine/StatusEffectSystem";
+import { getUnitDef } from "@/data/units";
 import { battleState, place, makeDummy } from "./helpers";
 import type { Unit } from "@/types";
 
@@ -126,6 +128,134 @@ describe("Slime Blob — ignores combat, races home", () => {
     expect(foe.hp).toBe(foe.maxHp); // never attacked
     expect(blob.pos.y).toBeLessThan(300); // moved toward home (north)
     expect(blob.state).not.toBe("dead");
+  });
+});
+
+describe("Slime Knight — Caustic Aura (acid beat on nearby enemies)", () => {
+  it("ticks a fraction of its damage to enemies in radius; none beyond it", () => {
+    const s = battleState(11);
+    const knight = place(s, "slime_knight", "player", 240, 300);
+    knight.moveSpeed = 0;
+    // A NON-skeleton dummy (skeletons get the bone-melt beat instead), inside
+    // the aura (dist 88 ≤ 90) but outside melee reach (range 48 + the two
+    // bodies' radius slop ≈ 76) — any HP it loses is aura damage, in whole
+    // per-beat multiples.
+    const near = makeDummy(place(s, "dire_wolf", "enemy", 240, 388));
+    // Well outside the aura (dist 180) — the control, must stay untouched.
+    const far = makeDummy(place(s, "skeleton", "enemy", 240, 480));
+
+    for (let i = 0; i < 45; i++) stepSimulation(s); // ≥ 2 one-second beats
+
+    const perBeat = Math.max(1, Math.round(knight.damage * 0.3));
+    const lost = near.maxHp - near.hp;
+    expect(lost).toBeGreaterThanOrEqual(perBeat * 2);
+    expect(lost % perBeat).toBe(0);
+    expect(far.hp).toBe(far.maxHp);
+  });
+
+  it("melts a skeleton for 90% of its REMAINING hp per beat", () => {
+    const s = battleState(16);
+    const knight = place(s, "slime_knight", "player", 240, 300);
+    knight.moveSpeed = 0;
+    const bones = place(s, "skeleton", "enemy", 240, 388); // in aura, out of reach
+    bones.moveSpeed = 0;
+    bones.hp = bones.maxHp = 1000; // tanky, so exactly one beat is measurable
+
+    let guard = 0;
+    while (bones.hp === 1000 && guard < 45) {
+      stepSimulation(s);
+      guard++;
+    }
+
+    // One beat = round(1000 × 0.9) = 900 gone, 100 left.
+    expect(bones.hp).toBe(100);
+    expect(bones.state).not.toBe("dead");
+  });
+
+  it("goes silent while the knight is stunned", () => {
+    const s = battleState(12);
+    const knight = place(s, "slime_knight", "player", 240, 300);
+    knight.moveSpeed = 0;
+    applyEffect(knight, makeEffect("stun", { durationSec: 5, source: knight.uid }));
+    const near = makeDummy(place(s, "skeleton", "enemy", 240, 388));
+
+    for (let i = 0; i < 45; i++) stepSimulation(s);
+
+    expect(near.hp).toBe(near.maxHp);
+  });
+});
+
+describe("Slime Knight — Absorb Bones (slurps enemy skeletons dying in the aura)", () => {
+  it("heals 20 when its own acid melts a skeleton", () => {
+    const s = battleState(13);
+    const knight = place(s, "slime_knight", "player", 240, 300);
+    knight.moveSpeed = 0;
+    knight.hp = knight.maxHp - 50;
+    const skel = place(s, "skeleton", "enemy", 240, 360); // inside the aura
+    skel.moveSpeed = 0;
+    skel.hp = 1; // the first acid beat kills it
+
+    let guard = 0;
+    while (skel.state !== "dead" && guard < 60) {
+      stepSimulation(s);
+      guard++;
+    }
+
+    expect(skel.state).toBe("dead");
+    expect(knight.hp).toBe(knight.maxHp - 50 + 20);
+  });
+
+  it("absorbs a skeleton an ALLY killed inside the aura (any killer counts)", () => {
+    const s = battleState(14);
+    const knight = place(s, "slime_knight", "player", 240, 300);
+    knight.moveSpeed = 0;
+    knight.hp = knight.maxHp - 50;
+    // Tanky enough that the aura can't kill it before the archer's shot lands.
+    const skel = place(s, "skeleton", "enemy", 240, 360);
+    skel.moveSpeed = 0;
+    skel.hp = skel.maxHp = 1000;
+    const archer = place(s, "archer", "player", 240, 470); // in bow range of skel
+    archer.moveSpeed = 0;
+    archer.damage = 999; // one-shot
+
+    let guard = 0;
+    while (skel.state !== "dead" && guard < 120) {
+      stepSimulation(s);
+      guard++;
+    }
+
+    expect(skel.state).toBe("dead");
+    expect(knight.hp).toBe(knight.maxHp - 50 + 20);
+  });
+
+  it("does NOT absorb non-skeleton undead (a ghoul melts unslurped)", () => {
+    const s = battleState(15);
+    const knight = place(s, "slime_knight", "player", 240, 300);
+    knight.moveSpeed = 0;
+    knight.hp = knight.maxHp - 50;
+    const ghoul = place(s, "ghoul", "enemy", 240, 360);
+    ghoul.moveSpeed = 0;
+    ghoul.hp = 1;
+
+    let guard = 0;
+    while (ghoul.state !== "dead" && guard < 60) {
+      stepSimulation(s);
+      guard++;
+    }
+
+    expect(ghoul.state).toBe("dead");
+    expect(knight.hp).toBe(knight.maxHp - 50); // no heal
+  });
+});
+
+describe("creature tags (UnitDef.tags) — the undead roster", () => {
+  it("skeletons carry both tags; the rest of the roster is undead only", () => {
+    expect(getUnitDef("skeleton").tags).toEqual(["undead", "skeleton"]);
+    expect(getUnitDef("skeleton_archer").tags).toEqual(["undead", "skeleton"]);
+    for (const id of ["zombie_shambler", "ghoul", "bonecaller", "abomination", "lich"]) {
+      expect(getUnitDef(id).tags).toContain("undead");
+      expect(getUnitDef(id).tags).not.toContain("skeleton");
+    }
   });
 });
 

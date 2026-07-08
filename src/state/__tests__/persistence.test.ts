@@ -13,6 +13,7 @@ import { DECKABLE_UNIT_IDS } from "@/data/units";
 import { QUEST_LOCKED_UNITS } from "@/data/dungeons";
 import { DEFAULT_AVATAR_ID } from "@/meta/avatars";
 import { STARTER_UNIT_IDS } from "@/meta/economy";
+import { TOTAL_XP_CAP } from "@/meta/leveling";
 
 /** Legacy (pre-v6) shape: carried a single `depths` high-water mark before the
  *  per-dungeon `dungeons` map replaced it. */
@@ -40,7 +41,7 @@ function v2Save(): Partial<PlayerSave> {
 describe("migrateSave", () => {
   it("null (new player) → defaults: starter units, 0 gold, floor 0", () => {
     const save = migrateSave(null);
-    expect(save.version).toBe(7);
+    expect(save.version).toBe(8);
     expect(save.username).toBe("Champion");
     expect(save.avatarId).toBe(DEFAULT_AVATAR_ID);
     expect(save.gold).toBe(0);
@@ -48,6 +49,7 @@ describe("migrateSave", () => {
     expect(save.dungeons.bonefields.highestClearedFloor).toBe(0);
     expect(save.questUnlocks).toEqual([]);
     expect(save.endless.bestWave).toBe(0);
+    expect(save.unitXp).toEqual({});
     expect([...save.unlockedUnits].sort()).toEqual(
       [...STARTER_UNIT_IDS].sort()
     );
@@ -109,6 +111,31 @@ describe("migrateSave", () => {
     expect(
       migrateSave({ version: 7, endless: { bestWave: -4 } }).endless.bestWave
     ).toBe(0);
+  });
+
+  it("defaults unitXp to {} for a pre-v8 save", () => {
+    expect(migrateSave({ version: 7, gold: 100 }).unitXp).toEqual({});
+  });
+
+  it("keeps valid unitXp and drops/clamps junk (v8)", () => {
+    const save = migrateSave({
+      version: 8,
+      unitXp: {
+        ogre: 137,
+        archer: 812.9, // floats floor
+        knight: TOTAL_XP_CAP + 999, // over-cap clamps
+        warrior: -50, // negatives clamp to 0
+        bloater: 100, // non-deckable → dropped
+        not_a_unit: 100, // unknown → dropped
+        fire_mage: Number.NaN, // non-finite → dropped
+      },
+    });
+    expect(save.unitXp).toEqual({
+      ogre: 137,
+      archer: 812,
+      knight: TOTAL_XP_CAP,
+      warrior: 0,
+    });
   });
 
   it("strips locked units from a v3 deck and always owns the starters", () => {
@@ -180,9 +207,12 @@ describe("migrateSave", () => {
     const a = migrateSave(null);
     a.unlockedUnits.push("summoner");
     a.deck.push("summoner");
+    a.unitXp.ogre = 9999;
     const b = migrateSave(null);
     expect(b.unlockedUnits).not.toContain("summoner");
     expect(DEFAULT_SAVE.unlockedUnits).not.toContain("summoner");
+    expect(b.unitXp).toEqual({});
+    expect(DEFAULT_SAVE.unitXp).toEqual({});
   });
 });
 

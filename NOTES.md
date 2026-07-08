@@ -15,8 +15,11 @@ Two parts: **data** (stats + what the hub detail panel shows) and **behavior** (
 1. **Stats** — define it in `data/units.ts` with full stats (hp, damage,
    attackSpeed, moveSpeed, range, role, color, accent). These render in the panel
    automatically. *Optional data-driven behavior* (no code): `basicShotRider` (an
-   every-Nth-attack on-hit rider, like the Fire/Ice mages) and `wardedAgainst`
-   (status immunities, like the Aegis Knight).
+   every-Nth-attack on-hit rider, like the Fire/Ice mages), `wardedAgainst`
+   (status immunities, like the Aegis Knight), and `tags` (creature types —
+   `"undead"`/`"skeleton"`; a skeleton carries BOTH. Tribal mechanics key on
+   these — the Slime Knight's Absorb Bones eats `"skeleton"`-tagged enemies —
+   so tag any new undead/skeletal monster or summon accordingly).
 2. **Ability** — its `ability` MUST have a matching entry in `data/abilities.ts`
    (name / description / cooldown / `castTimeSec`). The panel reads
    `ABILITIES[def.ability]` (a missing entry crashes it), and the engine reads the
@@ -27,7 +30,9 @@ Two parts: **data** (stats + what the hub detail panel shows) and **behavior** (
    hooks: `onTick` / `onActTick` / `onReactTick`, `fireAbility` / `wantsToCast`, the
    HP-funnel hooks (`onDamaged` / `onWouldDie` / `onKill` / `modifyIncoming*`), the
    attack split (`onBeforeAttack` / `onBasicAttack` / `onAfterAttack`),
-   `onProjectileHit`, `onChargeContact`, `onSpawn` / `onDeath`. **Never edit
+   `onProjectileHit`, `onChargeContact`, `onSpawn` / `onDeath`, and the death
+   OBSERVER `onUnitDeath` (fired on every other living unit when anyone dies —
+   the Slime Knight's Absorb Bones; the observer filters team/tags/radius itself). **Never edit
    `CombatSystem`/`AbilitySystem` per-unit** — they have no `defId` branches, and
    there is **no** `PASSIVE_ABILITIES` list: "passive" just means the kit defines no
    `fireAbility`. A pure-stat unit needs no kit at all. Copy an existing kit as a
@@ -324,11 +329,60 @@ sound:
   `DungeonMapSheet` are all dungeon-driven; the depths branch reads `dungeon.theme`.
   **Save v6**: `save.dungeons` (per-dungeon `{highestClearedFloor}` map, via
   `highestClearedFloorOf`) replaced the single `save.depths`; `migrateSave` copies the
-  legacy field into `dungeons.depths`. Adding a themed dungeon = a `DUNGEONS` row + its
+  legacy field into `dungeons.depths`. Adding a themed dungeon = a `DUNGEONS` row
+  (incl. its `monsterLevel` + `gate` link into the chain — see §8) + its
   monsters (kits/sprites reuse existing draws) + a `quest` row (auto-joins
   `QUEST_LOCKED_UNITS`, so the reward legendary becomes quest-exclusive for free).
-  Themed legendary dungeons are a phased roadmap (Bonefields→Necromancer built; see
-  the plan file / the `themed-legendary-dungeons` memory).
+  All six themed dungeons are built (PR #50). **The dungeons form a gated chain**
+  (registry order = chain order: Depths → Bonefields → Wilds → Overgrowth →
+  Sealed Vault → Deep Forge → Eclipse Spire), each `gate: {dungeonId, floor}`
+  requiring the previous dungeon's floor 5. `isDungeonUnlocked` NEVER re-locks a
+  dungeon that has its own cleared progress (pre-chain saves may hold
+  out-of-order clears). Boss-floor first-clear chests grade up the chain via
+  `bossChestTierFor` (rewards.ts): Depths silver → themed gold → Deep Forge
+  arcane → Eclipse Spire dragon (the only arcane/dragon drops besides deep
+  endless milestones).
+
+### 8. Unit levels are a match INPUT; summons inherit via the spawn queue
+
+Unit XP/levels (save v8, `save.unitXp` — TOTAL XP per defId; the level is ALWAYS
+derived via `meta/leveling.levelFromXp`, never stored) scale hp/damage only.
+Rules that keep the system sound:
+
+- **Every number lives in `src/meta/leveling.ts`** (cap, +5%HP/+3%DMG per level,
+  XP rewards, the 25·(L−1)·L cost curve). The pacing targets are an executable
+  spec in `meta/__tests__/leveling.test.ts` — a retune must keep them true (or
+  consciously change them).
+- **The bake happens in ONE place**: `createUnit(defId, team, pos, level)`.
+  Level 1 is the exact identity, so unleveled sims are byte-identical to
+  pre-leveling builds. Levels are a deterministic match input (like the seed):
+  `MatchOptions.unitLevels`, frozen by BattleScreen at mount (useState
+  initializer — re-deriving from live save after the grant would re-create the
+  match under the results screen) and recorded in `ReplayData.unitLevels`.
+- **Summons inherit their creator's level via the spawn-queue `level` stamp**
+  (both `pendingSpawns` and `state.damageSpawns` in CombatSystem carry it;
+  `flushSpawns` bakes it before `init` runs, so inits that derive from maxHp —
+  Slime Knight rebirth — scale correctly). This is FREE for any kit using
+  `ctx.spawnUnit`. A NEW spawn path that calls `createUnit` directly must
+  choose a level explicitly (endless boon pets deliberately stay level 1 —
+  they scale by the wave curve instead).
+- **Dungeon monsters have REAL levels too** (the counter-curve made visible):
+  WaveController spawns everything at `Dungeon.monsterLevel` — bosses and rare
+  quest catalysts at +1 via `monsterLevelFor(dungeon, kind)` — through the same
+  `createUnit` bake, so badges/tooltips render and their summons inherit for
+  free. The ladder (1/3/5/6/7/8/9 along the gate chain, Eclipse Warden Lv 10)
+  tracks the player's expected arrival level; both sides ride the same
+  +5%/+3% curve, so "monster Lv = your Lv" reproduces the pre-leveling tuned
+  difficulty. The per-floor multiplier stays a SEPARATE post-bake layered on
+  top (nested rounding: `round(round(def × lvlMult) × floorMult)` — tests
+  asserting exact stats must nest, not flatten). The two mechanisms compose
+  but never merge. **Endless monsters stay level 1 on purpose** (its own
+  compounding wave curve is the difficulty; a leak would double-dip), and the
+  **arena mirror** is unchanged: arena AI spawns at the player's average deck
+  level (`MatchController.enemyLevel`) so the fair-fight mode stays fair.
+- **XP rides the reward fold**: `computeBattleRewards().xp` → whole-deck fold
+  in `grantBattleRewards` via `addXp` (the SAME clamp the RewardPanel preview
+  uses — preview must always equal the persisted value).
 
 ---
 

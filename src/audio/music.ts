@@ -942,9 +942,13 @@ export function pickDungeonTrack(dungeonId: string, floor: number): MusicTrackId
 // palette rule: drones and triangle/sine voices, no chirpy square leads.
 // ---------------------------------------------------------------------------
 
-export type StingerId = "victory" | "defeat";
+export type StingerId = "victory" | "defeat" | "levelup";
 
-const STINGER_DUR: Record<StingerId, number> = { victory: 4.5, defeat: 5.5 };
+const STINGER_DUR: Record<StingerId, number> = {
+  victory: 4.5,
+  defeat: 5.5,
+  levelup: 1.8,
+};
 
 const STINGERS: Record<StingerId, (t0: number, out: GainNode) => void> = {
   /** A-major sunrise: low drone, a rising triangle arpeggio, then the chord
@@ -972,6 +976,15 @@ const STINGERS: Record<StingerId, (t0: number, out: GainNode) => void> = {
       for (const dt of [-0.07, 0.07]) drone(t0 + 1.5, m + dt, 3.8, "triangle", 0.02, out);
     thump(t0 + 2.4, 0.06, out, 55, 26); // second, farther toll
     tone(t0 + 3.2, 69, 1.8, "sine", 0.013, out, 66); // distant falling cry
+  },
+  /** Level-up chime: a quick A-major triangle run up the octave with a sine
+   *  sparkle on top. Light and short — it rings over the results screen
+   *  (after the result stinger), so no drone floor, no toll. */
+  levelup(t0, out) {
+    const run = [[0, 69], [0.09, 73], [0.18, 76], [0.27, 81]]; // A4 C#5 E5 A5
+    for (const [at, m] of run) tone(t0 + at, m, 0.4, "triangle", 0.055, out);
+    tone(t0 + 0.27, 88, 1.1, "sine", 0.02, out); // E6 sparkle
+    tone(t0 + 0.42, 93, 1.2, "sine", 0.012, out); // A6 glint
   },
 };
 

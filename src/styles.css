@@ -878,6 +878,20 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
+/* Unit level badge on the card art (hidden at level 1 / locked cards). */
+.card-level {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: #ffd75e;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(245, 179, 1, 0.45);
+  border-radius: 999px;
+  padding: 1px 7px;
+  pointer-events: none;
+}
 
 /* Quick add + info button row. */
 .card-actions {
@@ -1014,6 +1028,50 @@ body.modal-open .pager-nav {
   border: 1px solid;
   border-radius: 999px;
   padding: 1px 8px;
+}
+.detail-level {
+  font-size: 0.6rem;
+  font-weight: 800;
+  color: #dfe8ff;
+  background: rgba(90, 110, 160, 0.35);
+  border: 1px solid rgba(160, 180, 230, 0.4);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+.detail-level.max {
+  color: #1a140d;
+  background: var(--gold);
+  border-color: var(--gold);
+}
+/* XP progress under the role line. */
+.detail-xp {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: -6px 0 12px;
+}
+.detail-xp-bar {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+.detail-xp-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #4cae6e, #7dd3a0);
+}
+.detail-xp-text {
+  font-size: 0.68rem;
+  color: var(--stone);
+  white-space: nowrap;
+}
+/* Level-granted stat gain, next to the leveled Health/Damage values. */
+.stat-bonus {
+  color: #7dd3a0;
+  font-size: 0.72rem;
+  font-weight: 700;
 }
 .detail-deckcount {
   margin-left: auto;
@@ -1630,6 +1688,14 @@ body.modal-open .pager-nav {
   font-size: 0.85rem;
   font-weight: 800;
 }
+.unit-tip-level {
+  font-size: 0.55rem;
+  font-weight: 800;
+  color: #ffd75e;
+  border: 1px solid rgba(245, 179, 1, 0.45);
+  border-radius: 4px;
+  padding: 1px 4px;
+}
 .unit-tip-team {
   font-size: 0.55rem;
   font-weight: 700;
@@ -1815,6 +1881,123 @@ body.modal-open .pager-nav {
 }
 .reward-unlock {
   font-weight: 700;
+}
+
+/* ---- XP ceremony (per-unit bars on the results screen) ------------------- */
+.reward-xp {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(125, 211, 160, 0.25);
+  border-radius: 12px;
+}
+.reward-xp-head {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #7dd3a0;
+  letter-spacing: 0.04em;
+}
+.xp-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.xp-row.leveled {
+  animation: xp-pop 0.45s ease;
+}
+@keyframes xp-pop {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.xp-portrait {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.35);
+  flex: none;
+}
+.xp-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.xp-name-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: #f3e3c2;
+}
+.xp-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.xp-levelup-tag {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #ffd75e;
+  text-shadow: 0 0 8px rgba(245, 179, 1, 0.8);
+  animation: xp-flash 0.9s ease infinite alternate;
+}
+@keyframes xp-flash {
+  from {
+    opacity: 0.75;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.xp-max-tag {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--gold);
+  letter-spacing: 0.08em;
+}
+.xp-bar {
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+.xp-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #4cae6e, #7dd3a0);
+  transition: width 90ms linear;
+}
+.xp-delta {
+  font-size: 0.7rem;
+  color: #7dd3a0;
+  animation: fade 0.4s ease;
+}
+.xp-level-chip {
+  flex: none;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #dfe8ff;
+  background: rgba(90, 110, 160, 0.35);
+  border: 1px solid rgba(160, 180, 230, 0.4);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+.xp-level-chip.max {
+  color: #1a140d;
+  background: var(--gold);
+  border-color: var(--gold);
 }
 
 /* ---- Depths floor picker ------------------------------------------------- */

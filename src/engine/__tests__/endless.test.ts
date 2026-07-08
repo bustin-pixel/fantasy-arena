@@ -188,6 +188,35 @@ describe("endless — cadence + win-condition safety", () => {
     expect(run.wave).toBeGreaterThanOrEqual(2);
   });
 
+  it("endless monsters stay level 1 (dungeon monster levels never apply here)", () => {
+    // Endless borrows dungeon pools per cycle but its own wave curve is the sole
+    // difficulty driver — Dungeon.monsterLevel must not leak into its spawns.
+    const mc = new MatchController(4242, DECK, [], { mode: "endless" });
+    let sawEnemy = false;
+    let leveledEnemy: string | null = null;
+    let guard = 0;
+    while (
+      mc.phase !== "defeat" &&
+      mc.phase !== "victory" &&
+      mc.phase !== "draw" &&
+      guard < 8000
+    ) {
+      mc.tick();
+      guard++;
+      const st = mc.endlessStatus();
+      if (st?.intermission) mc.pickBoon(0);
+      for (const u of mc.state.units) {
+        if (u.team !== "enemy") continue;
+        sawEnemy = true;
+        if (u.level !== 1 && leveledEnemy === null) {
+          leveledEnemy = `${u.defId} Lv ${u.level}`;
+        }
+      }
+    }
+    expect(sawEnemy).toBe(true);
+    expect(leveledEnemy).toBeNull();
+  });
+
   it("every dungeon boss and every rare resolve to a real unit def", () => {
     for (const id of DUNGEON_IDS) {
       const boss = getDungeon(id).tiers[0].boss;

@@ -7,8 +7,9 @@
 // ============================================================================
 
 import { useEffect, useState } from "react";
-import { isBossFloorIn, type Dungeon } from "@/data/dungeons";
+import { isBossFloorIn, monsterLevelFor, type Dungeon } from "@/data/dungeons";
 import { GOLD_REWARDS } from "@/meta/economy";
+import { bossChestTierFor } from "@/meta/rewards";
 
 interface Props {
   dungeon: Dungeon;
@@ -42,9 +43,8 @@ export function FloorPickerSheet({
 
   const floors = [];
   for (let f = 1; f <= maxSelectable; f++) floors.push(f);
-  // Boss chest tier label: The Depths' bosses give silver; the themed dungeons'
-  // deep bosses give gold (mirrors the reward fold in meta/rewards.ts).
-  const bossChest = dungeon.id === "depths" ? "silver" : "gold";
+  // Boss chest tier label — same source of truth as the reward fold.
+  const bossChest = bossChestTierFor(dungeon.id);
 
   return (
     <div className="detail-overlay" onClick={onClose}>
@@ -77,6 +77,9 @@ export function FloorPickerSheet({
                 >
                   <span className="floor-num">
                     {boss ? "☠ " : ""}Floor {floor}
+                    {boss
+                      ? ` · Lv ${monsterLevelFor(dungeon, "boss")} boss`
+                      : ""}
                   </span>
                   <span className="floor-reward">
                     {cleared

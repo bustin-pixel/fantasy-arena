@@ -447,6 +447,7 @@ export const UNITS: Record<string, UnitDef> = {
     moveSpeed: 72,
     range: MELEE,
     ability: "lifesteal", // passive filler
+    tags: ["undead", "skeleton"],
     color: "#d6d3d1",
     accent: "#a78bfa",
   },
@@ -478,6 +479,13 @@ export const UNITS: Record<string, UnitDef> = {
     abilities: ["divide_reconvene"],
     color: "#2b9d54",
     accent: "#a7f3c0",
+    traits: [
+      {
+        name: "Caustic Aura",
+        description:
+          "Its acid body constantly dissolves every enemy nearby — 30% of its damage per second. Skeletons fare far worse: each pulse melts 90% of their remaining bones, and any enemy skeleton that falls inside the aura is slurped into its body, restoring 20 health.",
+      },
+    ],
   },
   mystic_archer: {
     id: "mystic_archer",
@@ -625,6 +633,7 @@ export const UNITS: Record<string, UnitDef> = {
     moveSpeed: 32, // shambles
     range: MELEE,
     ability: "lifesteal", // passive filler — never casts
+    tags: ["undead"],
     color: "#7a8f6a", // rot green
     accent: "#c9d1c0", // pallid flesh
     traits: [
@@ -700,6 +709,7 @@ export const UNITS: Record<string, UnitDef> = {
     moveSpeed: 70,
     range: FIELD_WIDTH * 0.32, // plain arrows, no rider
     ability: "lifesteal", // passive filler — never casts
+    tags: ["undead", "skeleton"],
     color: "#d8d2c2", // bleached bone
     accent: "#9bd0ff", // cold blue fletching
   },
@@ -714,6 +724,7 @@ export const UNITS: Record<string, UnitDef> = {
     moveSpeed: 95, // lunges — far faster than a shambler
     range: MELEE,
     ability: "lifesteal", // passive filler — never casts
+    tags: ["undead"],
     color: "#8a9b7a", // grave-rot grey-green
     accent: "#e0c48a", // jaundiced claws
   },
@@ -729,6 +740,7 @@ export const UNITS: Record<string, UnitDef> = {
     range: FIELD_WIDTH * 0.28,
     ability: "lifesteal", // Raise Dead is a passive (kit onTick), not a cast
     school: "magic",
+    tags: ["undead"],
     color: "#4b3f6b", // violet grave-robes
     accent: "#c4b5fd",
     traits: [
@@ -753,6 +765,7 @@ export const UNITS: Record<string, UnitDef> = {
     range: MELEE,
     ability: "crushing_slam",
     wardedAgainst: ["polymorph"], // bosses don't fit in a sheep
+    tags: ["undead"],
     color: "#6f7a58", // grey-green stitched flesh
     accent: "#b7c48a",
     traits: [
@@ -789,6 +802,7 @@ export const UNITS: Record<string, UnitDef> = {
     abilities: ["fear_aura"], // Terrify — its AoE second cast
     school: "magic",
     wardedAgainst: ["polymorph"],
+    tags: ["undead"],
     color: "#2a2140", // black-violet bone
     accent: "#a78bfa",
     traits: [

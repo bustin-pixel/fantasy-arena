@@ -91,6 +91,23 @@ function drawHealthBar(ctx: Ctx, u: Unit): void {
   ctx.lineWidth = 0.5;
   ctx.strokeRect(x, y, w, h);
 
+  // Level badge: a tiny gold number left of the bar for any unit above level 1
+  // (player deck levels, arena AI mirror, inherited summons). Reads only the
+  // snapshot's Unit.level — level-1 fields render exactly as before.
+  if (u.level > 1) {
+    const bx = x - 12;
+    const by = y - 3;
+    ctx.fillStyle = "rgba(0,0,0,0.65)";
+    ctx.fillRect(bx, by, 10, 9.5);
+    ctx.fillStyle = "#ffd75e";
+    ctx.font = "bold 7px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(String(u.level), bx + 5, by + 5.2);
+    ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
+  }
+
   // Cast bar (Electric Mage's Chain Lightning wind-up): a thin yellow bar just
   // below the HP bar that fills as the cast completes.
   if (u.castTicks > 0 && u.castTicksMax > 0) {

@@ -52,6 +52,7 @@ export function BattleUnitTip({
         <span className="unit-tip-name" style={{ color: rarity.color }}>
           {unit.name}
         </span>
+        {unit.level > 1 && <span className="unit-tip-level">Lv {unit.level}</span>}
         <span className={`unit-tip-team ${unit.team}`}>
           {unit.team === "player" ? "You" : "Enemy"}
         </span>

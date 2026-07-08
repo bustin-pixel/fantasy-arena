@@ -32,10 +32,12 @@ import {
 import {
   floorStatMultipliersIn,
   isBossFloorIn,
+  monsterLevelFor,
   questForFloorIn,
   tierForFloorIn,
   waveBudgetIn,
   type Dungeon,
+  type MonsterSpawnKind,
 } from "@/data/dungeons";
 
 /** Spawn y — nudged to the top edge so monsters visibly creep in from
@@ -162,7 +164,7 @@ export class WaveController {
       return;
     }
     if (this.enemiesAlive(state) >= state.activeCaps.enemy) return;
-    this.spawnMonster(state, this.queue.shift()!);
+    this.spawnMonster(state, this.queue.shift()!, "fodder");
   }
 
   // -- Boss floor: fodder pool → rare → boss, gated on clearing each batch. ----
@@ -202,7 +204,9 @@ export class WaveController {
         return;
       }
       if (this.enemiesAlive(state) >= state.activeCaps.enemy) return;
-      this.spawnMonster(state, this.pending.shift()!);
+      const kind: MonsterSpawnKind =
+        this.phase === "rare" ? "rare" : this.phase === "boss" ? "boss" : "fodder";
+      this.spawnMonster(state, this.pending.shift()!, kind);
       return;
     }
 
@@ -252,10 +256,19 @@ export class WaveController {
       .length;
   }
 
-  private spawnMonster(state: SimState, defId: string): void {
+  private spawnMonster(
+    state: SimState,
+    defId: string,
+    kind: MonsterSpawnKind
+  ): void {
     const x = this.rng.float(60, FIELD_WIDTH - 60);
-    const unit = createUnit(defId, "enemy", { x, y: SPAWN_Y });
-    // Depth pressure: monsters (bosses included) spawn pre-scaled by floor.
+    // Monsters carry the dungeon's unit level (elites +1) through the same
+    // createUnit bake as player units — level consumes no RNG, so composition
+    // and positions stay byte-identical to the unleveled build.
+    const level = monsterLevelFor(this.dungeon, kind);
+    const unit = createUnit(defId, "enemy", { x, y: SPAWN_Y }, level);
+    // Depth pressure: monsters (bosses included) spawn pre-scaled by floor,
+    // layered ON TOP of the level bake (nested rounding — see NOTES §8).
     const mult = floorStatMultipliersIn(this.dungeon, this.floor);
     unit.maxHp = Math.round(unit.maxHp * mult.hp);
     unit.hp = unit.maxHp;

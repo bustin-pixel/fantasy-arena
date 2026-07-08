@@ -25,6 +25,7 @@ import {
   GOLD_REWARDS,
   type ChestTier,
 } from "./economy";
+import { XP_REWARDS } from "./leveling";
 
 /** One thing inside a chest. A discriminated union so later slices can add
  *  entries (e.g. { kind: "item" }) without touching existing code — contents
@@ -44,6 +45,11 @@ export interface ChestResult {
 export interface BattleRewards {
   /** Flat battle gold (chest gold lives inside the chest contents). */
   gold: number;
+  /** Battle XP, granted in full to EVERY unit in the fielded deck (the grant
+   *  fold in GameStateContext caps each unit at TOTAL_XP_CAP). Dungeon wins
+   *  scale by floor; losses pay a fraction; replays pay full — XP is the
+   *  grind currency, unlike first-clear gold. */
+  xp: number;
   chest: ChestResult | null;
   /** Depths only: this victory beat the player's high-water floor. Drives
    *  the progress bump and the milestone unlock. */
@@ -97,6 +103,19 @@ function pickWeightedUnit(rng: RNG): string {
   return CHEST_POOL[CHEST_POOL.length - 1];
 }
 
+/** Boss-floor first-clear chest tier per dungeon. Unlisted themed dungeons are
+ *  "gold" deep bosses; the chain's two capstones pay the top tiers (the only
+ *  place arcane/dragon chests drop). FloorPickerSheet previews from this too. */
+const BOSS_CHEST_TIERS: Record<string, ChestTier> = {
+  depths: "silver",
+  deep_forge: "arcane",
+  eclipse_spire: "dragon",
+};
+
+export function bossChestTierFor(dungeonId: string): ChestTier {
+  return BOSS_CHEST_TIERS[dungeonId] ?? "gold";
+}
+
 /** The full post-battle reward matrix. Callers pass chestSeed from
  *  generateSeed() at drop time so this stays pure. */
 export function computeBattleRewards(input: {
@@ -133,7 +152,7 @@ export function computeBattleRewards(input: {
     wavesSurvived = 0,
     bestWave = 0,
   } = input;
-  const none: BattleRewards = { gold: 0, chest: null, firstClear: false };
+  const none: BattleRewards = { gold: 0, xp: 0, chest: null, firstClear: false };
 
   // PvP is scaffolding only; server-authoritative rewards replace this later.
   if (mode === "pvp") return none;
@@ -145,6 +164,7 @@ export function computeBattleRewards(input: {
     const tier = endlessMilestoneChestTier(bestWave, wavesSurvived);
     return {
       gold: ENDLESS_GOLD.base + ENDLESS_GOLD.perWave * wavesSurvived,
+      xp: XP_REWARDS.endlessBase + XP_REWARDS.endlessPerWave * wavesSurvived,
       chest: tier
         ? { tier, seed: chestSeed, contents: rollChest(chestSeed, tier, unlockedUnits) }
         : null,
@@ -167,24 +187,32 @@ export function computeBattleRewards(input: {
         ? quest.unlocks
         : undefined;
 
+    // XP scales with the floor fought, win or lose — replays pay full (unlike
+    // gold) so fighting at your edge is always the best XP.
+    const winXp =
+      XP_REWARDS.dungeonWinBase + XP_REWARDS.dungeonWinPerFloor * floor;
     if (outcome !== "victory") {
-      return { ...none, gold: GOLD_REWARDS.depthsLoss, questUnlock };
+      return {
+        ...none,
+        gold: GOLD_REWARDS.depthsLoss,
+        xp: Math.round(XP_REWARDS.lossFrac * winXp),
+        questUnlock,
+      };
     }
     const firstClear = floor > highestClearedFloor;
     if (!firstClear) {
-      return { ...none, gold: GOLD_REWARDS.depthsReplay, questUnlock };
+      return { ...none, gold: GOLD_REWARDS.depthsReplay, xp: winXp, questUnlock };
     }
-    // Boss floors drop a chest: The Depths' bosses give silver; the themed
-    // legendary dungeons are "deep bosses" and give gold (progress.md slice 2).
+    // Boss floors drop a chest, graded by the dungeon's place in the chain
+    // (Depths silver → themed gold → Forge arcane → Spire dragon).
     const tier: ChestTier = isBossFloorIn(dungeon, floor)
-      ? dungeonId === "depths"
-        ? "silver"
-        : "gold"
+      ? bossChestTierFor(dungeonId)
       : "wooden";
     return {
       gold:
         GOLD_REWARDS.depthsFirstClearBase +
         GOLD_REWARDS.depthsFirstClearPerFloor * floor,
+      xp: winXp,
       chest: { tier, seed: chestSeed, contents: rollChest(chestSeed, tier, unlockedUnits) },
       firstClear: true,
       questUnlock,
@@ -193,10 +221,11 @@ export function computeBattleRewards(input: {
 
   // Arena ("solo").
   if (outcome !== "victory") {
-    return { ...none, gold: GOLD_REWARDS.arenaLoss };
+    return { ...none, gold: GOLD_REWARDS.arenaLoss, xp: XP_REWARDS.arenaLoss };
   }
   return {
     gold: GOLD_REWARDS.arenaWin,
+    xp: XP_REWARDS.arenaWin,
     chest: {
       tier: "wooden",
       seed: chestSeed,
