@@ -165,6 +165,8 @@ export interface SimState {
     defId: string;
     team: Team;
     pos: Vec2;
+    /** Creator's level — summons inherit it (stats bake before `init` runs). */
+    level?: number;
     init?: (u: Unit) => void;
   }[];
   /** Boss-floor telegraph banner (rare catalyst / boss incoming), or null. Set
@@ -573,7 +575,13 @@ function stepArcaneBarrage(
 function flushSpawns(
   state: SimState,
   byUid: Map<string, Unit>,
-  spawns: { defId: string; team: Team; pos: Vec2; init?: (u: Unit) => void }[]
+  spawns: {
+    defId: string;
+    team: Team;
+    pos: Vec2;
+    level?: number;
+    init?: (u: Unit) => void;
+  }[]
 ): void {
   for (const spawn of spawns) {
     const isClone =
@@ -585,7 +593,11 @@ function flushSpawns(
       (u) => u.team === spawn.team && u.state !== "dead"
     ).length;
     if (teamCount >= cap) continue;
-    const summoned = createUnit(spawn.defId, spawn.team, spawn.pos);
+    // Summons inherit their creator's level (spawn.level) — a leveled
+    // summoner's skeletons/turrets/blobs must not under-scale the rest of
+    // the warband. Level bakes into hp/maxHp BEFORE init runs, so inits that
+    // derive from maxHp (Slime Knight rebirth) scale correctly.
+    const summoned = createUnit(spawn.defId, spawn.team, spawn.pos, spawn.level ?? 1);
     spawn.init?.(summoned); // stamp deterministic starting state (blob anchor / rebirth HP)
     state.units.push(summoned);
     byUid.set(summoned.uid, summoned);
@@ -612,6 +624,7 @@ export function stepSimulation(state: SimState): void {
     defId: string;
     team: Unit["team"];
     pos: { x: number; y: number };
+    level?: number;
     init?: (u: Unit) => void;
   }[] = [];
 
@@ -645,6 +658,7 @@ export function stepSimulation(state: SimState): void {
           defId,
           team,
           pos,
+          level: subject.level, // summons inherit their creator's level
           init,
         }),
       spawnTrap: (t) => state.traps.push(t),
@@ -828,7 +842,13 @@ export function stepSimulation(state: SimState): void {
       spawnProjectile: (p) => spawnProjectile(state, p),
       spawnVfx: (v) => spawnVfx(state, v),
       spawnUnit: (defId, team, pos, init) =>
-        pendingSpawns.push({ defId, team, pos, init }),
+        pendingSpawns.push({
+          defId,
+          team,
+          pos,
+          level: unit.level, // summons inherit their creator's level
+          init,
+        }),
       spawnTrap: (t) => state.traps.push(t),
       spawnFloatingText: (u, v, k) => spawnFloatingText(state, u, v, k),
     };

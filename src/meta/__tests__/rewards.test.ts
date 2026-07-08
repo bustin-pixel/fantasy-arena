@@ -19,6 +19,7 @@ import {
   UNLOCK_PRICES,
   type ChestTier,
 } from "@/meta/economy";
+import { XP_REWARDS } from "@/meta/leveling";
 import { DECKABLE_UNIT_IDS, getUnitDef } from "@/data/units";
 import { RARITY_ORDER } from "@/data/rarities";
 import { DEPTHS_TIERS, rareSpawnQuestForFloor } from "@/data/depths";
@@ -241,23 +242,30 @@ describe("computeBattleRewards — the reward matrix", () => {
     expect(r.chest?.tier).toBe("silver");
   });
 
-  it("depths replay: trickle gold, no chest, not a first clear", () => {
+  it("depths replay: trickle gold but FULL floor XP, no chest, not a first clear", () => {
     const r = computeBattleRewards({
       ...base, mode: "depths", floor: 2, outcome: "victory",
       highestClearedFloor: 4,
     });
     expect(r).toEqual({
-      gold: GOLD_REWARDS.depthsReplay, chest: null, firstClear: false,
+      gold: GOLD_REWARDS.depthsReplay,
+      xp: XP_REWARDS.dungeonWinBase + XP_REWARDS.dungeonWinPerFloor * 2,
+      chest: null,
+      firstClear: false,
     });
   });
 
-  it("depths defeat and draw both pay the consolation, no chest", () => {
+  it("depths defeat and draw both pay the consolation + fractional XP, no chest", () => {
+    const winXp = XP_REWARDS.dungeonWinBase + XP_REWARDS.dungeonWinPerFloor * 3;
     for (const outcome of ["defeat", "draw"] as const) {
       const r = computeBattleRewards({
         ...base, mode: "depths", floor: 3, outcome,
       });
       expect(r).toEqual({
-        gold: GOLD_REWARDS.depthsLoss, chest: null, firstClear: false,
+        gold: GOLD_REWARDS.depthsLoss,
+        xp: Math.round(XP_REWARDS.lossFrac * winXp),
+        chest: null,
+        firstClear: false,
       });
     }
   });
@@ -286,8 +294,26 @@ describe("computeBattleRewards — the reward matrix", () => {
     for (const outcome of ["victory", "defeat", "draw"] as const) {
       expect(
         computeBattleRewards({ ...base, mode: "pvp", floor: 1, outcome })
-      ).toEqual({ gold: 0, chest: null, firstClear: false });
+      ).toEqual({ gold: 0, xp: 0, chest: null, firstClear: false });
     }
+  });
+
+  it("XP scales with the floor fought (win) and arena pays its flat rates", () => {
+    const floor5 = computeBattleRewards({
+      ...base, mode: "depths", floor: 5, outcome: "victory",
+      highestClearedFloor: 4,
+    });
+    expect(floor5.xp).toBe(
+      XP_REWARDS.dungeonWinBase + XP_REWARDS.dungeonWinPerFloor * 5
+    );
+    const win = computeBattleRewards({
+      ...base, mode: "solo", floor: 1, outcome: "victory",
+    });
+    const loss = computeBattleRewards({
+      ...base, mode: "solo", floor: 1, outcome: "defeat",
+    });
+    expect(win.xp).toBe(XP_REWARDS.arenaWin);
+    expect(loss.xp).toBe(XP_REWARDS.arenaLoss);
   });
 
   it("is deterministic end to end", () => {
@@ -368,6 +394,7 @@ describe("endless rewards", () => {
   it("pays base + perWave gold regardless of the (always) defeat outcome", () => {
     const r = computeBattleRewards({ ...base, wavesSurvived: 7, bestWave: 0 });
     expect(r.gold).toBe(ENDLESS_GOLD.base + ENDLESS_GOLD.perWave * 7);
+    expect(r.xp).toBe(XP_REWARDS.endlessBase + XP_REWARDS.endlessPerWave * 7);
   });
 
   it("flags a new best wave via firstClear", () => {

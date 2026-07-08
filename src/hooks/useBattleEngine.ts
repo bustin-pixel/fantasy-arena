@@ -79,6 +79,8 @@ export interface InspectedUnit {
   team: Team;
   hp: number;
   maxHp: number;
+  /** Unit level (stats below already include the level bake). */
+  level: number;
   damage: number;
   attackSpeed: number;
   range: number;
@@ -117,7 +119,10 @@ export function useBattleEngine(
   /** Depths floor to descend to (ignored outside "depths" mode). */
   floor: number = 1,
   /** Which dungeon to descend (ignored outside "depths" mode). */
-  dungeonId: string = "depths"
+  dungeonId: string = "depths",
+  /** Player unit levels by defId (missing = 1). Callers must pass a STABLE
+   *  object (frozen at mount) — it's a match input, like the seed. */
+  unitLevels?: Record<string, number>
 ): UseBattleEngine {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const controllerRef = useRef<MatchController | null>(null);
@@ -176,10 +181,16 @@ export function useBattleEngine(
         mode,
         floor,
         dungeonId,
+        unitLevels,
       });
     } else {
       const enemyDeck = generateEnemyDeck(seed);
-      controllerRef.current = new MatchController(seed, playerDeck.slice(0, 4), enemyDeck);
+      controllerRef.current = new MatchController(
+        seed,
+        playerDeck.slice(0, 4),
+        enemyDeck,
+        { unitLevels }
+      );
     }
     themeRef.current =
       mode === "solo" ? pickArenaTheme(seed)
@@ -308,6 +319,7 @@ export function useBattleEngine(
       team: u.team,
       hp: Math.ceil(u.hp),
       maxHp: u.maxHp,
+      level: u.level,
       damage: u.damage,
       attackSpeed: u.attackSpeed,
       range: u.range,

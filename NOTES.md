@@ -330,6 +330,39 @@ sound:
   Themed legendary dungeons are a phased roadmap (Bonefields→Necromancer built; see
   the plan file / the `themed-legendary-dungeons` memory).
 
+### 8. Unit levels are a match INPUT; summons inherit via the spawn queue
+
+Unit XP/levels (save v8, `save.unitXp` — TOTAL XP per defId; the level is ALWAYS
+derived via `meta/leveling.levelFromXp`, never stored) scale hp/damage only.
+Rules that keep the system sound:
+
+- **Every number lives in `src/meta/leveling.ts`** (cap, +5%HP/+3%DMG per level,
+  XP rewards, the 25·(L−1)·L cost curve). The pacing targets are an executable
+  spec in `meta/__tests__/leveling.test.ts` — a retune must keep them true (or
+  consciously change them).
+- **The bake happens in ONE place**: `createUnit(defId, team, pos, level)`.
+  Level 1 is the exact identity, so unleveled sims are byte-identical to
+  pre-leveling builds. Levels are a deterministic match input (like the seed):
+  `MatchOptions.unitLevels`, frozen by BattleScreen at mount (useState
+  initializer — re-deriving from live save after the grant would re-create the
+  match under the results screen) and recorded in `ReplayData.unitLevels`.
+- **Summons inherit their creator's level via the spawn-queue `level` stamp**
+  (both `pendingSpawns` and `state.damageSpawns` in CombatSystem carry it;
+  `flushSpawns` bakes it before `init` runs, so inits that derive from maxHp —
+  Slime Knight rebirth — scale correctly). This is FREE for any kit using
+  `ctx.spawnUnit`. A NEW spawn path that calls `createUnit` directly must
+  choose a level explicitly (endless boon pets deliberately stay level 1 —
+  they scale by the wave curve instead).
+- **Enemy floor/wave scaling is a separate post-bake** (WaveController /
+  EndlessController mutate hp/damage AFTER createUnit). Never merge the two:
+  PvE enemies (and their summons) stay level 1 on purpose. The one enemy-side
+  exception is the **arena mirror**: arena AI units spawn at the player's
+  average deck level (`MatchController.enemyLevel`) so the fair-fight mode
+  stays fair.
+- **XP rides the reward fold**: `computeBattleRewards().xp` → whole-deck fold
+  in `grantBattleRewards` via `addXp` (the SAME clamp the RewardPanel preview
+  uses — preview must always equal the persisted value).
+
 ---
 
 ## Architecture reminders (the good patterns to preserve)

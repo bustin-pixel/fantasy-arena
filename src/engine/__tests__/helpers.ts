@@ -58,9 +58,10 @@ export function place(
   defId: string,
   team: Team,
   x: number,
-  y: number
+  y: number,
+  level = 1
 ): Unit {
-  const u = createUnit(defId, team, { x, y });
+  const u = createUnit(defId, team, { x, y }, level);
   s.units.push(u);
   return u;
 }

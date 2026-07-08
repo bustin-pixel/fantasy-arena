@@ -7,6 +7,7 @@ import { CardPortrait, type CardAddState } from "@/components/CardPortrait";
 import { DeckStrip } from "@/components/DeckStrip";
 import { UnitDetail } from "@/components/UnitDetail";
 import { generateRandomDeck } from "@/engine/AIDeck";
+import { levelFromXp } from "@/meta/leveling";
 import { MAX_DECK } from "@/utils/constants";
 import { generateSeed } from "@/utils/rng";
 import { useGameState } from "@/state/GameStateContext";
@@ -179,6 +180,7 @@ export function HubScreen() {
                 onToggle={() => toggle(id)}
                 onInfo={() => setDetailId(id)}
                 lockLabel={lockLabel}
+                level={levelFromXp(save.unitXp[id] ?? 0)}
               />
             );
           })}
@@ -202,6 +204,8 @@ export function HubScreen() {
           onBuy={() => purchaseUnit(detailId)}
           unlockPrice={detailQuest?.price}
           lockHint={detailLockHint}
+          // Level UI only for owned units — a locked unit has no XP story yet.
+          totalXp={isLocked(detailId) ? undefined : save.unitXp[detailId] ?? 0}
         />
       )}
     </div>

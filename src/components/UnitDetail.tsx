@@ -5,6 +5,12 @@ import { ABILITIES } from "@/data/abilities";
 import { renderPortrait } from "@/engine/Renderer";
 import { FIELD_WIDTH, MAX_DECK } from "@/utils/constants";
 import { UNLOCK_PRICES } from "@/meta/economy";
+import {
+  levelFromXp,
+  levelStatMultipliers,
+  xpForNext,
+  xpIntoLevel,
+} from "@/meta/leveling";
 import type { UnitDef } from "@/types";
 
 interface Props {
@@ -26,6 +32,10 @@ interface Props {
   /** When a locked unit isn't purchasable yet (its unlock quest isn't done),
    *  this hint replaces the Unlock button and explains how to earn it. */
   lockHint?: string;
+  /** The unit's total battle XP. Enables the level chip, the XP bar, and the
+   *  leveled Health/Damage readouts. Omit (Compendium monsters, locked units)
+   *  to hide all level UI. */
+  totalXp?: number;
 }
 
 const ART_SIZE = 120;
@@ -49,11 +59,15 @@ function StatBar({
   pct,
   value,
   fill,
+  bonus,
 }: {
   label: string;
   pct: number;
   value: string;
   fill: string;
+  /** Level-granted gain shown as a green suffix (e.g. "+32"). The bar itself
+   *  stays normalized to BASE stats so units stay comparable across levels. */
+  bonus?: string;
 }) {
   return (
     <div className="stat-row">
@@ -64,7 +78,10 @@ function StatBar({
           style={{ width: `${Math.max(0, Math.min(100, pct))}%`, background: fill }}
         />
       </div>
-      <span className="stat-value">{value}</span>
+      <span className="stat-value">
+        {value}
+        {bonus && <span className="stat-bonus"> {bonus}</span>}
+      </span>
     </div>
   );
 }
@@ -80,10 +97,17 @@ export function UnitDetail({
   onBuy,
   unlockPrice,
   lockHint,
+  totalXp,
 }: Props) {
   const def = getUnitDef(defId);
   const price = unlockPrice ?? UNLOCK_PRICES[def.rarity];
   const rarity = RARITIES[def.rarity];
+  // Level readouts (only when the caller supplies XP — hub-owned units).
+  const level = totalXp !== undefined ? levelFromXp(totalXp) : 1;
+  const mult = levelStatMultipliers(level);
+  const shownHp = Math.round(def.hp * mult.hp);
+  const shownDmg = Math.round(def.damage * mult.dmg);
+  const xpNeed = totalXp !== undefined ? xpForNext(totalXp) : null;
   // Skip the "lifesteal" filler slot (the never-casts convention for summons
   // and Depths monsters) unless the unit actually lifesteals (the Orc pairs
   // `def.lifesteal` with a real ability, so it's unaffected).
@@ -186,6 +210,11 @@ export function UnitDetail({
             >
               {rarity.label}
             </span>
+            {totalXp !== undefined && (
+              <span className={`detail-level${xpNeed === null ? " max" : ""}`}>
+                Lv {level}
+              </span>
+            )}
             {!readonly && (
               <span className="detail-deckcount">
                 {deck.length}/{MAX_DECK} in deck
@@ -194,9 +223,41 @@ export function UnitDetail({
           </div>
           <div className="detail-role">{def.role}</div>
 
+          {totalXp !== undefined && (
+            <div className="detail-xp">
+              <div className="detail-xp-bar">
+                <div
+                  className="detail-xp-fill"
+                  style={{
+                    width: `${
+                      (xpNeed === null ? 1 : xpIntoLevel(totalXp) / xpNeed) * 100
+                    }%`,
+                  }}
+                />
+              </div>
+              <span className="detail-xp-text">
+                {xpNeed === null
+                  ? "Max level"
+                  : `${xpIntoLevel(totalXp)} / ${xpNeed} XP to Lv ${level + 1}`}
+              </span>
+            </div>
+          )}
+
           <div className="detail-stats">
-            <StatBar label="Health" pct={(def.hp / MAX_HP) * 100} value={`${def.hp}`} fill="#86efac" />
-            <StatBar label="Damage" pct={(def.damage / MAX_DMG) * 100} value={`${def.damage}`} fill="#fb923c" />
+            <StatBar
+              label="Health"
+              pct={(def.hp / MAX_HP) * 100}
+              value={`${shownHp}`}
+              bonus={level > 1 ? `+${shownHp - def.hp}` : undefined}
+              fill="#86efac"
+            />
+            <StatBar
+              label="Damage"
+              pct={(def.damage / MAX_DMG) * 100}
+              value={`${shownDmg}`}
+              bonus={level > 1 ? `+${shownDmg - def.damage}` : undefined}
+              fill="#fb923c"
+            />
             <StatBar
               label="Atk speed"
               pct={(MIN_ATK / def.attackSpeed) * 100}

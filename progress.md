@@ -31,8 +31,9 @@ boss **Bloater** with Putrid Burst). The floor picker + persisted progress
 
 **Floor rebalance DONE (2026-07-05, on PR #46)** — floors were too easy/short.
 Now: per-floor stat multipliers (+8% HP / +5% dmg per floor, linear — so floors
-6+ escalate instead of plateauing, and future unit levels/items become the
-player counter-curve), waveBudget 25+3×floor (~28–40 bodies), 0.5s trickle,
+6+ escalate instead of plateauing; **unit levels are now that player
+counter-curve — BUILT, see "Unit leveling" below**; items are the second lever),
+waveBudget 25+3×floor (~28–40 bodies), 0.5s trickle,
 enemy cap 12, Depths-specific 300s clock, Bloater 800hp/28dmg, boss floors keep
 70% fodder. Tuned by headless winrate sweep (target hit: floors 1–3 comfy→
 bloodied, floor 4 77%, boss floor ≈ coin flip depending on deck). Method +
@@ -68,6 +69,22 @@ procedural canvas sprite + rattle/lid-swing/sparkle animation + creak/jingle SFX
 per tier, and the ladder tops out at five tiers — wooden → silver → gold →
 **arcane → dragon** (the new two are data + art only; deep bosses / premium will
 drop them later).
+
+#### Unit leveling — BUILT (2026-07-08, feat/unit-leveling)
+
+Per-unit XP/levels, the player counter-curve to floor scaling. Cap 10;
++5% HP / +3% dmg per level (max +45%/+27% vs floor-5 enemies' +32%/+20%),
+hp/dmg only — the exact mirror of what enemy floors bake. Whole deck earns
+full XP from every mode (dungeon wins 20+10×floor, replays pay full, losses
+40%, endless 10+8×wave, arena 25/10); rising cost curve 25·(L−1)·L (cap at
+2250 total ≈ clearing all content + some endless). No catch-up mechanic.
+Arena AI mirrors the player's average deck level. Save v8 (`unitXp`, level
+always derived). All numbers in `src/meta/leveling.ts`; pacing targets are an
+executable spec. Summons inherit their creator's level (NOTES hazard 8).
+Surfaced: results-screen XP bars + LEVEL UP flash/stinger + stat deltas, hub
+card badges, detail-panel level chip/XP bar/leveled stats, in-battle badge by
+the HP bar. Design decisions in the plan file
+(`plan-how-units-level-keen-dijkstra.md`) + the `unit-leveling-built` memory.
 
 **Remaining economy/PvE slices, in order** (slices 2 & 3 have a build-ready
 handshake with file anchors + commit sequencing in

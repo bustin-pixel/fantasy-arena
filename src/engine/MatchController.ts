@@ -41,6 +41,7 @@ import { WaveController } from "./WaveController";
 import { EndlessController, type EndlessStatus } from "./EndlessController";
 import { isMelee, getUnitDef } from "@/data/units";
 import { getDungeon } from "@/data/dungeons";
+import { averageDeckLevel } from "@/meta/leveling";
 import {
   ENDLESS_ENEMY_ACTIVE,
   ENDLESS_PLAYER_ACTIVE,
@@ -59,6 +60,9 @@ export interface MatchOptions {
   floor?: number;
   /** Which dungeon to descend (defaults to "depths"). Ignored in arena. */
   dungeonId?: string;
+  /** Player unit levels by defId (missing = 1). A deterministic match input,
+   *  like the seed: baked into stats at createUnit, recorded in the replay. */
+  unitLevels?: Record<string, number>;
 }
 
 /** The match clock for a mode. Endless resets its clock per wave (a stalemate
@@ -89,6 +93,12 @@ export class MatchController {
   private autoDeployCountdown = 0;
   readonly seed: number;
   readonly mode: MatchMode;
+  /** Player unit levels by defId (missing = 1). */
+  private unitLevels: Record<string, number>;
+  /** Arena mirror: AI units fight at the player's average deck level, so the
+   *  fair-fight mode stays fair as the player levels. 1 in PvE modes (their
+   *  enemies scale by floor/wave instead). */
+  private enemyLevel: number;
   /** The Depths' horde director (null outside depths). */
   private wave: WaveController | null = null;
   /** The survival-mode director (null outside endless). */
@@ -106,6 +116,11 @@ export class MatchController {
     this.mode = opts.mode ?? "arena";
     this.playerDeck = playerDeck;
     this.enemyDeck = enemyDeck;
+    this.unitLevels = opts.unitLevels ?? {};
+    this.enemyLevel =
+      this.mode === "arena"
+        ? averageDeckLevel(playerDeck, this.unitLevels)
+        : 1;
     resetUidCounter();
     this.state = createSimState(seed, matchClockSec(this.mode));
     if (this.mode === "depths") {
@@ -207,10 +222,17 @@ export class MatchController {
     if (!this.canDeploy(team)) return null;
     const zone = team === "player" ? PLAYER_ZONE : ENEMY_ZONE;
     const clampedY = Math.max(zone.top, Math.min(zone.bottom, pos.y));
-    const unit = createUnit(defId, team, {
-      x: Math.max(40, Math.min(FIELD_WIDTH - 40, pos.x)),
-      y: clampedY,
-    });
+    const level =
+      team === "player" ? (this.unitLevels[defId] ?? 1) : this.enemyLevel;
+    const unit = createUnit(
+      defId,
+      team,
+      {
+        x: Math.max(40, Math.min(FIELD_WIDTH - 40, pos.x)),
+        y: clampedY,
+      },
+      level
+    );
     this.state.units.push(unit);
 
     // [seam] kit spawn hook (opening stealth for the Assassin/Rogue/Trickster rides
@@ -618,6 +640,7 @@ export class MatchController {
       playerDeck: this.playerDeck.slice(),
       enemyDeck: this.enemyDeck.slice(),
       picks: this.pickIndices.slice(),
+      unitLevels: { ...this.unitLevels },
     };
   }
 }

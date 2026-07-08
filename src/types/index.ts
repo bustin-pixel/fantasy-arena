@@ -165,6 +165,11 @@ export interface Unit {
   hp: number;
   maxHp: number;
 
+  /** Unit level, fixed at spawn — hp/maxHp/damage above already have the
+   *  level multipliers baked in (meta/leveling, applied by createUnit).
+   *  Summons inherit their creator's level via the spawn queue. */
+  level: number;
+
   // resolved stats (copied from def, modifiable by effects later)
   damage: number;
   attackSpeed: number;
@@ -394,4 +399,7 @@ export interface ReplayData {
   /** Endless mode: ordered boon-pick offer indices (the between-wave inputs).
    *  Absent/empty for Arena and Depths. */
   picks?: number[];
+  /** Player unit levels by defId (a match input — re-simulation must bake the
+   *  same stat multipliers). Absent = everything level 1. */
+  unitLevels?: Record<string, number>;
 }

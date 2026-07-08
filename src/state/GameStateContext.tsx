@@ -23,6 +23,7 @@ import {
 } from "./persistence";
 import { isAvatarUnlocked } from "@/meta/avatars";
 import { MILESTONE_UNLOCKS, UNLOCK_PRICES } from "@/meta/economy";
+import { addXp } from "@/meta/leveling";
 import { questForUnlock } from "@/data/dungeons";
 import type { BattleRewards } from "@/meta/rewards";
 import type { BattleMode } from "@/hooks/useBattleEngine";
@@ -51,6 +52,8 @@ interface GameStateValue {
       dungeonId: string;
       /** Endless: waves cleared this run, folded into the best-wave record. */
       wavesSurvived?: number;
+      /** The warband fielded this battle — every unit in it earns rewards.xp. */
+      deck?: readonly string[];
     }
   ) => void;
   /** Buy a locked unit with gold. No-op unless locked and affordable. */
@@ -111,10 +114,19 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       floor: number;
       dungeonId: string;
       wavesSurvived?: number;
+      deck?: readonly string[];
     }
   ) =>
     setSave((s) => {
       let gold = s.gold + rewards.gold;
+      // Whole-deck XP: every fielded unit earns the full amount (addXp is the
+      // same clamp the RewardPanel preview uses, so preview ≡ persisted).
+      const unitXp = { ...s.unitXp };
+      if (rewards.xp > 0) {
+        for (const id of new Set(ctx.deck ?? [])) {
+          unitXp[id] = addXp(unitXp[id] ?? 0, rewards.xp);
+        }
+      }
       const unlocked = new Set(s.unlockedUnits);
       for (const entry of rewards.chest?.contents ?? []) {
         if (entry.kind === "gold") gold += entry.amount;
@@ -146,6 +158,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       return {
         ...s,
         gold,
+        unitXp,
         unlockedUnits: [...unlocked],
         dungeons,
         questUnlocks: [...questUnlocks],

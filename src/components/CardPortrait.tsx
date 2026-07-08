@@ -25,6 +25,8 @@ interface Props {
   /** Overrides the locked-button label (e.g. a quest-gated unit shows a plain
    *  lock, or its discounted price once earned). Defaults to the rarity price. */
   lockLabel?: string;
+  /** Unit level badge on the art (hidden at level 1 and on locked cards). */
+  level?: number;
 }
 
 const ADD_LABEL: Record<CardAddState, string> = {
@@ -43,6 +45,7 @@ export function CardPortrait({
   onInfo,
   onToggle,
   lockLabel,
+  level,
 }: Props) {
   const ref = useRef<HTMLCanvasElement>(null);
   const def = getUnitDef(defId);
@@ -78,6 +81,9 @@ export function CardPortrait({
         aria-label={`${def.name} details`}
       >
         <canvas ref={ref} width={size} height={size} className="card-canvas" />
+        {!unowned && level !== undefined && level > 1 && (
+          <span className="card-level">Lv {level}</span>
+        )}
         <span className="card-name">{def.name}</span>
         <span className="card-rarity" style={{ color: rarity.color }}>
           {rarity.label}
