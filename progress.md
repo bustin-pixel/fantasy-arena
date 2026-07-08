@@ -110,9 +110,11 @@ still holds.
 pure data like `wardedAgainst`, tagged across the whole undead roster. The
 Slime Knight gained the counter package for the Bonefields' skeleton hordes:
 **Caustic Aura** (once a second, 30% of its damage in acid to every enemy
-within 90px — scales with level, silent while stunned/feared/polymorphed) and
-**Absorb Bones** (any ENEMY skeleton dying inside the aura is slurped for
-12 HP, whoever landed the kill). Built on a new reusable kit seam:
+within 90px — but a SKELETON loses 90% of its remaining hp per pulse; scales
+with level, silent while stunned/feared/polymorphed) and **Absorb Bones**
+(any ENEMY skeleton dying inside the aura is slurped for 20 HP, whoever
+landed the kill; shown as ONE merged "Caustic Aura" panel trait). Built on a
+new reusable kit seam:
 `onUnitDeath` death-observer hook (fired on every other living unit from the
 HP-funnel death branch, after the victim's own `onDeath`). Unlock price stays
 2500g — he's a strong optional answer to the Bonefields, not a required key.

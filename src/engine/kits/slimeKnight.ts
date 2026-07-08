@@ -34,8 +34,9 @@ const GUARD_SHIELD = 45; // Gelatinous Guard absorb granted per cast
 // counter for The Bonefields; see UnitDef.tags).
 const AURA_RADIUS = 90; // matches the death-burst radius — one visual language
 const AURA_DMG_FRAC = 0.3; // of its damage stat, dealt to each enemy per beat
+const AURA_BONE_MELT_FRAC = 0.9; // skeletons lose this share of REMAINING hp per beat
 const AURA_INTERVAL_TICKS = secToTicks(1); // one acid beat per second
-const ABSORB_HEAL = 12; // HP slurped per enemy skeleton dying in the aura
+const ABSORB_HEAL = 20; // HP slurped per enemy skeleton dying in the aura
 const BASE_BLOBS = 3; // blobs flung at rebornStage 0 (decays by stage → 3/2/1)
 const FLING_DIST = 110; // how far outward blobs spawn from the corpse
 const KNIGHT_BURST = 30; // the knight's own death burst
@@ -84,7 +85,15 @@ export const slimeKnightKit: UnitKit = {
     const acid = Math.max(1, Math.round(unit.damage * AURA_DMG_FRAC));
     for (const e of ctx.enemies) {
       if (e.state === "dead") continue;
-      if (dist(unit.pos, e.pos) <= AURA_RADIUS) ctx.dealDamage(e, acid, unit);
+      if (dist(unit.pos, e.pos) > AURA_RADIUS) continue;
+      // Skeletons dissolve outright: each beat strips 90% of their REMAINING
+      // hp (percentage-of-current, so leveled / floor-scaled bones melt just
+      // as fast — two beats and they're gone), then Absorb Bones slurps them.
+      const isBones = getUnitDef(e.defId).tags?.includes("skeleton");
+      const dmg = isBones
+        ? Math.max(1, Math.round(e.hp * AURA_BONE_MELT_FRAC))
+        : acid;
+      ctx.dealDamage(e, dmg, unit);
     }
   },
 

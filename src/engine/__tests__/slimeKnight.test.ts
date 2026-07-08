@@ -136,10 +136,11 @@ describe("Slime Knight — Caustic Aura (acid beat on nearby enemies)", () => {
     const s = battleState(11);
     const knight = place(s, "slime_knight", "player", 240, 300);
     knight.moveSpeed = 0;
-    // Inside the aura (dist 88 ≤ 90) but outside melee reach (range 48 + the
-    // two bodies' radius slop ≈ 76) — any HP the dummy loses is aura damage,
-    // in whole per-beat multiples.
-    const near = makeDummy(place(s, "skeleton", "enemy", 240, 388));
+    // A NON-skeleton dummy (skeletons get the bone-melt beat instead), inside
+    // the aura (dist 88 ≤ 90) but outside melee reach (range 48 + the two
+    // bodies' radius slop ≈ 76) — any HP it loses is aura damage, in whole
+    // per-beat multiples.
+    const near = makeDummy(place(s, "dire_wolf", "enemy", 240, 388));
     // Well outside the aura (dist 180) — the control, must stay untouched.
     const far = makeDummy(place(s, "skeleton", "enemy", 240, 480));
 
@@ -150,6 +151,25 @@ describe("Slime Knight — Caustic Aura (acid beat on nearby enemies)", () => {
     expect(lost).toBeGreaterThanOrEqual(perBeat * 2);
     expect(lost % perBeat).toBe(0);
     expect(far.hp).toBe(far.maxHp);
+  });
+
+  it("melts a skeleton for 90% of its REMAINING hp per beat", () => {
+    const s = battleState(16);
+    const knight = place(s, "slime_knight", "player", 240, 300);
+    knight.moveSpeed = 0;
+    const bones = place(s, "skeleton", "enemy", 240, 388); // in aura, out of reach
+    bones.moveSpeed = 0;
+    bones.hp = bones.maxHp = 1000; // tanky, so exactly one beat is measurable
+
+    let guard = 0;
+    while (bones.hp === 1000 && guard < 45) {
+      stepSimulation(s);
+      guard++;
+    }
+
+    // One beat = round(1000 × 0.9) = 900 gone, 100 left.
+    expect(bones.hp).toBe(100);
+    expect(bones.state).not.toBe("dead");
   });
 
   it("goes silent while the knight is stunned", () => {
@@ -166,7 +186,7 @@ describe("Slime Knight — Caustic Aura (acid beat on nearby enemies)", () => {
 });
 
 describe("Slime Knight — Absorb Bones (slurps enemy skeletons dying in the aura)", () => {
-  it("heals 12 when its own acid melts a skeleton", () => {
+  it("heals 20 when its own acid melts a skeleton", () => {
     const s = battleState(13);
     const knight = place(s, "slime_knight", "player", 240, 300);
     knight.moveSpeed = 0;
@@ -182,7 +202,7 @@ describe("Slime Knight — Absorb Bones (slurps enemy skeletons dying in the aur
     }
 
     expect(skel.state).toBe("dead");
-    expect(knight.hp).toBe(knight.maxHp - 50 + 12);
+    expect(knight.hp).toBe(knight.maxHp - 50 + 20);
   });
 
   it("absorbs a skeleton an ALLY killed inside the aura (any killer counts)", () => {
@@ -205,7 +225,7 @@ describe("Slime Knight — Absorb Bones (slurps enemy skeletons dying in the aur
     }
 
     expect(skel.state).toBe("dead");
-    expect(knight.hp).toBe(knight.maxHp - 50 + 12);
+    expect(knight.hp).toBe(knight.maxHp - 50 + 20);
   });
 
   it("does NOT absorb non-skeleton undead (a ghoul melts unslurped)", () => {

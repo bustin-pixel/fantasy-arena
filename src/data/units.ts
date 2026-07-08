@@ -483,12 +483,7 @@ export const UNITS: Record<string, UnitDef> = {
       {
         name: "Caustic Aura",
         description:
-          "Its acid body constantly dissolves every enemy nearby — 30% of its damage per second. Fragile hordes melt just standing close.",
-      },
-      {
-        name: "Absorb Bones",
-        description:
-          "An enemy skeleton that falls inside the aura is slurped into its body, restoring 12 health each.",
+          "Its acid body constantly dissolves every enemy nearby — 30% of its damage per second. Skeletons fare far worse: each pulse melts 90% of their remaining bones, and any enemy skeleton that falls inside the aura is slurped into its body, restoring 20 health.",
       },
     ],
   },
