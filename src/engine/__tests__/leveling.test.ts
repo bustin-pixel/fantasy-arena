@@ -2,12 +2,18 @@
 // seed) baked into hp/damage at createUnit. Covers the bake itself, the two
 // summon-inheritance queue paths (pendingSpawns via the Necromancer's Raise
 // Dead, damageSpawns via the Slime's split), the arena AI level mirror, and
-// the depths regression (PvE enemies never level).
+// dungeon monster levels (fodder at Dungeon.monsterLevel, elites +1).
 import { describe, it, expect } from "vitest";
-import { stepSimulation } from "@/engine/CombatSystem";
+import { createSimState, stepSimulation, type SimState } from "@/engine/CombatSystem";
 import { MatchController } from "@/engine/MatchController";
+import { WaveController } from "@/engine/WaveController";
 import { createUnit, resetUidCounter } from "@/entities/createUnit";
 import { getUnitDef } from "@/data/units";
+import {
+  floorStatMultipliersIn,
+  getDungeon,
+  monsterLevelFor,
+} from "@/data/dungeons";
 import { averageDeckLevel, levelStatMultipliers } from "@/meta/leveling";
 import { battleState, digest, makeDummy, place } from "./helpers";
 
@@ -17,11 +23,14 @@ const DECK = ["ogre", "archer", "knight", "fire_mage"];
 function runLeveledMatch(
   seed: number,
   levels: Record<string, number>,
-  mode: "arena" | "depths" = "arena"
+  mode: "arena" | "depths" = "arena",
+  dungeonId = "depths",
+  floor = 1
 ): MatchController {
   const mc = new MatchController(seed, DECK, mode === "arena" ? DECK : [], {
     mode,
-    floor: 1,
+    floor,
+    dungeonId,
     unitLevels: levels,
   });
   let guard = 0;
@@ -29,7 +38,7 @@ function runLeveledMatch(
     mc.phase !== "victory" &&
     mc.phase !== "defeat" &&
     mc.phase !== "draw" &&
-    guard < 3400
+    guard < 8000
   ) {
     mc.tick();
     guard++;
@@ -132,8 +141,39 @@ describe("arena AI level mirror", () => {
   });
 });
 
-describe("depths regression — PvE enemies never level", () => {
-  it("floor monsters stay level 1 even when the player deck is leveled", () => {
+describe("dungeon monster levels — fodder at Dungeon.monsterLevel, elites +1", () => {
+  /** Drain a dungeon floor with an unlimited-cap dummy state, recording every
+   *  spawn's stats at spawn time (each is killed so gated phases advance). */
+  function drainFloorSpawns(
+    seed: number,
+    dungeonId: string,
+    floor: number
+  ): { defId: string; level: number; maxHp: number; damage: number }[] {
+    const wc = new WaveController(seed, getDungeon(dungeonId), floor);
+    const s: SimState = createSimState(seed, 120);
+    s.activeCaps = { player: 4, enemy: 999 };
+    const out: { defId: string; level: number; maxHp: number; damage: number }[] =
+      [];
+    let guard = 0;
+    while (wc.remaining > 0 && guard < 8000) {
+      const before = s.units.length;
+      wc.step(s);
+      if (s.units.length > before) {
+        const u = s.units[s.units.length - 1];
+        out.push({
+          defId: u.defId,
+          level: u.level,
+          maxHp: u.maxHp,
+          damage: u.damage,
+        });
+        u.state = "dead";
+      }
+      guard++;
+    }
+    return out;
+  }
+
+  it("Depths fodder stays level 1 even when the player deck is leveled", () => {
     const levels = { ogre: 10, archer: 10, knight: 10, fire_mage: 10 };
     const mc = runLeveledMatch(7, levels, "depths");
 
@@ -146,6 +186,69 @@ describe("depths regression — PvE enemies never level", () => {
     );
     expect(players.length).toBeGreaterThan(0);
     for (const p of players) expect(p.level).toBe(10);
+  });
+
+  it("Bonefields fodder spawns at the dungeon's monster level (Lv 3)", () => {
+    const bonefields = getDungeon("bonefields");
+    expect(monsterLevelFor(bonefields, "fodder")).toBe(3);
+    // Floor 1: the floor multiplier is identity, so stats are the pure Lv-3 bake.
+    const spawns = drainFloorSpawns(31, "bonefields", 1);
+    expect(spawns.length).toBeGreaterThan(0);
+    const mult = levelStatMultipliers(3);
+    for (const spawn of spawns) {
+      const def = getUnitDef(spawn.defId);
+      expect(spawn.level).toBe(3);
+      expect(spawn.maxHp).toBe(Math.round(def.hp * mult.hp));
+      expect(spawn.damage).toBe(Math.round(def.damage * mult.dmg));
+    }
+  });
+
+  it("the boss spawns one level above the fodder, layered under floor scaling", () => {
+    const bonefields = getDungeon("bonefields");
+    const boss = drainFloorSpawns(9, "bonefields", 5).find(
+      (u) => u.defId === "abomination"
+    )!;
+    expect(boss).toBeDefined();
+    expect(boss.level).toBe(4); // monsterLevel 3 + elite bonus
+    const lvl = levelStatMultipliers(4);
+    const mult = floorStatMultipliersIn(bonefields, 5);
+    const def = getUnitDef("abomination");
+    expect(boss.maxHp).toBe(Math.round(Math.round(def.hp * lvl.hp) * mult.hp));
+    expect(boss.damage).toBe(
+      Math.round(Math.round(def.damage * lvl.dmg) * mult.dmg)
+    );
+  });
+
+  it("the rare quest catalyst is an elite too (+1)", () => {
+    // Scan seeds until the Lich rolls in (~15% per seed), then drain that run.
+    let seed = 0;
+    for (let s = 1; s <= 500 && seed === 0; s++) {
+      const wc = new WaveController(s, getDungeon("bonefields"), 5);
+      if (wc.planForTest()!.catalyst === "lich") seed = s;
+    }
+    expect(seed).toBeGreaterThan(0);
+    const lich = drainFloorSpawns(seed, "bonefields", 5).find(
+      (u) => u.defId === "lich"
+    )!;
+    expect(lich).toBeDefined();
+    expect(lich.level).toBe(4);
+  });
+
+  it("the Eclipse Warden caps the ladder at Lv 10", () => {
+    const spire = getDungeon("eclipse_spire");
+    expect(monsterLevelFor(spire, "boss")).toBe(10);
+    const warden = drainFloorSpawns(9, "eclipse_spire", 5).find(
+      (u) => u.defId === "eclipse_warden"
+    )!;
+    expect(warden).toBeDefined();
+    expect(warden.level).toBe(10);
+  });
+
+  it("a leveled dungeon match is deterministic (same seed → same digest)", () => {
+    const levels = { ogre: 4, archer: 4, knight: 4, fire_mage: 4 };
+    const a = runLeveledMatch(13, levels, "depths", "bonefields", 5);
+    const b = runLeveledMatch(13, levels, "depths", "bonefields", 5);
+    expect(digest(a.state)).toBe(digest(b.state));
   });
 });
 

@@ -13,8 +13,9 @@ import {
   floorStatMultipliers,
   rareSpawnQuestForFloor,
 } from "@/data/depths";
-import { getDungeon, isBossFloorIn } from "@/data/dungeons";
+import { getDungeon, isBossFloorIn, monsterLevelFor } from "@/data/dungeons";
 import { getUnitDef } from "@/data/units";
+import { levelStatMultipliers } from "@/meta/leveling";
 import { DEPTHS_ENEMY_ACTIVE, DEPTHS_MATCH_TIME_SEC, secToTicks } from "@/utils/constants";
 import { battleState, digest, place, makeDummy } from "./helpers";
 
@@ -134,8 +135,9 @@ describe("WaveController — wave composition", () => {
     expect(deep.maxHp).toBeGreaterThan(deepDef.hp);
   });
 
-  it("the boss scales with floor depth too", () => {
-    // Floor 5's Bloater must carry the floor multiplier, or boss floors stay soft.
+  it("the boss scales with floor depth AND its elite level", () => {
+    // Floor 5's Bloater carries the floor multiplier layered over its elite
+    // level bake (dungeon monsterLevel + 1 — nested rounding, see NOTES §8).
     const wc = new WaveController(9, getDungeon("depths"), 5);
     const s: SimState = createSimState(9, 120);
     s.activeCaps = { player: 4, enemy: 999 };
@@ -152,9 +154,17 @@ describe("WaveController — wave composition", () => {
       guard++;
     }
     const boss = s.units.find((u) => u.defId === "bloater")!;
+    const bossLevel = monsterLevelFor(getDungeon("depths"), "boss");
+    expect(bossLevel).toBe(2); // Depths fodder is Lv 1; elites run +1
+    expect(boss.level).toBe(bossLevel);
+    const lvl = levelStatMultipliers(bossLevel);
     const mult = floorStatMultipliers(5);
-    expect(boss.maxHp).toBe(Math.round(getUnitDef("bloater").hp * mult.hp));
-    expect(boss.damage).toBe(Math.round(getUnitDef("bloater").damage * mult.dmg));
+    expect(boss.maxHp).toBe(
+      Math.round(Math.round(getUnitDef("bloater").hp * lvl.hp) * mult.hp)
+    );
+    expect(boss.damage).toBe(
+      Math.round(Math.round(getUnitDef("bloater").damage * lvl.dmg) * mult.dmg)
+    );
   });
 
   it("deeper floors roll bigger waves", () => {

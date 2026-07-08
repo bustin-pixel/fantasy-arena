@@ -42,20 +42,32 @@ export interface Dungeon {
   /** Linear per-floor stat scaling past floor 1 (the difficulty dial). */
   hpPerFloor: number;
   dmgPerFloor: number;
+  /** Every monster here spawns at this unit level (the same +5% HP / +3% dmg
+   *  per-level curve players get — see meta/leveling). Bosses and rare quest
+   *  spawns come in at +ELITE_LEVEL_BONUS. Tuned to the player's expected
+   *  arrival level walking the gate chain in order. */
+  monsterLevel: number;
   /** The rare-spawn fusion quest hosted here (its `floor` = this dungeon's boss
    *  floor). Absent = no quest. */
   quest?: RareSpawnQuest;
-  /** Availability gate: locked until this many Depths floors are cleared.
-   *  Absent = always available (The Depths itself). */
-  gate?: { depthsFloor: number };
+  /** Availability gate: locked until `floor` of dungeon `dungeonId` is cleared.
+   *  Absent = always available (The Depths itself). The gates form a single
+   *  chain (each dungeon requires the previous one's last floor); a dungeon
+   *  with any cleared progress of its own never re-locks — see
+   *  isDungeonUnlocked. */
+  gate?: { dungeonId: string; floor: number };
   /** Lore blurb shown on the dungeon-select card. */
   entryHint: string;
 }
 
 // ---------------------------------------------------------------------------
-// The registry. The Depths wraps the legacy tuning from depths.ts unchanged, so
-// its waves stay byte-identical. The themed dungeons are shorter self-contained
-// trials whose boss floor hosts the legendary rare-spawn quest.
+// The registry, in gate-chain order (each dungeon requires the previous one's
+// floor 5): Depths → Bonefields → Wilds → Overgrowth → Sealed Vault →
+// Deep Forge → Eclipse Spire. The Depths wraps the legacy tuning from depths.ts
+// unchanged. The themed dungeons are shorter self-contained trials whose boss
+// floor hosts the legendary rare-spawn quest; their monsterLevel ladder
+// (1/3/5/6/7/8/9) tracks the player's expected warband level walking the chain,
+// running one level hot from the Sealed Vault on.
 // ---------------------------------------------------------------------------
 
 /** Fire Mage + Lich = Necromancer: end the rare Lich in The Bonefields with a
@@ -144,6 +156,7 @@ export const DUNGEONS: Record<string, Dungeon> = {
     budgetPerFloor: 3,
     hpPerFloor: DEPTHS_HP_PER_FLOOR,
     dmgPerFloor: DEPTHS_DMG_PER_FLOOR,
+    monsterLevel: 1,
     quest: RARE_SPAWN_QUESTS[0], // Slime Knight
     entryHint:
       "The endless descent beneath the arena — a rising horde, floor after floor.",
@@ -166,8 +179,9 @@ export const DUNGEONS: Record<string, Dungeon> = {
     budgetPerFloor: 3,
     hpPerFloor: DEPTHS_HP_PER_FLOOR,
     dmgPerFloor: DEPTHS_DMG_PER_FLOOR,
+    monsterLevel: 3,
     quest: BONEFIELDS_QUEST,
-    gate: { depthsFloor: 5 },
+    gate: { dungeonId: "depths", floor: 5 },
     entryHint:
       "A haunted barrow of the restless dead — and something older still commanding them.",
   },
@@ -189,33 +203,11 @@ export const DUNGEONS: Record<string, Dungeon> = {
     budgetPerFloor: 3,
     hpPerFloor: DEPTHS_HP_PER_FLOOR,
     dmgPerFloor: DEPTHS_DMG_PER_FLOOR,
+    monsterLevel: 5,
     quest: WILDS_QUEST,
-    gate: { depthsFloor: 5 },
+    gate: { dungeonId: "bonefields", floor: 5 },
     entryHint:
       "Untamed hunting grounds where the whole pack answers to one apex beast.",
-  },
-  sealed_vault: {
-    id: "sealed_vault",
-    name: "The Sealed Vault",
-    theme: "sealedVault",
-    floors: 5,
-    tiers: [
-      {
-        floors: [1, 5],
-        monsters: { arcane_wisp: 1, imp: 2, cultist: 3 },
-        boss: "rune_golem",
-      },
-    ],
-    bossFloorInterval: 5,
-    bossFloorFodderShare: BOSS_FLOOR_FODDER_SHARE,
-    budgetBase: 25,
-    budgetPerFloor: 3,
-    hpPerFloor: DEPTHS_HP_PER_FLOOR,
-    dmgPerFloor: DEPTHS_DMG_PER_FLOOR,
-    quest: SEALED_VAULT_QUEST,
-    gate: { depthsFloor: 5 },
-    entryHint:
-      "A quarantined hall of loosed magic — its wards strain against the arcana within.",
   },
   overgrowth: {
     id: "overgrowth",
@@ -235,21 +227,22 @@ export const DUNGEONS: Record<string, Dungeon> = {
     budgetPerFloor: 3,
     hpPerFloor: DEPTHS_HP_PER_FLOOR,
     dmgPerFloor: DEPTHS_DMG_PER_FLOOR,
+    monsterLevel: 6,
     quest: OVERGROWTH_QUEST,
-    gate: { depthsFloor: 5 },
+    gate: { dungeonId: "wilds", floor: 5 },
     entryHint:
       "A blighted grove run wild — brambles, spores, and an ancient heart beating at its center.",
   },
-  eclipse_spire: {
-    id: "eclipse_spire",
-    name: "The Eclipse Spire",
-    theme: "eclipseSpire",
+  sealed_vault: {
+    id: "sealed_vault",
+    name: "The Sealed Vault",
+    theme: "sealedVault",
     floors: 5,
     tiers: [
       {
         floors: [1, 5],
-        monsters: { light_wisp: 1, shadow_wraith: 2, eclipse_acolyte: 3 },
-        boss: "eclipse_warden",
+        monsters: { arcane_wisp: 1, imp: 2, cultist: 3 },
+        boss: "rune_golem",
       },
     ],
     bossFloorInterval: 5,
@@ -258,10 +251,11 @@ export const DUNGEONS: Record<string, Dungeon> = {
     budgetPerFloor: 3,
     hpPerFloor: DEPTHS_HP_PER_FLOOR,
     dmgPerFloor: DEPTHS_DMG_PER_FLOOR,
-    quest: ECLIPSE_QUEST,
-    gate: { depthsFloor: 5 },
+    monsterLevel: 7,
+    quest: SEALED_VAULT_QUEST,
+    gate: { dungeonId: "overgrowth", floor: 5 },
     entryHint:
-      "A tower where light and dark war without end — motes, shades, and the Warden between them.",
+      "A quarantined hall of loosed magic — its wards strain against the arcana within.",
   },
   deep_forge: {
     id: "deep_forge",
@@ -281,10 +275,35 @@ export const DUNGEONS: Record<string, Dungeon> = {
     budgetPerFloor: 3,
     hpPerFloor: DEPTHS_HP_PER_FLOOR,
     dmgPerFloor: DEPTHS_DMG_PER_FLOOR,
+    monsterLevel: 8,
     quest: DEEP_FORGE_QUEST,
-    gate: { depthsFloor: 5 },
+    gate: { dungeonId: "sealed_vault", floor: 5 },
     entryHint:
       "A dwarven foundry gone silent — its constructs still clank the halls, tended by one great engine.",
+  },
+  eclipse_spire: {
+    id: "eclipse_spire",
+    name: "The Eclipse Spire",
+    theme: "eclipseSpire",
+    floors: 5,
+    tiers: [
+      {
+        floors: [1, 5],
+        monsters: { light_wisp: 1, shadow_wraith: 2, eclipse_acolyte: 3 },
+        boss: "eclipse_warden",
+      },
+    ],
+    bossFloorInterval: 5,
+    bossFloorFodderShare: BOSS_FLOOR_FODDER_SHARE,
+    budgetBase: 25,
+    budgetPerFloor: 3,
+    hpPerFloor: DEPTHS_HP_PER_FLOOR,
+    dmgPerFloor: DEPTHS_DMG_PER_FLOOR,
+    monsterLevel: 9,
+    quest: ECLIPSE_QUEST,
+    gate: { dungeonId: "deep_forge", floor: 5 },
+    entryHint:
+      "A tower where light and dark war without end — motes, shades, and the Warden between them.",
   },
 };
 
@@ -294,8 +313,36 @@ export function getDungeon(id: string): Dungeon {
   return d;
 }
 
-/** Ordered dungeon ids for the select map (Depths first, then themed). */
+/** Ordered dungeon ids for the select map (gate-chain order, Depths first). */
 export const DUNGEON_IDS: string[] = Object.keys(DUNGEONS);
+
+/** Bosses and telegraphed rare quest catalysts spawn this many levels above the
+ *  dungeon's fodder (uniform rule: the Depths Bloater is Lv 2, the Eclipse
+ *  Warden Lv 10). */
+export const ELITE_LEVEL_BONUS = 1;
+
+export type MonsterSpawnKind = "fodder" | "rare" | "boss";
+
+/** The unit level a monster of `kind` spawns at in this dungeon. */
+export function monsterLevelFor(
+  dungeon: Dungeon,
+  kind: MonsterSpawnKind
+): number {
+  return dungeon.monsterLevel + (kind === "fodder" ? 0 : ELITE_LEVEL_BONUS);
+}
+
+/** Gate check for the dungeon-select map. `clearedFloorOf` abstracts the save
+ *  (this module stays persistence-free). A dungeon with any cleared progress of
+ *  its own is always unlocked — saves from before the gate chain may hold
+ *  out-of-order clears, and those must never re-lock. */
+export function isDungeonUnlocked(
+  dungeon: Dungeon,
+  clearedFloorOf: (dungeonId: string) => number
+): boolean {
+  if (!dungeon.gate) return true;
+  if (clearedFloorOf(dungeon.id) > 0) return true;
+  return clearedFloorOf(dungeon.gate.dungeonId) >= dungeon.gate.floor;
+}
 
 // ---------------------------------------------------------------------------
 // Per-dungeon wave helpers — the dungeon-scoped twins of the Depths globals in
