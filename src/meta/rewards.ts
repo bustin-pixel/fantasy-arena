@@ -103,6 +103,19 @@ function pickWeightedUnit(rng: RNG): string {
   return CHEST_POOL[CHEST_POOL.length - 1];
 }
 
+/** Boss-floor first-clear chest tier per dungeon. Unlisted themed dungeons are
+ *  "gold" deep bosses; the chain's two capstones pay the top tiers (the only
+ *  place arcane/dragon chests drop). FloorPickerSheet previews from this too. */
+const BOSS_CHEST_TIERS: Record<string, ChestTier> = {
+  depths: "silver",
+  deep_forge: "arcane",
+  eclipse_spire: "dragon",
+};
+
+export function bossChestTierFor(dungeonId: string): ChestTier {
+  return BOSS_CHEST_TIERS[dungeonId] ?? "gold";
+}
+
 /** The full post-battle reward matrix. Callers pass chestSeed from
  *  generateSeed() at drop time so this stays pure. */
 export function computeBattleRewards(input: {
@@ -190,12 +203,10 @@ export function computeBattleRewards(input: {
     if (!firstClear) {
       return { ...none, gold: GOLD_REWARDS.depthsReplay, xp: winXp, questUnlock };
     }
-    // Boss floors drop a chest: The Depths' bosses give silver; the themed
-    // legendary dungeons are "deep bosses" and give gold (progress.md slice 2).
+    // Boss floors drop a chest, graded by the dungeon's place in the chain
+    // (Depths silver → themed gold → Forge arcane → Spire dragon).
     const tier: ChestTier = isBossFloorIn(dungeon, floor)
-      ? dungeonId === "depths"
-        ? "silver"
-        : "gold"
+      ? bossChestTierFor(dungeonId)
       : "wooden";
     return {
       gold:

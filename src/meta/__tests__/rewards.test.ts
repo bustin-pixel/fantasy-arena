@@ -3,6 +3,7 @@
 // (fixed scan range) rather than hardcoded, so number tuning doesn't break them.
 import { describe, expect, it } from "vitest";
 import {
+  bossChestTierFor,
   computeBattleRewards,
   rollChest,
   type ChestContent,
@@ -211,6 +212,34 @@ describe("computeBattleRewards — themed dungeon quest (The Bonefields)", () =>
       outcome: "victory", highestClearedFloor: 0, // first clear → chest
     });
     expect(r.chest?.tier).toBe("gold");
+  });
+});
+
+describe("computeBattleRewards — boss chest ladder (chain capstones)", () => {
+  const base = { unlockedUnits: NO_UNITS, highestClearedFloor: 0, chestSeed: 7 };
+  const bossTier = (dungeonId: string) =>
+    computeBattleRewards({
+      ...base,
+      mode: "depths",
+      dungeonId,
+      floor: getDungeon(dungeonId).floors,
+      outcome: "victory",
+    }).chest?.tier;
+
+  it("mid-chain dungeons pay gold; the two capstones pay arcane and dragon", () => {
+    expect(bossTier("wilds")).toBe("gold");
+    expect(bossTier("overgrowth")).toBe("gold");
+    expect(bossTier("sealed_vault")).toBe("gold");
+    expect(bossTier("deep_forge")).toBe("arcane");
+    expect(bossTier("eclipse_spire")).toBe("dragon");
+  });
+
+  it("bossChestTierFor grades the whole ladder and defaults to gold", () => {
+    expect(bossChestTierFor("depths")).toBe("silver");
+    expect(bossChestTierFor("bonefields")).toBe("gold");
+    expect(bossChestTierFor("deep_forge")).toBe("arcane");
+    expect(bossChestTierFor("eclipse_spire")).toBe("dragon");
+    expect(bossChestTierFor("some_future_dungeon")).toBe("gold");
   });
 });
 

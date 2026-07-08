@@ -67,9 +67,10 @@ export function endlessMilestoneChestTier(
   return "silver"; // milestone === 5
 }
 
-/** Ascending order. Wooden/silver drop today; gold is reserved for deep
- *  bosses (Depths slice 2); arcane and dragon are the far-future top of the
- *  ladder (deepest bosses / premium — see progress.md slices 2 & 5). */
+/** Ascending order. Wooden/silver drop from ordinary floors and Depths bosses;
+ *  gold from themed-dungeon deep bosses; arcane/dragon cap the dungeon chain
+ *  (Deep Forge / Eclipse Spire boss first-clears — bossChestTierFor in
+ *  meta/rewards.ts) plus arcane from deep endless milestones. */
 export type ChestTier = "wooden" | "silver" | "gold" | "arcane" | "dragon";
 
 /** Chance a chest contains a unit unlock (rolled from the FULL deckable pool,
