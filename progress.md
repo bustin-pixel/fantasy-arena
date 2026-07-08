@@ -67,8 +67,8 @@ Collection + gold purchases, milestone unlocks (floors 2–5 → Warrior/Mage/Cl
 Berserker), duplicate drops → gold. The chest tap is now a full ceremony (PR #46):
 procedural canvas sprite + rattle/lid-swing/sparkle animation + creak/jingle SFX
 per tier, and the ladder tops out at five tiers — wooden → silver → gold →
-**arcane → dragon** (the new two are data + art only; deep bosses / premium will
-drop them later).
+**arcane → dragon** (now dropped by the chain capstones: Deep Forge / Eclipse
+Spire boss first-clears, plus arcane from deep endless milestones).
 
 #### Unit leveling — BUILT (2026-07-08, feat/unit-leveling)
 
@@ -85,6 +85,24 @@ Surfaced: results-screen XP bars + LEVEL UP flash/stinger + stat deltas, hub
 card badges, detail-panel level chip/XP bar/leveled stats, in-battle badge by
 the HP bar. Design decisions in the plan file
 (`plan-how-units-level-keen-dijkstra.md`) + the `unit-leveling-built` memory.
+
+#### Dungeon monster levels + ordered chain — BUILT (2026-07-08, feat/unit-leveling)
+
+The dungeons now form a hard gated chain (each requires the previous one's
+floor 5): Depths → Bonefields → Wilds → Overgrowth → Sealed Vault → Deep Forge
+→ Eclipse Spire. Monsters carry REAL visible levels through the same createUnit
+bake as players (ladder 1/3/5/6/7/8/9 ≈ your arrival level walking the chain,
+one level hot from the Sealed Vault on; bosses + rare catalysts +1, so the
+Eclipse Warden caps at Lv 10). Floor multipliers still layer on top; Endless
+stays Lv 1 (its own curve). The gate never re-locks a dungeon with its own
+progress (legacy out-of-order saves). Chest capstones: Deep Forge boss
+first-clear → **arcane**, Eclipse Spire → **dragon** (first wiring of the top
+two tiers). Dungeon map shows "Lv N foes" chips + your warband level with an
+under-leveled warning; floor picker shows the boss level + the real chest tier.
+Numbers in `data/dungeons.ts` (`monsterLevel`, `ELITE_LEVEL_BONUS`, `gate`) and
+`meta/rewards.ts` (`bossChestTierFor`); ladder/gate specs in
+`meta/__tests__/dungeons.test.ts`. No XP retune — the leveling pacing spec
+still holds.
 
 **Remaining economy/PvE slices, in order** (slices 2 & 3 have a build-ready
 handshake with file anchors + commit sequencing in

@@ -324,11 +324,19 @@ sound:
   `DungeonMapSheet` are all dungeon-driven; the depths branch reads `dungeon.theme`.
   **Save v6**: `save.dungeons` (per-dungeon `{highestClearedFloor}` map, via
   `highestClearedFloorOf`) replaced the single `save.depths`; `migrateSave` copies the
-  legacy field into `dungeons.depths`. Adding a themed dungeon = a `DUNGEONS` row + its
+  legacy field into `dungeons.depths`. Adding a themed dungeon = a `DUNGEONS` row
+  (incl. its `monsterLevel` + `gate` link into the chain — see §8) + its
   monsters (kits/sprites reuse existing draws) + a `quest` row (auto-joins
   `QUEST_LOCKED_UNITS`, so the reward legendary becomes quest-exclusive for free).
-  Themed legendary dungeons are a phased roadmap (Bonefields→Necromancer built; see
-  the plan file / the `themed-legendary-dungeons` memory).
+  All six themed dungeons are built (PR #50). **The dungeons form a gated chain**
+  (registry order = chain order: Depths → Bonefields → Wilds → Overgrowth →
+  Sealed Vault → Deep Forge → Eclipse Spire), each `gate: {dungeonId, floor}`
+  requiring the previous dungeon's floor 5. `isDungeonUnlocked` NEVER re-locks a
+  dungeon that has its own cleared progress (pre-chain saves may hold
+  out-of-order clears). Boss-floor first-clear chests grade up the chain via
+  `bossChestTierFor` (rewards.ts): Depths silver → themed gold → Deep Forge
+  arcane → Eclipse Spire dragon (the only arcane/dragon drops besides deep
+  endless milestones).
 
 ### 8. Unit levels are a match INPUT; summons inherit via the spawn queue
 
@@ -353,12 +361,20 @@ Rules that keep the system sound:
   `ctx.spawnUnit`. A NEW spawn path that calls `createUnit` directly must
   choose a level explicitly (endless boon pets deliberately stay level 1 —
   they scale by the wave curve instead).
-- **Enemy floor/wave scaling is a separate post-bake** (WaveController /
-  EndlessController mutate hp/damage AFTER createUnit). Never merge the two:
-  PvE enemies (and their summons) stay level 1 on purpose. The one enemy-side
-  exception is the **arena mirror**: arena AI units spawn at the player's
-  average deck level (`MatchController.enemyLevel`) so the fair-fight mode
-  stays fair.
+- **Dungeon monsters have REAL levels too** (the counter-curve made visible):
+  WaveController spawns everything at `Dungeon.monsterLevel` — bosses and rare
+  quest catalysts at +1 via `monsterLevelFor(dungeon, kind)` — through the same
+  `createUnit` bake, so badges/tooltips render and their summons inherit for
+  free. The ladder (1/3/5/6/7/8/9 along the gate chain, Eclipse Warden Lv 10)
+  tracks the player's expected arrival level; both sides ride the same
+  +5%/+3% curve, so "monster Lv = your Lv" reproduces the pre-leveling tuned
+  difficulty. The per-floor multiplier stays a SEPARATE post-bake layered on
+  top (nested rounding: `round(round(def × lvlMult) × floorMult)` — tests
+  asserting exact stats must nest, not flatten). The two mechanisms compose
+  but never merge. **Endless monsters stay level 1 on purpose** (its own
+  compounding wave curve is the difficulty; a leak would double-dip), and the
+  **arena mirror** is unchanged: arena AI spawns at the player's average deck
+  level (`MatchController.enemyLevel`) so the fair-fight mode stays fair.
 - **XP rides the reward fold**: `computeBattleRewards().xp` → whole-deck fold
   in `grantBattleRewards` via `addXp` (the SAME clamp the RewardPanel preview
   uses — preview must always equal the persisted value).
