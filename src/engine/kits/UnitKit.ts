@@ -108,6 +108,12 @@ export interface UnitKit {
   onWouldDie?(unit: Unit, source: Unit, ctx: KitCtx): boolean;
   /** Fired on the KILLER when its blow kills `victim` (Berserker Bloodthirst). */
   onKill?(source: Unit, victim: Unit, ctx: KitCtx): void;
+  /** Death OBSERVER: fired on every OTHER living unit when `victim` dies, any
+   *  team, any killer — after the victim's own onDeath, so corpse bursts resolve
+   *  first (Slime Knight Absorb Bones: slurp enemy skeletons dying in its aura).
+   *  The observer filters team/tags/radius itself. Dispatch iterates units in
+   *  array (uid) order — deterministic. */
+  onUnitDeath?(unit: Unit, victim: Unit, killer: Unit, ctx: KitCtx): void;
 
   // --- ability: has-an-active-cast <=> fireAbility is defined ---
   /** Fire the unit's active ability EFFECT. The engine still owns the cast

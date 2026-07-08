@@ -15,8 +15,11 @@ Two parts: **data** (stats + what the hub detail panel shows) and **behavior** (
 1. **Stats** — define it in `data/units.ts` with full stats (hp, damage,
    attackSpeed, moveSpeed, range, role, color, accent). These render in the panel
    automatically. *Optional data-driven behavior* (no code): `basicShotRider` (an
-   every-Nth-attack on-hit rider, like the Fire/Ice mages) and `wardedAgainst`
-   (status immunities, like the Aegis Knight).
+   every-Nth-attack on-hit rider, like the Fire/Ice mages), `wardedAgainst`
+   (status immunities, like the Aegis Knight), and `tags` (creature types —
+   `"undead"`/`"skeleton"`; a skeleton carries BOTH. Tribal mechanics key on
+   these — the Slime Knight's Absorb Bones eats `"skeleton"`-tagged enemies —
+   so tag any new undead/skeletal monster or summon accordingly).
 2. **Ability** — its `ability` MUST have a matching entry in `data/abilities.ts`
    (name / description / cooldown / `castTimeSec`). The panel reads
    `ABILITIES[def.ability]` (a missing entry crashes it), and the engine reads the
@@ -27,7 +30,9 @@ Two parts: **data** (stats + what the hub detail panel shows) and **behavior** (
    hooks: `onTick` / `onActTick` / `onReactTick`, `fireAbility` / `wantsToCast`, the
    HP-funnel hooks (`onDamaged` / `onWouldDie` / `onKill` / `modifyIncoming*`), the
    attack split (`onBeforeAttack` / `onBasicAttack` / `onAfterAttack`),
-   `onProjectileHit`, `onChargeContact`, `onSpawn` / `onDeath`. **Never edit
+   `onProjectileHit`, `onChargeContact`, `onSpawn` / `onDeath`, and the death
+   OBSERVER `onUnitDeath` (fired on every other living unit when anyone dies —
+   the Slime Knight's Absorb Bones; the observer filters team/tags/radius itself). **Never edit
    `CombatSystem`/`AbilitySystem` per-unit** — they have no `defId` branches, and
    there is **no** `PASSIVE_ABILITIES` list: "passive" just means the kit defines no
    `fireAbility`. A pure-stat unit needs no kit at all. Copy an existing kit as a

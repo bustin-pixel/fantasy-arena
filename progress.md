@@ -104,6 +104,20 @@ Numbers in `data/dungeons.ts` (`monsterLevel`, `ELITE_LEVEL_BONUS`, `gate`) and
 `meta/__tests__/dungeons.test.ts`. No XP retune — the leveling pacing spec
 still holds.
 
+#### Creature tags + Slime Knight anti-horde rework — BUILT (2026-07-08, feat/unit-leveling)
+
+`UnitDef.tags` creature types ("undead"/"skeleton"; skeletons carry both) —
+pure data like `wardedAgainst`, tagged across the whole undead roster. The
+Slime Knight gained the counter package for the Bonefields' skeleton hordes:
+**Caustic Aura** (once a second, 30% of its damage in acid to every enemy
+within 90px — scales with level, silent while stunned/feared/polymorphed) and
+**Absorb Bones** (any ENEMY skeleton dying inside the aura is slurped for
+12 HP, whoever landed the kill). Built on a new reusable kit seam:
+`onUnitDeath` death-observer hook (fired on every other living unit from the
+HP-funnel death branch, after the victim's own `onDeath`). Unlock price stays
+2500g — he's a strong optional answer to the Bonefields, not a required key.
+Specs in `slimeKnight.test.ts`; panel traits added.
+
 **Remaining economy/PvE slices, in order** (slices 2 & 3 have a build-ready
 handshake with file anchors + commit sequencing in
 [`docs/handoff-depths-slices-2-3.md`](docs/handoff-depths-slices-2-3.md)):

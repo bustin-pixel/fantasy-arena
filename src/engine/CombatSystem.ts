@@ -342,6 +342,18 @@ function makeDamageDealer(
         // (Bloater Putrid Burst + Slime death-burst now live in their kits'
         // onDeath, fired by the onDeath seam above; both re-enter dealDamage via
         // ctx.dealDamage on the same-tick damage funnel.)
+
+        // [seam] kit death OBSERVERS on every other living unit (Slime Knight
+        // Absorb Bones). After the victim's onDeath so corpse bursts resolve
+        // first; a unit killed BY that burst re-enters here with any dead
+        // observers already skipped. Array order = uid order = deterministic.
+        for (const watcher of state.units) {
+          if (watcher.state === "dead" || watcher === target) continue;
+          const wKit = getKit(watcher.defId);
+          if (wKit?.onUnitDeath) {
+            wKit.onUnitDeath(watcher, target, source, makeKitCtx(watcher, true));
+          }
+        }
       }
     }
 

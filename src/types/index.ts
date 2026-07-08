@@ -87,6 +87,12 @@ export interface AbilityDef {
   castTimeSec?: number;
 }
 
+/** Creature-type tags for tribal mechanics — data, like `school` and
+ *  `wardedAgainst`, so the engine reads them without defId branches. The Slime
+ *  Knight's Absorb Bones keys on "skeleton"; future holy-vs-undead effects can
+ *  key on "undead". A skeleton carries BOTH. */
+export type UnitTag = "undead" | "skeleton";
+
 export interface UnitDef {
   id: string;
   name: string;
@@ -123,6 +129,9 @@ export interface UnitDef {
    *  `wardedAgainst`: performBasicAttack attaches `rider` to the shot's projectile
    *  and stepProjectiles applies it — no per-unit `defId` branch. */
   basicShotRider?: { everyNthAttack: number; rider: ShotRider };
+  /** Creature-type tags (the whole Bonefields roster is "undead"; raised bones
+   *  are also "skeleton"). Absent = untyped. */
+  tags?: UnitTag[];
   /** Human-readable passive traits (engine-coded behaviors) for the detail UI. */
   traits?: { name: string; description: string }[];
 }

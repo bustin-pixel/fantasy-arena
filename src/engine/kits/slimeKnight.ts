@@ -1,7 +1,10 @@
 // Slime Knight (defId "slime_knight") & Slime Blob (defId "slime_squire") — a
 // legendary "undying" bruiser. While alive it plays like a knight: Gelatinous
-// Guard sheathes it in an absorb shield off cooldown (fireAbility). Its death is
-// the real trick — Divide & Reconvene:
+// Guard sheathes it in an absorb shield off cooldown (fireAbility), its acid
+// body ticks Caustic Aura damage on everything nearby (onTick), and enemy
+// skeletons dying in that aura are slurped up for health — Absorb Bones
+// (onUnitDeath, the anti-horde tech for The Bonefields). Its death is the real
+// trick — Divide & Reconvene:
 //   • On death it bursts (AoE) and FLINGS a shrinking squad of Slime Blobs outward
 //     (4 at stage 0, one fewer each rebirth). The blobs ignore combat entirely and
 //     ooze straight back toward the corpse — homeAnchor drives their movement
@@ -17,6 +20,7 @@
 import type { UnitKit, KitCtx } from "./UnitKit";
 import type { Unit, Vec2 } from "@/types";
 import { getUnitDef } from "@/data/units";
+import { isIncapacitated } from "../StatusEffectSystem";
 import {
   secToTicks,
   FIELD_WIDTH,
@@ -26,6 +30,12 @@ import {
 import { clamp, dist } from "@/utils/math";
 
 const GUARD_SHIELD = 45; // Gelatinous Guard absorb granted per cast
+// Caustic Aura + Absorb Bones — the anti-horde package (built as the skeleton
+// counter for The Bonefields; see UnitDef.tags).
+const AURA_RADIUS = 90; // matches the death-burst radius — one visual language
+const AURA_DMG_FRAC = 0.3; // of its damage stat, dealt to each enemy per beat
+const AURA_INTERVAL_TICKS = secToTicks(1); // one acid beat per second
+const ABSORB_HEAL = 12; // HP slurped per enemy skeleton dying in the aura
 const BASE_BLOBS = 3; // blobs flung at rebornStage 0 (decays by stage → 3/2/1)
 const FLING_DIST = 110; // how far outward blobs spawn from the corpse
 const KNIGHT_BURST = 30; // the knight's own death burst
@@ -62,6 +72,39 @@ function burst(unit: Unit, ctx: KitCtx, damage: number, radius: number): void {
 
 export const slimeKnightKit: UnitKit = {
   roleClass: "melee",
+
+  // Caustic Aura: once a second (tick-synced, like Raise Dead), its acid body
+  // burns every enemy within reach for a fraction of its damage stat — so the
+  // aura scales with unit level. Pre-gate slot, so it must self-gate: silent
+  // while dead or incapacitated (stun/fear/polymorph), matching the other
+  // periodic passives.
+  onTick(unit, ctx) {
+    if (unit.state === "dead" || isIncapacitated(unit)) return;
+    if (ctx.tick % AURA_INTERVAL_TICKS !== 0) return;
+    const acid = Math.max(1, Math.round(unit.damage * AURA_DMG_FRAC));
+    for (const e of ctx.enemies) {
+      if (e.state === "dead") continue;
+      if (dist(unit.pos, e.pos) <= AURA_RADIUS) ctx.dealDamage(e, acid, unit);
+    }
+  },
+
+  // Absorb Bones: any ENEMY skeleton (UnitDef.tags) dying inside the aura —
+  // whoever landed the kill — is slurped up and heals the knight. Fired from
+  // the death-observer seam; heals through the funnel (clamps at maxHp).
+  onUnitDeath(unit, victim, _killer, ctx) {
+    if (isIncapacitated(unit)) return;
+    if (victim.team === unit.team) return;
+    if (!getUnitDef(victim.defId).tags?.includes("skeleton")) return;
+    if (dist(unit.pos, victim.pos) > AURA_RADIUS) return;
+    ctx.heal(unit, ABSORB_HEAL);
+    ctx.spawnVfx({
+      kind: "shield_pop",
+      pos: { x: unit.pos.x, y: unit.pos.y - 4 },
+      life: secToTicks(0.35),
+      maxLife: secToTicks(0.35),
+      color: getUnitDef(unit.defId).accent,
+    });
+  },
 
   // Gelatinous Guard: top the absorb shield up to GUARD_SHIELD each time the
   // cooldown is up. Instant (no cast time) → fires through the instant-cast seam
