@@ -24,7 +24,10 @@ import {
 import { isAvatarUnlocked } from "@/meta/avatars";
 import { MILESTONE_UNLOCKS, UNLOCK_PRICES } from "@/meta/economy";
 import { addXp } from "@/meta/leveling";
+import { canEquip, combineFold } from "@/meta/inventory";
 import { questForUnlock } from "@/data/dungeons";
+import { makeItemKey, parseItemKey, type ItemKey } from "@/data/items";
+import type { ItemSlot } from "@/types";
 import type { BattleRewards } from "@/meta/rewards";
 import type { BattleMode } from "@/hooks/useBattleEngine";
 import { UNITS } from "@/data/units";
@@ -58,6 +61,15 @@ interface GameStateValue {
   ) => void;
   /** Buy a locked unit with gold. No-op unless locked and affordable. */
   purchaseUnit: (unitId: string) => void;
+  /** Equip an item on a unit (the key's slot type picks the slot; a same-slot
+   *  swap frees its own reference first). No-op unless a copy is free. */
+  equipItem: (defId: string, key: ItemKey) => void;
+  /** Clear one of a unit's item slots. */
+  unequipItem: (defId: string, slot: ItemSlot) => void;
+  /** Merge two copies of `key` into the next star/quality, paying the
+   *  gold/shard fee. No-op when blocked (copies/fee/cap) — the Bag disables
+   *  the button with the reason, this is belt-and-braces. */
+  combineItems: (key: ItemKey) => void;
 }
 
 const GameStateContext = createContext<GameStateValue | null>(null);
@@ -119,6 +131,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
   ) =>
     setSave((s) => {
       let gold = s.gold + rewards.gold;
+      let soulShards = s.soulShards + rewards.shards;
       // Whole-deck XP: every fielded unit earns the full amount (addXp is the
       // same clamp the RewardPanel preview uses, so preview ≡ persisted).
       const unitXp = { ...s.unitXp };
@@ -128,10 +141,17 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
         }
       }
       const unlocked = new Set(s.unlockedUnits);
+      const items = { ...s.items };
       for (const entry of rewards.chest?.contents ?? []) {
         if (entry.kind === "gold") gold += entry.amount;
         else if (entry.kind === "duplicate") gold += entry.gold;
-        else unlocked.add(entry.unitId);
+        else if (entry.kind === "unit") unlocked.add(entry.unitId);
+        else if (entry.kind === "shards") soulShards += entry.amount;
+        else {
+          // Item drops arrive at 1★ — stars only ever come from merging.
+          const key = makeItemKey(entry.lineId, entry.quality, 1);
+          items[key] = (items[key] ?? 0) + 1;
+        }
       }
       // Endless: fold the run's depth into the best-wave high-water mark.
       const endless =
@@ -158,6 +178,8 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       return {
         ...s,
         gold,
+        soulShards,
+        items,
         unitXp,
         unlockedUnits: [...unlocked],
         dungeons,
@@ -184,6 +206,48 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       };
     });
 
+  // ---- items — every fold is pure (StrictMode-safe) and preserves the
+  // references ≤ counts invariant via meta/inventory. ------------------------
+  const equipItem = (defId: string, key: ItemKey) =>
+    setSave((s) => {
+      const p = parseItemKey(key);
+      if (!p || !UNITS[defId]) return s;
+      if (!s.unlockedUnits.includes(defId)) return s;
+      if (!canEquip(s, defId, key)) return s;
+      return {
+        ...s,
+        loadouts: {
+          ...s.loadouts,
+          [defId]: { ...s.loadouts[defId], [p.line.slot]: key },
+        },
+      };
+    });
+
+  const unequipItem = (defId: string, slot: ItemSlot) =>
+    setSave((s) => {
+      const current = s.loadouts[defId];
+      if (!current?.[slot]) return s;
+      const next = { ...current };
+      delete next[slot];
+      const loadouts = { ...s.loadouts };
+      if (next.weapon || next.armor || next.trinket) loadouts[defId] = next;
+      else delete loadouts[defId];
+      return { ...s, loadouts };
+    });
+
+  const combineItems = (key: ItemKey) =>
+    setSave((s) => {
+      const folded = combineFold(s, key);
+      if (folded === (s as typeof folded)) return s;
+      return {
+        ...s,
+        items: folded.items,
+        loadouts: folded.loadouts,
+        gold: folded.gold,
+        soulShards: folded.soulShards,
+      };
+    });
+
   return (
     <GameStateContext.Provider
       value={{
@@ -195,6 +259,9 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
         recordBestiary,
         grantBattleRewards,
         purchaseUnit,
+        equipItem,
+        unequipItem,
+        combineItems,
       }}
     >
       {children}

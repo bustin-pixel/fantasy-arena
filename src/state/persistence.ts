@@ -6,9 +6,11 @@
 // Vitest can exercise it headlessly — loadSave only does the storage I/O.
 // ============================================================================
 
+import type { ItemLoadouts } from "@/types";
 import { DECKABLE_UNIT_IDS, UNITS } from "@/data/units";
 import { STARTER_UNIT_IDS } from "@/meta/economy";
 import { TOTAL_XP_CAP } from "@/meta/leveling";
+import { sanitizeItems, sanitizeLoadouts } from "@/meta/inventory";
 import { DEFAULT_AVATAR_ID, isAvatarUnlocked } from "@/meta/avatars";
 import { DUNGEON_IDS, DUNGEONS, QUEST_LOCKED_UNITS } from "@/data/dungeons";
 
@@ -85,8 +87,16 @@ export interface PlayerSave {
    *  via meta/leveling.levelFromXp — never store a level, so the two can't
    *  desync. Missing id = 0 XP = level 1. Clamped to TOTAL_XP_CAP. (Save v8.) */
   unitXp: Record<string, number>;
-  // Future slices (additive, versioned-merge handles them): soulShards,
-  // items inventory, per-unit loadouts.
+  /** Soul Shards — the premium currency. Earned from one-time first clears
+   *  and a rare top-chest drip; spent on legendary-tier item merges. (Save v9.) */
+  soulShards: number;
+  /** Item inventory: STACK COUNTS keyed by ItemKey "lineId:quality:star"
+   *  (equipped copies included — loadouts REFERENCE these stacks). The
+   *  invariant references ≤ count is enforced by meta/inventory folds and
+   *  re-enforced in migrateSave. (Save v9.) */
+  items: Record<string, number>;
+  /** Equipped item keys per unit defId (weapon/armor/trinket). (Save v9.) */
+  loadouts: ItemLoadouts;
 }
 
 // The key names the storage SLOT, not the schema — the version lives inside
@@ -94,7 +104,7 @@ export interface PlayerSave {
 const KEY = "fantasy-arena/save/v1";
 
 export const DEFAULT_SAVE: PlayerSave = {
-  version: 8,
+  version: 9,
   username: "Champion",
   avatarId: DEFAULT_AVATAR_ID,
   deck: ["ogre", "archer", "knight", "fire_mage"],
@@ -107,6 +117,9 @@ export const DEFAULT_SAVE: PlayerSave = {
   questUnlocks: [],
   endless: { bestWave: 0 },
   unitXp: {},
+  soulShards: 0,
+  items: {},
+  loadouts: {},
 };
 
 export function loadSave(): PlayerSave {
@@ -161,6 +174,19 @@ export function migrateSave(parsed: Partial<PlayerSave> | null): PlayerSave {
     unitXp[id] = Math.min(TOTAL_XP_CAP, Math.max(0, Math.floor(xp)));
   }
   merged.unitXp = unitXp;
+  // v9: Soul Shards + item inventory + per-unit loadouts. The sanitizers
+  // rebuild both maps defensively (parseable keys, slot-type match, and the
+  // references ≤ count invariant) — see meta/inventory.
+  const rawShards = Number(parsed.soulShards ?? 0);
+  merged.soulShards = Number.isFinite(rawShards)
+    ? Math.max(0, Math.floor(rawShards))
+    : 0;
+  merged.items = sanitizeItems(parsed.items);
+  merged.loadouts = sanitizeLoadouts(
+    parsed.loadouts,
+    merged.items,
+    DECKABLE_UNIT_IDS
+  );
 
   // Grandfathering: saves from before the unlock system keep every unit that
   // exists today — EXCEPT quest-locked ones, whose purchase must always be
@@ -213,6 +239,10 @@ function structuredCloneSave(save: PlayerSave): PlayerSave {
     questUnlocks: [...save.questUnlocks],
     endless: { ...save.endless },
     unitXp: { ...save.unitXp },
+    items: { ...save.items },
+    loadouts: Object.fromEntries(
+      Object.entries(save.loadouts).map(([id, l]) => [id, { ...l }])
+    ),
   };
 }
 

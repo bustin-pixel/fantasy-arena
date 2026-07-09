@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { DECKABLE_UNIT_IDS, getUnitDef, isMelee } from "@/data/units";
 import { RARITIES } from "@/data/rarities";
 import { ABILITIES } from "@/data/abilities";
@@ -11,7 +11,17 @@ import {
   xpForNext,
   xpIntoLevel,
 } from "@/meta/leveling";
-import type { UnitDef } from "@/types";
+import {
+  describeItemMods,
+  describeLuckyCoin,
+  ITEM_SLOTS,
+  parseItemKey,
+  resolveItemMods,
+  resolveLoadoutMods,
+} from "@/data/items";
+import { availableCount } from "@/meta/inventory";
+import { ItemIcon } from "@/components/ItemIcon";
+import type { ItemLoadouts, ItemSlot, UnitDef } from "@/types";
 
 interface Props {
   defId: string;
@@ -36,6 +46,13 @@ interface Props {
    *  leveled Health/Damage readouts. Omit (Compendium monsters, locked units)
    *  to hide all level UI. */
   totalXp?: number;
+  /** Equipment (hub only): the item inventory + all loadouts, with equip /
+   *  unequip callbacks scoped to THIS unit. Omit any of the four (Compendium,
+   *  locked units) to hide the Equipment section. */
+  items?: Record<string, number>;
+  loadouts?: ItemLoadouts;
+  onEquip?: (key: string) => void;
+  onUnequip?: (slot: ItemSlot) => void;
 }
 
 const ART_SIZE = 120;
@@ -52,6 +69,80 @@ const MAX_RANGE = Math.max(...DECK_DEFS.map((d) => d.range));
 function rangeLabel(def: UnitDef): string {
   if (isMelee(def)) return "Melee";
   return def.range <= FIELD_WIDTH * 0.31 ? "Medium" : "Long";
+}
+
+/** The inline "pick an item for this slot" list: every owned stack of the
+ *  slot's type with a FREE copy (or the one this unit already wears), plus a
+ *  Remove row. Fungible stacks — equipping just points the loadout at a key. */
+function EquipPicker({
+  slot,
+  defId,
+  items,
+  loadouts,
+  onEquip,
+  onUnequip,
+}: {
+  slot: ItemSlot;
+  defId: string;
+  items: Record<string, number>;
+  loadouts: ItemLoadouts;
+  onEquip: (key: string) => void;
+  onUnequip: () => void;
+}) {
+  const current = loadouts[defId]?.[slot];
+  const options = Object.keys(items)
+    .filter((key) => {
+      const p = parseItemKey(key);
+      if (!p || p.line.slot !== slot) return false;
+      return key === current || availableCount(items, loadouts, key) > 0;
+    })
+    .sort();
+  return (
+    <div className="equip-picker">
+      {options.length === 0 && !current && (
+        <div className="equip-picker-empty">
+          No {slot}s in your Bag yet — chests drop them.
+        </div>
+      )}
+      {options.map((key) => {
+        const p = parseItemKey(key)!;
+        const lines =
+          p.lineId === "lucky_coin"
+            ? describeLuckyCoin(p.quality, p.star)
+            : describeItemMods(resolveItemMods(key));
+        return (
+          <button
+            key={key}
+            type="button"
+            className={`equip-option${key === current ? " current" : ""}`}
+            onClick={() => (key === current ? onUnequip() : onEquip(key))}
+          >
+            <ItemIcon itemKey={key} size={40} />
+            <span className="equip-option-body">
+              <span
+                className="equip-option-name"
+                style={{ color: RARITIES[p.quality].color }}
+              >
+                {p.line.name} {"★".repeat(p.star)}
+              </span>
+              <span className="equip-option-desc">{lines.join(" · ")}</span>
+            </span>
+            <span className="equip-option-action">
+              {key === current ? "Remove" : "Equip"}
+            </span>
+          </button>
+        );
+      })}
+      {current && (
+        <button type="button" className="equip-option remove" onClick={onUnequip}>
+          <span className="equip-option-body">
+            <span className="equip-option-name">Empty the slot</span>
+          </span>
+          <span className="equip-option-action">Unequip</span>
+        </button>
+      )}
+    </div>
+  );
 }
 
 function StatBar({
@@ -98,15 +189,45 @@ export function UnitDetail({
   unlockPrice,
   lockHint,
   totalXp,
+  items,
+  loadouts,
+  onEquip,
+  onUnequip,
 }: Props) {
   const def = getUnitDef(defId);
   const price = unlockPrice ?? UNLOCK_PRICES[def.rarity];
   const rarity = RARITIES[def.rarity];
+  // Equipment (hub-owned units only). Which slot's picker is open.
+  const [pickerSlot, setPickerSlot] = useState<ItemSlot | null>(null);
+  const equipEnabled =
+    !readonly && !locked && items != null && loadouts != null && !!onEquip && !!onUnequip;
+  const loadout = equipEnabled ? loadouts[defId] : undefined;
+  const itemMods = resolveLoadoutMods(loadout);
   // Level readouts (only when the caller supplies XP — hub-owned units).
   const level = totalXp !== undefined ? levelFromXp(totalXp) : 1;
   const mult = levelStatMultipliers(level);
-  const shownHp = Math.round(def.hp * mult.hp);
-  const shownDmg = Math.round(def.damage * mult.dmg);
+  // Same nested rounding as the engine bake (level first, then items), so the
+  // panel numbers equal the battlefield exactly.
+  const shownHp = Math.round(
+    Math.round(def.hp * mult.hp) * (itemMods?.hpMult ?? 1)
+  );
+  const shownDmg = Math.round(
+    Math.round(def.damage * mult.dmg) * (itemMods?.dmgMult ?? 1)
+  );
+  const shownAtk = def.attackSpeed * (itemMods?.atkDelayMult ?? 1);
+  const shownMove = Math.round(def.moveSpeed * (itemMods?.moveSpeedMult ?? 1));
+  // The combined "what my gear does" summary under the slots (Lucky Coin is
+  // meta-only, described from its own ladder).
+  const luckyTrinket =
+    loadout?.trinket && parseItemKey(loadout.trinket)?.lineId === "lucky_coin"
+      ? parseItemKey(loadout.trinket)!
+      : null;
+  const equipSummary = [
+    ...(itemMods ? describeItemMods(itemMods) : []),
+    ...(luckyTrinket
+      ? describeLuckyCoin(luckyTrinket.quality, luckyTrinket.star)
+      : []),
+  ];
   const xpNeed = totalXp !== undefined ? xpForNext(totalXp) : null;
   // Skip the "lifesteal" filler slot (the never-casts convention for summons
   // and Depths monsters) unless the unit actually lifesteals (the Orc pairs
@@ -248,23 +369,34 @@ export function UnitDetail({
               label="Health"
               pct={(def.hp / MAX_HP) * 100}
               value={`${shownHp}`}
-              bonus={level > 1 ? `+${shownHp - def.hp}` : undefined}
+              bonus={shownHp > def.hp ? `+${shownHp - def.hp}` : undefined}
               fill="#86efac"
             />
             <StatBar
               label="Damage"
               pct={(def.damage / MAX_DMG) * 100}
               value={`${shownDmg}`}
-              bonus={level > 1 ? `+${shownDmg - def.damage}` : undefined}
+              bonus={shownDmg > def.damage ? `+${shownDmg - def.damage}` : undefined}
               fill="#fb923c"
             />
             <StatBar
               label="Atk speed"
               pct={(MIN_ATK / def.attackSpeed) * 100}
-              value={`${def.attackSpeed.toFixed(1)}s`}
+              value={`${shownAtk.toFixed(1)}s`}
+              bonus={
+                shownAtk < def.attackSpeed
+                  ? `+${Math.round((def.attackSpeed / shownAtk - 1) * 100)}%`
+                  : undefined
+              }
               fill="#fcd34d"
             />
-            <StatBar label="Move" pct={(def.moveSpeed / MAX_MOVE) * 100} value={`${def.moveSpeed}`} fill="#7dd3fc" />
+            <StatBar
+              label="Move"
+              pct={(def.moveSpeed / MAX_MOVE) * 100}
+              value={`${shownMove}`}
+              bonus={shownMove > def.moveSpeed ? `+${shownMove - def.moveSpeed}` : undefined}
+              fill="#7dd3fc"
+            />
             <StatBar
               label="Range"
               pct={(def.range / MAX_RANGE) * 100}
@@ -272,6 +404,75 @@ export function UnitDetail({
               fill="#5dcaa5"
             />
           </div>
+
+          {equipEnabled && (
+            <div className="detail-section equip-section">
+              <div className="detail-skill-head">
+                <span className="detail-skill-name">Equipment</span>
+              </div>
+              <div className="equip-slots">
+                {ITEM_SLOTS.map((slot) => {
+                  const key = loadout?.[slot];
+                  const p = key ? parseItemKey(key) : null;
+                  return (
+                    <button
+                      key={slot}
+                      type="button"
+                      className={`equip-slot${pickerSlot === slot ? " open" : ""}`}
+                      onClick={() =>
+                        setPickerSlot(pickerSlot === slot ? null : slot)
+                      }
+                      aria-label={`${slot} slot`}
+                    >
+                      {key && p ? (
+                        <>
+                          <ItemIcon itemKey={key} size={44} />
+                          <span
+                            className="equip-slot-name"
+                            style={{ color: RARITIES[p.quality].color }}
+                          >
+                            {p.line.name}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="equip-slot-glyph" aria-hidden>
+                            {slot === "weapon" ? "⚔" : slot === "armor" ? "🛡" : "◈"}
+                          </span>
+                          <span className="equip-slot-name empty">
+                            {slot[0].toUpperCase() + slot.slice(1)}
+                          </span>
+                        </>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              {pickerSlot && (
+                <EquipPicker
+                  slot={pickerSlot}
+                  defId={defId}
+                  items={items!}
+                  loadouts={loadouts!}
+                  onEquip={(key) => {
+                    onEquip!(key);
+                    setPickerSlot(null);
+                  }}
+                  onUnequip={() => {
+                    onUnequip!(pickerSlot);
+                    setPickerSlot(null);
+                  }}
+                />
+              )}
+              {equipSummary.length > 0 && (
+                <ul className="equip-effects">
+                  {equipSummary.map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
 
           {abilityIds.map((id) => {
             const ab = ABILITIES[id];

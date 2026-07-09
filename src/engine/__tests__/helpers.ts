@@ -6,8 +6,15 @@ import {
   stepSimulation,
   type SimState,
 } from "@/engine/CombatSystem";
-import { MatchController } from "@/engine/MatchController";
-import { createUnit, resetUidCounter } from "@/entities/createUnit";
+import {
+  MatchController,
+  type MatchOptions,
+} from "@/engine/MatchController";
+import {
+  createUnit,
+  resetUidCounter,
+  type ItemCarry,
+} from "@/entities/createUnit";
 import { MATCH_TIME_SEC } from "@/utils/constants";
 import type { Team, Unit } from "@/types";
 
@@ -15,9 +22,10 @@ import type { Team, Unit } from "@/types";
 export function runMatch(
   seed: number,
   player: string[],
-  enemy: string[]
+  enemy: string[],
+  opts?: MatchOptions
 ): MatchController {
-  const mc = new MatchController(seed, player, enemy);
+  const mc = new MatchController(seed, player, enemy, opts);
   let guard = 0;
   while (
     mc.phase !== "victory" &&
@@ -52,16 +60,19 @@ export function battleState(seed: number): SimState {
   return s;
 }
 
-/** Place a unit directly on the field (bypassing the deployment flow). */
+/** Place a unit directly on the field (bypassing the deployment flow).
+ *  `items` carries resolved equipment like MatchController.deploy does —
+ *  it activates only when its owner matches `defId`. */
 export function place(
   s: SimState,
   defId: string,
   team: Team,
   x: number,
   y: number,
-  level = 1
+  level = 1,
+  items?: ItemCarry
 ): Unit {
-  const u = createUnit(defId, team, { x, y }, level);
+  const u = createUnit(defId, team, { x, y }, level, items);
   s.units.push(u);
   return u;
 }

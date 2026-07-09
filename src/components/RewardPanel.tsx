@@ -17,6 +17,7 @@ import {
 } from "@/meta/leveling";
 import { getUnitDef } from "@/data/units";
 import { RARITIES } from "@/data/rarities";
+import { ITEM_LINES } from "@/data/items";
 import { ChestSprite } from "@/components/ChestSprite";
 import { renderPortrait } from "@/engine/Renderer";
 import { playStinger } from "@/audio/music";
@@ -71,6 +72,15 @@ export function RewardPanel({ rewards, floor, mode, xpGains }: Props) {
         +{shownGold} gold
       </div>
 
+      {rewards.shards > 0 && (
+        <div className="reward-gold reward-shards">
+          <span className="shard-gem" aria-hidden>
+            ◆
+          </span>
+          +{rewards.shards} Soul Shards
+        </div>
+      )}
+
       {rewards.xp > 0 && xpGains && xpGains.length > 0 && (
         <XpCeremony xp={rewards.xp} gains={xpGains} />
       )}
@@ -116,6 +126,24 @@ export function RewardPanel({ rewards, floor, mode, xpGains }: Props) {
               return (
                 <li key={i} className="reward-entry">
                   +{entry.amount} gold
+                </li>
+              );
+            }
+            if (entry.kind === "shards") {
+              return (
+                <li key={i} className="reward-entry reward-shards">
+                  +{entry.amount} Soul Shards
+                </li>
+              );
+            }
+            if (entry.kind === "item") {
+              const line = ITEM_LINES[entry.lineId];
+              return (
+                <li key={i} className="reward-entry reward-unlock">
+                  <span style={{ color: RARITIES[entry.quality].color }}>
+                    {line?.name ?? entry.lineId} ★1
+                  </span>{" "}
+                  — sent to your Bag
                 </li>
               );
             }

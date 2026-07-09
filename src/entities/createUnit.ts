@@ -1,4 +1,4 @@
-import type { Team, Unit, Vec2 } from "@/types";
+import type { ItemMods, Team, Unit, Vec2 } from "@/types";
 import { getUnitDef } from "@/data/units";
 import { levelStatMultipliers } from "@/meta/leveling";
 import { UNIT_RADIUS } from "@/utils/constants";
@@ -11,11 +11,21 @@ export function resetUidCounter(): void {
   uidCounter = 0;
 }
 
+/** The equipment a unit CARRIES: resolved mods plus the defId that owns them.
+ *  Rides the spawn queues like `level`, so gear survives self-respawn chains
+ *  (Slime Knight → blob → reborn knight) without ever activating on true
+ *  summons (skeletons/wolves/turrets carry it inert). */
+export interface ItemCarry {
+  mods: ItemMods;
+  owner: string;
+}
+
 export function createUnit(
   defId: string,
   team: Team,
   pos: Vec2,
-  level = 1
+  level = 1,
+  items?: ItemCarry
 ): Unit {
   const def = getUnitDef(defId);
   const uid = `u${uidCounter++}`;
@@ -23,7 +33,21 @@ export function createUnit(
   // Level 1 is the exact identity (round(x*1) === x). Enemy floor/wave
   // scaling is a separate post-bake in the wave controllers; never merge them.
   const mult = levelStatMultipliers(level);
-  const hp = Math.round(def.hp * mult.hp);
+  // Item bake — ACTIVE only when the carried gear belongs to this defId.
+  // Nested rounding, level first: round(round(def × lvl) × item) — the same
+  // convention as floor multipliers (NOTES §8). No items = exact identity, so
+  // an itemless sim stays byte-identical to pre-items builds.
+  const active = items && items.owner === defId ? items.mods : undefined;
+  const hp = active
+    ? Math.round(Math.round(def.hp * mult.hp) * active.hpMult)
+    : Math.round(def.hp * mult.hp);
+  const damage = active
+    ? Math.round(Math.round(def.damage * mult.dmg) * active.dmgMult)
+    : Math.round(def.damage * mult.dmg);
+  // Golem Core: spawn with an absorb shield worth a fraction of (baked) max HP.
+  const startShield = active?.effects.find((e) => e.kind === "startShield");
+  const shield =
+    startShield?.kind === "startShield" ? Math.round(hp * startShield.frac) : 0;
   return {
     uid,
     defId,
@@ -34,7 +58,9 @@ export function createUnit(
     hp,
     maxHp: hp,
     level,
-    damage: Math.round(def.damage * mult.dmg),
+    ...(items ? { latentItems: items } : {}),
+    ...(active ? { itemMods: active } : {}),
+    damage,
     attackSpeed: def.attackSpeed,
     moveSpeed: def.moveSpeed,
     range: def.range,
@@ -77,8 +103,8 @@ export function createUnit(
     tauntedByUid: null,
     chargeTicks: 0,
     chargeTargetUid: null,
-    shieldHp: 0,
-    shieldHpMax: 0,
+    shieldHp: shield,
+    shieldHpMax: shield,
     effects: [],
     hitFlash: 0,
     animTime: 0,

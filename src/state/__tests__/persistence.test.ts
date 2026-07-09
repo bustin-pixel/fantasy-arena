@@ -41,7 +41,10 @@ function v2Save(): Partial<PlayerSave> {
 describe("migrateSave", () => {
   it("null (new player) → defaults: starter units, 0 gold, floor 0", () => {
     const save = migrateSave(null);
-    expect(save.version).toBe(8);
+    expect(save.version).toBe(9);
+    expect(save.soulShards).toBe(0);
+    expect(save.items).toEqual({});
+    expect(save.loadouts).toEqual({});
     expect(save.username).toBe("Champion");
     expect(save.avatarId).toBe(DEFAULT_AVATAR_ID);
     expect(save.gold).toBe(0);
@@ -208,11 +211,86 @@ describe("migrateSave", () => {
     a.unlockedUnits.push("summoner");
     a.deck.push("summoner");
     a.unitXp.ogre = 9999;
+    a.items["soldiers_blade:rare:1"] = 5;
+    a.loadouts.ogre = { weapon: "soldiers_blade:rare:1" };
     const b = migrateSave(null);
     expect(b.unlockedUnits).not.toContain("summoner");
     expect(DEFAULT_SAVE.unlockedUnits).not.toContain("summoner");
     expect(b.unitXp).toEqual({});
     expect(DEFAULT_SAVE.unitXp).toEqual({});
+    expect(b.items).toEqual({});
+    expect(b.loadouts).toEqual({});
+    expect(DEFAULT_SAVE.items).toEqual({});
+    expect(DEFAULT_SAVE.loadouts).toEqual({});
+  });
+
+  // ---- v9: soulShards + items + loadouts ----------------------------------
+
+  it("defaults the v9 fields for a pre-v9 save", () => {
+    const save = migrateSave({ version: 8, gold: 500, unitXp: { ogre: 100 } });
+    expect(save.soulShards).toBe(0);
+    expect(save.items).toEqual({});
+    expect(save.loadouts).toEqual({});
+    expect(save.gold).toBe(500); // untouched by the new fields
+  });
+
+  it("preserves valid v9 fields end to end", () => {
+    const save = migrateSave({
+      version: 9,
+      soulShards: 42,
+      items: { "soldiers_blade:rare:2": 3, "ember_charm:legendary:1": 1 },
+      loadouts: {
+        ogre: {
+          weapon: "soldiers_blade:rare:2",
+          trinket: "ember_charm:legendary:1",
+        },
+      },
+      unlockedUnits: [...STARTER_UNIT_IDS],
+    });
+    expect(save.soulShards).toBe(42);
+    expect(save.items).toEqual({
+      "soldiers_blade:rare:2": 3,
+      "ember_charm:legendary:1": 1,
+    });
+    expect(save.loadouts.ogre).toEqual({
+      weapon: "soldiers_blade:rare:2",
+      trinket: "ember_charm:legendary:1",
+    });
+  });
+
+  it("sanitizes hand-edited v9 garbage: bad keys, bad counts, bad shards", () => {
+    const save = migrateSave({
+      version: 9,
+      soulShards: -12,
+      items: {
+        "soldiers_blade:rare:1": 2.9, // floors to 2
+        "not_a_line:rare:1": 4, // unknown line → dropped
+        "soldiers_blade:mythic:1": 4, // unknown quality → dropped
+        "soldiers_blade:rare:9": 4, // star out of range → dropped
+        "squires_plate:rare:1": -3, // negative → dropped
+      },
+    });
+    expect(save.soulShards).toBe(0);
+    expect(save.items).toEqual({ "soldiers_blade:rare:1": 2 });
+  });
+
+  it("enforces the loadout invariant: slot types match and references ≤ counts", () => {
+    const save = migrateSave({
+      version: 9,
+      items: { "soldiers_blade:rare:1": 1, "squires_plate:rare:1": 1 },
+      loadouts: {
+        ogre: {
+          weapon: "soldiers_blade:rare:1",
+          armor: "soldiers_blade:rare:1", // weapon in the armor slot → dropped
+        },
+        archer: { weapon: "soldiers_blade:rare:1" }, // over-referenced → dropped
+        not_a_unit: { armor: "squires_plate:rare:1" }, // unknown unit → dropped
+      },
+    });
+    // Sorted defId order: archer wins the single blade copy.
+    expect(save.loadouts.archer).toEqual({ weapon: "soldiers_blade:rare:1" });
+    expect(save.loadouts.ogre).toBeUndefined();
+    expect(save.loadouts.not_a_unit).toBeUndefined();
   });
 });
 

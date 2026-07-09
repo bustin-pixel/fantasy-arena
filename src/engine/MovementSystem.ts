@@ -91,6 +91,12 @@ function teamMoveMult(
   return teamMods ? teamMods[team].moveSpeedMult : 1;
 }
 
+/** Equipment move-speed multiplier (Wanderer's Cloak) — 1 for unequipped
+ *  units, so itemless sims stay byte-identical. */
+function itemMoveMult(unit: Unit): number {
+  return unit.itemMods?.moveSpeedMult ?? 1;
+}
+
 /**
  * Advance movement for one tick. A unit moves only if it is in the `moving`
  * state (the CombatSystem decides state each tick before this runs).
@@ -118,6 +124,7 @@ export function stepMovement(ctx: MovementContext): void {
         unit.moveSpeed *
         moveSpeedMultiplier(unit) *
         teamMoveMult(unit.team, teamMods) *
+        itemMoveMult(unit) *
         SEC_PER_TICK;
       if (dist(unit.pos, home) > 4) {
         const v = dir(unit.pos, home);
@@ -140,6 +147,7 @@ export function stepMovement(ctx: MovementContext): void {
       unit.moveSpeed *
       moveSpeedMultiplier(unit) *
       teamMoveMult(unit.team, teamMods) *
+      itemMoveMult(unit) *
       SEC_PER_TICK;
 
     // --- Fear: flee from the source of terror -----------------------------

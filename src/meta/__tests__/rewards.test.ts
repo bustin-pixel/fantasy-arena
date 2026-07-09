@@ -14,12 +14,16 @@ import {
   DUPLICATE_GOLD,
   ENDLESS_GOLD,
   endlessMilestoneChestTier,
+  freshMilestonesCrossed,
   GOLD_REWARDS,
   MILESTONE_UNLOCKS,
+  SHARD_CHEST_DRIP,
+  SHARD_REWARDS,
   STARTER_UNIT_IDS,
   UNLOCK_PRICES,
   type ChestTier,
 } from "@/meta/economy";
+import { ITEM_LINES, signatureLineFor } from "@/data/items";
 import { XP_REWARDS } from "@/meta/leveling";
 import { DECKABLE_UNIT_IDS, getUnitDef } from "@/data/units";
 import { RARITY_ORDER } from "@/data/rarities";
@@ -280,6 +284,7 @@ describe("computeBattleRewards — the reward matrix", () => {
       gold: GOLD_REWARDS.depthsReplay,
       xp: XP_REWARDS.dungeonWinBase + XP_REWARDS.dungeonWinPerFloor * 2,
       chest: null,
+      shards: 0,
       firstClear: false,
     });
   });
@@ -294,6 +299,7 @@ describe("computeBattleRewards — the reward matrix", () => {
         gold: GOLD_REWARDS.depthsLoss,
         xp: Math.round(XP_REWARDS.lossFrac * winXp),
         chest: null,
+        shards: 0,
         firstClear: false,
       });
     }
@@ -323,7 +329,7 @@ describe("computeBattleRewards — the reward matrix", () => {
     for (const outcome of ["victory", "defeat", "draw"] as const) {
       expect(
         computeBattleRewards({ ...base, mode: "pvp", floor: 1, outcome })
-      ).toEqual({ gold: 0, xp: 0, chest: null, firstClear: false });
+      ).toEqual({ gold: 0, xp: 0, chest: null, shards: 0, firstClear: false });
     }
   });
 
@@ -451,5 +457,229 @@ describe("endlessMilestoneChestTier", () => {
     expect(endlessMilestoneChestTier(7, 10)).toBe("gold");
     expect(endlessMilestoneChestTier(14, 15)).toBe("gold");
     expect(endlessMilestoneChestTier(15, 22)).toBe("arcane");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Items & Soul Shards
+// ---------------------------------------------------------------------------
+
+describe("rollChest — item drops", () => {
+  const itemEntries = (contents: ChestContent[]) =>
+    contents.filter(
+      (c): c is Extract<ChestContent, { kind: "item" }> => c.kind === "item"
+    );
+
+  it("is deterministic with opts, and no-signature opts change nothing", () => {
+    expect(rollChest(777, "gold", NO_UNITS, { dungeonId: "wilds" })).toEqual(
+      rollChest(777, "gold", NO_UNITS, { dungeonId: "wilds" })
+    );
+    // "depths" has no signature line → identical to the no-opts roll.
+    expect(rollChest(777, "gold", NO_UNITS, { dungeonId: "depths" })).toEqual(
+      rollChest(777, "gold", NO_UNITS)
+    );
+  });
+
+  it("keeps the legacy gold/unit prefix: gold first, item-era entries appended", () => {
+    for (let seed = 1; seed <= 200; seed++) {
+      const contents = rollChest(seed, "arcane", NO_UNITS);
+      expect(contents[0].kind).toBe("gold");
+      const firstExtra = contents.findIndex(
+        (c) => c.kind === "item" || c.kind === "shards"
+      );
+      if (firstExtra !== -1) {
+        for (const later of contents.slice(firstExtra)) {
+          expect(["item", "shards"]).toContain(later.kind);
+        }
+      }
+    }
+  });
+
+  it("respects tier quality gates: wooden/silver never drop above rare", () => {
+    for (const tier of ["wooden", "silver"] as ChestTier[]) {
+      for (let seed = 1; seed <= 400; seed++) {
+        for (const item of itemEntries(rollChest(seed, tier, NO_UNITS))) {
+          expect(item.quality).toBe("rare");
+        }
+      }
+    }
+    // Gold can reach epic but never legendary.
+    for (let seed = 1; seed <= 400; seed++) {
+      for (const item of itemEntries(rollChest(seed, "gold", NO_UNITS))) {
+        expect(item.quality).not.toBe("legendary");
+      }
+    }
+  });
+
+  it("dragon chests always contain an item; direct legendaries are reachable", () => {
+    let sawLegendary = false;
+    for (let seed = 1; seed <= 200; seed++) {
+      const items = itemEntries(rollChest(seed, "dragon", NO_UNITS));
+      expect(items.length).toBeGreaterThanOrEqual(1);
+      if (items.some((i) => i.quality === "legendary")) sawLegendary = true;
+    }
+    expect(sawLegendary).toBe(true);
+  });
+
+  it("base rolls never drop dungeon-signature lines", () => {
+    for (const tier of Object.keys(CHEST_GOLD_RANGE) as ChestTier[]) {
+      for (let seed = 1; seed <= 300; seed++) {
+        for (const item of itemEntries(rollChest(seed, tier, NO_UNITS))) {
+          expect(ITEM_LINES[item.lineId].dungeonId).toBeUndefined();
+        }
+      }
+    }
+  });
+
+  it("a themed dungeonId adds (only) that dungeon's signature line, reachably", () => {
+    const sig = signatureLineFor("wilds")!;
+    let sawSignature = false;
+    for (let seed = 1; seed <= 300; seed++) {
+      const items = itemEntries(
+        rollChest(seed, "gold", NO_UNITS, { dungeonId: "wilds" })
+      );
+      for (const item of items) {
+        const line = ITEM_LINES[item.lineId];
+        if (line.dungeonId) {
+          expect(line.id).toBe(sig.id);
+          sawSignature = true;
+        }
+      }
+    }
+    expect(sawSignature).toBe(true);
+  });
+
+  it("shard drips appear only in arcane/dragon chests, within their range", () => {
+    for (const tier of Object.keys(CHEST_GOLD_RANGE) as ChestTier[]) {
+      const drip = SHARD_CHEST_DRIP[tier];
+      let saw = false;
+      for (let seed = 1; seed <= 300; seed++) {
+        for (const c of rollChest(seed, tier, NO_UNITS)) {
+          if (c.kind !== "shards") continue;
+          expect(drip).toBeDefined();
+          expect(c.amount).toBeGreaterThanOrEqual(drip!.range[0]);
+          expect(c.amount).toBeLessThanOrEqual(drip!.range[1]);
+          saw = true;
+        }
+      }
+      if (drip) expect(saw).toBe(true);
+    }
+  });
+});
+
+describe("computeBattleRewards — Soul Shards", () => {
+  const base = { unlockedUnits: NO_UNITS, highestClearedFloor: 0, chestSeed: 42 };
+
+  it("depths first clears pay the shard ladder: floor / boss / capstone", () => {
+    const floorClear = computeBattleRewards({
+      ...base, mode: "depths", floor: 2, outcome: "victory",
+      highestClearedFloor: 1,
+    });
+    expect(floorClear.shards).toBe(SHARD_REWARDS.floorFirstClear);
+    const bossClear = computeBattleRewards({
+      ...base, mode: "depths", dungeonId: "bonefields", floor: 5,
+      outcome: "victory", highestClearedFloor: 4,
+    });
+    expect(bossClear.shards).toBe(SHARD_REWARDS.bossFirstClear);
+    const capstone = computeBattleRewards({
+      ...base, mode: "depths", dungeonId: "eclipse_spire", floor: 5,
+      outcome: "victory", highestClearedFloor: 4,
+    });
+    expect(capstone.shards).toBe(SHARD_REWARDS.bossFirstClearCapstone);
+  });
+
+  it("replays and losses pay zero shards (first-time signals only)", () => {
+    const replay = computeBattleRewards({
+      ...base, mode: "depths", floor: 2, outcome: "victory",
+      highestClearedFloor: 4,
+    });
+    const loss = computeBattleRewards({
+      ...base, mode: "depths", floor: 2, outcome: "defeat",
+    });
+    expect(replay.shards).toBe(0);
+    expect(loss.shards).toBe(0);
+    expect(
+      computeBattleRewards({ ...base, mode: "solo", floor: 1, outcome: "victory" })
+        .shards
+    ).toBe(0);
+  });
+
+  it("endless pays per FRESH milestone crossed in the run", () => {
+    const endlessBase = {
+      ...base, mode: "endless" as const, floor: 1, outcome: "defeat" as const,
+    };
+    // 3 → 12 crosses the 5 and 10 marks.
+    expect(
+      computeBattleRewards({ ...endlessBase, wavesSurvived: 12, bestWave: 3 }).shards
+    ).toBe(SHARD_REWARDS.endlessPerMilestone * 2);
+    // Already banked 10; reaching 12 crosses nothing new.
+    expect(
+      computeBattleRewards({ ...endlessBase, wavesSurvived: 12, bestWave: 10 }).shards
+    ).toBe(0);
+    expect(
+      computeBattleRewards({ ...endlessBase, wavesSurvived: 4, bestWave: 0 }).shards
+    ).toBe(0);
+  });
+
+  it("freshMilestonesCrossed counts multiples of 5 in (prevBest, survived]", () => {
+    expect(freshMilestonesCrossed(0, 4)).toBe(0);
+    expect(freshMilestonesCrossed(0, 5)).toBe(1);
+    expect(freshMilestonesCrossed(3, 12)).toBe(2);
+    expect(freshMilestonesCrossed(10, 12)).toBe(0);
+    expect(freshMilestonesCrossed(15, 30)).toBe(3);
+  });
+});
+
+describe("computeBattleRewards — Lucky Coin", () => {
+  const base = { unlockedUnits: NO_UNITS, highestClearedFloor: 0, chestSeed: 42 };
+  const coined = (key: string) => ({
+    deck: ["knight"],
+    itemLoadouts: { knight: { trinket: key } },
+  });
+
+  it("boosts flat battle gold by the coin's percentage", () => {
+    const plain = computeBattleRewards({
+      ...base, mode: "solo", floor: 1, outcome: "victory",
+    });
+    const boosted = computeBattleRewards({
+      ...base, mode: "solo", floor: 1, outcome: "victory",
+      ...coined("lucky_coin:rare:1"),
+    });
+    expect(boosted.gold).toBe(Math.round(plain.gold * 1.05));
+  });
+
+  it("a coin equipped on a unit NOT in the deck does nothing", () => {
+    const r = computeBattleRewards({
+      ...base, mode: "solo", floor: 1, outcome: "victory",
+      deck: ["ogre"],
+      itemLoadouts: { knight: { trinket: "lucky_coin:legendary:3" } },
+    });
+    expect(r.gold).toBe(GOLD_REWARDS.arenaWin);
+  });
+
+  it("legendary coin can upgrade the chest tier (seeded, both outcomes reachable)", () => {
+    const roll = (chestSeed: number) =>
+      computeBattleRewards({
+        ...base, chestSeed, mode: "solo", floor: 1, outcome: "victory",
+        ...coined("lucky_coin:legendary:3"),
+      }).chest!.tier;
+    let upgraded: number | null = null;
+    let plain: number | null = null;
+    for (let seed = 1; seed <= 5000 && (upgraded == null || plain == null); seed++) {
+      const tier = roll(seed);
+      if (tier === "silver" && upgraded == null) upgraded = seed;
+      if (tier === "wooden" && plain == null) plain = seed;
+    }
+    expect(upgraded).not.toBeNull();
+    expect(plain).not.toBeNull();
+    // Re-assert exactly on the found seeds.
+    expect(roll(upgraded!)).toBe("silver");
+    expect(roll(plain!)).toBe("wooden");
+    // Rare coins never upgrade.
+    const rareTier = computeBattleRewards({
+      ...base, chestSeed: upgraded!, mode: "solo", floor: 1, outcome: "victory",
+      ...coined("lucky_coin:rare:1"),
+    }).chest!.tier;
+    expect(rareTier).toBe("wooden");
   });
 });

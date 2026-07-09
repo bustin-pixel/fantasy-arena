@@ -384,6 +384,73 @@ Rules that keep the system sound:
   in `grantBattleRewards` via `addXp` (the SAME clamp the RewardPanel preview
   uses — preview must always equal the persisted value).
 
+### 9. Items are a match INPUT; the inventory is stack counts
+
+Equipment (save v9: `soulShards`, `items`, `loadouts`) follows the leveling
+playbook — one bake point, deterministic match input — plus its own invariants:
+
+- **The inventory is STACK COUNTS**, `save.items[ItemKey]` where `ItemKey` is
+  `"lineId:quality:star"`; instances are fungible, and `save.loadouts`
+  REFERENCE keys. The one invariant everything preserves:
+  `references(loadouts, K) ≤ items[K]` (equipped copies stay inside the
+  counts). Every mutation is a pure fold in `meta/inventory.ts`
+  (`combineFold`'s repair pass keeps the merged result equipped on the first
+  orphaned unit, sorted-defId order); `migrateSave` re-enforces it via
+  `sanitizeItems`/`sanitizeLoadouts`. Don't add per-instance state — that's a
+  schema migration and a new invariant surface.
+- **The numbers are split on purpose**: item POWER (ladders, effects,
+  `resolveItemMods`) lives in `data/items.ts`; item ACQUISITION (drop odds,
+  quality weights, merge costs, shard rewards/drip) lives in
+  `meta/economy.ts`. Tune in the right file.
+- **Items bake at `createUnit` only** — nested rounding, LEVEL FIRST:
+  `round(round(def × lvlMult) × itemMult)`. UnitDetail mirrors this exact
+  math so the panel equals the battlefield. No loadout = no `latentItems`/
+  `itemMods` fields at all ⇒ an itemless sim is byte-identical to pre-items
+  builds (`items.test.ts` digest-identity specs guard this).
+- **Loadouts ride the level channel**: `MatchOptions.itemLoadouts`, frozen by
+  BattleScreen at mount, resolved ONCE in the MatchController constructor,
+  recorded in `ReplayData.itemLoadouts`.
+- **Gear does NOT inherit; identity does.** Spawn queues carry the creator's
+  `latentItems` pair `{mods, owner}` inert; `createUnit` activates it only
+  when `owner === defId` — that's how the Slime Knight's rebirth keeps its
+  sword through the blob hop while skeletons/wolves/turrets stay bare. The
+  ONE deliberate exception is the Summoner's Sigil (`sigilPct` on the spawn
+  entry → flat stat bump in `flushSpawns`, before `init`, skipped for
+  self-respawns).
+- **Funnel reads mirror the TeamMods list** (all `?.`-guarded on
+  `unit.itemMods`): dealDamage (execute/giant-slayer/pack-tactics ×,
+  damage/magic taken ×, thorns, spell feedback, kill heal/haste, elemental
+  detonations off the dying unit's status SOURCES), attack cooldown
+  (`atkDelayMult` + Tempo stacks), performBasicAttack (crit cadence, riders —
+  ranged via `Projectile.itemRider`, a SECOND slot so innate `basicShotRider`s
+  are never displaced — double strike, chain, Nth bonus, poison spread),
+  per-tick upkeep (regen/runic barrier, pre-gate so they tick while stunned),
+  cast sites (`cooldownMult`, `abilityStartsReady` bypasses the opening
+  grace), MovementSystem (`moveSpeedMult`). Item on-hit/swing effects apply to
+  DEFAULT swings only — a kit that replaces its swing (Mystic Archer) gets
+  stat mults but not procs.
+- **AoE radii must clear unit bodies**: units are 32px-radius circles parked
+  ~64–72px apart center-to-center, so any item nova/splash radius under ~80px
+  can NEVER reach an adjacent enemy (the detonation radii are 90–100 for this
+  reason).
+- **Shards are monotonic first-time signals, no claims ledger**: depths
+  `firstClear` per floor/boss/capstone + fresh endless 5-wave milestones
+  (`freshMilestonesCrossed`), all computed inside `computeBattleRewards`; the
+  repeatable drip is a seeded `{kind:"shards"}` chest roll. Don't add a
+  claimed-grants ledger — the high-water marks already make the fold
+  exactly-once.
+- **`rollChest` appends its item-era rolls AFTER the legacy gold/unit rolls**,
+  so any pre-items seed still produces its old contents byte-identically
+  (rewards.test.ts asserts this). New chest content kinds must keep appending.
+- **The arena item mirror is enemy-side only** (`arenaMirrorMultipliers` →
+  flat hp/dmg mods with `owner = defId`, so the normal bake applies): derived
+  purely from the replay inputs, identity when nothing is equipped. PvE enemy
+  tuning is untouched by design — the player's own gear DOES apply everywhere.
+- **The Lucky Coin is the ONLY meta-read item**: `computeBattleRewards` takes
+  `itemLoadouts` just for it (gold boost + a chest-tier upgrade rolled on a
+  SEPARATE seeded stream, `RNG(chestSeed ^ 0x5eed)`, so chest contents stay
+  stable). Combat never sees it.
+
 ---
 
 ## Architecture reminders (the good patterns to preserve)

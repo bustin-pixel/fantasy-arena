@@ -143,7 +143,8 @@ export type SfxKey =
   | "sword" | "slam" | "dagger" | "bow" | "mysticShot" | "bolt" | "fireWhoosh"
   | "fireBoom" | "frostShatter" | "zap" | "arcaneWarp" | "curse" | "heal"
   | "summon" | "roar" | "shieldGong" | "slimeSquish" | "boneRattle" | "death"
-  | "deploy" | "trapSet" | "trapSnap" | "chestCreak" | "chestOpen" | "polymorph";
+  | "deploy" | "trapSet" | "trapSnap" | "chestCreak" | "chestOpen" | "polymorph"
+  | "anvil" | "itemReveal";
 
 const SOUNDS: Record<SfxKey, (r: number) => void> = {
   // metallic clang (A)
@@ -197,6 +198,10 @@ const SOUNDS: Record<SfxKey, (r: number) => void> = {
   // polymorph lands: sparkle rise, comic pop, confused double baa (variant B,
   // widget-auditioned 2026-07-05; the bleat is the zap-style rapid-blip wobble)
   polymorph(r) { [900, 1300, 1900].forEach((f, i) => blip(r, i * 0.05, f, f * 1.2, 0.08, "sine", 0.05)); blip(r, 0.16, 1400, 300, 0.05, "square", 0.12); for (let i = 0; i < 3; i++) blip(r, 0.26 + i * 0.04, 660 - i * 20, 600 - i * 20, 0.045, "sawtooth", 0.08, 0.008); for (let i = 0; i < 3; i++) blip(r, 0.47 + i * 0.045, 520 - i * 15, 470 - i * 15, 0.05, "sawtooth", 0.07, 0.01); },
+  // item combine: hammer-on-anvil clash (metallic ring over a low thud)
+  anvil(r) { blip(r, 0, 110, 45, 0.14, "triangle", 0.4); ring(r, 0.01, [1720, 2610, 3900], 0.32, 0.12); burst(r, 0, 0.05, 0.2, "highpass", 3500, 6500); },
+  // item reveal: rising shimmer arpeggio (the merged result pops into view)
+  itemReveal(r) { [1047, 1319, 1568, 2093].forEach((f, i) => blip(r, i * 0.06, f, f * 1.04, 0.16, "sine", 0.06, 0.008)); ring(r, 0.22, [3140, 4230], 0.14, 0.05); },
 };
 
 // ---------------------------------------------------------------------------

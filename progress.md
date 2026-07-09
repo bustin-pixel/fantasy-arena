@@ -128,15 +128,24 @@ handshake with file anchors + commit sequencing in
    crypt → Gargoyle), 16–20 (the throne → Lich) per the approved monster list
    below; difficulty pass as the curve extends; gold-tier chests on deep bosses.
    Content work — interleaves with slices 3+.
-3. **Bestiary rewards + Soul Shard earn-side:** one-time gold on first
-   encounter/defeat (hook into the `recordBestiary` tier-upgrade write —
-   inherently unfarmable); boss first-kills + section completions grant **Soul
-   Shards** (save v4: `soulShards`, `bossFirstKills`); 3-star floors. Soul
-   Shards are scarce by design — never from replays/farming.
-4. **Items v1:** 3 slots (weapon +dmg / armor +HP / trinket special) × 3 tiers,
-   chest-only drops (a `kind: "item"` entry joins the chest-content union — no
-   migration needed); modifiers applied at `createUnit`; loadout UI + detail
-   panel surfacing. Save v5: `items`, `loadouts`.
+3. **Bestiary rewards (+ the REMAINING Soul Shard earn ideas):** one-time gold
+   on first encounter/defeat (hook into the `recordBestiary` tier-upgrade
+   write — inherently unfarmable); 3-star floors. NOTE: the Soul Shard
+   currency itself SHIPPED with Items v1 (save v9, not the sketched v4) —
+   earned from floor/boss/capstone first clears + fresh endless milestones +
+   an arcane/dragon chest drip; spent on legendary-tier merges. Bestiary
+   shard grants would be additive on top.
+4. ~~**Items v1**~~ — **✅ BUILT (feat/items-v1, save v9 — bigger than the
+   sketch):** 25 item lines (6 weapons / 5 armors / 8 trinkets base + 6
+   dungeon-signature relics on themed boss chests), rare→epic→legendary ×
+   1–3★ with **pairwise-doubling merges** (2 identical → +1★; two 3★ → next
+   quality; gold fees for rare/epic work, **Soul Shards for everything
+   legendary**), Bag sheet + combine ceremony + UnitDetail equip slots,
+   per-unit `itemMods` engine channel (a deterministic match input like
+   levels), arena enemy item mirror, Lucky Coin meta trinket. Invariants =
+   NOTES §9. Still open: **item-assuming dungeon tier** (post-gear
+   difficulty band — new content, its own slice) and a **Combine All** QoL
+   sweep for late-game hoards.
 5. **Soul Shop — sells distinction, never battle power** (no stat boosts, no
    revives, no timers): unit skins (palette swaps — mostly cheap via
    `color`/`accent`, but the sprite glow-up added hardcoded literals — knight
@@ -207,16 +216,19 @@ the engine. Adding a unit is one kit file + data. Full design + hook contracts i
 future balance passes just use the seam (e.g. the shipped `isIncapacitated` upkeep
 suppression).
 
-### Items / equipment for units (planned — economy slice 4)
-Gear that modifies a unit's stats or kit (weapon → +damage, armor → +HP / damage
-reduction, trinket → a small effect or extra trait). Design notes:
-- Layer item modifiers onto `UnitDef` stats at unit creation (like a buff applied in
-  `entities/createUnit.ts`) so the engine stays data-driven.
-- **Must stay deterministic** — no random drops mid-battle; rolls happen in the meta
-  layer with a stored seed (the shipped chest roller in `src/meta/rewards.ts` is the
-  pattern: item drops become a new `ChestContent` kind).
-- Surface equipped items in the hub detail panel (already data-driven) and a new loadout
-  UI. Ties into PvE rewards and the rarity model.
+### Items / equipment for units ✅ BUILT (feat/items-v1, save v9)
+Shipped exactly on the old design's anchors — modifiers bake at `createUnit`
+(nested rounding, level first), drops are a `{kind:"item"}` chest-content
+entry from the seeded `rollChest`, loadout UI lives in the UnitDetail panel +
+a new Bag sheet. What grew beyond the sketch: item LINES that persist across
+rare→epic→legendary (palette-swapped, signature effect unlocks at legendary),
+1–3★ pairwise merging with a combine ceremony, Soul Shards as the premium
+currency for legendary-tier merges, six dungeon-signature relics, an arena
+enemy item mirror, and per-unit proc effects (execute/lifesteal/thorns/
+detonations/tempo/pack tactics/…). All invariants in NOTES §9; specs in
+`engine/__tests__/items.test.ts` + `meta/__tests__/inventory.test.ts`.
+- Still open: **item-assuming dungeon tier** (harder content band tuned for
+  geared warbands) and **Combine All** QoL.
 
 ### Anticipated meta systems (still out of scope)
 Trophies / ranks, accounts / auth, replay-playback UI. (Gold, chests, and unit

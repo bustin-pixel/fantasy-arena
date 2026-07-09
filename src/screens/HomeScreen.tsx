@@ -15,6 +15,8 @@ const ENDLESS_GATE_FLOOR = 5;
 
 interface Props {
   onBattle: (mode: BattleMode, floor?: number, dungeonId?: string) => void;
+  /** Open the equipment Bag (rendered by AppShell so it overlays everything). */
+  onOpenBag: () => void;
 }
 
 /**
@@ -22,8 +24,10 @@ interface Props {
  * (mode "solo"); the Dungeons card opens the dungeon-select map (The Depths +
  * the themed legendary dungeons), then a floor picker for the chosen dungeon.
  */
-export function HomeScreen({ onBattle }: Props) {
+export function HomeScreen({ onBattle, onOpenBag }: Props) {
   const { save } = useGameState();
+  // Total items owned (across all stacks) for the Bag button's count badge.
+  const bagCount = Object.values(save.items).reduce((n, c) => n + c, 0);
   // A single unit is enough to battle — the engine fields whatever you bring
   // (readiness is min(deckSize, activeCap)); an empty deck is the only block.
   const ready = save.deck.length >= 1;
@@ -101,6 +105,20 @@ export function HomeScreen({ onBattle }: Props) {
       {!ready && (
         <p className="home-hint">← Swipe to Collection to build your warband</p>
       )}
+
+      {/* Floating Bag button — bottom-right, above the Compendium tab. */}
+      <button
+        type="button"
+        className="home-bag-fab"
+        aria-label="Open Bag"
+        onClick={onOpenBag}
+      >
+        <span className="home-bag-emoji" aria-hidden>
+          🎒
+        </span>
+        <span className="home-bag-text">Bag</span>
+        {bagCount > 0 && <span className="home-bag-count">{bagCount}</span>}
+      </button>
 
       {editingProfile && (
         <ProfileSheet onClose={() => setEditingProfile(false)} />

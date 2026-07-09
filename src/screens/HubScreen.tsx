@@ -13,7 +13,7 @@ import { generateSeed } from "@/utils/rng";
 import { useGameState } from "@/state/GameStateContext";
 
 export function HubScreen() {
-  const { save, setDeck, purchaseUnit } = useGameState();
+  const { save, setDeck, purchaseUnit, equipItem, unequipItem } = useGameState();
   const deck = save.deck;
   const unlockedUnits = save.unlockedUnits;
   const [detailId, setDetailId] = useState<string | null>(null);
@@ -206,6 +206,11 @@ export function HubScreen() {
           lockHint={detailLockHint}
           // Level UI only for owned units — a locked unit has no XP story yet.
           totalXp={isLocked(detailId) ? undefined : save.unitXp[detailId] ?? 0}
+          // Equipment slots (UnitDetail hides them for locked units itself).
+          items={save.items}
+          loadouts={save.loadouts}
+          onEquip={(key) => equipItem(detailId, key)}
+          onUnequip={(slot) => unequipItem(detailId, slot)}
         />
       )}
     </div>

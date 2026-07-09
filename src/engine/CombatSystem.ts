@@ -16,8 +16,10 @@
 import type {
   BattleSnapshot,
   FloatingText,
+  ItemEffect,
   MatchPhase,
   Projectile,
+  ShotRider,
   Team,
   Trap,
   Unit,
@@ -40,7 +42,7 @@ import {
 import { clamp, dir, dist } from "@/utils/math";
 import { getUnitDef } from "@/data/units";
 import { EXECUTE_THRESHOLD } from "@/data/boons";
-import { createUnit } from "@/entities/createUnit";
+import { createUnit, type ItemCarry } from "@/entities/createUnit";
 import {
   abilityCastTimeTicks,
   abilityCooldownTicks,
@@ -167,6 +169,11 @@ export interface SimState {
     pos: Vec2;
     /** Creator's level — summons inherit it (stats bake before `init` runs). */
     level?: number;
+    /** Creator's carried equipment — rides INERT unless the spawn's defId is
+     *  the gear's owner (Slime Knight rebirth). True summons never activate it. */
+    items?: ItemCarry;
+    /** Creator's Summoner's Sigil bonus — spawned units get +frac stats. */
+    sigilPct?: number;
     init?: (u: Unit) => void;
   }[];
   /** Boss-floor telegraph banner (rare catalyst / boss incoming), or null. Set
@@ -205,6 +212,92 @@ export function createSimState(seed: number, clockSec: number): SimState {
 
 function nextId(state: SimState, prefix: string): string {
   return `${prefix}${state.idCounter++}`;
+}
+
+// ---------------------------------------------------------------------------
+// Item-effect helpers — per-unit equipment (unit.itemMods), the per-unit twin
+// of TeamMods. Every read is `?.`-guarded so an unequipped unit costs nothing
+// and an itemless sim stays byte-identical to pre-items builds.
+// ---------------------------------------------------------------------------
+
+/** Items' execute threshold (Soldier's Blade legendary): below 25% HP. */
+const ITEM_EXECUTE_THRESHOLD = 0.25;
+
+function findItemEffect<K extends ItemEffect["kind"]>(
+  unit: Unit,
+  kind: K
+): Extract<ItemEffect, { kind: K }> | undefined {
+  return unit.itemMods?.effects.find(
+    (e): e is Extract<ItemEffect, { kind: K }> => e.kind === kind
+  );
+}
+
+/** Pack Tactics (Alpha's Pelt legendary): bonus fraction per LIVING ally. */
+function packTacticsFrac(state: SimState, unit: Unit): number {
+  const pt = findItemEffect(unit, "packTactics");
+  if (!pt) return 0;
+  let allies = 0;
+  for (const u of state.units) {
+    if (u !== unit && u.team === unit.team && u.state !== "dead") allies++;
+  }
+  return pt.perAlly * allies;
+}
+
+/** Apply an item rider's status + impact vfx to a target (melee hits, item
+ *  projectile riders, detonation novae all funnel through here). */
+function applyItemRider(
+  state: SimState,
+  target: Unit,
+  sourceUid: string,
+  r: ShotRider
+): void {
+  applyEffect(
+    target,
+    makeEffect(r.effectType, {
+      source: sourceUid,
+      durationSec: r.durationSec,
+      damagePerTick: r.damagePerTick,
+      tickIntervalSec: r.tickIntervalSec,
+      magnitude: r.magnitude,
+    })
+  );
+  spawnVfx(state, {
+    kind: r.vfxKind,
+    pos: { x: target.pos.x, y: target.pos.y },
+    life: secToTicks(0.4),
+    maxLife: secToTicks(0.4),
+    color: r.color,
+  });
+}
+
+/** Per-tick equipment upkeep: Heartwood regen (through the heal funnel, once
+ *  per second on the global clock) and the Runeward barrier re-form timer.
+ *  Runs in the pre-gate maintenance slot, so it ticks even while stunned. */
+function stepItemUpkeep(
+  state: SimState,
+  unit: Unit,
+  heal: (t: Unit, amt: number) => void
+): void {
+  for (const e of unit.itemMods!.effects) {
+    if (e.kind === "regen") {
+      if (state.tick % secToTicks(1) === 0 && unit.hp < unit.maxHp) {
+        const doubled = e.doubledBelowHalf && unit.hp < unit.maxHp / 2 ? 2 : 1;
+        heal(
+          unit,
+          Math.max(1, Math.round((unit.maxHp * e.pctPerSec * doubled) / 100))
+        );
+      }
+    } else if (e.kind === "runicBarrier") {
+      if (unit.barrierCountdown == null || unit.barrierCountdown <= 0) {
+        const amt = Math.round(unit.maxHp * e.frac);
+        unit.shieldHp = Math.max(unit.shieldHp, amt);
+        unit.shieldHpMax = Math.max(unit.shieldHpMax, unit.shieldHp);
+        unit.barrierCountdown = secToTicks(e.intervalSec);
+      } else {
+        unit.barrierCountdown--;
+      }
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -247,12 +340,46 @@ function makeDamageDealer(
       target.hp / target.maxHp < EXECUTE_THRESHOLD
         ? 1 + srcMods.executeBonus
         : 1;
+    // Equipment mods, the per-unit twins: source-side execute / giant slayer /
+    // pack tactics, target-side damage reduction / magic reduction / pack
+    // tactics. Both stay exactly 1 for unequipped units.
+    let itemMult = 1;
+    const srcItems = source.itemMods;
+    if (srcItems) {
+      if (
+        srcItems.executeBonus > 0 &&
+        target.maxHp > 0 &&
+        target.hp / target.maxHp < ITEM_EXECUTE_THRESHOLD
+      ) {
+        itemMult *= 1 + srcItems.executeBonus;
+      }
+      if (srcItems.giantSlayerPct > 0 && target.maxHp > source.maxHp) {
+        itemMult *= 1 + srcItems.giantSlayerPct;
+      }
+      const pt = packTacticsFrac(state, source);
+      if (pt > 0) itemMult *= 1 + pt;
+    }
+    let itemTakenMult = 1;
+    const tgtItems = target.itemMods;
+    if (tgtItems) {
+      itemTakenMult *= tgtItems.damageTakenMult;
+      if (
+        tgtItems.magicTakenMult !== 1 &&
+        getUnitDef(source.defId).school === "magic"
+      ) {
+        itemTakenMult *= tgtItems.magicTakenMult;
+      }
+      const pt = packTacticsFrac(state, target);
+      if (pt > 0) itemTakenMult *= Math.max(0, 1 - pt);
+    }
     const scaled =
       effAmount *
       srcMods.dmgMult *
       execMult *
+      itemMult *
       target.damageTakenMult *
-      state.teamMods[target.team].damageTakenMult;
+      state.teamMods[target.team].damageTakenMult *
+      itemTakenMult;
     let dmg = Math.max(0, Math.round(scaled));
     const shown = dmg; // pre-absorb hit shown as the floating number
 
@@ -278,6 +405,28 @@ function makeDamageDealer(
 
     // (Ogre Second Wind now lives in its kit — kits/ogre.ts. onDamaged catches a
     // non-lethal hit that crosses 25%; onWouldDie below catches the lethal one.)
+
+    // Phasecloak (legendary): one-shot stealth the first time the wearer drops
+    // below half HP. Timed, so it can't stalemate a last-unit-standing check.
+    if (
+      target.hp > 0 &&
+      target.itemMods &&
+      !target.stealthTriggerUsed &&
+      target.hp < target.maxHp / 2
+    ) {
+      const cloak = findItemEffect(target, "stealthBelowHalf");
+      if (cloak) {
+        target.stealthTriggerUsed = true;
+        applyEffect(
+          target,
+          makeEffect("stealth", {
+            source: target.uid,
+            durationSec: cloak.durationSec,
+          })
+        );
+        spawnFloatingText(state, target, "Phase!", "heal");
+      }
+    }
 
     if (target.hp <= 0) {
       // [seam] kit death veto (open contract 3): runs BEFORE the generic
@@ -324,6 +473,24 @@ function makeDamageDealer(
               }
             }
           }
+          // Equipment on-kill: Gravewhisper heals the killer, Quicksilver
+          // grants a haste burst. Absent on unequipped units.
+          if (source.itemMods) {
+            if (source.itemMods.killHeal > 0) {
+              heal(source, source.itemMods.killHeal);
+            }
+            const hok = findItemEffect(source, "hasteOnKill");
+            if (hok) {
+              applyEffect(
+                source,
+                makeEffect("haste", {
+                  source: source.uid,
+                  durationSec: hok.durationSec,
+                  magnitude: hok.magnitude,
+                })
+              );
+            }
+          }
         }
 
         spawnVfx(state, {
@@ -354,15 +521,76 @@ function makeDamageDealer(
             wKit.onUnitDeath(watcher, target, source, makeKitCtx(watcher, true));
           }
         }
+
+        // Elemental detonations (legendary Ember/Frostbite/Venom): a victim
+        // dying while afflicted by burn/slow/poison erupts if that status's
+        // SOURCE wears the matching detonation trinket. Statuses merge per
+        // type, so at most one detonation per element fires per corpse. The
+        // rider lands before the nova damage, so a nova kill can chain-detonate
+        // — bounded (each corpse detonates once) and deterministic.
+        for (const eff of target.effects) {
+          if (
+            eff.type !== "burn" &&
+            eff.type !== "slow" &&
+            eff.type !== "poison"
+          ) {
+            continue;
+          }
+          const wearer = state.units.find((u) => u.uid === eff.source);
+          if (!wearer || wearer.state === "dead") continue;
+          const det = wearer.itemMods?.effects.find(
+            (e): e is Extract<ItemEffect, { kind: "detonateOnDeath" }> =>
+              e.kind === "detonateOnDeath" && e.element === eff.type
+          );
+          if (!det) continue;
+          spawnVfx(state, {
+            kind: eff.type === "slow" ? "frost" : "burn_burst",
+            pos: { x: target.pos.x, y: target.pos.y },
+            life: secToTicks(0.45),
+            maxLife: secToTicks(0.45),
+            color: det.vfxColor,
+          });
+          for (const foe of state.units) {
+            if (
+              foe.state === "dead" ||
+              foe.team === wearer.team ||
+              foe === target
+            ) {
+              continue;
+            }
+            if (dist(foe.pos, target.pos) > det.radius) continue;
+            if (det.rider) applyItemRider(state, foe, wearer.uid, det.rider);
+            if (det.damage > 0) dealDamage(foe, det.damage, wearer);
+          }
+        }
       }
     }
 
     // Thornmail (Endless): after the hit fully resolves, reflect a fraction of it
     // back at the attacker. One level deep only — the reflected hit lands on an
     // enemy (thornsFrac 0), so it can't re-reflect. Identity when thornsFrac is 0.
-    const thorns = state.teamMods[target.team].thornsFrac;
+    const thorns =
+      state.teamMods[target.team].thornsFrac +
+      (target.itemMods?.thornsFrac ?? 0); // Squire's Plate stacks with Thornmail
     if (thorns > 0 && source !== target && source.state !== "dead" && shown > 0) {
       const back = Math.round(shown * thorns);
+      if (back > 0) dealDamage(source, back, target);
+    }
+
+    // Spell Feedback (Runeward legendary): reflect a fraction of a MAGIC hit
+    // at the caster. Like thorns, reflections shrink geometrically (round of a
+    // fraction), so mutual feedback converges.
+    const feedback = target.itemMods
+      ? findItemEffect(target, "spellFeedback")
+      : undefined;
+    if (
+      feedback &&
+      source !== target &&
+      source.state !== "dead" &&
+      shown > 0 &&
+      getUnitDef(source.defId).school === "magic"
+    ) {
+      const back = Math.round(shown * feedback.frac);
       if (back > 0) dealDamage(source, back, target);
     }
   };
@@ -587,13 +815,7 @@ function stepArcaneBarrage(
 function flushSpawns(
   state: SimState,
   byUid: Map<string, Unit>,
-  spawns: {
-    defId: string;
-    team: Team;
-    pos: Vec2;
-    level?: number;
-    init?: (u: Unit) => void;
-  }[]
+  spawns: SimState["damageSpawns"]
 ): void {
   for (const spawn of spawns) {
     const isClone =
@@ -608,8 +830,24 @@ function flushSpawns(
     // Summons inherit their creator's level (spawn.level) — a leveled
     // summoner's skeletons/turrets/blobs must not under-scale the rest of
     // the warband. Level bakes into hp/maxHp BEFORE init runs, so inits that
-    // derive from maxHp (Slime Knight rebirth) scale correctly.
-    const summoned = createUnit(spawn.defId, spawn.team, spawn.pos, spawn.level ?? 1);
+    // derive from maxHp (Slime Knight rebirth) scale correctly. Carried
+    // equipment (spawn.items) activates inside createUnit ONLY when the
+    // spawn's defId owns it (Slime Knight rebirth keeps its gear).
+    const summoned = createUnit(
+      spawn.defId,
+      spawn.team,
+      spawn.pos,
+      spawn.level ?? 1,
+      spawn.items
+    );
+    // Summoner's Sigil: the creator's trinket buffs its summons' stats. Applied
+    // before `init` (like the level bake) so maxHp-derived inits scale. A
+    // self-respawn that reactivated its own gear is not a "summon" — skip it.
+    if (spawn.sigilPct && spawn.sigilPct > 0 && !summoned.itemMods) {
+      summoned.hp = Math.round(summoned.hp * (1 + spawn.sigilPct));
+      summoned.maxHp = summoned.hp;
+      summoned.damage = Math.round(summoned.damage * (1 + spawn.sigilPct));
+    }
     spawn.init?.(summoned); // stamp deterministic starting state (blob anchor / rebirth HP)
     state.units.push(summoned);
     byUid.set(summoned.uid, summoned);
@@ -632,13 +870,7 @@ export function stepSimulation(state: SimState): void {
   // Units summoned this tick are queued here and flushed after the AI loop, so we
   // never mutate the array we're iterating. Hoisted above the funnel so the kit
   // context builder can route a kit's ability-driven summons into this queue.
-  const pendingSpawns: {
-    defId: string;
-    team: Unit["team"];
-    pos: { x: number; y: number };
-    level?: number;
-    init?: (u: Unit) => void;
-  }[] = [];
+  const pendingSpawns: SimState["damageSpawns"] = [];
 
   // The single HP funnel, forward-declared so makeKitCtx (which a kit hook fired
   // from *inside* dealDamage/heal captures) can reference them. Both are assigned
@@ -671,6 +903,8 @@ export function stepSimulation(state: SimState): void {
           team,
           pos,
           level: subject.level, // summons inherit their creator's level
+          items: subject.latentItems, // carried gear (inert unless owner-defId)
+          sigilPct: subject.itemMods?.summonStatPct,
           init,
         }),
       spawnTrap: (t) => state.traps.push(t),
@@ -719,6 +953,10 @@ export function stepSimulation(state: SimState): void {
     if (unit.shadowCooldown > 0) unit.shadowCooldown--;
     if (unit.curseCooldown > 0) unit.curseCooldown--;
     if (unit.rejuvCooldown > 0) unit.rejuvCooldown--;
+
+    // Equipment upkeep (Heartwood regen, Runeward barrier) — pre-gate like kit
+    // onTick, so it runs even while stunned. No-op for unequipped units.
+    if (unit.itemMods) stepItemUpkeep(state, unit, heal);
 
     // (Bear Form's guard-timer countdown now lives in kits/druid.ts onTick — the
     // pre-gate maintenance slot, decremented before the transform check.)
@@ -859,6 +1097,8 @@ export function stepSimulation(state: SimState): void {
           team,
           pos,
           level: unit.level, // summons inherit their creator's level
+          items: unit.latentItems, // carried gear (inert unless owner-defId)
+          sigilPct: unit.itemMods?.summonStatPct,
           init,
         }),
       spawnTrap: (t) => state.traps.push(t),
@@ -878,7 +1118,11 @@ export function stepSimulation(state: SimState): void {
     // basic-attack, they just don't cast. This gates the kit-owned cast pipeline
     // (Necromancer) here and the begin-cast/instant-fire paths below; passive and
     // reactive kit hooks (shields, on-hit riders, Second Wind) are unaffected.
-    const inOpeningGrace = state.castGraceTicks > 0;
+    // Chrono Amulet legendary ("ability starts the battle ready"): the wearer
+    // ignores the opening cast grace — its first cast comes before anyone's.
+    const inOpeningGrace =
+      state.castGraceTicks > 0 &&
+      !(unit.itemMods && findItemEffect(unit, "abilityStartsReady"));
     const ownsCast = inOpeningGrace
       ? undefined
       : abilityKit?.onActTick?.(unit, abilityCtx);
@@ -919,7 +1163,11 @@ export function stepSimulation(state: SimState): void {
           unit.castTicks = castTime;
           unit.castTicksMax = castTime;
           unit.castTargetUid = target ? target.uid : null;
-          unit.abilityCooldown = abilityCooldownTicks(unit.ability);
+          // Chrono Amulet: item cooldown reduction (×1 when unequipped).
+          unit.abilityCooldown = Math.round(
+            abilityCooldownTicks(unit.ability) *
+              (unit.itemMods?.cooldownMult ?? 1)
+          );
           transitionTo(unit, "casting");
           continue;
         }
@@ -932,7 +1180,13 @@ export function stepSimulation(state: SimState): void {
           !isStunned(unit) &&
           !isSilenced(unit) &&
           abilityKit.fireAbility(abilityCtx);
-        if (fired) unit.abilityCooldown = abilityCooldownTicks(unit.ability);
+        if (fired) {
+          // Chrono Amulet: item cooldown reduction (×1 when unequipped).
+          unit.abilityCooldown = Math.round(
+            abilityCooldownTicks(unit.ability) *
+              (unit.itemMods?.cooldownMult ?? 1)
+          );
+        }
       }
     }
 
@@ -955,8 +1209,18 @@ export function stepSimulation(state: SimState): void {
         // Berserker's Rhythm (Endless): the live rhythm bonus shrinks the delay on
         // top of the flat attack-speed mod. Identity when rhythmBonus is 0.
         const tm = state.teamMods[unit.team];
+        // Equipment attack speed: the flat item multiplier (Windlash /
+        // Quicksilver) plus Tempo stacks built in performBasicAttack.
+        let itemDelay = unit.itemMods?.atkDelayMult ?? 1;
+        const tempo = unit.itemMods ? findItemEffect(unit, "tempo") : undefined;
+        if (tempo && unit.tempoStacks) {
+          itemDelay /= 1 + tempo.perStack * unit.tempoStacks;
+        }
         const delay =
-          (unit.attackSpeed * attackDelayMultiplier(unit) * tm.atkDelayMult) /
+          (unit.attackSpeed *
+            attackDelayMultiplier(unit) *
+            tm.atkDelayMult *
+            itemDelay) /
           (1 + tm.rhythmBonus);
         unit.attackCooldown = secToTicks(delay);
       }
@@ -1055,6 +1319,25 @@ function performBasicAttack(
 
   unit.attackCount += 1;
 
+  // Windlash Tempo: consecutive hits on the SAME target stack attack speed;
+  // switching targets resets. Bookkept before the swing so kit-replaced swings
+  // count too; the attack-cooldown site reads the stacks.
+  const im = unit.itemMods;
+  if (im) {
+    const tempo = findItemEffect(unit, "tempo");
+    if (tempo) {
+      if (unit.tempoTargetUid === target.uid) {
+        unit.tempoStacks = Math.min(
+          tempo.maxStacks,
+          (unit.tempoStacks ?? 0) + 1
+        );
+      } else {
+        unit.tempoTargetUid = target.uid;
+        unit.tempoStacks = 0;
+      }
+    }
+  }
+
   // Team on-hit boons (Endless): every-Nth-attack status riders (Thunderclap stun,
   // Venom poison) apply to the primary target on any swing; Overkill's crit doubles
   // the default swing below. Both are no-ops when the team has none.
@@ -1073,8 +1356,15 @@ function performBasicAttack(
       );
     }
   }
+  // Crit: team Overkill or the item's own crit cadence (Forgemaster's Hammer)
+  // — either firing doubles the default swing.
+  const itemCrit =
+    im != null && im.critEveryNth > 0 && unit.attackCount % im.critEveryNth === 0;
   const critMult =
-    tmods.critEveryNth > 0 && unit.attackCount % tmods.critEveryNth === 0 ? 2 : 1;
+    (tmods.critEveryNth > 0 && unit.attackCount % tmods.critEveryNth === 0) ||
+    itemCrit
+      ? 2
+      : 1;
 
   // [seam] replace the default swing entirely (open contract 2 — Mystic / Ranger /
   // Warrior do their own thing). attackCount is already bumped, matching today.
@@ -1087,6 +1377,14 @@ function performBasicAttack(
 
   // (The Arcane Mage has no special basic attack — it uses the default ranged
   // shot below, and nukes with its active Arcane Barrage on cooldown.)
+
+  // Equipment on-hit rider (Ember/Frostbite/Venom/Hexblade): fires every Nth
+  // attack, riding the projectile for ranged units (a SECOND slot so it never
+  // displaces an innate basicShotRider) and applying directly for melee.
+  const itemRiderEff = im?.effects.find(
+    (e): e is Extract<ItemEffect, { kind: "onHitRider" }> =>
+      e.kind === "onHitRider" && unit.attackCount % e.everyNth === 0
+  );
 
   if (ranged) {
     // Ranged basic attacks spawn a simple projectile (archer arrows etc.). A unit
@@ -1107,12 +1405,23 @@ function performBasicAttack(
       color: rider ? rider.color : def.accent,
       angle: 0,
       rider,
+      itemRider: itemRiderEff?.rider,
     });
   } else {
     // [seam] Warrior Whirlwind (the AoE spin + bleed that replaces the swing) now
     // lives in kits/warrior.ts onBasicAttack, fired above.
     dealDamage(target, unit.damage * critMult, unit);
-    applyLifesteal(unit, unit.damage * critMult, heal, tmods.lifestealBonus);
+    applyLifesteal(
+      unit,
+      unit.damage * critMult,
+      heal,
+      tmods.lifestealBonus + (im?.lifesteal ?? 0) // Bloodletter adds on top
+    );
+
+    // Equipment on-hit rider lands with the melee swing.
+    if (itemRiderEff) {
+      applyItemRider(state, target, unit.uid, itemRiderEff.rider);
+    }
 
     // [seam] after the default melee swing lands (open contract 2). Zombie
     // Shambler's Numbing Bite now lives in its kit (kits/zombieShambler.ts);
@@ -1126,6 +1435,92 @@ function performBasicAttack(
 
     // (Aegis Knight Backlash now lives in kits/aegisKnight.ts onAfterAttack,
     // fired by the onAfterAttack seam above.)
+  }
+
+  // --- Equipment swing effects (default swings only — a kit-replaced swing
+  // returned above). All share the attackCount cadence counter. -------------
+  if (!im) return;
+
+  // Twinfang: every Nth attack strikes twice (a second full swing).
+  const twin = findItemEffect(unit, "doubleStrikeNth");
+  if (twin && unit.attackCount % twin.everyNth === 0) {
+    if (ranged) {
+      spawnProjectile(state, {
+        pos: { x: unit.pos.x, y: unit.pos.y },
+        target: { x: target.pos.x, y: target.pos.y },
+        targetUid: target.uid,
+        speed: 380,
+        damage: unit.damage * critMult,
+        team: unit.team,
+        sourceUid: unit.uid,
+        ability: "lifesteal",
+        color: def.accent,
+        angle: 0,
+      });
+    } else {
+      dealDamage(target, unit.damage * critMult, unit);
+      applyLifesteal(
+        unit,
+        unit.damage * critMult,
+        heal,
+        tmods.lifestealBonus + im.lifesteal
+      );
+    }
+  }
+
+  // Stormpiercer: every Nth attack arcs to the nearest OTHER enemy.
+  const chain = findItemEffect(unit, "chainNth");
+  if (chain && unit.attackCount % chain.everyNth === 0) {
+    let nearest: Unit | null = null;
+    let nd = Infinity;
+    for (const e of ctx.enemies) {
+      if (e === target || e.state === "dead") continue;
+      const d = dist(unit.pos, e.pos);
+      if (d < nd) {
+        nd = d;
+        nearest = e;
+      }
+    }
+    if (nearest) {
+      spawnVfx(state, {
+        kind: "lightning",
+        pos: { x: target.pos.x, y: target.pos.y },
+        to: { x: nearest.pos.x, y: nearest.pos.y },
+        life: secToTicks(0.3),
+        maxLife: secToTicks(0.3),
+        color: "#38bdf8",
+      });
+      dealDamage(nearest, Math.round(unit.damage * chain.frac), unit);
+    }
+  }
+
+  // Eclipse Pendant: every Nth hit lands bonus shadow damage (+ leg. stun).
+  const eclipse = findItemEffect(unit, "nthBonusDamage");
+  if (eclipse && unit.attackCount % eclipse.everyNth === 0) {
+    spawnVfx(state, {
+      kind: "burn_burst",
+      pos: { x: target.pos.x, y: target.pos.y },
+      life: secToTicks(0.35),
+      maxLife: secToTicks(0.35),
+      color: "#facc15",
+    });
+    dealDamage(target, eclipse.bonus, unit);
+    if (eclipse.stunSec) {
+      applyEffect(
+        target,
+        makeEffect("stun", { source: unit.uid, durationSec: eclipse.stunSec })
+      );
+    }
+  }
+
+  // Venom Fang legendary: hits on a poisoned target splash the poison nearby.
+  const spread = findItemEffect(unit, "spreadPoisonOnAttack");
+  if (spread && target.effects.some((e) => e.type === "poison")) {
+    for (const foe of ctx.enemies) {
+      if (foe === target || foe.state === "dead") continue;
+      if (dist(foe.pos, target.pos) > spread.radius) continue;
+      applyItemRider(state, foe, unit.uid, spread.rider);
+    }
   }
 }
 
@@ -1174,8 +1569,11 @@ function stepProjectiles(
         } else if (isBasic) {
           if (source) {
             dealDamage(target, proj.damage, source);
-            // Marksman's Focus (Endless): ranged basics lifesteal. No-op at 0.
-            const rl = state.teamMods[source.team].rangedLifesteal;
+            // Marksman's Focus (Endless) + Bloodletter (item): ranged basics
+            // lifesteal. No-op at 0.
+            const rl =
+              state.teamMods[source.team].rangedLifesteal +
+              (source.itemMods?.lifesteal ?? 0);
             if (rl > 0) heal(source, Math.round(proj.damage * rl));
           }
           // On-hit rider (Ice freeze / Fire burn) — applied generically from the
@@ -1200,6 +1598,11 @@ function stepProjectiles(
               maxLife: secToTicks(0.4),
               color: r.color,
             });
+          }
+          // Equipment on-hit rider (second slot — never displaces the innate
+          // rider above; both may land on the same shot).
+          if (proj.itemRider) {
+            applyItemRider(state, target, proj.sourceUid, proj.itemRider);
           }
         } else {
           onProjectileHit(proj, target, source, {

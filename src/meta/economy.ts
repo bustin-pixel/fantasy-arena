@@ -101,3 +101,84 @@ export const MILESTONE_UNLOCKS: Record<number, string> = {
   4: "healer", // rare support — teaches sustain before the boss
   5: "berserker", // epic — reward for downing the Bloater
 };
+
+// ---------------------------------------------------------------------------
+// Items — ACQUISITION numbers (drop odds, merge costs, shard economy). Item
+// POWER numbers live in data/items.ts; keep the split.
+// ---------------------------------------------------------------------------
+
+/** Chance a chest contains an item drop (rolled after gold/unit, so legacy
+ *  chest seeds keep their old contents byte-identical). */
+export const ITEM_DROP_CHANCE: Record<ChestTier, number> = {
+  wooden: 0.25,
+  silver: 0.4,
+  gold: 0.6,
+  arcane: 0.85,
+  dragon: 1,
+};
+
+/** Item QUALITY odds by chest tier (normalized weights). Low chests feed the
+ *  rare merge ladder; arcane/dragon can shortcut straight to epic/legendary —
+ *  without direct high drops, a legendary 3★ would take 256 rare copies. */
+export const ITEM_QUALITY_WEIGHTS: Record<ChestTier, Record<Rarity, number>> = {
+  wooden: { rare: 1, epic: 0, legendary: 0 },
+  silver: { rare: 1, epic: 0, legendary: 0 },
+  gold: { rare: 0.7, epic: 0.3, legendary: 0 },
+  arcane: { rare: 0.35, epic: 0.55, legendary: 0.1 },
+  dragon: { rare: 0.15, epic: 0.55, legendary: 0.3 },
+};
+
+/** Extra roll on a themed-dungeon BOSS chest for that dungeon's signature
+ *  line (quality from the same tier weights). */
+export const SIGNATURE_DROP_CHANCE = 0.35;
+
+/** Merge fee, keyed by the FUEL pair's quality and star (index star−1). Two
+ *  3★ pay the quality-up fee. Gold funds the rare/epic climb; everything that
+ *  produces or improves a LEGENDARY costs Soul Shards. Legendary 3★ is the
+ *  cap (its slot is unreachable — mergeCost returns null there). */
+export const MERGE_COSTS: Record<
+  Rarity,
+  { gold: [number, number, number]; shards: [number, number, number] }
+> = {
+  rare: { gold: [100, 200, 400], shards: [0, 0, 0] },
+  epic: { gold: [600, 900, 0], shards: [0, 0, 20] },
+  legendary: { gold: [0, 0, 0], shards: [30, 50, 0] },
+};
+
+/** Soul Shard grants — every source is a ONE-TIME monotonic signal (first
+ *  clears, fresh endless milestones), so the reward fold stays idempotent
+ *  without a claims ledger. The repeatable drip lives in SHARD_CHEST_DRIP. */
+export const SHARD_REWARDS = {
+  /** Any dungeon's non-boss floor, first clear. */
+  floorFirstClear: 3,
+  /** A dungeon boss floor, first clear. */
+  bossFirstClear: 15,
+  /** The chain capstones (Deep Forge / Eclipse Spire bosses), first clear. */
+  bossFirstClearCapstone: 25,
+  /** Per FRESH 5-wave endless milestone crossed in one run. */
+  endlessPerMilestone: 8,
+} as const;
+
+/** Dungeons whose boss first-clear pays the capstone shard grant. */
+export const CAPSTONE_DUNGEON_IDS = ["deep_forge", "eclipse_spire"] as const;
+
+/** Repeatable shard drip inside top-tier chests (seeded roll in rollChest). */
+export const SHARD_CHEST_DRIP: Partial<
+  Record<ChestTier, { chance: number; range: [number, number] }>
+> = {
+  arcane: { chance: 0.35, range: [3, 6] },
+  dragon: { chance: 0.6, range: [6, 12] },
+};
+
+/** How many FRESH 5-wave milestones this endless run crossed — the shard twin
+ *  of endlessMilestoneChestTier (which pays one chest for the deepest); shards
+ *  pay per milestone (a 3→12 run banks the 5 AND 10 marks). */
+export function freshMilestonesCrossed(
+  prevBest: number,
+  wavesSurvived: number
+): number {
+  return Math.max(
+    0,
+    Math.floor(wavesSurvived / 5) - Math.floor(Math.max(0, prevBest) / 5)
+  );
+}
