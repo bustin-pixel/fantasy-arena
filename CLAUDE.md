@@ -8,7 +8,7 @@ Fantasy Arena — a deterministic 4v4 high-fantasy auto-battler (React + TypeScr
 
 ## Where we're going
 
-See **`progress.md`** for the roadmap — planned features (PvE mode, PvP, an items/equipment system), brainstormed unit ideas, and open design questions. It's forward-looking; `git log --oneline` / `gh pr list` is the source of truth for what's already shipped. Update `progress.md` (and memories) before a context reset so the next session picks up cleanly.
+See **`progress.md`** for the roadmap — planned features (PvP, an item-assuming dungeon tier; the items/equipment system itself shipped as save v9 — invariants in NOTES §9), brainstormed unit ideas, and open design questions. It's forward-looking; `git log --oneline` / `gh pr list` is the source of truth for what's already shipped. Update `progress.md` (and memories) before a context reset so the next session picks up cleanly.
 
 ## Commands
 

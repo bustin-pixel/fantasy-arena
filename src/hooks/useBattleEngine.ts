@@ -14,6 +14,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
+  ItemLoadouts,
   MatchPhase,
   Rarity,
   StatusEffectType,
@@ -122,7 +123,10 @@ export function useBattleEngine(
   dungeonId: string = "depths",
   /** Player unit levels by defId (missing = 1). Callers must pass a STABLE
    *  object (frozen at mount) — it's a match input, like the seed. */
-  unitLevels?: Record<string, number>
+  unitLevels?: Record<string, number>,
+  /** Player equipped item keys by defId (missing = bare). Same contract as
+   *  unitLevels: a STABLE object frozen at mount — a match input. */
+  itemLoadouts?: ItemLoadouts
 ): UseBattleEngine {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const controllerRef = useRef<MatchController | null>(null);
@@ -182,6 +186,7 @@ export function useBattleEngine(
         floor,
         dungeonId,
         unitLevels,
+        itemLoadouts,
       });
     } else {
       const enemyDeck = generateEnemyDeck(seed);
@@ -189,7 +194,7 @@ export function useBattleEngine(
         seed,
         playerDeck.slice(0, 4),
         enemyDeck,
-        { unitLevels }
+        { unitLevels, itemLoadouts }
       );
     }
     themeRef.current =

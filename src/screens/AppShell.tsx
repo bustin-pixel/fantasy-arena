@@ -6,6 +6,7 @@ import { DungeonWall } from "@/components/DungeonWall";
 import { DungeonVines } from "@/components/DungeonVines";
 import { DungeonGate } from "@/components/DungeonGate";
 import { SettingsPanel } from "@/components/SettingsPanel";
+import { BagSheet } from "@/components/BagSheet";
 import { useGameState } from "@/state/GameStateContext";
 import type { BattleMode } from "@/hooks/useBattleEngine";
 
@@ -34,6 +35,7 @@ export function AppShell({ onBattle }: Props) {
   const snapTimer = useRef<number | null>(null);
   const [page, setPage] = useState(1); // land on Home (center)
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [bagOpen, setBagOpen] = useState(false);
   // Live drag state in a ref so pointer handlers never trigger re-renders.
   const drag = useRef({
     pending: false,
@@ -169,8 +171,20 @@ export function AppShell({ onBattle }: Props) {
 
   return (
     <div className="app-shell">
-      {/* Wallet + settings gear, floating over every page (no header bar). */}
-      <div className="top-right-cluster">
+      {/* Bag + wallet + settings gear. Shown on the HOME page only (per the
+          design) — faded out (not unmounted) elsewhere so a mid-swipe doesn't
+          pop elements in and out. */}
+      <div className={`top-right-cluster${page === 1 ? "" : " off-home"}`}>
+        <button
+          type="button"
+          className="bag-btn"
+          aria-label="Bag"
+          onClick={() => setBagOpen(true)}
+        >
+          🎒
+        </button>
+        <ShardPill />
+        <GoldPill />
         <button
           type="button"
           className="settings-btn"
@@ -179,9 +193,9 @@ export function AppShell({ onBattle }: Props) {
         >
           ⚙️
         </button>
-        <GoldPill />
       </div>
       {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
+      {bagOpen && <BagSheet onClose={() => setBagOpen(false)} />}
       <div className="shell-bg" aria-hidden="true">
         {/* One continuous hall (3 pages wide) panned 1:1 with the pager. Brick
             spans it all; the gate lives in the middle (Home) third. */}
@@ -245,6 +259,19 @@ function GoldPill() {
         ●
       </span>
       {save.gold.toLocaleString()}
+    </div>
+  );
+}
+
+/** Soul Shards — the premium currency (legendary-tier item merges). */
+function ShardPill() {
+  const { save } = useGameState();
+  return (
+    <div className="gold-pill shard-pill" aria-label={`${save.soulShards} Soul Shards`}>
+      <span className="shard-gem" aria-hidden>
+        ◆
+      </span>
+      {save.soulShards.toLocaleString()}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { ItemLoadouts } from "@/types";
 import { useBattleEngine, type BattleMode } from "@/hooks/useBattleEngine";
 import { BattleHud } from "@/components/BattleHud";
 import { BattleUnitTip } from "@/components/BattleUnitTip";
@@ -47,6 +48,13 @@ export function BattleScreen({
   const [unitLevels] = useState<Record<string, number>>(() =>
     Object.fromEntries(deck.map((id) => [id, levelFromXp(save.unitXp[id] ?? 0)]))
   );
+  // Equipped items, frozen at mount like unitLevels — a match input. Only the
+  // fielded deck's entries matter; the sim resolves + bakes them at deploy.
+  const [itemLoadouts] = useState<ItemLoadouts>(() =>
+    Object.fromEntries(
+      deck.filter((id) => save.loadouts[id]).map((id) => [id, save.loadouts[id]])
+    )
+  );
   const {
     canvasRef,
     ui,
@@ -59,7 +67,15 @@ export function BattleScreen({
     enemyLedger,
     pickBoon,
     wavesSurvived,
-  } = useBattleEngine(deck, mode, undefined, floor, dungeonId, unitLevels);
+  } = useBattleEngine(
+    deck,
+    mode,
+    undefined,
+    floor,
+    dungeonId,
+    unitLevels,
+    itemLoadouts
+  );
   const wrapRef = useRef<HTMLDivElement>(null);
   const recordedRef = useRef(false);
   // Timestamp of the last touch, to suppress the synthetic click a touchscreen
@@ -122,6 +138,7 @@ export function BattleScreen({
         questUnlocks: save.questUnlocks,
         wavesSurvived: survived,
         bestWave: endlessBestWave(save),
+        itemLoadouts, // Lucky Coin: gold boost + seeded chest-tier upgrade
       });
       grantBattleRewards(bundle, {
         mode,
