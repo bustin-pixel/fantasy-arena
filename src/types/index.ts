@@ -275,6 +275,24 @@ export interface Unit {
   /** Max absorb shield, for rendering the silver segment proportionally. */
   shieldHpMax: number;
 
+  // ---- equipment (items) — ALL fields absent for an unequipped unit, so an
+  // itemless sim stays byte-identical to pre-items builds (digest identity). --
+  /** Resolved item modifiers ACTIVE on this unit (dmg/hp already baked at
+   *  createUnit). Set only when latentItems.owner === defId. */
+  itemMods?: ItemMods;
+  /** The equipment pair this unit CARRIES (inert): its creator's mods + the
+   *  defId that owns them. Rides spawn stamps like `level`, so a Slime
+   *  Knight's blob can hand the knight's gear back to the reborn knight while
+   *  a skeleton never activates its necromancer's sword. */
+  latentItems?: { mods: ItemMods; owner: string };
+  /** Windlash Tempo: consecutive-hit stacks on the current tempo target. */
+  tempoStacks?: number;
+  tempoTargetUid?: string | null;
+  /** Runic Barrier: ticks until the shield re-forms. */
+  barrierCountdown?: number;
+  /** Phasecloak: true once the one-shot below-half stealth has fired. */
+  stealthTriggerUsed?: boolean;
+
   effects: ActiveStatusEffect[];
 
   // ---- presentation-only fields (read by renderer, ignored by sim logic) --
@@ -321,7 +339,107 @@ export interface Projectile {
    *  in stepProjectiles. Attached by performBasicAttack from the source's
    *  `UnitDef.basicShotRider`; absent for a plain shot. */
   rider?: ShotRider;
+  /** A second rider slot for equipped-item on-hit effects (e.g. the Ember
+   *  Charm's burn). Separate from `rider` so an item never displaces a unit's
+   *  innate shot rider — both apply on impact. */
+  itemRider?: ShotRider;
 }
+
+// ---------------------------------------------------------------------------
+// Items — equipment modifiers resolved from data/items.ts and baked onto units.
+// Like ShotRider, the TYPES live here so the engine can read them without
+// importing data modules.
+// ---------------------------------------------------------------------------
+
+export type ItemSlot = "weapon" | "armor" | "trinket";
+
+/** Triggered item effects (the DATA half; CombatSystem reads these at its
+ *  existing seams — no per-item branches). All magnitudes are pre-resolved for
+ *  the item's quality/star by data/items.resolveItemMods. */
+export type ItemEffect =
+  /** Plant `rider` on every Nth basic attack (melee: applied directly; ranged:
+   *  carried via Projectile.itemRider). */
+  | { kind: "onHitRider"; everyNth: number; rider: ShotRider }
+  /** Enemies that die while carrying `element` (applied by the wearer) erupt:
+   *  `damage` + `rider` hit enemies within `radius` of the corpse. */
+  | {
+      kind: "detonateOnDeath";
+      element: StatusEffectType;
+      damage: number;
+      radius: number;
+      rider?: ShotRider;
+      vfxColor: string;
+    }
+  /** Basic hits on a poisoned target splash the wearer's poison rider to other
+   *  enemies within `radius` of the target. */
+  | { kind: "spreadPoisonOnAttack"; radius: number; rider: ShotRider }
+  /** Every Nth basic attack also strikes the nearest OTHER enemy for `frac`
+   *  of attack damage. */
+  | { kind: "chainNth"; everyNth: number; frac: number }
+  /** Every Nth basic attack hits twice (second hit at full damage). */
+  | { kind: "doubleStrikeNth"; everyNth: number }
+  /** Every Nth basic attack deals `bonus` extra damage (and optionally stuns). */
+  | { kind: "nthBonusDamage"; everyNth: number; bonus: number; stunSec?: number }
+  /** Kills grant the wearer haste. */
+  | { kind: "hasteOnKill"; durationSec: number; magnitude: number }
+  /** Consecutive hits on the same target stack attack speed (reset on retarget). */
+  | { kind: "tempo"; perStack: number; maxStacks: number }
+  /** +dmg dealt and -dmg taken per LIVING ally (read live at the damage funnel). */
+  | { kind: "packTactics"; perAlly: number }
+  /** Spawn with an absorb shield worth `frac` of max HP. */
+  | { kind: "startShield"; frac: number }
+  /** One-shot: first time below 50% HP, stealth for `durationSec`. */
+  | { kind: "stealthBelowHalf"; durationSec: number }
+  /** Regenerate `pctPerSec`% of max HP each second (through the heal funnel). */
+  | { kind: "regen"; pctPerSec: number; doubledBelowHalf?: boolean }
+  /** Reflect `frac` of incoming MAGIC damage back at the caster. */
+  | { kind: "spellFeedback"; frac: number }
+  /** An absorb shield worth `frac` of max HP that re-forms every `intervalSec`. */
+  | { kind: "runicBarrier"; frac: number; intervalSec: number }
+  /** The unit's ability starts the battle off cooldown. */
+  | { kind: "abilityStartsReady" };
+
+/** A unit's resolved equipment modifiers (all three slots merged). Multipliers
+ *  default to 1 and additive fields to 0 — identityItemMods() in data/items.ts.
+ *  dmgMult/hpMult are baked into stats at createUnit (like levels); everything
+ *  else is read live at CombatSystem's existing funnel seams. */
+export interface ItemMods {
+  dmgMult: number;
+  hpMult: number;
+  /** <1 = attacks faster (multiplies seconds-between-attacks). */
+  atkDelayMult: number;
+  moveSpeedMult: number;
+  damageTakenMult: number;
+  /** Extra multiplier on incoming MAGIC-school damage. */
+  magicTakenMult: number;
+  /** Fraction of basic-attack damage healed back (adds to team lifesteal). */
+  lifesteal: number;
+  /** Fraction of received hits reflected at the attacker. */
+  thornsFrac: number;
+  /** Extra damage fraction vs targets below 25% HP. */
+  executeBonus: number;
+  /** Flat heal to the wearer on kill. */
+  killHeal: number;
+  /** Every Nth basic attack crits (×2). 0 = never. */
+  critEveryNth: number;
+  /** Multiplier on ability cooldown (<1 = faster). */
+  cooldownMult: number;
+  /** Extra damage fraction vs enemies with higher max HP than the wearer. */
+  giantSlayerPct: number;
+  /** The wearer's summons spawn with +this fraction of hp/damage. */
+  summonStatPct: number;
+  effects: ItemEffect[];
+}
+
+/** One unit's equipped item keys ("lineId:quality:star"), by slot. */
+export interface ItemLoadout {
+  weapon?: string;
+  armor?: string;
+  trinket?: string;
+}
+
+/** Equipped items by unit defId — a deterministic match input, like unitLevels. */
+export type ItemLoadouts = Record<string, ItemLoadout>;
 
 export type FloatingTextKind = "damage" | "heal" | "crit";
 
@@ -411,4 +529,7 @@ export interface ReplayData {
   /** Player unit levels by defId (a match input — re-simulation must bake the
    *  same stat multipliers). Absent = everything level 1. */
   unitLevels?: Record<string, number>;
+  /** Player equipped items by defId (a match input, like unitLevels — the
+   *  same loadouts must be resolved and baked on re-simulation). */
+  itemLoadouts?: ItemLoadouts;
 }

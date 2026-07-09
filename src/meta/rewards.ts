@@ -7,6 +7,7 @@
 // ============================================================================
 
 import type { BattleMode } from "@/hooks/useBattleEngine"; // type-only: erased at runtime
+import type { ItemLoadouts } from "@/types";
 import { DECKABLE_UNIT_IDS, getUnitDef } from "@/data/units";
 import { RARITIES } from "@/data/rarities";
 import {
@@ -15,25 +16,42 @@ import {
   QUEST_LOCKED_UNITS,
   questForFloorIn,
 } from "@/data/dungeons";
+import {
+  BASE_LINES_BY_SLOT,
+  ITEM_SLOTS,
+  luckyCoinBonus,
+  signatureLineFor,
+  type ItemQuality,
+} from "@/data/items";
 import { RNG } from "@/utils/rng";
 import {
+  CAPSTONE_DUNGEON_IDS,
   CHEST_GOLD_RANGE,
   CHEST_UNIT_CHANCE,
   DUPLICATE_GOLD,
   ENDLESS_GOLD,
   endlessMilestoneChestTier,
+  freshMilestonesCrossed,
   GOLD_REWARDS,
+  ITEM_DROP_CHANCE,
+  ITEM_QUALITY_WEIGHTS,
+  SHARD_CHEST_DRIP,
+  SHARD_REWARDS,
+  SIGNATURE_DROP_CHANCE,
   type ChestTier,
 } from "./economy";
 import { XP_REWARDS } from "./leveling";
 
 /** One thing inside a chest. A discriminated union so later slices can add
- *  entries (e.g. { kind: "item" }) without touching existing code — contents
- *  are granted instantly and never persisted, so there's no migration. */
+ *  entries without touching existing code — contents are granted instantly
+ *  and never persisted, so there's no migration. Items drop at 1★ (stars come
+ *  from merging, never from drops). */
 export type ChestContent =
   | { kind: "gold"; amount: number }
   | { kind: "unit"; unitId: string }
-  | { kind: "duplicate"; unitId: string; gold: number };
+  | { kind: "duplicate"; unitId: string; gold: number }
+  | { kind: "item"; lineId: string; quality: ItemQuality }
+  | { kind: "shards"; amount: number };
 
 export interface ChestResult {
   tier: ChestTier;
@@ -51,6 +69,10 @@ export interface BattleRewards {
    *  grind currency, unlike first-clear gold. */
   xp: number;
   chest: ChestResult | null;
+  /** Soul Shards earned this battle. Every source is a one-time monotonic
+   *  signal (first clears, fresh endless milestones) so re-running the fold
+   *  can't double-pay; the repeatable drip lives INSIDE chest contents. */
+  shards: number;
   /** Depths only: this victory beat the player's high-water floor. Drives
    *  the progress bump and the milestone unlock. */
   firstClear: boolean;
@@ -60,13 +82,19 @@ export interface BattleRewards {
   questUnlock?: string;
 }
 
-/** Roll a chest's contents. Pure: same (seed, tier, unlockedUnits) → same
- *  contents. Unit drops roll from the FULL deckable pool weighted by rarity
- *  deckWeight — already-owned units convert to gold. */
+/** Roll a chest's contents. Pure: same (seed, tier, unlockedUnits, opts) →
+ *  same contents. Unit drops roll from the FULL deckable pool weighted by
+ *  rarity deckWeight — already-owned units convert to gold.
+ *
+ *  The item-era rolls (shard drip → item → dungeon signature) are APPENDED
+ *  after the legacy gold/unit rolls, so any pre-items seed keeps its old
+ *  gold/unit contents byte-identical. `opts.dungeonId` enables the extra
+ *  signature-line roll (themed BOSS chests only — callers gate it). */
 export function rollChest(
   seed: number,
   tier: ChestTier,
-  unlockedUnits: readonly string[]
+  unlockedUnits: readonly string[],
+  opts?: { dungeonId?: string }
 ): ChestContent[] {
   const rng = new RNG(seed);
   const [min, max] = CHEST_GOLD_RANGE[tier];
@@ -81,7 +109,46 @@ export function rollChest(
       contents.push({ kind: "unit", unitId });
     }
   }
+
+  // Repeatable Soul Shard drip (top tiers only — see SHARD_CHEST_DRIP).
+  const drip = SHARD_CHEST_DRIP[tier];
+  if (drip && rng.next() < drip.chance) {
+    contents.push({ kind: "shards", amount: rng.int(drip.range[0], drip.range[1]) });
+  }
+
+  // Item drop: slot first (so 6 weapons aren't drowned by 8 trinkets), then a
+  // uniform line within the slot; quality weighted by tier.
+  if (rng.next() < ITEM_DROP_CHANCE[tier]) {
+    const quality = pickWeightedQuality(rng, tier);
+    const slot = ITEM_SLOTS[rng.int(0, ITEM_SLOTS.length - 1)];
+    const pool = BASE_LINES_BY_SLOT[slot];
+    contents.push({ kind: "item", lineId: pool[rng.int(0, pool.length - 1)], quality });
+  }
+
+  // Themed-dungeon signature line: one extra roll on that dungeon's boss chest.
+  const signature = opts?.dungeonId ? signatureLineFor(opts.dungeonId) : undefined;
+  if (signature && rng.next() < SIGNATURE_DROP_CHANCE) {
+    contents.push({
+      kind: "item",
+      lineId: signature.id,
+      quality: pickWeightedQuality(rng, tier),
+    });
+  }
   return contents;
+}
+
+/** Weighted quality pick for `tier` (normalized ITEM_QUALITY_WEIGHTS walk,
+ *  stable rare→epic→legendary order). */
+function pickWeightedQuality(rng: RNG, tier: ChestTier): ItemQuality {
+  const weights = ITEM_QUALITY_WEIGHTS[tier];
+  const order: ItemQuality[] = ["rare", "epic", "legendary"];
+  const total = order.reduce((sum, q) => sum + weights[q], 0);
+  let roll = rng.next() * total;
+  for (const q of order) {
+    roll -= weights[q];
+    if (roll < 0) return q;
+  }
+  return "rare";
 }
 
 /** Chest-droppable pool: deckables minus quest-locked units (those are earned
@@ -137,6 +204,9 @@ export function computeBattleRewards(input: {
   wavesSurvived?: number;
   /** Endless: the player's previous best wave, for the milestone-chest check. */
   bestWave?: number;
+  /** Equipped items by defId — read ONLY for the Lucky Coin (gold boost +
+   *  seeded chest-tier upgrade). Combat item effects never reach this layer. */
+  itemLoadouts?: ItemLoadouts;
 }): BattleRewards {
   const {
     mode,
@@ -151,23 +221,60 @@ export function computeBattleRewards(input: {
     questUnlocks = [],
     wavesSurvived = 0,
     bestWave = 0,
+    itemLoadouts,
   } = input;
-  const none: BattleRewards = { gold: 0, xp: 0, chest: null, firstClear: false };
+  const none: BattleRewards = {
+    gold: 0,
+    xp: 0,
+    chest: null,
+    shards: 0,
+    firstClear: false,
+  };
+
+  // Lucky Coin (the one meta-layer item): boosts flat battle gold and, at
+  // legendary, may upgrade the reward chest a tier. Both deterministic — the
+  // upgrade rolls a SEPARATE stream off chestSeed so the chest's own
+  // contents-roll (and every legacy seed) is untouched.
+  const coin = luckyCoinBonus(deck, itemLoadouts);
+  const boostGold = (g: number) => Math.round(g * (1 + coin.goldPct / 100));
+  const TIER_ORDER: ChestTier[] = ["wooden", "silver", "gold", "arcane", "dragon"];
+  const upgradeTier = (tier: ChestTier): ChestTier => {
+    if (coin.chestUpgradeChance <= 0) return tier;
+    const rng = new RNG(chestSeed ^ 0x5eed);
+    if (rng.next() >= coin.chestUpgradeChance) return tier;
+    const i = TIER_ORDER.indexOf(tier);
+    return TIER_ORDER[Math.min(i + 1, TIER_ORDER.length - 1)];
+  };
+  const makeChest = (tier: ChestTier, sigDungeonId?: string): ChestResult => {
+    const t = upgradeTier(tier);
+    return {
+      tier: t,
+      seed: chestSeed,
+      contents: rollChest(
+        chestSeed,
+        t,
+        unlockedUnits,
+        sigDungeonId ? { dungeonId: sigDungeonId } : undefined
+      ),
+    };
+  };
 
   // PvP is scaffolding only; server-authoritative rewards replace this later.
   if (mode === "pvp") return none;
 
   // Endless: gold scales with waves survived (paid regardless of the eventual
   // wipe), plus a chest the first time a run crosses a new 5-wave milestone.
-  // `firstClear` doubles as "new best wave" for the results copy.
+  // `firstClear` doubles as "new best wave" for the results copy. Shards pay
+  // per FRESH milestone crossed (a 3→12 run banks the 5 AND 10 marks).
   if (mode === "endless") {
     const tier = endlessMilestoneChestTier(bestWave, wavesSurvived);
     return {
-      gold: ENDLESS_GOLD.base + ENDLESS_GOLD.perWave * wavesSurvived,
+      gold: boostGold(ENDLESS_GOLD.base + ENDLESS_GOLD.perWave * wavesSurvived),
       xp: XP_REWARDS.endlessBase + XP_REWARDS.endlessPerWave * wavesSurvived,
-      chest: tier
-        ? { tier, seed: chestSeed, contents: rollChest(chestSeed, tier, unlockedUnits) }
-        : null,
+      chest: tier ? makeChest(tier) : null,
+      shards:
+        SHARD_REWARDS.endlessPerMilestone *
+        freshMilestonesCrossed(bestWave, wavesSurvived),
       firstClear: wavesSurvived > bestWave,
     };
   }
@@ -194,26 +301,40 @@ export function computeBattleRewards(input: {
     if (outcome !== "victory") {
       return {
         ...none,
-        gold: GOLD_REWARDS.depthsLoss,
+        gold: boostGold(GOLD_REWARDS.depthsLoss),
         xp: Math.round(XP_REWARDS.lossFrac * winXp),
         questUnlock,
       };
     }
     const firstClear = floor > highestClearedFloor;
     if (!firstClear) {
-      return { ...none, gold: GOLD_REWARDS.depthsReplay, xp: winXp, questUnlock };
+      return {
+        ...none,
+        gold: boostGold(GOLD_REWARDS.depthsReplay),
+        xp: winXp,
+        questUnlock,
+      };
     }
     // Boss floors drop a chest, graded by the dungeon's place in the chain
-    // (Depths silver → themed gold → Forge arcane → Spire dragon).
-    const tier: ChestTier = isBossFloorIn(dungeon, floor)
-      ? bossChestTierFor(dungeonId)
-      : "wooden";
+    // (Depths silver → themed gold → Forge arcane → Spire dragon). A themed
+    // boss chest also rolls its dungeon's signature item line. Shards pay on
+    // first clears only: a trickle per floor, a chunk per boss, the most on
+    // the two chain capstones.
+    const isBoss = isBossFloorIn(dungeon, floor);
+    const tier: ChestTier = isBoss ? bossChestTierFor(dungeonId) : "wooden";
+    const shards = isBoss
+      ? (CAPSTONE_DUNGEON_IDS as readonly string[]).includes(dungeonId)
+        ? SHARD_REWARDS.bossFirstClearCapstone
+        : SHARD_REWARDS.bossFirstClear
+      : SHARD_REWARDS.floorFirstClear;
     return {
-      gold:
+      gold: boostGold(
         GOLD_REWARDS.depthsFirstClearBase +
-        GOLD_REWARDS.depthsFirstClearPerFloor * floor,
+          GOLD_REWARDS.depthsFirstClearPerFloor * floor
+      ),
       xp: winXp,
-      chest: { tier, seed: chestSeed, contents: rollChest(chestSeed, tier, unlockedUnits) },
+      chest: makeChest(tier, isBoss ? dungeonId : undefined),
+      shards,
       firstClear: true,
       questUnlock,
     };
@@ -221,16 +342,17 @@ export function computeBattleRewards(input: {
 
   // Arena ("solo").
   if (outcome !== "victory") {
-    return { ...none, gold: GOLD_REWARDS.arenaLoss, xp: XP_REWARDS.arenaLoss };
+    return {
+      ...none,
+      gold: boostGold(GOLD_REWARDS.arenaLoss),
+      xp: XP_REWARDS.arenaLoss,
+    };
   }
   return {
-    gold: GOLD_REWARDS.arenaWin,
+    gold: boostGold(GOLD_REWARDS.arenaWin),
     xp: XP_REWARDS.arenaWin,
-    chest: {
-      tier: "wooden",
-      seed: chestSeed,
-      contents: rollChest(chestSeed, "wooden", unlockedUnits),
-    },
+    chest: makeChest("wooden"),
+    shards: 0,
     firstClear: false,
   };
 }

@@ -8,6 +8,7 @@
 
 import type {
   DeploymentRecord,
+  ItemLoadouts,
   MatchPhase,
   ReplayData,
   Team,
@@ -29,7 +30,7 @@ import {
   UNIT_RADIUS,
   secToTicks,
 } from "@/utils/constants";
-import { createUnit, resetUidCounter } from "@/entities/createUnit";
+import { createUnit, resetUidCounter, type ItemCarry } from "@/entities/createUnit";
 import {
   createSimState,
   snapshot,
@@ -41,6 +42,11 @@ import { WaveController } from "./WaveController";
 import { EndlessController, type EndlessStatus } from "./EndlessController";
 import { isMelee, getUnitDef } from "@/data/units";
 import { getDungeon } from "@/data/dungeons";
+import {
+  arenaMirrorMultipliers,
+  identityItemMods,
+  resolveLoadoutMods,
+} from "@/data/items";
 import { averageDeckLevel } from "@/meta/leveling";
 import {
   ENDLESS_ENEMY_ACTIVE,
@@ -63,6 +69,10 @@ export interface MatchOptions {
   /** Player unit levels by defId (missing = 1). A deterministic match input,
    *  like the seed: baked into stats at createUnit, recorded in the replay. */
   unitLevels?: Record<string, number>;
+  /** Player equipped item keys by defId (missing = bare). A deterministic
+   *  match input, like unitLevels: resolved once at construction, baked/read
+   *  via Unit.itemMods, recorded in the replay. */
+  itemLoadouts?: ItemLoadouts;
 }
 
 /** The match clock for a mode. Endless resets its clock per wave (a stalemate
@@ -99,6 +109,14 @@ export class MatchController {
    *  fair-fight mode stays fair as the player levels. 1 in PvE modes (their
    *  enemies scale by floor/wave instead). */
   private enemyLevel: number;
+  /** The raw loadouts input, kept only for the replay record. */
+  private itemLoadouts: ItemLoadouts;
+  /** Player gear resolved once per defId (missing = bare unit). */
+  private playerItems = new Map<string, ItemCarry>();
+  /** Arena item mirror: the flat hp/dmg mods every AI unit fights with,
+   *  approximating the player's average equipped power (the item twin of
+   *  enemyLevel). Null in PvE modes and when the player wears nothing. */
+  private enemyItemMods: ItemCarry["mods"] | null = null;
   /** The Depths' horde director (null outside depths). */
   private wave: WaveController | null = null;
   /** The survival-mode director (null outside endless). */
@@ -121,6 +139,25 @@ export class MatchController {
       this.mode === "arena"
         ? averageDeckLevel(playerDeck, this.unitLevels)
         : 1;
+    this.itemLoadouts = opts.itemLoadouts ?? {};
+    // Resolve each deck unit's gear once (pure, memoized for every deploy).
+    for (const defId of playerDeck) {
+      const mods = resolveLoadoutMods(this.itemLoadouts[defId]);
+      if (mods) this.playerItems.set(defId, { mods, owner: defId });
+    }
+    // Arena item mirror: like enemyLevel, the AI deck fights with a flat
+    // hp/dmg bump derived from the player's equipped power. Identity (null)
+    // when nothing is equipped, so bare arenas stay byte-identical.
+    if (this.mode === "arena" && this.playerItems.size > 0) {
+      const m = arenaMirrorMultipliers(playerDeck, this.itemLoadouts);
+      if (m.hp !== 1 || m.dmg !== 1) {
+        this.enemyItemMods = {
+          ...identityItemMods(),
+          hpMult: m.hp,
+          dmgMult: m.dmg,
+        };
+      }
+    }
     resetUidCounter();
     this.state = createSimState(seed, matchClockSec(this.mode));
     if (this.mode === "depths") {
@@ -224,6 +261,14 @@ export class MatchController {
     const clampedY = Math.max(zone.top, Math.min(zone.bottom, pos.y));
     const level =
       team === "player" ? (this.unitLevels[defId] ?? 1) : this.enemyLevel;
+    // Player units carry their own resolved gear; arena AI units carry the
+    // mirror mods (owner = their defId, so the bake activates like real gear).
+    const items =
+      team === "player"
+        ? this.playerItems.get(defId)
+        : this.enemyItemMods
+          ? { mods: this.enemyItemMods, owner: defId }
+          : undefined;
     const unit = createUnit(
       defId,
       team,
@@ -231,7 +276,8 @@ export class MatchController {
         x: Math.max(40, Math.min(FIELD_WIDTH - 40, pos.x)),
         y: clampedY,
       },
-      level
+      level,
+      items
     );
     this.state.units.push(unit);
 
@@ -641,6 +687,7 @@ export class MatchController {
       enemyDeck: this.enemyDeck.slice(),
       picks: this.pickIndices.slice(),
       unitLevels: { ...this.unitLevels },
+      itemLoadouts: structuredClone(this.itemLoadouts),
     };
   }
 }
