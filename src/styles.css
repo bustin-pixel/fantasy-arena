@@ -698,6 +698,9 @@ body {
 
 /* ---- Home page ----------------------------------------------------------- */
 .home {
+  /* Fill the pager page so the floating Bag button anchors to the bottom-right
+     (above the nav), not to the bottom of the content. */
+  min-height: 100%;
   padding: 22px 18px calc(18px + env(safe-area-inset-bottom));
   gap: 20px;
   align-items: center;
@@ -2274,16 +2277,62 @@ body.modal-open .pager-nav {
   opacity: 0;
   pointer-events: none;
 }
-.bag-btn {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  border: 1px solid #7a5c28;
-  background: linear-gradient(180deg, #241a10, #140e08);
-  box-shadow: inset 0 1px 0 rgba(236, 227, 207, 0.08), 0 3px 8px rgba(0, 0, 0, 0.5);
-  font-size: 0.9rem;
-  line-height: 1;
+/* Floating Bag button — bottom-right of the Home screen, above the pager nav
+   and visually to the right of the Endless card. Anchored to the full-height
+   Home column (see `.home { min-height: 100% }`). */
+.home-bag-fab {
+  position: absolute;
+  right: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  width: 78px;
+  height: 78px;
+  border-radius: 22px;
+  border: 2px solid var(--gold);
+  background: linear-gradient(180deg, #2c2118, #191209);
+  color: var(--parchment);
   cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(236, 227, 207, 0.08),
+    0 0 20px rgba(245, 179, 1, 0.2), 0 6px 16px rgba(0, 0, 0, 0.5);
+  transition: transform 0.08s ease, filter 0.15s ease;
+}
+.home-bag-fab:active {
+  transform: translateY(1px) scale(0.98);
+}
+.home-bag-emoji {
+  font-size: 2rem;
+  line-height: 1;
+  filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.55));
+}
+.home-bag-text {
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--gold);
+  letter-spacing: 0.02em;
+}
+.home-bag-count {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #b91c1c;
+  border: 1.5px solid #1b1510;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
 }
 .shard-pill {
   color: #c084fc;

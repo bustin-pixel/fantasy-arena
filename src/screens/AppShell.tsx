@@ -171,18 +171,10 @@ export function AppShell({ onBattle }: Props) {
 
   return (
     <div className="app-shell">
-      {/* Bag + wallet + settings gear. Shown on the HOME page only (per the
-          design) — faded out (not unmounted) elsewhere so a mid-swipe doesn't
-          pop elements in and out. */}
+      {/* Wallet + settings gear. Shown on the HOME page only (per the design) —
+          faded out (not unmounted) elsewhere so a mid-swipe doesn't pop
+          elements in and out. (The Bag lives in a Home-screen FAB now.) */}
       <div className={`top-right-cluster${page === 1 ? "" : " off-home"}`}>
-        <button
-          type="button"
-          className="bag-btn"
-          aria-label="Bag"
-          onClick={() => setBagOpen(true)}
-        >
-          🎒
-        </button>
         <ShardPill />
         <GoldPill />
         <button
@@ -227,7 +219,7 @@ export function AppShell({ onBattle }: Props) {
           <HubScreen />
         </section>
         <section className="pager-page" aria-label="Home">
-          <HomeScreen onBattle={onBattle} />
+          <HomeScreen onBattle={onBattle} onOpenBag={() => setBagOpen(true)} />
         </section>
         <section className="pager-page" aria-label="Compendium">
           <CompendiumScreen />
