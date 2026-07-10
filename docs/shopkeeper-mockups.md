@@ -37,6 +37,31 @@ Idle loop: slow coin flip with eye tracking, drumming fingers, swaying lantern
 Further art tweaks happen against the REAL screen (Home → Shop) — there is no
 separate scene harness on purpose; a copy would drift from the component.
 
+## Round 3 — brand-new PixiJS art (4 directions, 2026-07-10)
+
+Superseded round 2's canvas art. Harness: `public/mockups/grubbins-newart.html`
+(deleted after the pick, per the loop) — four from-scratch goblins authored as
+native PixiJS v8 scene graphs with WebGL bloom, not effect passes over old art.
+(The earlier `grubbins-pixi.html` round — effect stacks over the round-2 canvas
+art — was abandoned unpicked when the user asked for new art instead.)
+
+| # | Direction | Signature bits |
+|---|-----------|----------------|
+| **1** | **Gilded Baron (CHOSEN & BUILT)** | burgundy velvet, monocle + glint, gold chain/medallion, brass lamp + light cone, coin flip w/ eye tracking, bloomed golds |
+| 2 | Bog Fence | notched droopy ears, snaggletooth, moon slats vs. candle, pickled-things jars, fireflies, circling fly |
+| 3 | Arcane Appraiser | jeweler's lens w/ magnified eye, levitating gem over palm, rising runes, glowing bottles, brass scale |
+| 4 | Torchlit Brute | tusks, torn ear, ear cuffs, live brazier + embers/smoke, coin-bite test cycle, pulsing vignette |
+
+Tweaks applied to 1 before building: variant 4's broad flat nose; variant 3's
+brass balance scale added (left counter, verbatim incl. cyan gem chip); ring
+stand moved from under the resting arm to the counter's far right; the lamp's
+hard skewed beam polygon replaced with a soft conical gradient that sways with
+the lamp + a tracking light pool (motes re-aimed into the cone).
+
+Built as `components/GrubbinsScene.tsx` (same `width`/`reactNonce` interface;
+ShopScreen untouched). This added `pixi.js` + `pixi-filters` as the app's
+first WebGL dependency — gotchas in NOTES hazard 10.
+
 ## Theme song
 
 Ear-tested 2026-07-09 on a gitignored harness (3 sketches): **2 — Jaunty

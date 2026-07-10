@@ -482,6 +482,14 @@ shelf that is re-rolled from its inputs everywhere it's needed:
 Specs: `meta/__tests__/shop.test.ts`; v10 migration cases in
 `state/__tests__/persistence.test.ts`.
 
+**The shop's set piece is PixiJS (the only WebGL surface in the app).**
+`components/GrubbinsScene.tsx` ("Gilded Baron", 2026-07-10) owns the repo's
+only `pixi.js`/`pixi-filters` imports — battle canvas is still plain 2D.
+Its gotchas live in the component header: `Application.init()` is async (the
+`disposed` guard covers unmount/StrictMode races), and the canvas-generated
+textures are module-scope + shared across mounts, so `app.destroy` must NOT
+pass `texture: true`.
+
 ---
 
 ## Architecture reminders (the good patterns to preserve)
