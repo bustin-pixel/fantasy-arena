@@ -20,6 +20,8 @@ interface Props {
 // Logical drawing space.
 const VIEW_W = 400;
 const VIEW_H = 280;
+/** Width/height ratio, for callers sizing the scene from available height. */
+export const SCENE_ASPECT = VIEW_W / VIEW_H;
 /** How long the purchase-pleased overlay lasts (ms). */
 const REACT_MS = 1100;
 

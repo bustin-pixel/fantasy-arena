@@ -11,7 +11,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useGameState } from "@/state/GameStateContext";
-import { GrubbinsScene } from "@/components/GrubbinsScene";
+import { GrubbinsScene, SCENE_ASPECT } from "@/components/GrubbinsScene";
 import { GoldPill, ShardPill } from "@/components/CurrencyPills";
 import { ItemIcon } from "@/components/ItemIcon";
 import { ITEM_LINES, makeItemKey } from "@/data/items";
@@ -103,16 +103,31 @@ export function ShopScreen({ onExit }: Props) {
     return () => window.removeEventListener("keydown", onKey);
   }, [onExit]);
 
-  // The scene fills the column width (measured, dpr handled inside the scene).
+  // Scene sizing: fill the column width when there's room, but SHRINK (kept
+  // centered, aspect fixed) so the whole shop — shelf AND premium vault —
+  // fits the viewport without scrolling. Width derives from the height left
+  // over after the body content; refs are stable so the resize closure can't
+  // go stale.
   const wrapRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
   const [sceneW, setSceneW] = useState(0);
+  const measure = () => {
+    const wrapW = wrapRef.current?.clientWidth ?? 0;
+    const bodyH = bodyRef.current?.offsetHeight ?? 0;
+    // -6: the scene wrap's bottom border + canvas height rounding, so the
+    // fit is exact instead of 'one FAB-height of scroll'.
+    const availH = Math.max(150, window.innerHeight - bodyH - 6);
+    const target = Math.min(wrapW, Math.floor(availH * SCENE_ASPECT));
+    setSceneW((w) => (Math.abs(w - target) > 1 ? target : w));
+  };
   useEffect(() => {
-    const measure = () =>
-      setSceneW(wrapRef.current ? wrapRef.current.clientWidth : 0);
-    measure();
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // Re-measure after every render: sold states / note text can rewrap and
+  // change the body height by a line.
+  useEffect(measure);
 
   // Brief pop on the card that just sold.
   const [justBought, setJustBought] = useState<number | null>(null);
@@ -188,7 +203,7 @@ export function ShopScreen({ onExit }: Props) {
         <h1 className="shop-title">Grubbins&rsquo; Pawn-Den</h1>
       </div>
 
-      <div className="shop-body">
+      <div className="shop-body" ref={bodyRef}>
         <div className="shop-shelf-head">
           <h2 className="shop-shelf-title">Today&rsquo;s Shelf</h2>
           <button
@@ -225,7 +240,7 @@ export function ShopScreen({ onExit }: Props) {
                     : `Buy ${line.name} for ${offer.price} gold`
                 }
               >
-                <ItemIcon itemKey={key} size={52} hideStars />
+                <ItemIcon itemKey={key} size={38} hideStars />
                 <span className="shop-card-name">{line.name}</span>
                 <span className="shop-card-sub" style={{ color: qColor }}>
                   {offer.quality} {offer.slot}

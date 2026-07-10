@@ -2405,6 +2405,11 @@ body.modal-open .pager-nav {
   max-width: 520px;
   background: #0c0a07;
   border-bottom: 2px solid #57432c;
+  /* The canvas may be narrower than the column (height-budgeted so the whole
+     shop fits without scrolling) — keep it centered; edges vanish into the
+     matching dark backdrop. */
+  display: flex;
+  justify-content: center;
 }
 .shop-header {
   position: absolute;
@@ -2440,11 +2445,11 @@ body.modal-open .pager-nav {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 8px;
+  bottom: 6px;
   margin: 0;
   text-align: center;
   font-family: var(--font-display);
-  font-size: 1.3rem;
+  font-size: 1.1rem;
   color: var(--gold);
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.9), 0 0 18px rgba(245, 179, 1, 0.25);
   pointer-events: none;
@@ -2461,8 +2466,8 @@ body.modal-open .pager-nav {
   color: #241a10;
   border: 2px solid #57432c;
   border-radius: 12px;
-  padding: 7px 11px;
-  font-size: 0.82rem;
+  padding: 6px 10px;
+  font-size: 0.76rem;
   font-weight: 700;
   line-height: 1.25;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.55);
@@ -2489,7 +2494,7 @@ body.modal-open .pager-nav {
 .shop-body {
   width: 100%;
   max-width: 520px;
-  padding: 14px 14px calc(26px + env(safe-area-inset-bottom));
+  padding: 10px 12px calc(12px + env(safe-area-inset-bottom));
 }
 .shop-shelf-head {
   display: flex;
@@ -2505,11 +2510,11 @@ body.modal-open .pager-nav {
   letter-spacing: 0.02em;
 }
 .shop-premium-title {
-  margin-top: 22px;
+  margin-top: 12px;
 }
 .shop-note {
-  margin: 4px 0 10px;
-  font-size: 0.74rem;
+  margin: 3px 0 8px;
+  font-size: 0.7rem;
   color: #9b8d75;
 }
 .shop-reroll {
@@ -2529,7 +2534,7 @@ body.modal-open .pager-nav {
 .shop-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
+  gap: 8px;
 }
 .shop-premium-grid {
   grid-template-columns: repeat(3, 1fr);
@@ -2540,8 +2545,8 @@ body.modal-open .pager-nav {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
-  padding: 10px 8px 9px;
+  gap: 2px;
+  padding: 6px;
   border-radius: 14px;
   border: 2px solid #57432c;
   background: linear-gradient(180deg, #241b12, #15100a);
@@ -2571,20 +2576,20 @@ body.modal-open .pager-nav {
 }
 .shop-card-name {
   font-weight: 700;
-  font-size: 0.8rem;
+  font-size: 0.74rem;
   text-align: center;
   line-height: 1.15;
 }
 .shop-card-sub {
-  font-size: 0.66rem;
+  font-size: 0.62rem;
   text-transform: capitalize;
   color: #9b8d75;
 }
 .shop-card-price {
-  margin-top: 2px;
+  margin-top: 1px;
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: 0.9rem;
+  font-size: 0.82rem;
   color: var(--gold);
 }
 .shop-card-price.cant {
@@ -2598,16 +2603,26 @@ body.modal-open .pager-nav {
   border: 2.5px solid #b91c1c;
   color: #ef6a6a;
   border-radius: 6px;
-  padding: 2px 10px;
+  padding: 2px 8px;
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: 1rem;
+  font-size: 0.85rem;
   letter-spacing: 0.12em;
   background: rgba(14, 10, 6, 0.75);
 }
 .shop-pack-icon {
-  font-size: 1.5rem;
-  line-height: 1.2;
+  font-size: 1.1rem;
+  line-height: 1.15;
+}
+.shop-pack .shop-card-name {
+  font-size: 0.62rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.shop-pack .shop-card-sub {
+  font-size: 0.58rem;
 }
 .shop-pack-icon.shards {
   color: #c084fc;
@@ -2618,19 +2633,19 @@ body.modal-open .pager-nav {
   text-shadow: 0 0 10px rgba(245, 179, 1, 0.6);
 }
 .shop-pack {
-  padding-top: 12px;
+  padding-top: 8px;
 }
 .shop-ribbon {
   position: absolute;
-  top: 10px;
+  top: 4px;
   right: -30px;
   transform: rotate(35deg);
   background: #7a2e2e;
   color: #f6e7e7;
-  font-size: 0.56rem;
+  font-size: 0.46rem;
   font-weight: 800;
   letter-spacing: 0.06em;
-  padding: 2px 30px;
+  padding: 2px 24px;
   text-transform: uppercase;
 }
 
