@@ -39,8 +39,15 @@ separate scene harness on purpose; a copy would drift from the component.
 
 ## Theme song
 
-Pending the ear test: **`http://localhost:5173/mockups/shop-theme.html`**
-(gitignored harness) plays three sketches — 1 Sly & Smoky (currently wired as
-`shopTheme` in `src/audio/music.ts`), 2 Jaunty Haggler, 3 Curio Music-Box
-Waltz. Swapping the winner in is a one-track edit (the union/registry entry
-stays `shopTheme`). Delete the harness page after the pick.
+Ear-tested 2026-07-09 on a gitignored harness (3 sketches): **2 — Jaunty
+Haggler WON** and is wired in as `shopTheme` in `src/audio/music.ts` — a
+bright A-major oom-pah market tune played as cheerful contrast over the
+gritty den. Losers: 1 Sly & Smoky (the interim default; composition preserved
+in git history at commit 23008c3) and 3 Curio Music-Box Waltz. The harness
+page was deleted after the pick, per the mockup loop.
+
+Harness bug for posterity (the "audio is bugged" report): never schedule
+gain automation on a shared master bus — play()'s volume restore raced
+stop()'s pending fade and parked the page at permanent silence. Fix: one
+session GainNode per play(), faded + disconnected on stop/switch (which also
+kills pre-scheduled note bleed). Pattern recorded in session memory.
