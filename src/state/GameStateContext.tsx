@@ -25,6 +25,11 @@ import { isAvatarUnlocked } from "@/meta/avatars";
 import { MILESTONE_UNLOCKS, UNLOCK_PRICES } from "@/meta/economy";
 import { addXp } from "@/meta/leveling";
 import { canEquip, combineFold } from "@/meta/inventory";
+import {
+  applyShopPurchase,
+  applyShopReroll,
+  normalizeShopDay,
+} from "@/meta/shop";
 import { questForUnlock } from "@/data/dungeons";
 import { makeItemKey, parseItemKey, type ItemKey } from "@/data/items";
 import type { ItemSlot } from "@/types";
@@ -70,6 +75,14 @@ interface GameStateValue {
    *  gold/shard fee. No-op when blocked (copies/fee/cap) — the Bag disables
    *  the button with the reason, this is belt-and-braces. */
   combineItems: (key: ItemKey) => void;
+  /** Roll the shop's day forward (clears the Home FAB's "new stock" dot).
+   *  Callers pass dayIndexLocal() — the impure edge stays outside the fold. */
+  visitShop: (todayIdx: number) => void;
+  /** Buy one shelf slot: gate → deduct gold → grant the item at 1★ → mark the
+   *  slot sold. No-op when blocked (bought/broke) — meta/shop.applyShopPurchase. */
+  purchaseShopItem: (todayIdx: number, slotIdx: number) => void;
+  /** Pay to re-roll today's shelf (once, and only before the first buy). */
+  rerollShop: (todayIdx: number) => void;
 }
 
 const GameStateContext = createContext<GameStateValue | null>(null);
@@ -248,6 +261,18 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       };
     });
 
+  // ---- shop — the folds live in meta/shop (pure, StrictMode-safe); these
+  // wrappers only bind them to setSave. ------------------------------------
+  const visitShop = (todayIdx: number) =>
+    setSave((s) => {
+      const shop = normalizeShopDay(s.shop, todayIdx);
+      return shop === s.shop ? s : { ...s, shop };
+    });
+  const purchaseShopItem = (todayIdx: number, slotIdx: number) =>
+    setSave((s) => applyShopPurchase(s, todayIdx, slotIdx));
+  const rerollShop = (todayIdx: number) =>
+    setSave((s) => applyShopReroll(s, todayIdx));
+
   return (
     <GameStateContext.Provider
       value={{
@@ -262,6 +287,9 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
         equipItem,
         unequipItem,
         combineItems,
+        visitShop,
+        purchaseShopItem,
+        rerollShop,
       }}
     >
       {children}

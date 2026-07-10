@@ -11,6 +11,7 @@ import { DECKABLE_UNIT_IDS, UNITS } from "@/data/units";
 import { STARTER_UNIT_IDS } from "@/meta/economy";
 import { TOTAL_XP_CAP } from "@/meta/leveling";
 import { sanitizeItems, sanitizeLoadouts } from "@/meta/inventory";
+import { sanitizeShop, type ShopState } from "@/meta/shop";
 import { DEFAULT_AVATAR_ID, isAvatarUnlocked } from "@/meta/avatars";
 import { DUNGEON_IDS, DUNGEONS, QUEST_LOCKED_UNITS } from "@/data/dungeons";
 
@@ -97,6 +98,10 @@ export interface PlayerSave {
   items: Record<string, number>;
   /** Equipped item keys per unit defId (weapon/armor/trinket). (Save v9.) */
   loadouts: ItemLoadouts;
+  /** Grubbins' shop bookkeeping — which local day the counters refer to, paid
+   *  rerolls used, and shelf slots bought. The STOCK itself is never stored:
+   *  it's re-derived from (day, rerolls) in meta/shop. (Save v10.) */
+  shop: ShopState;
 }
 
 // The key names the storage SLOT, not the schema — the version lives inside
@@ -104,7 +109,7 @@ export interface PlayerSave {
 const KEY = "fantasy-arena/save/v1";
 
 export const DEFAULT_SAVE: PlayerSave = {
-  version: 9,
+  version: 10,
   username: "Champion",
   avatarId: DEFAULT_AVATAR_ID,
   deck: ["ogre", "archer", "knight", "fire_mage"],
@@ -120,6 +125,7 @@ export const DEFAULT_SAVE: PlayerSave = {
   soulShards: 0,
   items: {},
   loadouts: {},
+  shop: { day: -1, rerolls: 0, bought: [] },
 };
 
 export function loadSave(): PlayerSave {
@@ -187,6 +193,9 @@ export function migrateSave(parsed: Partial<PlayerSave> | null): PlayerSave {
     merged.items,
     DECKABLE_UNIT_IDS
   );
+  // v10: shop bookkeeping — rebuilt defensively; older saves get the fresh
+  // "never visited" state (day -1), which normalizes on first shop open.
+  merged.shop = sanitizeShop(parsed.shop);
 
   // Grandfathering: saves from before the unlock system keep every unit that
   // exists today — EXCEPT quest-locked ones, whose purchase must always be
@@ -243,6 +252,7 @@ function structuredCloneSave(save: PlayerSave): PlayerSave {
     loadouts: Object.fromEntries(
       Object.entries(save.loadouts).map(([id, l]) => [id, { ...l }])
     ),
+    shop: { ...save.shop, bought: [...save.shop.bought] },
   };
 }
 

@@ -170,6 +170,45 @@ export const SHARD_CHEST_DRIP: Partial<
   dragon: { chance: 0.6, range: [6, 12] },
 };
 
+// ---------------------------------------------------------------------------
+// Shop (Grubbins' pawn-den) — daily-stock acquisition numbers. The stock roll
+// and purchase folds live in meta/shop.ts; these are the tunables.
+// ---------------------------------------------------------------------------
+
+/** Gold price per offered quality. Sits deliberately ABOVE the duplicate-gold
+ *  conversion (80/240) so a shop buy never reads as cheaper than a chest dupe.
+ *  Legendary quality is never sold — that stays a merge/dungeon achievement. */
+export const SHOP_PRICES: Record<"rare" | "epic", number> = {
+  rare: 250,
+  epic: 750,
+};
+
+/** Chance an offered slot rolls epic quality (else rare). */
+export const SHOP_EPIC_CHANCE = 0.25;
+
+/** Gold price to re-roll the whole shelf (allowed only before the day's
+ *  first purchase — see applyShopReroll). */
+export const SHOP_REROLL_COST = 200;
+
+/** Paid rerolls per day. */
+export const SHOP_REROLLS_PER_DAY = 1;
+
+/** Premium shelf — DISPLAY-ONLY stub ("the mint isn't open yet"): there is no
+ *  payment path, no grants, no prices. Real packs arrive with accounts/backend. */
+export const SHOP_PREMIUM_PACKS: readonly {
+  id: string;
+  kind: "shards" | "gold";
+  amount: number;
+  label: string;
+}[] = [
+  { id: "shards_s", kind: "shards", amount: 40, label: "Fistful of Shards" },
+  { id: "shards_m", kind: "shards", amount: 110, label: "Pouch of Shards" },
+  { id: "shards_l", kind: "shards", amount: 260, label: "Casket of Shards" },
+  { id: "gold_s", kind: "gold", amount: 1200, label: "Coin Purse" },
+  { id: "gold_m", kind: "gold", amount: 3200, label: "Coin Chest" },
+  { id: "gold_l", kind: "gold", amount: 8000, label: "Dragon's Hoard" },
+];
+
 /** How many FRESH 5-wave milestones this endless run crossed — the shard twin
  *  of endlessMilestoneChestTier (which pays one chest for the deepest); shards
  *  pay per milestone (a 3→12 run banks the 5 AND 10 marks). */

@@ -54,7 +54,8 @@ export type MusicTrackId =
   | "totality"
   | "coldAnvil"
   | "emberHalls"
-  | "forgeGolem";
+  | "forgeGolem"
+  | "shopTheme";
 
 interface TrackDef {
   bpm: number;
@@ -792,6 +793,44 @@ const forgeGolem: TrackDef = {
   },
 };
 
+/** Grubbins' shop — the "Jaunty Haggler" (ear-test winner, 2026-07-09, over
+ *  a sly-smoky swing and a music-box waltz; the losing sketches live in git
+ *  history). A bright A-major oom-pah market tune played as cheerful contrast
+ *  over the gritty den: root/fifth sine bass, skipping triangle lute,
+ *  tambourine offbeats, the odd coin glint. Palette rules hold — no squares,
+ *  sines only down low — and it's A-rooted like everything else so
+ *  crossfades land consonantly. */
+const shopTheme: TrackDef = {
+  bpm: 104,
+  steps: 64,
+  schedule(t0, out, st) {
+    // Oom-pah bass: roots on the downbeats, the fifth answering; bar 3 lifts
+    // to D for the turnaround.
+    for (let b = 0; b < 4; b++) {
+      const root = b === 2 ? 38 : 33;
+      for (const s of [0, 8])
+        tone(t0 + (b * 16 + s) * st, root, st * 3, "sine", 0.08, out);
+      for (const s of [4, 12])
+        tone(t0 + (b * 16 + s) * st, root + 7, st * 3, "sine", 0.06, out);
+    }
+    // The skipping lute.
+    const lute = [
+      [0, 69, 1], [2, 73, 1], [4, 76, 2], [7, 74, 1], [8, 73, 1], [10, 71, 1], [12, 69, 2],
+      [16, 69, 1], [18, 73, 1], [20, 76, 2], [23, 78, 1], [24, 76, 1], [26, 74, 1], [28, 73, 2],
+      [32, 74, 1], [34, 74, 1], [36, 78, 2], [39, 76, 1], [40, 74, 1], [42, 73, 1], [44, 71, 2],
+      [48, 69, 1], [50, 71, 1], [52, 73, 2], [55, 71, 1], [56, 69, 3], [60, 64, 3],
+    ];
+    for (const [s, m, d] of lute) tone(t0 + s * st, m, d * st, "triangle", 0.062, out);
+    // Tambourine offbeats + a light foot-tap on the bar lines.
+    for (let s = 2; s < 64; s += 4)
+      noiseHit(t0 + s * st, 0.05, 0.02, out, "highpass", 5200);
+    for (const s of [0, 16, 32, 48]) thump(t0 + s * st, 0.08, out, 95, 40);
+    // Coin glints.
+    tone(t0 + 30 * st, 88, st * 1.5, "sine", 0.012, out);
+    tone(t0 + 62 * st, 93, st * 1.5, "sine", 0.012, out);
+  },
+};
+
 const TRACKS: Record<MusicTrackId, TrackDef> = {
   emberfall,
   blackblade,
@@ -817,6 +856,7 @@ const TRACKS: Record<MusicTrackId, TrackDef> = {
   coldAnvil,
   emberHalls,
   forgeGolem,
+  shopTheme,
 };
 
 // ---------------------------------------------------------------------------

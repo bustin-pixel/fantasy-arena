@@ -718,15 +718,17 @@ body {
   max-width: 300px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 9px;
   margin-top: 8px;
 }
+/* Cards + Bag are sized so the three-card stack clears the floating Bag FAB on a
+   short phone (see .home-bag-fab) — don't scale these back up without rechecking. */
 .mode-card {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  padding: 22px 16px;
+  padding: 8px 16px;
   border-radius: 16px;
   border: 2px solid #57432c;
   background: linear-gradient(180deg, #2c2118, #191209);
@@ -750,13 +752,14 @@ body {
   filter: grayscale(0.7) brightness(0.7);
 }
 .mode-card-icon {
-  font-size: 2rem;
+  width: 32px;
+  height: 32px;
   line-height: 1;
   filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.55));
 }
 .mode-card-title {
   font-family: var(--font-display);
-  font-size: 1.5rem;
+  font-size: 1.24rem;
   font-weight: 700;
   color: var(--gold);
   letter-spacing: 0.01em;
@@ -2277,12 +2280,13 @@ body.modal-open .pager-nav {
   opacity: 0;
   pointer-events: none;
 }
-/* Floating Bag button — bottom-right of the Home screen, above the pager nav
-   and visually to the right of the Endless card. Anchored to the full-height
-   Home column (see `.home { min-height: 100% }`). */
-.home-bag-fab {
+/* Floating Bag (bottom-right) + Shop (bottom-left) buttons on the Home screen,
+   above the pager nav and flanking the mode cards. Anchored to the full-height
+   Home column (see `.home { min-height: 100% }`). Both share the mode-card
+   clearance budget on short phones — resize together, and recheck. */
+.home-bag-fab,
+.home-shop-fab {
   position: absolute;
-  right: 16px;
   bottom: calc(16px + env(safe-area-inset-bottom));
   z-index: 3;
   display: flex;
@@ -2290,9 +2294,9 @@ body.modal-open .pager-nav {
   align-items: center;
   justify-content: center;
   gap: 1px;
-  width: 78px;
-  height: 78px;
-  border-radius: 22px;
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
   border: 2px solid var(--gold);
   background: linear-gradient(180deg, #2c2118, #191209);
   color: var(--parchment);
@@ -2301,20 +2305,52 @@ body.modal-open .pager-nav {
     0 0 20px rgba(245, 179, 1, 0.2), 0 6px 16px rgba(0, 0, 0, 0.5);
   transition: transform 0.08s ease, filter 0.15s ease;
 }
-.home-bag-fab:active {
+.home-bag-fab {
+  right: 16px;
+}
+.home-shop-fab {
+  left: 16px;
+}
+.home-bag-fab:active,
+.home-shop-fab:active {
   transform: translateY(1px) scale(0.98);
 }
-.home-bag-emoji {
-  font-size: 2rem;
+.home-bag-emoji,
+.home-shop-emoji {
+  font-size: 1.4rem;
   line-height: 1;
   filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.55));
 }
-.home-bag-text {
+.home-bag-text,
+.home-shop-text {
   font-family: var(--font-display);
-  font-size: 0.82rem;
+  font-size: 0.58rem;
   font-weight: 700;
   color: var(--gold);
   letter-spacing: 0.02em;
+}
+/* "New stock today" pip — cleared by opening the shop (visitShop rolls the
+   save's shop.day forward to today). */
+.home-shop-dot {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 35% 30%, #ffe08a, var(--gold) 70%);
+  border: 1.5px solid #1b1510;
+  box-shadow: 0 0 10px rgba(245, 179, 1, 0.7);
+  animation: shop-dot-pulse 1.6s ease-in-out infinite;
+}
+@keyframes shop-dot-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.18);
+  }
 }
 .home-bag-count {
   position: absolute;
@@ -2348,6 +2384,269 @@ body.modal-open .pager-nav {
 }
 .reward-shards .shard-gem {
   font-size: 0.75rem;
+}
+
+/* ============================================================================
+   Shop — Grubbins' Pawn-Den (full-screen App view)
+   ========================================================================== */
+.shop-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  overflow-y: auto;
+  background: #0e0a06;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.shop-scene-wrap {
+  position: relative;
+  width: 100%;
+  max-width: 520px;
+  background: #0c0a07;
+  border-bottom: 2px solid #57432c;
+  /* The canvas may be narrower than the column (height-budgeted so the whole
+     shop fits without scrolling) — keep it centered; edges vanish into the
+     matching dark backdrop. */
+  display: flex;
+  justify-content: center;
+}
+.shop-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 10px;
+  z-index: 2;
+}
+.shop-pills {
+  display: flex;
+  gap: 6px;
+}
+.shop-back {
+  border: 2px solid #57432c;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #2c2118, #191209);
+  color: var(--parchment);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.85rem;
+  padding: 6px 12px;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.45);
+}
+.shop-back:active {
+  transform: translateY(1px);
+}
+.shop-title {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 6px;
+  margin: 0;
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  color: var(--gold);
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.9), 0 0 18px rgba(245, 179, 1, 0.25);
+  pointer-events: none;
+  z-index: 2;
+}
+/* Grubbins' speech bubble — parchment, tail pointing at the goblin. */
+.shop-bark {
+  position: absolute;
+  left: 5%;
+  top: 14%;
+  max-width: 46%;
+  z-index: 2;
+  background: #efe3c8;
+  color: #241a10;
+  border: 2px solid #57432c;
+  border-radius: 12px;
+  padding: 6px 10px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  line-height: 1.25;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.55);
+  animation: bark-in 0.16s ease-out;
+}
+.shop-bark::after {
+  content: "";
+  position: absolute;
+  right: -12px;
+  top: 55%;
+  border: 8px solid transparent;
+  border-left-color: #efe3c8;
+}
+@keyframes bark-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.shop-body {
+  width: 100%;
+  max-width: 520px;
+  padding: 10px 12px calc(12px + env(safe-area-inset-bottom));
+}
+.shop-shelf-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.shop-shelf-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  color: var(--gold);
+  letter-spacing: 0.02em;
+}
+.shop-premium-title {
+  margin-top: 12px;
+}
+.shop-note {
+  margin: 3px 0 8px;
+  font-size: 0.7rem;
+  color: #9b8d75;
+}
+.shop-reroll {
+  border: 1.5px solid #57432c;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #2c2118, #191209);
+  color: var(--parchment);
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+.shop-reroll:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.shop-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+.shop-premium-grid {
+  grid-template-columns: repeat(3, 1fr);
+}
+.shop-card {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px;
+  border-radius: 14px;
+  border: 2px solid #57432c;
+  background: linear-gradient(180deg, #241b12, #15100a);
+  color: var(--parchment);
+  cursor: pointer;
+  transition: transform 0.08s ease, filter 0.15s ease;
+}
+.shop-card:active {
+  transform: translateY(1px) scale(0.99);
+}
+.shop-card.sold {
+  filter: grayscale(0.8) brightness(0.75);
+}
+.shop-card.just-bought {
+  animation: shop-pop 0.45s ease-out;
+}
+@keyframes shop-pop {
+  0% {
+    transform: scale(0.94);
+  }
+  55% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.shop-card-name {
+  font-weight: 700;
+  font-size: 0.74rem;
+  text-align: center;
+  line-height: 1.15;
+}
+.shop-card-sub {
+  font-size: 0.62rem;
+  text-transform: capitalize;
+  color: #9b8d75;
+}
+.shop-card-price {
+  margin-top: 1px;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 0.82rem;
+  color: var(--gold);
+}
+.shop-card-price.cant {
+  color: #c96a5a;
+}
+.shop-sold-stamp {
+  position: absolute;
+  top: 42%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-14deg);
+  border: 2.5px solid #b91c1c;
+  color: #ef6a6a;
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 0.85rem;
+  letter-spacing: 0.12em;
+  background: rgba(14, 10, 6, 0.75);
+}
+.shop-pack-icon {
+  font-size: 1.1rem;
+  line-height: 1.15;
+}
+.shop-pack .shop-card-name {
+  font-size: 0.62rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.shop-pack .shop-card-sub {
+  font-size: 0.58rem;
+}
+.shop-pack-icon.shards {
+  color: #c084fc;
+  text-shadow: 0 0 10px rgba(192, 132, 252, 0.8);
+}
+.shop-pack-icon.gold {
+  color: var(--gold);
+  text-shadow: 0 0 10px rgba(245, 179, 1, 0.6);
+}
+.shop-pack {
+  padding-top: 8px;
+}
+.shop-ribbon {
+  position: absolute;
+  top: 4px;
+  right: -30px;
+  transform: rotate(35deg);
+  background: #7a2e2e;
+  color: #f6e7e7;
+  font-size: 0.46rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  padding: 2px 24px;
+  text-transform: uppercase;
 }
 
 /* ---- Bag sheet ----------------------------------------------------------- */

@@ -41,7 +41,8 @@ function v2Save(): Partial<PlayerSave> {
 describe("migrateSave", () => {
   it("null (new player) → defaults: starter units, 0 gold, floor 0", () => {
     const save = migrateSave(null);
-    expect(save.version).toBe(9);
+    expect(save.version).toBe(10);
+    expect(save.shop).toEqual({ day: -1, rerolls: 0, bought: [] });
     expect(save.soulShards).toBe(0);
     expect(save.items).toEqual({});
     expect(save.loadouts).toEqual({});
@@ -213,7 +214,10 @@ describe("migrateSave", () => {
     a.unitXp.ogre = 9999;
     a.items["soldiers_blade:rare:1"] = 5;
     a.loadouts.ogre = { weapon: "soldiers_blade:rare:1" };
+    a.shop.bought.push(2);
     const b = migrateSave(null);
+    expect(b.shop.bought).toEqual([]);
+    expect(DEFAULT_SAVE.shop.bought).toEqual([]);
     expect(b.unlockedUnits).not.toContain("summoner");
     expect(DEFAULT_SAVE.unlockedUnits).not.toContain("summoner");
     expect(b.unitXp).toEqual({});
@@ -272,6 +276,36 @@ describe("migrateSave", () => {
     });
     expect(save.soulShards).toBe(0);
     expect(save.items).toEqual({ "soldiers_blade:rare:1": 2 });
+  });
+
+  // ---- v10: shop bookkeeping ----------------------------------------------
+
+  it("defaults shop to never-visited for a pre-v10 save", () => {
+    const save = migrateSave({ version: 9, gold: 500 });
+    expect(save.shop).toEqual({ day: -1, rerolls: 0, bought: [] });
+    expect(save.gold).toBe(500);
+  });
+
+  it("preserves valid v10 shop bookkeeping", () => {
+    const save = migrateSave({
+      version: 10,
+      shop: { day: 1037543, rerolls: 1, bought: [0, 2] },
+    });
+    expect(save.shop).toEqual({ day: 1037543, rerolls: 1, bought: [0, 2] });
+  });
+
+  it("sanitizes hand-edited v10 shop garbage", () => {
+    const save = migrateSave({
+      version: 10,
+      shop: {
+        day: 3.7, // non-integer → never-visited
+        rerolls: 99, // clamps to the per-day cap
+        bought: [0, 0, -1, 9, 2.5, "x", 3], // dedupe + drop out-of-range/junk
+      } as unknown as PlayerSave["shop"],
+    });
+    expect(save.shop.day).toBe(-1);
+    expect(save.shop.rerolls).toBe(1);
+    expect(save.shop.bought).toEqual([0, 3]);
   });
 
   it("enforces the loadout invariant: slot types match and references ≤ counts", () => {

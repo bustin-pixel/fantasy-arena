@@ -144,7 +144,7 @@ export type SfxKey =
   | "fireBoom" | "frostShatter" | "zap" | "arcaneWarp" | "curse" | "heal"
   | "summon" | "roar" | "shieldGong" | "slimeSquish" | "boneRattle" | "death"
   | "deploy" | "trapSet" | "trapSnap" | "chestCreak" | "chestOpen" | "polymorph"
-  | "anvil" | "itemReveal";
+  | "anvil" | "itemReveal" | "coinSpend";
 
 const SOUNDS: Record<SfxKey, (r: number) => void> = {
   // metallic clang (A)
@@ -202,6 +202,9 @@ const SOUNDS: Record<SfxKey, (r: number) => void> = {
   anvil(r) { blip(r, 0, 110, 45, 0.14, "triangle", 0.4); ring(r, 0.01, [1720, 2610, 3900], 0.32, 0.12); burst(r, 0, 0.05, 0.2, "highpass", 3500, 6500); },
   // item reveal: rising shimmer arpeggio (the merged result pops into view)
   itemReveal(r) { [1047, 1319, 1568, 2093].forEach((f, i) => blip(r, i * 0.06, f, f * 1.04, 0.16, "sine", 0.06, 0.008)); ring(r, 0.22, [3140, 4230], 0.14, 0.05); },
+  // shop purchase: coins clinking into Grubbins' palm (quick metallic double
+  // tap + a couple of stray pouch jingles). First UI/meta sound — kept gentle.
+  coinSpend(r) { ring(r, 0, [2520, 3810], 0.1, 0.07); ring(r, 0.07, [2930, 4420], 0.12, 0.06); [0.16, 0.23].forEach((at, i) => ring(r, at, [3350 + i * 420], 0.08, 0.035)); burst(r, 0, 0.03, 0.08, "highpass", 5200, 8200); },
 };
 
 // ---------------------------------------------------------------------------
