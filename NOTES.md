@@ -451,6 +451,37 @@ playbook — one bake point, deterministic match input — plus its own invarian
   SEPARATE seeded stream, `RNG(chestSeed ^ 0x5eed)`, so chest contents stay
   stable). Combat never sees it.
 
+### 10. The shop's stock is DERIVED, never stored
+
+Grubbins' shop (save v10: `shop: { day, rerolls, bought }`) sells a daily
+shelf that is re-rolled from its inputs everywhere it's needed:
+
+- **Never persist the stock.** `rollDailyStock(dayIndex, rerolls)`
+  (`meta/shop.ts`) is pure/seeded; the UI renders it and `applyShopPurchase`
+  re-derives it, so what you see is exactly what the fold grants — no second
+  source of truth, no claims ledger (hazard 9's shard rule, same reasoning).
+- **Dungeon-signature exclusion is by pool construction, not a filter**:
+  the roll draws from `BASE_LINES_BY_SLOT`, which already omits every
+  `dungeonId` line.
+- **The quality ceiling is epic ON PURPOSE** (user-locked design decision):
+  legendary quality stays a merge/dungeon achievement. `ShopQuality` is
+  `"rare" | "epic"` — widening it is a design change, not a refactor.
+- **`bought[]` indexes into the CURRENT (day, rerolls) stock** — that's why
+  `applyShopReroll` refuses after the day's first purchase (a reroll would
+  relabel what "sold" points at). Keep that guard.
+- **The impure edge is `dayIndexLocal()`** (local calendar day → integer),
+  computed by CALLERS like `generateSeed()`; the folds take `todayIdx` as an
+  argument so the specs stay clock-free. Clock changes re-roll the shelf —
+  accepted for a local solo game whose save is hand-editable anyway.
+- **Prices live in `meta/economy.ts`** (`SHOP_PRICES` / `SHOP_REROLL_COST` /
+  `SHOP_EPIC_CHANCE`), per the hazard-9 power/acquisition split, deliberately
+  ABOVE `DUPLICATE_GOLD` so a shop buy never undercuts a chest dupe. The
+  premium shelf (`SHOP_PREMIUM_PACKS`) is a DISPLAY-ONLY coming-soon stub —
+  no grant path exists on purpose; real payments arrive with accounts.
+
+Specs: `meta/__tests__/shop.test.ts`; v10 migration cases in
+`state/__tests__/persistence.test.ts`.
+
 ---
 
 ## Architecture reminders (the good patterns to preserve)

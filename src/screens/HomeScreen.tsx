@@ -7,6 +7,7 @@ import { ProfilePlate } from "@/components/ProfilePlate";
 import { ProfileSheet } from "@/components/ProfileSheet";
 import { getDungeon } from "@/data/dungeons";
 import { endlessBestWave, highestClearedFloorOf } from "@/state/persistence";
+import { dayIndexLocal } from "@/meta/shop";
 import type { BattleMode } from "@/hooks/useBattleEngine";
 
 /** Endless unlocks once the player has cleared the fifth Depths floor — the same
@@ -17,6 +18,8 @@ interface Props {
   onBattle: (mode: BattleMode, floor?: number, dungeonId?: string) => void;
   /** Open the equipment Bag (rendered by AppShell so it overlays everything). */
   onOpenBag: () => void;
+  /** Open Grubbins' shop (a full-screen App view). */
+  onOpenShop: () => void;
 }
 
 /**
@@ -24,10 +27,13 @@ interface Props {
  * (mode "solo"); the Dungeons card opens the dungeon-select map (The Depths +
  * the themed legendary dungeons), then a floor picker for the chosen dungeon.
  */
-export function HomeScreen({ onBattle, onOpenBag }: Props) {
+export function HomeScreen({ onBattle, onOpenBag, onOpenShop }: Props) {
   const { save } = useGameState();
   // Total items owned (across all stacks) for the Bag button's count badge.
   const bagCount = Object.values(save.items).reduce((n, c) => n + c, 0);
+  // Shop pip: today's shelf hasn't been seen yet (opening the shop rolls
+  // save.shop.day forward via visitShop, which clears this).
+  const newStock = save.shop.day !== dayIndexLocal();
   // A single unit is enough to battle — the engine fields whatever you bring
   // (readiness is min(deckSize, activeCap)); an empty deck is the only block.
   const ready = save.deck.length >= 1;
@@ -118,6 +124,20 @@ export function HomeScreen({ onBattle, onOpenBag }: Props) {
         </span>
         <span className="home-bag-text">Bag</span>
         {bagCount > 0 && <span className="home-bag-count">{bagCount}</span>}
+      </button>
+
+      {/* Floating Shop button — bottom-left, the Bag's mirror twin. */}
+      <button
+        type="button"
+        className="home-shop-fab"
+        aria-label="Open Shop"
+        onClick={onOpenShop}
+      >
+        <span className="home-shop-emoji" aria-hidden>
+          💰
+        </span>
+        <span className="home-shop-text">Shop</span>
+        {newStock && <span className="home-shop-dot" />}
       </button>
 
       {editingProfile && (

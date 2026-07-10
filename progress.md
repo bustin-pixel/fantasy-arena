@@ -146,21 +146,29 @@ handshake with file anchors + commit sequencing in
    NOTES §9. Still open: **item-assuming dungeon tier** (post-gear
    difficulty band — new content, its own slice) and a **Combine All** QoL
    sweep for late-game hoards.
-5. **Soul Shop — sells distinction, never battle power** (no stat boosts, no
-   revives, no timers): unit skins (palette swaps — mostly cheap via
-   `color`/`accent`, but the sprite glow-up added hardcoded literals — knight
-   `KnightLivery` heraldry, per-mage element tints, bone/flame/steel material
-   colours — that a skin for those units must also recolour); titles/flair
-   ("Lichslayer", pairs with boss first-kills); **themed legendary dungeons** —
-   each existing legendary gets its own SEPARATE themed dungeon whose rare-spawn
-   fusion quest unlocks it, quest-exclusive (`data/dungeons.ts`; the Slime Knight
-   quest is now `DUNGEONS.depths.quest`). Each dungeon is **5 floors** (boss +
-   catalyst on floor 5) with its own themed roster. **ALL SIX BUILT (uncommitted):**
-   Bonefields → Necromancer, Wilds → Hunter, Sealed Vault → Aegis Knight, Overgrowth
-   → Druid, Eclipse Spire → Mystic Archer, Deep Forge → Engineer. Every existing
-   legendary is now quest-exclusive. Full
-   6-dungeon spec in the plan file + the `themed-legendary-dungeons` memory. Premium
-   chest + reroll token.
+5. **General Store — Grubbins' Pawn-Den (v1 BUILT, 2026-07-09, on
+   feat/player-shop).** The shop identity question was settled by grilling:
+   ONE general store, and the old "Soul Shop sells distinction, never battle
+   power" philosophy is formally REVISED — earned gold buying power matches
+   the game's existing pattern (unit unlocks, merges); the money guardrail
+   moved to the IAP layer instead (premium shelf is a coming-soon STUB, no
+   payments/no fake grants until an accounts/backend project exists). v1 =
+   full-screen animated Grubbins scene (gritty pawn-den, mockup-picked) +
+   daily 4-slot shelf (rare/epic only, 1★, from `BASE_LINES_BY_SLOT`; never
+   dungeon signatures, never legendary quality) + one 200g pre-purchase
+   reroll + shop theme track + coinSpend SFX; save v10 `shop` bookkeeping;
+   invariants in NOTES hazard 10. Cut by the user: boosts/potions of any
+   kind. **Still open for later slices:** the distinction goods this slice
+   absorbed — unit skins (palette swaps — mostly cheap via `color`/`accent`,
+   but the sprite glow-up added hardcoded literals — knight `KnightLivery`
+   heraldry, per-mage element tints, bone/flame/steel material colours — that
+   a skin for those units must also recolour) and titles/flair ("Lichslayer",
+   pairs with boss first-kills) as a cosmetics TAB of this same screen, plus
+   real payments. (The themed legendary dungeons that used to live in this
+   slice shipped separately via PR #50 — Bonefields → Necromancer, Wilds →
+   Hunter, Sealed Vault → Aegis Knight, Overgrowth → Druid, Eclipse Spire →
+   Mystic Archer, Deep Forge → Engineer; every existing legendary is
+   quest-exclusive, spec in the `themed-legendary-dungeons` memory.)
 6. **Later:** Endless mode, per-monster kill crests, trophies/ranks → Arena
    enemy-deck budget scaling via the existing `budget` param, PvP rewards
    (server-side — PvP pays nothing today by design).
@@ -232,7 +240,8 @@ detonations/tempo/pack tactics/…). All invariants in NOTES §9; specs in
 
 ### Anticipated meta systems (still out of scope)
 Trophies / ranks, accounts / auth, replay-playback UI. (Gold, chests, and unit
-unlocks shipped with Economy slice 1; the Soul Shop is slice 5.) The architecture
+unlocks shipped with Economy slice 1; the General Store shipped as slice 5 —
+cosmetics tab + real payments remain.) The architecture
 leaves room for each; persistence swaps behind `state/persistence.ts`.
 
 ---

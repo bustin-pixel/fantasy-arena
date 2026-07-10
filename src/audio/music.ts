@@ -54,7 +54,8 @@ export type MusicTrackId =
   | "totality"
   | "coldAnvil"
   | "emberHalls"
-  | "forgeGolem";
+  | "forgeGolem"
+  | "shopTheme";
 
 interface TrackDef {
   bpm: number;
@@ -792,6 +793,55 @@ const forgeGolem: TrackDef = {
   },
 };
 
+/** Grubbins' shop — sly, smoky pawn-den swing: walking sine bass with
+ *  chromatic approach notes, a muted lute slinking down half-steps, brushed
+ *  shuffle hats, and stray coin glints. Default pick pending the harness
+ *  ear-test (public/mockups/shop-theme.html offers the alternatives); melodic
+ *  per the palette rule — no squares, sines only down low. A-rooted like
+ *  everything else so crossfades land consonantly. */
+const shopTheme: TrackDef = {
+  bpm: 88,
+  steps: 64,
+  schedule(t0, out, st) {
+    // Smoky pad + the faintest room tone.
+    drone(t0, 45, st * 64, "triangle", 0.02, out); // A2
+    drone(t0, 52, st * 64, "triangle", 0.014, out); // E3
+    noiseHit(t0, st * 64, 0.008, out, "lowpass", 500);
+    // Walking bass — chromatic approaches are the sly lean (Eb2→E2).
+    const bass = [
+      [0, 33], [4, 36], [8, 40], [12, 43],
+      [16, 33], [20, 36], [24, 38], [28, 39],
+      [32, 40], [36, 43], [40, 41], [44, 40],
+      [48, 33], [52, 36], [56, 39], [60, 40],
+    ];
+    for (const [s, m] of bass) tone(t0 + s * st, m, st * 3.6, "sine", 0.075, out);
+    // Brushed shuffle hats on swung 16ths; soft finger-thumps on 1 & 3.
+    for (let s = 0; s < 64; s += 4) {
+      noiseHit(t0 + s * st, 0.03, s % 8 === 0 ? 0.013 : 0.009, out, "highpass", 6200);
+      noiseHit(t0 + (s + 3) * st, 0.025, 0.008, out, "highpass", 7000);
+    }
+    for (const s of [0, 8, 16, 24, 32, 40, 48, 56])
+      thump(t0 + s * st, s % 16 === 0 ? 0.1 : 0.06, out, 85, 38);
+    // The lute: a slinking minor phrase with chromatic passing winks.
+    const lute = [
+      [0, 69, 2], [3, 72, 1], [4, 71, 2], [7, 70, 1], [8, 69, 3], [12, 64, 3],
+      [16, 69, 2], [19, 72, 1], [20, 74, 2], [23, 73, 1], [24, 72, 3], [28, 67, 3],
+      [32, 76, 2], [35, 75, 1], [36, 74, 2], [39, 72, 1], [40, 71, 2], [43, 70, 1], [44, 69, 3],
+      [48, 67, 2], [51, 68, 1], [52, 69, 6], [60, 76, 1], [62, 75, 2],
+    ];
+    for (const [s, m, d] of lute) {
+      tone(t0 + s * st, m, d * st * 0.92, "triangle", 0.06, out);
+      // Dulcimer echo on the held notes.
+      if (d >= 2) tone(t0 + (s + 1.5) * st, m, d * st * 0.6, "triangle", 0.016, out);
+    }
+    // Stray coin glints from the counter.
+    tone(t0 + 14 * st, 93, st * 1.2, "sine", 0.012, out);
+    tone(t0 + 14.6 * st, 96, st * 1.2, "sine", 0.009, out);
+    tone(t0 + 46 * st, 91, st * 1.2, "sine", 0.011, out);
+    tone(t0 + 46.6 * st, 95, st * 1.2, "sine", 0.008, out);
+  },
+};
+
 const TRACKS: Record<MusicTrackId, TrackDef> = {
   emberfall,
   blackblade,
@@ -817,6 +867,7 @@ const TRACKS: Record<MusicTrackId, TrackDef> = {
   coldAnvil,
   emberHalls,
   forgeGolem,
+  shopTheme,
 };
 
 // ---------------------------------------------------------------------------

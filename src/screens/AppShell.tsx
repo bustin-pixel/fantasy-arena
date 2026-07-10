@@ -7,13 +7,15 @@ import { DungeonVines } from "@/components/DungeonVines";
 import { DungeonGate } from "@/components/DungeonGate";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import { BagSheet } from "@/components/BagSheet";
-import { useGameState } from "@/state/GameStateContext";
+import { GoldPill, ShardPill } from "@/components/CurrencyPills";
 import type { BattleMode } from "@/hooks/useBattleEngine";
 
 interface Props {
   /** Launch a battle in the given mode (from a Home mode card). Depths passes
    *  the floor picked in the floor sheet + the chosen dungeon id. */
   onBattle: (mode: BattleMode, floor?: number, dungeonId?: string) => void;
+  /** Open Grubbins' shop — a full-screen App view, like Battle (not a sheet). */
+  onOpenShop: () => void;
 }
 
 // Page order: Collection (0) ← Home (1) → Compendium (2). Home is the landing.
@@ -28,7 +30,7 @@ const PAGES = ["Collection", "Home", "Compendium"] as const;
  * Battle is NOT a page here — it's a full-screen overlay owned by App, so the
  * pager never fights the finger mid-fight.
  */
-export function AppShell({ onBattle }: Props) {
+export function AppShell({ onBattle, onOpenShop }: Props) {
   const trackRef = useRef<HTMLDivElement>(null);
   const hallRef = useRef<HTMLDivElement>(null);
   // Pending "restore scroll-snap" timeout from the last drag (see endDrag).
@@ -219,7 +221,11 @@ export function AppShell({ onBattle }: Props) {
           <HubScreen />
         </section>
         <section className="pager-page" aria-label="Home">
-          <HomeScreen onBattle={onBattle} onOpenBag={() => setBagOpen(true)} />
+          <HomeScreen
+            onBattle={onBattle}
+            onOpenBag={() => setBagOpen(true)}
+            onOpenShop={onOpenShop}
+          />
         </section>
         <section className="pager-page" aria-label="Compendium">
           <CompendiumScreen />
@@ -238,32 +244,6 @@ export function AppShell({ onBattle }: Props) {
           </button>
         ))}
       </nav>
-    </div>
-  );
-}
-
-/** The player's gold, pinned to the shell's top-right corner. */
-function GoldPill() {
-  const { save } = useGameState();
-  return (
-    <div className="gold-pill" aria-label={`${save.gold} gold`}>
-      <span className="coin" aria-hidden>
-        ●
-      </span>
-      {save.gold.toLocaleString()}
-    </div>
-  );
-}
-
-/** Soul Shards — the premium currency (legendary-tier item merges). */
-function ShardPill() {
-  const { save } = useGameState();
-  return (
-    <div className="gold-pill shard-pill" aria-label={`${save.soulShards} Soul Shards`}>
-      <span className="shard-gem" aria-hidden>
-        ◆
-      </span>
-      {save.soulShards.toLocaleString()}
     </div>
   );
 }
