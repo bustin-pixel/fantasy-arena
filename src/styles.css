@@ -2342,17 +2342,22 @@ body.modal-open .pager-nav {
   min-height: 34px;
 }
 .boon-retire-link {
-  background: none;
-  border: none;
+  background: rgba(0, 0, 0, 0.45);
+  border: 2px solid var(--stone-dark);
+  border-radius: 12px;
   font-family: inherit;
-  font-size: 0.78rem;
-  color: var(--stone);
-  text-decoration: underline;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--parchment);
   cursor: pointer;
-  padding: 6px 10px;
+  padding: 12px 22px;
 }
 .boon-retire-link:hover {
-  color: var(--parchment);
+  border-color: var(--gold);
+  color: var(--gold);
+}
+.boon-retire-link:active {
+  transform: translateY(1px);
 }
 .boon-retire-ask {
   font-size: 0.82rem;
