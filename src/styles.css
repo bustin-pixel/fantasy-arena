@@ -2561,14 +2561,14 @@ body.modal-open .pager-nav {
   left: 5%;
   /* Clear the Home button / currency pills row however short the scene gets. */
   top: calc(14% + 40px);
-  max-width: 46%;
+  max-width: 38%;
   z-index: 2;
   background: #efe3c8;
   color: #241a10;
   border: 2px solid #57432c;
   border-radius: 12px;
-  padding: 6px 10px;
-  font-size: 0.76rem;
+  padding: 5px 9px;
+  font-size: 0.68rem;
   font-weight: 700;
   line-height: 1.25;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.55);
