@@ -191,7 +191,9 @@ export function ShopScreen({ onExit }: Props) {
 
   const openInspect = (slotIdx: number) => {
     setInspect(slotIdx);
-    say("inspect");
+    // One sales-patter line on the FIRST inspect of a visit — window-shopping
+    // gets flavor without Grubbins yammering at every single tap.
+    if (!barkCounts.current.inspect) say("inspect");
   };
 
   const rerollUsed = shopView.rerolls >= SHOP_REROLLS_PER_DAY;
