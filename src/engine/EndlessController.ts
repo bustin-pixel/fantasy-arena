@@ -89,6 +89,11 @@ export interface EndlessStatus {
   wavesCleared: number;
   intermission: { wave: number; offers: BoonOffer[] } | null;
   boonsPicked: BoonTally[];
+  /** Momentum stacks banked (clean waves since picking it), or null if the boon
+   *  isn't owned — drives the HUD chip. */
+  momentumStacks: number | null;
+  /** Berserker's Rhythm's live attack-speed bonus (0..max), or null if unowned. */
+  rhythmBonus: number | null;
 }
 
 export class EndlessController {
@@ -118,6 +123,9 @@ export class EndlessController {
   private rhythmTicks = 0;
   /** Momentum active — bumps team damage each clean-wave clear. */
   private momentumActive = false;
+  /** Clean waves banked since Momentum was picked (HUD display only; the actual
+   *  damage fold happens directly on teamMods at each clean clear). */
+  private momentumStacks = 0;
   /** Wave-start summon orders (Kennel Master wolves, War Machine turret). */
   private summons: { defId: string; count: number }[] = [];
   /** uids of the pets summoned last wave, cleared + respawned each wave. */
@@ -170,6 +178,10 @@ export class EndlessController {
           ? { wave: this.wavesCleared, offers: this.offers.map(toOffer) }
           : null,
       boonsPicked: this.boonTally(),
+      momentumStacks: this.momentumActive ? this.momentumStacks : null,
+      rhythmBonus: this.rhythmActive
+        ? Math.min(ENDLESS_RHYTHM_MAX, ENDLESS_RHYTHM_PER_SEC * (this.rhythmTicks / TICK_RATE))
+        : null,
     };
   }
 
@@ -283,6 +295,7 @@ export class EndlessController {
       this.warbandUnits(state).every((u) => u.state !== "dead")
     ) {
       state.teamMods.player.dmgMult *= 1 + ENDLESS_MOMENTUM_PER_WAVE;
+      this.momentumStacks++;
     }
 
     // Baseline (+ Field Medicine) recovery on the living warband.
@@ -293,7 +306,7 @@ export class EndlessController {
     }
 
     const hasDead = this.warbandUnits(state).some((u) => u.state === "dead");
-    this.offers = rollBoonOffers(this.wave, this.rng, hasDead);
+    this.offers = rollBoonOffers(this.wave, this.rng, hasDead, new Set(this.picks));
     this.phase = "intermission";
   }
 

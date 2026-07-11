@@ -310,6 +310,48 @@ describe("endless — boon offer gating", () => {
     expect(withDead.length).toBe(3);
     expect(new Set(withDead).size).toBe(3);
   });
+
+  it("owned unique boons leave the offer pool; stackable ones stay", () => {
+    // A second copy of a unique boon (Momentum, Overkill, …) is a no-op, so it
+    // must never be re-offered. Stackable boons may repeat.
+    const uniques = new Set([
+      "overkill",
+      "last_breath",
+      "overheal_ward",
+      "berserkers_rhythm",
+      "momentum",
+    ]);
+    for (let seed = 1; seed <= 40; seed++) {
+      const offers = rollBoonOffers(12, new RNG(seed), false, uniques);
+      for (const id of offers) expect(uniques.has(id)).toBe(false);
+    }
+    // Sanity: with nothing owned, uniques CAN appear (find at least one).
+    let sawUnique = false;
+    for (let seed = 1; seed <= 40 && !sawUnique; seed++) {
+      sawUnique = rollBoonOffers(12, new RNG(seed), false).some((id) =>
+        uniques.has(id)
+      );
+    }
+    expect(sawUnique).toBe(true);
+  });
+});
+
+describe("endless — retire", () => {
+  it("retiring is only legal at an intermission; it ends the run keeping the score", () => {
+    const mc = new MatchController(777, DECK, [], { mode: "endless" });
+    expect(mc.retireEndless()).toBe(false); // mid-wave: refused
+    let guard = 0;
+    while (guard < 8000 && !mc.endlessStatus()?.intermission) {
+      mc.tick();
+      guard++;
+    }
+    expect(mc.endlessStatus()?.intermission).toBeTruthy();
+    const cleared = mc.wavesSurvived();
+    expect(cleared).toBeGreaterThanOrEqual(1);
+    expect(mc.retireEndless()).toBe(true);
+    expect(mc.phase).toBe("defeat"); // the endless end-of-run phase
+    expect(mc.wavesSurvived()).toBe(cleared); // the banked score is untouched
+  });
 });
 
 describe("endless — proc boon mechanics (via teamMods funnels)", () => {

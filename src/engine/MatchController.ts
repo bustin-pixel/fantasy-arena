@@ -658,6 +658,17 @@ export class MatchController {
     return ok;
   }
 
+  /** Endless: retire at an intermission — end the run voluntarily, banking the
+   *  reward for every wave already cleared. Only legal while the run is frozen
+   *  between waves (mid-wave a wipe pays the same). Resolves as "defeat" (the
+   *  endless end-of-run phase; rewards pay per wave cleared either way — the UI
+   *  frames a retirement as a completed run, not a loss). */
+  retireEndless(): boolean {
+    if (this.mode !== "endless" || !this.endless?.inIntermission) return false;
+    this.state.phase = "defeat";
+    return true;
+  }
+
   /** Endless read-model for the UI (wave number, live intermission offers, boon
    *  tally), or null outside endless. */
   endlessStatus(): EndlessStatus | null {

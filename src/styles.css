@@ -2145,6 +2145,33 @@ body.modal-open .pager-nav {
   letter-spacing: 0.02em;
 }
 
+/* Endless: live chips for the ramping epic boons, tucked under the top bar. */
+.hud-boon-strip {
+  position: absolute;
+  top: 56px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  pointer-events: none;
+}
+.hud-boon-chip {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid var(--stone-dark);
+  text-shadow: 0 1px 0 #000;
+}
+.hud-boon-chip.momentum {
+  color: #fcd34d;
+}
+.hud-boon-chip.rhythm {
+  color: #93c5fd;
+}
+
 /* "Wave N" telegraph (Endless) — gold headline like a rare, calmer tag. */
 .wave-banner-wave .wave-banner-headline {
   color: var(--gold);
@@ -2265,6 +2292,79 @@ body.modal-open .pager-nav {
 }
 .boon-chip strong {
   color: var(--gold);
+}
+/* Tally chips are tappable — they open the stack-math info card. */
+.boon-chip-btn {
+  font-family: inherit;
+  cursor: pointer;
+}
+.boon-chip-btn:hover {
+  filter: brightness(1.2);
+}
+.boon-chip-btn.open {
+  background: rgba(168, 85, 247, 0.18);
+}
+.boon-info {
+  margin-top: 10px;
+  padding: 10px 14px;
+  text-align: left;
+  border: 1px solid var(--stone-dark);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.5);
+  animation: fade 0.2s ease;
+}
+.boon-info-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.boon-info-name {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--parchment);
+}
+.boon-info-name strong {
+  color: var(--gold);
+}
+.boon-info-lines {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 0.8rem;
+  color: #86efac;
+  line-height: 1.45;
+}
+/* Retire: an understated link that arms into an explicit confirm row. */
+.boon-retire {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+}
+.boon-retire-link {
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 0.78rem;
+  color: var(--stone);
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 6px 10px;
+}
+.boon-retire-link:hover {
+  color: var(--parchment);
+}
+.boon-retire-ask {
+  font-size: 0.82rem;
+  color: var(--parchment);
+}
+.boon-retire-btn {
+  padding: 6px 14px;
+  font-size: 0.8rem;
+}
+/* Results screen: the run's boon recap. */
+.result-boons {
+  margin: 10px 0 4px;
 }
 
 /* ============================================================================
