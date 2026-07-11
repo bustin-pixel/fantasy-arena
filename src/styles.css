@@ -2711,14 +2711,14 @@ body.modal-open .pager-nav {
   background: rgba(14, 10, 6, 0.75);
 }
 
-/* Item detail panel — tap a shelf card to inspect before buying. Anchored low
-   so Grubbins (and his bark bubble) stay visible above the sheet. */
+/* Item detail panel — tap a shelf card to inspect before buying. Centered on
+   the screen. */
 .shop-detail-overlay {
   position: fixed;
   inset: 0;
   z-index: 40;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
   padding: 16px;
   background: rgba(8, 6, 4, 0.55);
@@ -2727,7 +2727,6 @@ body.modal-open .pager-nav {
 .shop-detail {
   width: 100%;
   max-width: 380px;
-  margin-bottom: 8px;
   padding: 14px 16px;
   border: 2px solid #57432c;
   border-radius: 16px;
