@@ -14,8 +14,16 @@ import { useGameState } from "@/state/GameStateContext";
 import { GrubbinsScene, SCENE_ASPECT } from "@/components/GrubbinsScene";
 import { GoldPill, ShardPill } from "@/components/CurrencyPills";
 import { ItemIcon } from "@/components/ItemIcon";
-import { ITEM_LINES, makeItemKey } from "@/data/items";
+import {
+  describeItemMods,
+  describeLuckyCoin,
+  ITEM_LINES,
+  makeItemKey,
+  parseItemKey,
+  resolveItemMods,
+} from "@/data/items";
 import { RARITIES } from "@/data/rarities";
+import { getUnitDef } from "@/data/units";
 import {
   dayIndexLocal,
   normalizeShopDay,
@@ -49,6 +57,12 @@ const BARKS = {
     "Come back with more shine.",
   ],
   soldOut: ["Already sold ya that one."],
+  inspect: [
+    "Aha, an eye for quality!",
+    "That one? Barely haunted.",
+    "Genuine! Mostly.",
+    "Go on, have a squint. Lookin's free.",
+  ],
   mint: [
     "Mint's closed, friend. Come back when the smelter's lit.",
     "Real coin? Heh. Grubbins wishes.",
@@ -58,6 +72,14 @@ const BARKS = {
 type BarkKind = keyof typeof BARKS;
 
 const BARK_MS = 2600;
+
+/** Effect lines for an item key (Lucky Coin is meta-only, described specially). */
+function effectLines(key: string): string[] {
+  const p = parseItemKey(key);
+  if (!p) return [];
+  if (p.lineId === "lucky_coin") return describeLuckyCoin(p.quality, p.star);
+  return describeItemMods(resolveItemMods(key));
+}
 
 export function ShopScreen({ onExit }: Props) {
   const { save, visitShop, purchaseShopItem, rerollShop } = useGameState();
@@ -95,9 +117,17 @@ export function ShopScreen({ onExit }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Slot index of the item whose detail panel is open (null = closed).
+  const [inspect, setInspect] = useState<number | null>(null);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onExit();
+      if (e.key !== "Escape") return;
+      // Escape peels one layer: the detail panel first, then the shop itself.
+      setInspect((cur) => {
+        if (cur === null) onExit();
+        return null;
+      });
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -155,6 +185,13 @@ export function ShopScreen({ onExit }: Props) {
     setReactNonce((n) => n + 1);
     setJustBought(slotIdx);
     say("purchase");
+    // Close the detail panel so the sold-card pop and Grubbins' reaction show.
+    setInspect(null);
+  };
+
+  const openInspect = (slotIdx: number) => {
+    setInspect(slotIdx);
+    say("inspect");
   };
 
   const rerollUsed = shopView.rerolls >= SHOP_REROLLS_PER_DAY;
@@ -233,11 +270,11 @@ export function ShopScreen({ onExit }: Props) {
                   justBought === offer.slotIdx ? " just-bought" : ""
                 }`}
                 style={{ borderColor: qColor }}
-                onClick={() => buy(offer.slotIdx)}
+                onClick={() => openInspect(offer.slotIdx)}
                 aria-label={
                   sold
-                    ? `${line.name} — sold`
-                    : `Buy ${line.name} for ${offer.price} gold`
+                    ? `${line.name} — sold (tap to view)`
+                    : `View ${line.name} — ${offer.price} gold`
                 }
               >
                 <ItemIcon itemKey={key} size={38} hideStars />
@@ -253,6 +290,86 @@ export function ShopScreen({ onExit }: Props) {
             );
           })}
         </div>
+
+        {inspect !== null &&
+          (() => {
+            // Re-derive the offer exactly like buy() does — the panel can never
+            // disagree with what a purchase would actually grant.
+            const offer = stock[inspect];
+            if (!offer) return null;
+            const line = ITEM_LINES[offer.lineId];
+            const key = makeItemKey(offer.lineId, offer.quality, 1);
+            const rarity = RARITIES[offer.quality];
+            const sold = shopView.bought.includes(offer.slotIdx);
+            const cant = save.gold < offer.price;
+            const owned = save.items[key] ?? 0;
+            const holders = Object.keys(save.loadouts).filter((id) => {
+              const l = save.loadouts[id];
+              return l.weapon === key || l.armor === key || l.trinket === key;
+            });
+            return (
+              <div
+                className="shop-detail-overlay"
+                onClick={() => setInspect(null)}
+              >
+                <div
+                  className="shop-detail"
+                  style={{ borderColor: rarity.color }}
+                  role="dialog"
+                  aria-label={`${line.name} details`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="shop-detail-head">
+                    <ItemIcon itemKey={key} size={56} hideStars />
+                    <div className="shop-detail-title">
+                      <span
+                        className="shop-detail-name"
+                        style={{ color: rarity.color }}
+                      >
+                        {line.name}
+                      </span>
+                      <span className="shop-detail-tier">
+                        {rarity.label} {offer.slot}
+                        {line.dungeonId && " · dungeon relic"}
+                      </span>
+                      <span className="shop-detail-owned">
+                        {owned > 0 ? `Owned ×${owned}` : "Not owned yet"}
+                        {holders.length > 0 &&
+                          ` · worn by ${holders
+                            .map((id) => getUnitDef(id).name)
+                            .join(", ")}`}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="shop-detail-desc">{line.desc}</p>
+                  <ul className="shop-detail-effects">
+                    {effectLines(key).map((l) => (
+                      <li key={l}>{l}</li>
+                    ))}
+                  </ul>
+                  <div className="shop-detail-actions">
+                    <button
+                      type="button"
+                      className="btn shop-detail-close"
+                      onClick={() => setInspect(null)}
+                    >
+                      Close
+                    </button>
+                    <button
+                      type="button"
+                      className={`btn btn-gold shop-detail-buy${
+                        cant && !sold ? " cant" : ""
+                      }`}
+                      disabled={sold}
+                      onClick={() => buy(offer.slotIdx)}
+                    >
+                      {sold ? "SOLD" : `Buy — ● ${offer.price}`}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
         <h2 className="shop-shelf-title shop-premium-title">Premium Vault</h2>
         <p className="shop-note">
