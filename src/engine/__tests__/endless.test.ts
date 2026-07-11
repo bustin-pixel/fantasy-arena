@@ -336,6 +336,53 @@ describe("endless — boon offer gating", () => {
   });
 });
 
+describe("endless — once-per-battle passives re-arm each wave", () => {
+  it("spent one-shots reset and Ambush re-stealths when the next wave opens", () => {
+    const mc = new MatchController(
+      321,
+      ["ogre", "assassin", "berserker", "archer"],
+      [],
+      { mode: "endless" }
+    );
+    let guard = 0;
+    while (guard < 12000 && !mc.endlessStatus()?.intermission) {
+      mc.tick();
+      guard++;
+      // God-mode heal so the whole warband reliably survives to the intermission.
+      for (const u of mc.state.units) {
+        if (u.team === "player" && u.state !== "dead") metaHeal(mc.state, u, u.maxHp);
+      }
+    }
+    expect(mc.endlessStatus()?.intermission).toBeTruthy();
+
+    // Mark every one-shot as spent, as a long wave would have.
+    const warband = mc.state.units.filter((u) => u.team === "player");
+    const assassin = warband.find((u) => u.defId === "assassin")!;
+    for (const u of warband) {
+      u.vanishUsed = true;
+      u.secondWindUsed = true;
+      u.lastStandUsed = true;
+      u.stealthTriggerUsed = true;
+      u.ambushReady = false;
+    }
+    assassin.effects = assassin.effects.filter((e) => e.type !== "stealth");
+
+    mc.pickBoon(0); // next wave opens -> wave-start prep runs
+
+    for (const u of warband) {
+      expect(u.vanishUsed).toBe(false);
+      expect(u.secondWindUsed).toBe(false);
+      expect(u.lastStandUsed).toBe(false);
+      expect(u.stealthTriggerUsed).toBe(false);
+    }
+    // Ambush re-arms only on the assassin (flag + fresh opening stealth).
+    expect(assassin.ambushReady).toBe(true);
+    expect(assassin.effects.some((e) => e.type === "stealth")).toBe(true);
+    const ogre = warband.find((u) => u.defId === "ogre")!;
+    expect(ogre.ambushReady).toBe(false);
+  });
+});
+
 describe("endless — retire", () => {
   it("retiring is only legal at an intermission; it ends the run keeping the score", () => {
     const mc = new MatchController(777, DECK, [], { mode: "endless" });

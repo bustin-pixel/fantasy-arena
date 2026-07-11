@@ -424,13 +424,29 @@ export class EndlessController {
   }
 
   /** Wave-start boons on the living warband: refresh shields, (re)apply the regen
-   *  HoT, and arm the Last Breath charge. Also resets the rhythm ramp and summons
-   *  fresh pets. Called at the top of every wave. */
+   *  HoT, and arm the Last Breath charge. Also re-arms the units' own once-per-
+   *  battle one-shots, resets the rhythm ramp and summons fresh pets. Called at
+   *  the top of every wave. */
   private applyWaveStartBoons(state: SimState): void {
     const lastBreath = state.teamMods.player.lastBreath;
     for (const u of this.warbandUnits(state)) {
       if (u.state === "dead") continue;
       if (lastBreath) u.cheatDeathReady = true;
+      // Each wave is a fresh fight: re-arm the once-per-battle one-shots — the
+      // death-cheats (Vanish / Second Wind / Last Stand), the Phasecloak item's
+      // one-time stealth, and the Ambush opener (flag is only ever set for
+      // ability "ambush"; re-arming includes its opening stealth, like onSpawn).
+      u.vanishUsed = false;
+      u.secondWindUsed = false;
+      u.lastStandUsed = false;
+      u.stealthTriggerUsed = false;
+      if (u.ability === "ambush") {
+        u.ambushReady = true;
+        applyEffect(
+          u,
+          makeEffect("stealth", { source: u.uid, durationSec: ENDLESS_WAVE_TIME_SEC })
+        );
+      }
       if (this.shieldPerWave > 0) {
         u.shieldHp = Math.max(u.shieldHp, this.shieldPerWave);
         u.shieldHpMax = Math.max(u.shieldHpMax, this.shieldPerWave);
