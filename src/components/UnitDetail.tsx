@@ -343,7 +343,20 @@ export function UnitDetail({
               </span>
             )}
           </div>
-          <div className="detail-role">{def.role}</div>
+          {/* Role · Tendency epithet — every unit shows its targeting
+              personality here (Brawler included), with the registry blurb as
+              a quiet teaching line. Derived from data/tendencies.ts, never
+              duplicated into def.traits. */}
+          <div className="detail-role">
+            {def.role}
+            <span className="detail-role-tendency">
+              {" · "}
+              {TENDENCIES[def.tendency ?? "brawler"].name}
+            </span>
+          </div>
+          <div className="detail-tendency-blurb">
+            {TENDENCIES[def.tendency ?? "brawler"].blurb}
+          </div>
 
           {totalXp !== undefined && (
             <div className="detail-xp">
@@ -504,22 +517,6 @@ export function UnitDetail({
               </div>
             );
           })}
-
-          {/* Tendency — derived from the registry (never duplicated into
-              def.traits, so the copy can't drift). Brawler shows nothing. */}
-          {def.tendency && def.tendency !== "brawler" && (
-            <div className="detail-section">
-              <div className="detail-skill-head">
-                <span className="detail-skill-name">
-                  {TENDENCIES[def.tendency].name}
-                </span>
-                <span className="detail-tag tendency">Tendency</span>
-              </div>
-              <div className="detail-skill-text">
-                {TENDENCIES[def.tendency].blurb}
-              </div>
-            </div>
-          )}
 
           {def.traits?.map((trait) => (
             <div className="detail-section" key={trait.name}>

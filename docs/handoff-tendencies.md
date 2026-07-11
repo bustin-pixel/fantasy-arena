@@ -107,11 +107,15 @@ it to these two read-only lookups.
 
 ## Panel surfacing
 
-`UnitDetail` renders the trait chip **derived** from `TENDENCIES[def.tendency]` —
+`UnitDetail` renders the tendency **derived** from `TENDENCIES[def.tendency]` —
 do **not** duplicate the text into each unit's `traits` array (it would drift).
-Brawler renders no chip. Find the trait-list render in the detail panel component
-(`src/components/UnitDetail.tsx`) and add a derived line above/among the existing
-`def.traits` chips.
+
+> **As built (revised with the user, 2026-07-11):** not a trait-style chip. The
+> tendency is an epithet on the role line — `Stealth Skirmisher · Hunts the
+> Backline` (copper) — with the registry blurb as one quiet italic line beneath.
+> Shown on **every** unit including Brawler (`· Brawler` — the user chose full
+> uniformity, superseding the original "Brawler renders no chip"), and in the
+> Compendium's monster pages (all Brawlers for now).
 
 ## Test & balance plan (this is the digest-affecting part)
 
