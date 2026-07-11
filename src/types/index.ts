@@ -93,6 +93,20 @@ export interface AbilityDef {
  *  key on "undead". A skeleton carries BOTH. */
 export type UnitTag = "undead" | "skeleton";
 
+/** Targeting personality — a fixed, per-unit preference that reorders the
+ *  CANDIDATE choice inside acquireTarget's steps 2 (lowest-HP in range) and 4
+ *  (nearest). Taunt and the retaliation rules are never overridden. Absent on
+ *  a UnitDef ⇒ "brawler" (today's exact behavior). Display copy lives in
+ *  data/tendencies.ts; the type lives here so the engine reads it off the
+ *  Unit without importing the data layer. */
+export type TendencyId =
+  | "brawler"
+  | "backline_stalker"
+  | "executioner"
+  | "bodyguard"
+  | "spellwrath"
+  | "big_game";
+
 export interface UnitDef {
   id: string;
   name: string;
@@ -132,6 +146,9 @@ export interface UnitDef {
   /** Creature-type tags (the whole Bonefields roster is "undead"; raised bones
    *  are also "skeleton"). Absent = untyped. */
   tags?: UnitTag[];
+  /** Targeting personality (see TendencyId). Declarative data like `school` /
+   *  `wardedAgainst` — never a kit hook. Absent = "brawler". */
+  tendency?: TendencyId;
   /** Human-readable passive traits (engine-coded behaviors) for the detail UI. */
   traits?: { name: string; description: string }[];
 }
@@ -187,6 +204,10 @@ export interface Unit {
   radius: number;
 
   ability: AbilityId;
+
+  /** Targeting personality, copied off the UnitDef at createUnit so the
+   *  per-tick acquireTarget never re-derives it. Absent = "brawler". */
+  tendency?: TendencyId;
 
   /** Multiplier applied to incoming damage (1 = normal, 0.5 = take half). */
   damageTakenMult: number;

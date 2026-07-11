@@ -11,10 +11,17 @@
 // of range they only switch when another enemy is in range, else they commit to
 // chasing it (so they don't flip-flop between two equally-far targets).
 // Pure & deterministic: ties broken by uid ordering, never by Math.random.
+//
+// Tendencies (data/tendencies.ts): a unit's fixed targeting personality
+// reorders the CANDIDATE preference inside steps 2 and 4 only — taunt (0) and
+// the retaliation rules (1, 3) are never overridden, so a taunt stays reliable
+// protection. Absent tendency = "brawler" = the exact loops below.
 // ============================================================================
 
 import type { Unit } from "@/types";
 import { distSq } from "@/utils/math";
+import { getKit } from "./kits/UnitKit";
+import { getUnitDef } from "@/data/units";
 
 function alive(u: Unit | undefined): u is Unit {
   return !!u && u.state !== "dead";
@@ -23,6 +30,60 @@ function alive(u: Unit | undefined): u is Unit {
 /** A unit can be targeted if it's alive and not stealthed (untargetable). */
 function targetable(u: Unit | undefined): u is Unit {
   return alive(u) && !u.effects.some((e) => e.type === "stealth");
+}
+
+/** uid ordering as the FINAL tie-break of every preference chain. */
+function byUid(a: Unit, b: Unit): number {
+  return a.uid < b.uid ? -1 : 1;
+}
+
+/** The preference comparator for `unit`'s tendency: negative ⇒ `a` is the
+ *  better catch. Null for Brawler/absent, in which case the caller keeps
+ *  today's exact selection (lowest HP in range / nearest). Candidate lookups
+ *  (roleClass on the kit, school on the def) are plain map indexes; the
+ *  chain always bottoms out in the uid tie-break, so ordering stays
+ *  deterministic. */
+function tendencyComparator(
+  unit: Unit,
+  unitsByUid: Map<string, Unit>
+): ((a: Unit, b: Unit) => number) | null {
+  switch (unit.tendency) {
+    case "backline_stalker": {
+      // Prefer ranged/support kits, then the longest reach, then most wounded.
+      const backline = (u: Unit) => {
+        const rc = getKit(u.defId)?.roleClass;
+        return rc === "ranged" || rc === "support" ? 1 : 0;
+      };
+      return (a, b) =>
+        backline(b) - backline(a) ||
+        b.range - a.range ||
+        a.hp - b.hp ||
+        byUid(a, b);
+    }
+    case "executioner":
+      // The most wounded enemy anywhere — step 4 ignores distance entirely.
+      return (a, b) => a.hp - b.hp || byUid(a, b);
+    case "bodyguard": {
+      // Prefer enemies whose own target is one of MY allies, then most wounded.
+      const menacing = (u: Unit) => {
+        const victim = u.targetUid ? unitsByUid.get(u.targetUid) : undefined;
+        return alive(victim) && victim.team === unit.team ? 1 : 0;
+      };
+      return (a, b) =>
+        menacing(b) - menacing(a) || a.hp - b.hp || byUid(a, b);
+    }
+    case "spellwrath": {
+      // Prefer magic-school enemies, then most wounded.
+      const caster = (u: Unit) =>
+        getUnitDef(u.defId).school === "magic" ? 1 : 0;
+      return (a, b) => caster(b) - caster(a) || a.hp - b.hp || byUid(a, b);
+    }
+    case "big_game":
+      // The biggest beast on the field.
+      return (a, b) => b.maxHp - a.maxHp || byUid(a, b);
+    default:
+      return null; // Brawler — today's exact behavior.
+  }
 }
 
 export function acquireTarget(
@@ -55,14 +116,20 @@ export function acquireTarget(
   // out-of-range attacker can't pull me off an enemy I could be shooting.
   if (aggressorValid && inRange(aggressor)) return aggressor.uid;
 
-  // (2) Lowest-HP enemy within range.
+  const prefer = tendencyComparator(unit, unitsByUid);
+
+  // (2) Lowest-HP enemy within range — or the tendency's preferred catch among
+  // what's in reach (a Backline Stalker standing next to a frontliner must not
+  // settle for the frontliner when the archer is also in range).
   let bestInRange: Unit | null = null;
   for (const e of living) {
     if (inRange(e)) {
       if (
         !bestInRange ||
-        e.hp < bestInRange.hp ||
-        (e.hp === bestInRange.hp && e.uid < bestInRange.uid)
+        (prefer
+          ? prefer(e, bestInRange) < 0
+          : e.hp < bestInRange.hp ||
+            (e.hp === bestInRange.hp && e.uid < bestInRange.uid))
       ) {
         bestInRange = e;
       }
@@ -73,7 +140,15 @@ export function acquireTarget(
   // (3) Nothing in range: move to retaliate against my attacker if I have one.
   if (aggressorValid) return aggressor.uid;
 
-  // (4) Otherwise close on the nearest enemy.
+  // (4) Otherwise close on the nearest enemy — or, with a tendency, seek the
+  // preferred catch anywhere on the field regardless of distance.
+  if (prefer) {
+    let sought: Unit | null = null;
+    for (const e of living) {
+      if (!sought || prefer(e, sought) < 0) sought = e;
+    }
+    return sought ? sought.uid : null;
+  }
   let nearest: Unit | null = null;
   let nearestD = Infinity;
   for (const e of living) {

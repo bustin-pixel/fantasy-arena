@@ -1152,6 +1152,11 @@ body.modal-open .pager-nav {
   color: var(--stone);
   border-color: var(--stone);
 }
+/* Tendency chip — the unit's fixed targeting personality. */
+.detail-tag.tendency {
+  color: #e0906a;
+  border-color: #e0906a;
+}
 /* Right-aligned cluster of meta chips (cast time + cooldown) for an active. */
 .detail-skill-meta {
   margin-left: auto;

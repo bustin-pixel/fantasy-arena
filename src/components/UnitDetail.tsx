@@ -19,6 +19,7 @@ import {
   resolveItemMods,
   resolveLoadoutMods,
 } from "@/data/items";
+import { TENDENCIES } from "@/data/tendencies";
 import { availableCount } from "@/meta/inventory";
 import { ItemIcon } from "@/components/ItemIcon";
 import type { ItemLoadouts, ItemSlot, UnitDef } from "@/types";
@@ -503,6 +504,22 @@ export function UnitDetail({
               </div>
             );
           })}
+
+          {/* Tendency — derived from the registry (never duplicated into
+              def.traits, so the copy can't drift). Brawler shows nothing. */}
+          {def.tendency && def.tendency !== "brawler" && (
+            <div className="detail-section">
+              <div className="detail-skill-head">
+                <span className="detail-skill-name">
+                  {TENDENCIES[def.tendency].name}
+                </span>
+                <span className="detail-tag tendency">Tendency</span>
+              </div>
+              <div className="detail-skill-text">
+                {TENDENCIES[def.tendency].blurb}
+              </div>
+            </div>
+          )}
 
           {def.traits?.map((trait) => (
             <div className="detail-section" key={trait.name}>
