@@ -66,6 +66,7 @@ export function createUnit(
     range: def.range,
     radius: UNIT_RADIUS,
     ability: def.ability,
+    ...(def.tendency ? { tendency: def.tendency } : {}),
     damageTakenMult: 1,
     transformed: false,
     vanishUsed: false,

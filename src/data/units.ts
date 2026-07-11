@@ -26,6 +26,7 @@ export const UNITS: Record<string, UnitDef> = {
     moveSpeed: 42, // slow
     range: MELEE,
     ability: "crushing_slam",
+    tendency: "big_game",
     color: "#6b8e3a",
     accent: "#c2410c",
     traits: [
@@ -96,6 +97,7 @@ export const UNITS: Record<string, UnitDef> = {
     moveSpeed: 60,
     range: MELEE,
     ability: "taunt_roar",
+    tendency: "bodyguard",
     color: "#9aa3ad",
     accent: "#e2e8f0",
   },
@@ -246,6 +248,7 @@ export const UNITS: Record<string, UnitDef> = {
     moveSpeed: 105, // fastest in the game — rushes
     range: MELEE,
     ability: "ambush",
+    tendency: "backline_stalker",
     color: "#4b2e6b",
     accent: "#c084fc",
     traits: [
@@ -267,6 +270,7 @@ export const UNITS: Record<string, UnitDef> = {
     moveSpeed: 98, // quick flanker (just under the Assassin)
     range: MELEE,
     ability: "venom",
+    tendency: "backline_stalker",
     color: "#1e3a2f", // dark poison-green cloak
     accent: "#84cc16", // venom lime
     traits: [
@@ -288,6 +292,7 @@ export const UNITS: Record<string, UnitDef> = {
     moveSpeed: 95,
     range: MELEE,
     ability: "shadow_step",
+    tendency: "spellwrath",
     color: "#241b33", // shadowed violet
     accent: "#5eead4", // trickster teal shimmer
     traits: [
@@ -361,6 +366,7 @@ export const UNITS: Record<string, UnitDef> = {
     range: FIELD_WIDTH * 0.34, // long range
     ability: "mend_beast",
     abilities: ["scatter_trap"], // a second active
+    tendency: "big_game",
     color: "#4d7c0f", // hunter green
     accent: "#d9a441", // tan leather
     traits: [
@@ -397,6 +403,7 @@ export const UNITS: Record<string, UnitDef> = {
     moveSpeed: 80,
     range: MELEE,
     ability: "bloodrage",
+    tendency: "executioner",
     color: "#7f1d1d",
     accent: "#ef4444",
     traits: [
@@ -525,6 +532,7 @@ export const UNITS: Record<string, UnitDef> = {
     moveSpeed: 52,
     range: MELEE,
     ability: "aegis",
+    tendency: "spellwrath",
     color: "#5b6b8a",
     accent: "#7dd3fc",
     wardedAgainst: ["burn", "slow", "poison"],
@@ -551,6 +559,7 @@ export const UNITS: Record<string, UnitDef> = {
     moveSpeed: 55,
     range: MELEE,
     ability: "blessing",
+    tendency: "bodyguard",
     color: "#c9a227",
     accent: "#fff4c2",
     traits: [

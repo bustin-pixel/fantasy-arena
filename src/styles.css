@@ -1088,6 +1088,18 @@ body.modal-open .pager-nav {
   font-size: 0.78rem;
   color: var(--stone);
   margin-top: 3px;
+}
+/* Targeting-personality epithet on the role line ("Tank · Answers for Allies")
+   + its one-line explainer beneath. Copy comes from data/tendencies.ts. */
+.detail-role-tendency {
+  color: #e0906a;
+  font-weight: 600;
+}
+.detail-tendency-blurb {
+  font-size: 0.7rem;
+  font-style: italic;
+  color: var(--stone-dark);
+  margin-top: 1px;
   margin-bottom: 12px;
 }
 .stat-row {

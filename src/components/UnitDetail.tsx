@@ -19,6 +19,7 @@ import {
   resolveItemMods,
   resolveLoadoutMods,
 } from "@/data/items";
+import { TENDENCIES } from "@/data/tendencies";
 import { availableCount } from "@/meta/inventory";
 import { ItemIcon } from "@/components/ItemIcon";
 import { playSfx } from "@/audio/sfx";
@@ -343,7 +344,20 @@ export function UnitDetail({
               </span>
             )}
           </div>
-          <div className="detail-role">{def.role}</div>
+          {/* Role · Tendency epithet — every unit shows its targeting
+              personality here (Brawler included), with the registry blurb as
+              a quiet teaching line. Derived from data/tendencies.ts, never
+              duplicated into def.traits. */}
+          <div className="detail-role">
+            {def.role}
+            <span className="detail-role-tendency">
+              {" · "}
+              {TENDENCIES[def.tendency ?? "brawler"].name}
+            </span>
+          </div>
+          <div className="detail-tendency-blurb">
+            {TENDENCIES[def.tendency ?? "brawler"].blurb}
+          </div>
 
           {totalXp !== undefined && (
             <div className="detail-xp">
