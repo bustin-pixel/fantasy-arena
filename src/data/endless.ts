@@ -81,9 +81,16 @@ export function endlessWaveKind(wave: number): EndlessWaveKind {
 export function endlessWaveStatMultipliers(wave: number): { hp: number; dmg: number } {
   const cyclesDone = Math.floor((wave - 1) / ENDLESS_CYCLE_LEN);
   const step = Math.pow(1.05, cyclesDone);
+  // Deep-end backstop: past wave 25 the horde compounds per-WAVE with a growth
+  // rate that itself accelerates. A boon arrives every wave, so any FIXED rate
+  // can be outrun by stacked multiplicative picks (Overwhelm ×1.35/wave, Aegis
+  // ×0.8 taken/wave made literally-immortal runs); an accelerating one always
+  // wins in the end — an endless run must always end.
+  const over = Math.max(0, wave - 25);
+  const deep = Math.pow(1.05 + 0.01 * over, over);
   return {
-    hp: (1 + 0.07 * (wave - 1)) * step,
-    dmg: (1 + 0.04 * (wave - 1)) * step,
+    hp: (1 + 0.05 * (wave - 1)) * step * deep,
+    dmg: (1 + 0.03 * (wave - 1)) * step * deep,
   };
 }
 
@@ -92,7 +99,7 @@ export function endlessWaveStatMultipliers(wave: number): { hp: number; dmg: num
  *  reserve-less units clear, heal from, then face a slightly bigger one. Rare and
  *  boss waves ignore this; their single unit spawns alone. */
 export function endlessWaveBudget(wave: number): number {
-  return Math.min(40, 8 + 3 * wave);
+  return Math.min(40, 5 + 2 * wave);
 }
 
 /** The dungeon a cycle draws its fodder pool + boss from. `rotation` is the

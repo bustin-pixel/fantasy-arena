@@ -197,25 +197,25 @@ export const BOONS: Record<string, BoonDef> = {
     id: "bloodlust",
     name: "Bloodlust",
     rarity: "epic",
-    description: "+15% attack speed and 8% melee lifesteal.",
+    description: "+20% attack speed and 10% melee lifesteal.",
     effects: [
-      { type: "teamMod", field: "atkDelayMult", value: 0.15 },
-      { type: "teamMod", field: "lifestealBonus", value: 0.08 },
+      { type: "teamMod", field: "atkDelayMult", value: 0.2 },
+      { type: "teamMod", field: "lifestealBonus", value: 0.1 },
     ],
   },
   aegis: {
     id: "aegis",
     name: "Aegis",
     rarity: "epic",
-    description: "The warband takes 15% less damage.",
-    effects: [{ type: "teamMod", field: "damageTakenMult", value: 0.15 }],
+    description: "The warband takes 20% less damage.",
+    effects: [{ type: "teamMod", field: "damageTakenMult", value: 0.2 }],
   },
   overwhelm: {
     id: "overwhelm",
     name: "Overwhelm",
     rarity: "epic",
-    description: "+25% attack damage to the whole warband.",
-    effects: [{ type: "teamMod", field: "dmgMult", value: 0.25 }],
+    description: "+35% attack damage to the whole warband.",
+    effects: [{ type: "teamMod", field: "dmgMult", value: 0.35 }],
   },
 
   // -- Slice 2: proc / mechanic boons (build-defining). --------------------

@@ -294,8 +294,14 @@ export class EndlessController {
       this.momentumActive &&
       this.warbandUnits(state).every((u) => u.state !== "dead")
     ) {
-      state.teamMods.player.dmgMult *= 1 + ENDLESS_MOMENTUM_PER_WAVE;
+      // ADDITIVE stacking: total bonus is +5% × stacks, not ×1.05^stacks — the
+      // compounding version eventually outruns the horde's own curve and makes
+      // runs literally unkillable. Fold in the ratio that moves the team mult
+      // from the old additive total to the new one.
       this.momentumStacks++;
+      state.teamMods.player.dmgMult *=
+        (1 + ENDLESS_MOMENTUM_PER_WAVE * this.momentumStacks) /
+        (1 + ENDLESS_MOMENTUM_PER_WAVE * (this.momentumStacks - 1));
     }
 
     // Baseline (+ Field Medicine) recovery on the living warband.
