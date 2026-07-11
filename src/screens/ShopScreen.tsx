@@ -34,7 +34,7 @@ import {
   SHOP_REROLL_COST,
   SHOP_REROLLS_PER_DAY,
 } from "@/meta/economy";
-import { playSfx } from "@/audio/sfx";
+import { playSfx, type SfxKey } from "@/audio/sfx";
 
 interface Props {
   onExit: () => void;
@@ -73,6 +73,17 @@ type BarkKind = keyof typeof BARKS;
 
 const BARK_MS = 2600;
 
+/** Gibberish mumble per bark mood — Grubbins "speaks" every bubble. */
+const BARK_VOICE: Record<BarkKind, SfxKey> = {
+  greet: "grubbinsGreet",
+  purchase: "grubbinsHappy",
+  broke: "grubbinsSad",
+  soldOut: "grubbinsNeutral",
+  inspect: "grubbinsNeutral",
+  mint: "grubbinsHappy",
+  reroll: "grubbinsHappy",
+};
+
 /** Effect lines for an item key (Lucky Coin is meta-only, described specially). */
 function effectLines(key: string): string[] {
   const p = parseItemKey(key);
@@ -102,6 +113,8 @@ export function ShopScreen({ onExit }: Props) {
     barkCounts.current[kind] = n + 1;
     const lines = BARKS[kind];
     setBark((b) => ({ text: lines[n % lines.length], nonce: (b?.nonce ?? 0) + 1 }));
+    // A little rate jitter so repeat barks don't sound stamped out.
+    playSfx(BARK_VOICE[kind], 0.95 + Math.random() * 0.1);
     if (barkTimer.current !== null) window.clearTimeout(barkTimer.current);
     barkTimer.current = window.setTimeout(() => setBark(null), BARK_MS);
   };
@@ -172,10 +185,12 @@ export function ShopScreen({ onExit }: Props) {
     const view = normalizeShopDay(save.shop, idx);
     const offer = rollDailyStock(idx, view.rerolls)[slotIdx];
     if (view.bought.includes(slotIdx)) {
+      playSfx("uiDeny");
       say("soldOut");
       return;
     }
     if (save.gold < offer.price) {
+      playSfx("uiDeny");
       say("broke");
       return;
     }
@@ -190,6 +205,7 @@ export function ShopScreen({ onExit }: Props) {
   };
 
   const openInspect = (slotIdx: number) => {
+    playSfx("uiOpen");
     setInspect(slotIdx);
     // One sales-patter line on the FIRST inspect of a visit — window-shopping
     // gets flavor without Grubbins yammering at every single tap.
@@ -224,7 +240,7 @@ export function ShopScreen({ onExit }: Props) {
           <button
             type="button"
             className="shop-back"
-            onClick={onExit}
+            onClick={() => { playSfx("uiClose"); onExit(); }}
             aria-label="Back to Home"
           >
             ← Home

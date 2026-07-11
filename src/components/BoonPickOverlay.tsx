@@ -7,6 +7,7 @@
 import { useState } from "react";
 import type { BoonOffer, BoonTally } from "@/engine/EndlessController";
 import { boonStackSummary, BOONS, type BoonRarity } from "@/data/boons";
+import { playSfx } from "@/audio/sfx";
 
 interface Props {
   wave: number;
@@ -77,7 +78,7 @@ export function BoonPickOverlay({ wave, offers, boonsPicked, onPick, onRetire }:
                 type="button"
                 className={`boon-chip boon-chip-btn${infoId === b.id ? " open" : ""}`}
                 style={{ borderColor: rarityColor(b.rarity) }}
-                onClick={() => setInfoId((prev) => (prev === b.id ? null : b.id))}
+                onClick={() => { playSfx("uiSelect"); setInfoId((prev) => (prev === b.id ? null : b.id)); }}
               >
                 {b.name}
                 {b.count > 1 && <strong> ×{b.count}</strong>}
@@ -123,7 +124,7 @@ export function BoonPickOverlay({ wave, offers, boonsPicked, onPick, onRetire }:
             <button
               type="button"
               className="btn boon-retire-btn"
-              onClick={() => setConfirmRetire(false)}
+              onClick={() => { playSfx("uiTap"); setConfirmRetire(false); }}
             >
               Keep fighting
             </button>
@@ -132,7 +133,7 @@ export function BoonPickOverlay({ wave, offers, boonsPicked, onPick, onRetire }:
           <button
             type="button"
             className="boon-retire-link"
-            onClick={() => setConfirmRetire(true)}
+            onClick={() => { playSfx("uiTap"); setConfirmRetire(true); }}
           >
             Retire — bank {wave} {wave === 1 ? "wave" : "waves"} of rewards
           </button>

@@ -78,8 +78,11 @@ const CREAK_RATE: Record<ChestTier, number> = {
   wooden: 1, silver: 1.08, gold: 1.15, arcane: 1.2, dragon: 0.85,
 };
 
-/** Extra reveal flavor layered on the shared chestOpen jingle. */
+/** Extra reveal flavor layered on the shared chestOpen jingle (wooden stays
+ *  bare — the plain tier should feel plain). */
 const REVEAL_EXTRA: Partial<Record<ChestTier, () => void>> = {
+  silver: () => playSfx("chestShine"),
+  gold: () => playSfx("coinShower"),
   arcane: () => playSfx("arcaneWarp"),
   dragon: () => playSfx("roar", 0.75),
 };

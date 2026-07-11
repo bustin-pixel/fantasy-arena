@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { BattleMode, BattleUiState } from "@/hooks/useBattleEngine";
 import { getUnitDef } from "@/data/units";
 import { getSettings, updateSettings } from "@/state/settings";
+import { playSfx } from "@/audio/sfx";
 
 interface Props {
   ui: BattleUiState;
@@ -26,7 +27,13 @@ function MuteButton() {
       className="hud-corner-btn"
       aria-label={muted ? "Unmute audio" : "Mute audio"}
       aria-pressed={muted}
-      onClick={() => setMuted(updateSettings({ muted: !getSettings().muted }).muted)}
+      onClick={() => {
+        const m = updateSettings({ muted: !getSettings().muted }).muted;
+        setMuted(m);
+        // Only the unmute direction is audible — the click confirming audio
+        // is back is the affordance (playSfx bails while muted anyway).
+        playSfx("uiSelect");
+      }}
     >
       {muted ? "🔇" : "🔊"}
     </button>
@@ -35,6 +42,21 @@ function MuteButton() {
 
 export function BattleHud({ ui, speed, onSpeed, mode, onExit }: Props) {
   const next = ui.playerNext ? getUnitDef(ui.playerNext) : null;
+
+  // Countdown ticks: the throttled ui snapshot (~6/s) is plenty for a 1s
+  // cadence. Guard the mount so loading mid-countdown doesn't tick, and only
+  // voice "go" on a seen 1→0 transition (not on entering battle some other way).
+  const prevCount = useRef<number | null | undefined>(undefined);
+  useEffect(() => {
+    const cur = ui.startCountdownSec;
+    const prev = prevCount.current;
+    prevCount.current = cur;
+    if (prev === undefined || cur === prev) return;
+    if (cur != null && cur > 0) playSfx("countTick", 1 + (3 - Math.min(cur, 3)) * 0.06);
+    // "Fight!": the 0 frame, or straight to null if the throttled sync skipped it.
+    else if (prev != null && prev > 0) playSfx("countGo");
+  }, [ui.startCountdownSec]);
+
   return (
     <div className="hud">
       {/* Exit and mute live INSIDE the bar so they can never cover the
@@ -134,7 +156,7 @@ export function BattleHud({ ui, speed, onSpeed, mode, onExit }: Props) {
                   <button
                     key={s}
                     className={`btn btn-speed ${speed === s ? "active" : ""}`}
-                    onClick={() => onSpeed(s)}
+                    onClick={() => { playSfx("uiSelect", 1 + (s - 1) * 0.1); onSpeed(s); }}
                   >
                     {s}×
                   </button>

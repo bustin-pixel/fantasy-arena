@@ -6,6 +6,7 @@ import { RARITIES } from "@/data/rarities";
 import { renderPortrait } from "@/engine/Renderer";
 import { UnitDetail } from "@/components/UnitDetail";
 import type { BestiaryEntry } from "@/state/persistence";
+import { playSfx } from "@/audio/sfx";
 
 /**
  * Compendium / Bestiary — the 3-tier reveal over every hero and Depths monster:
@@ -142,6 +143,7 @@ function Section({
 export function CompendiumScreen() {
   const { save } = useGameState();
   const [openId, setOpenId] = useState<string | null>(null);
+  const openEntry = (id: string) => { playSfx("compendiumReveal"); setOpenId(id); };
 
   const heroes = useMemo(() => DECKABLE_UNIT_IDS, []);
 
@@ -159,7 +161,7 @@ export function CompendiumScreen() {
         sub="Horrors from below. Face one to sight it; slay one to record its lore."
         ids={MONSTER_IDS}
         bestiary={save.bestiary}
-        onOpen={setOpenId}
+        onOpen={openEntry}
       />
 
       <Section
@@ -167,7 +169,7 @@ export function CompendiumScreen() {
         sub="Rival champions. Defeat them in the Arena to complete their pages."
         ids={heroes}
         bestiary={save.bestiary}
-        onOpen={setOpenId}
+        onOpen={openEntry}
       />
 
       {openId && (
@@ -175,7 +177,7 @@ export function CompendiumScreen() {
           defId={openId}
           deck={save.deck}
           onToggle={() => {}}
-          onClose={() => setOpenId(null)}
+          onClose={() => { playSfx("uiClose"); setOpenId(null); }}
           readonly
         />
       )}

@@ -17,6 +17,7 @@ import { addXp, levelFromXp } from "@/meta/leveling";
 import { RewardPanel } from "@/components/RewardPanel";
 import { generateSeed } from "@/utils/rng";
 import { playStinger, setMusicTrack } from "@/audio/music";
+import { playSfx } from "@/audio/sfx";
 
 interface Props {
   deck: string[];
@@ -191,9 +192,19 @@ export function BattleScreen({
     }
     setInspectedUid(null);
     if (ui.canDeploy && fy >= PLAYER_ZONE.top) {
+      // Tap ack only — the observer's deploy thud voices the actual placement.
+      playSfx("uiTap");
       deployAt({ x: fx, y: fy });
     }
   };
+
+  // Endless: chime when a new intermission (boon offer) opens.
+  const prevIntermissionWave = useRef<number | null>(null);
+  useEffect(() => {
+    const wave = ui.intermission?.wave ?? null;
+    if (wave != null && wave !== prevIntermissionWave.current) playSfx("boonChime");
+    prevIntermissionWave.current = wave;
+  }, [ui.intermission]);
 
   return (
     <div className="screen battle">
@@ -235,8 +246,9 @@ export function BattleScreen({
           wave={ui.intermission.wave}
           offers={ui.intermission.offers}
           boonsPicked={ui.boonsPicked}
-          onPick={pickBoon}
+          onPick={(i) => { playSfx("boonPick"); pickBoon(i); }}
           onRetire={() => {
+            playSfx("retireBank");
             retiredRef.current = true;
             setRetired(true);
             retireEndless();

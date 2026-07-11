@@ -13,6 +13,7 @@ import { rarityRank } from "@/data/rarities";
 import { MAX_USERNAME_LENGTH } from "@/state/persistence";
 import { useGameState } from "@/state/GameStateContext";
 import { AvatarPortrait } from "@/components/ProfilePlate";
+import { playSfx } from "@/audio/sfx";
 
 interface Props {
   onClose: () => void;
@@ -24,6 +25,7 @@ export function ProfileSheet({ onClose }: Props) {
 
   // Every way out funnels through here so the name is never left uncommitted.
   const commitAndClose = () => {
+    playSfx("uiClose");
     setUsername(draft);
     onClose();
   };
@@ -104,7 +106,7 @@ export function ProfileSheet({ onClose }: Props) {
                   locked ? " locked" : ""
                 }`}
                 disabled={locked}
-                onClick={() => setAvatar(id)}
+                onClick={() => { playSfx("uiSelect"); setAvatar(id); }}
                 aria-label={locked ? `${def.name} (locked)` : def.name}
                 title={locked ? `${def.name} — unlock to wear` : def.name}
               >
