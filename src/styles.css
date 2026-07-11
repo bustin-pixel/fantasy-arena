@@ -2145,6 +2145,33 @@ body.modal-open .pager-nav {
   letter-spacing: 0.02em;
 }
 
+/* Endless: live chips for the ramping epic boons, tucked under the top bar. */
+.hud-boon-strip {
+  position: absolute;
+  top: 56px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  pointer-events: none;
+}
+.hud-boon-chip {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid var(--stone-dark);
+  text-shadow: 0 1px 0 #000;
+}
+.hud-boon-chip.momentum {
+  color: #fcd34d;
+}
+.hud-boon-chip.rhythm {
+  color: #93c5fd;
+}
+
 /* "Wave N" telegraph (Endless) — gold headline like a rare, calmer tag. */
 .wave-banner-wave .wave-banner-headline {
   color: var(--gold);
@@ -2265,6 +2292,84 @@ body.modal-open .pager-nav {
 }
 .boon-chip strong {
   color: var(--gold);
+}
+/* Tally chips are tappable — they open the stack-math info card. */
+.boon-chip-btn {
+  font-family: inherit;
+  cursor: pointer;
+}
+.boon-chip-btn:hover {
+  filter: brightness(1.2);
+}
+.boon-chip-btn.open {
+  background: rgba(168, 85, 247, 0.18);
+}
+.boon-info {
+  margin-top: 10px;
+  padding: 10px 14px;
+  text-align: left;
+  border: 1px solid var(--stone-dark);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.5);
+  animation: fade 0.2s ease;
+}
+.boon-info-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.boon-info-name {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--parchment);
+}
+.boon-info-name strong {
+  color: var(--gold);
+}
+.boon-info-lines {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 0.8rem;
+  color: #86efac;
+  line-height: 1.45;
+}
+/* Retire: an understated link that arms into an explicit confirm row. */
+.boon-retire {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+}
+.boon-retire-link {
+  background: rgba(0, 0, 0, 0.45);
+  border: 2px solid var(--stone-dark);
+  border-radius: 12px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--parchment);
+  cursor: pointer;
+  padding: 12px 22px;
+}
+.boon-retire-link:hover {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+.boon-retire-link:active {
+  transform: translateY(1px);
+}
+.boon-retire-ask {
+  font-size: 0.82rem;
+  color: var(--parchment);
+}
+.boon-retire-btn {
+  padding: 6px 14px;
+  font-size: 0.8rem;
+}
+/* Results screen: the run's boon recap. */
+.result-boons {
+  margin: 10px 0 4px;
 }
 
 /* ============================================================================
@@ -2459,15 +2564,16 @@ body.modal-open .pager-nav {
 .shop-bark {
   position: absolute;
   left: 5%;
-  top: 14%;
-  max-width: 46%;
+  /* Clear the Home button / currency pills row however short the scene gets. */
+  top: calc(14% + 40px);
+  max-width: 38%;
   z-index: 2;
   background: #efe3c8;
   color: #241a10;
   border: 2px solid #57432c;
   border-radius: 12px;
-  padding: 6px 10px;
-  font-size: 0.76rem;
+  padding: 5px 9px;
+  font-size: 0.68rem;
   font-weight: 700;
   line-height: 1.25;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.55);
@@ -2609,6 +2715,91 @@ body.modal-open .pager-nav {
   font-size: 0.85rem;
   letter-spacing: 0.12em;
   background: rgba(14, 10, 6, 0.75);
+}
+
+/* Item detail panel — tap a shelf card to inspect before buying. Centered on
+   the screen. */
+.shop-detail-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(8, 6, 4, 0.55);
+  animation: fade 0.18s ease;
+}
+.shop-detail {
+  width: 100%;
+  max-width: 380px;
+  padding: 14px 16px;
+  border: 2px solid #57432c;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #2a2116, #171009);
+  box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.6);
+  text-align: left;
+}
+.shop-detail-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.shop-detail-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.shop-detail-name {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.shop-detail-tier {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: capitalize;
+  color: var(--stone);
+}
+.shop-detail-owned {
+  font-size: 0.72rem;
+  color: var(--stone-dark);
+}
+.shop-detail-desc {
+  margin: 10px 0 6px;
+  font-size: 0.82rem;
+  font-style: italic;
+  color: var(--stone);
+  line-height: 1.35;
+}
+.shop-detail-effects {
+  margin: 0 0 12px;
+  padding-left: 18px;
+  font-size: 0.85rem;
+  color: #86efac;
+  line-height: 1.5;
+}
+.shop-detail-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+.shop-detail-close {
+  padding: 8px 14px;
+  font-size: 0.85rem;
+}
+.shop-detail-buy {
+  padding: 8px 18px;
+  font-size: 0.85rem;
+}
+.shop-detail-buy.cant {
+  filter: saturate(0.4) brightness(0.8);
+}
+.shop-detail-buy:disabled {
+  opacity: 0.55;
+  cursor: default;
 }
 .shop-pack-icon {
   font-size: 1.1rem;

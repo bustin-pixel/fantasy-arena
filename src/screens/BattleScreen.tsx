@@ -3,7 +3,7 @@ import type { ItemLoadouts } from "@/types";
 import { useBattleEngine, type BattleMode } from "@/hooks/useBattleEngine";
 import { BattleHud } from "@/components/BattleHud";
 import { BattleUnitTip } from "@/components/BattleUnitTip";
-import { BoonPickOverlay } from "@/components/BoonPickOverlay";
+import { BoonPickOverlay, rarityColor } from "@/components/BoonPickOverlay";
 import { CardTray } from "@/components/CardTray";
 import {
   FIELD_HEIGHT,
@@ -66,6 +66,7 @@ export function BattleScreen({
     inspectUnit,
     enemyLedger,
     pickBoon,
+    retireEndless,
     wavesSurvived,
   } = useBattleEngine(
     deck,
@@ -86,6 +87,13 @@ export function BattleScreen({
   const [rewards, setRewards] = useState<BattleRewards | null>(null);
   // Endless: waves cleared this run, captured for the results screen.
   const [endlessWaves, setEndlessWaves] = useState(0);
+  // Endless: the pre-run best, frozen at mount — the post-battle grant updates
+  // the save, so reading it live would always show this run as the best.
+  const [bestAtStart] = useState(() => endlessBestWave(save));
+  // Endless: the player chose to retire (bank + end) rather than fight on.
+  // Ref for the record-once effect (stinger choice), state for the result copy.
+  const retiredRef = useRef(false);
+  const [retired, setRetired] = useState(false);
   // uid of the unit whose stat tooltip is open (tap a combatant to inspect).
   const [inspectedUid, setInspectedUid] = useState<string | null>(null);
 
@@ -110,8 +118,11 @@ export function BattleScreen({
       // The battle track ends with the battle: victory/defeat play a one-shot
       // stinger over its fade-out; a draw just falls silent. The hub theme
       // returns via App's view effect when the player exits.
-      if (outcome === "victory") playStinger("victory");
-      else if (outcome === "defeat") playStinger("defeat");
+      // A retirement resolves as "defeat" in the sim but is a banked win to the
+      // player — give it the victory fanfare.
+      if (outcome === "victory" || (isEndless && retiredRef.current)) {
+        playStinger("victory");
+      } else if (outcome === "defeat") playStinger("defeat");
       else setMusicTrack(null);
       // Endless runs are a survival score, not a win/loss — don't touch the W/L
       // tally (every run "ends" in a wipe).
@@ -216,26 +227,63 @@ export function BattleScreen({
         onSelect={selectCard}
       />
 
-      {/* Endless: the between-wave boon pick. The sim is frozen behind it. */}
-      {mode === "endless" && ui.intermission && (
+      {/* Endless: the between-wave boon pick. The sim is frozen behind it.
+          The phase guard matters for retirement: the controller stays in its
+          intermission after a retire, but the match has resolved. */}
+      {mode === "endless" && ui.phase === "battle" && ui.intermission && (
         <BoonPickOverlay
           wave={ui.intermission.wave}
           offers={ui.intermission.offers}
           boonsPicked={ui.boonsPicked}
           onPick={pickBoon}
+          onRetire={() => {
+            retiredRef.current = true;
+            setRetired(true);
+            retireEndless();
+          }}
         />
       )}
 
       {showResult && (
         <div className="result-overlay">
-          <div className={`result-card ${mode === "endless" ? "defeat" : ui.phase}`}>
+          <div
+            className={`result-card ${
+              mode === "endless" ? (retired ? "victory" : "defeat") : ui.phase
+            }`}
+          >
             {mode === "endless" ? (
               <>
-                <h2>Run Over</h2>
+                <h2>{retired ? "Run Complete" : "Run Over"}</h2>
                 <p>
-                  Your warband survived <strong>{endlessWaves}</strong>{" "}
-                  {endlessWaves === 1 ? "wave" : "waves"}.
+                  {retired ? (
+                    <>
+                      You banked your winnings after{" "}
+                      <strong>{endlessWaves}</strong>{" "}
+                      {endlessWaves === 1 ? "wave" : "waves"}.
+                    </>
+                  ) : (
+                    <>
+                      Your warband cleared <strong>{endlessWaves}</strong>{" "}
+                      {endlessWaves === 1 ? "wave" : "waves"} and fell on wave{" "}
+                      {endlessWaves + 1}.
+                    </>
+                  )}{" "}
+                  Best: <strong>{Math.max(bestAtStart, endlessWaves)}</strong>
                 </p>
+                {ui.boonsPicked.length > 0 && (
+                  <div className="boon-tally-chips result-boons">
+                    {ui.boonsPicked.map((b) => (
+                      <span
+                        key={b.id}
+                        className="boon-chip"
+                        style={{ borderColor: rarityColor(b.rarity) }}
+                      >
+                        {b.name}
+                        {b.count > 1 && <strong> ×{b.count}</strong>}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </>
             ) : (
               <>

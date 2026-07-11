@@ -89,6 +89,11 @@ export interface EndlessStatus {
   wavesCleared: number;
   intermission: { wave: number; offers: BoonOffer[] } | null;
   boonsPicked: BoonTally[];
+  /** Momentum stacks banked (clean waves since picking it), or null if the boon
+   *  isn't owned — drives the HUD chip. */
+  momentumStacks: number | null;
+  /** Berserker's Rhythm's live attack-speed bonus (0..max), or null if unowned. */
+  rhythmBonus: number | null;
 }
 
 export class EndlessController {
@@ -118,6 +123,9 @@ export class EndlessController {
   private rhythmTicks = 0;
   /** Momentum active — bumps team damage each clean-wave clear. */
   private momentumActive = false;
+  /** Clean waves banked since Momentum was picked (HUD display only; the actual
+   *  damage fold happens directly on teamMods at each clean clear). */
+  private momentumStacks = 0;
   /** Wave-start summon orders (Kennel Master wolves, War Machine turret). */
   private summons: { defId: string; count: number }[] = [];
   /** uids of the pets summoned last wave, cleared + respawned each wave. */
@@ -170,6 +178,10 @@ export class EndlessController {
           ? { wave: this.wavesCleared, offers: this.offers.map(toOffer) }
           : null,
       boonsPicked: this.boonTally(),
+      momentumStacks: this.momentumActive ? this.momentumStacks : null,
+      rhythmBonus: this.rhythmActive
+        ? Math.min(ENDLESS_RHYTHM_MAX, ENDLESS_RHYTHM_PER_SEC * (this.rhythmTicks / TICK_RATE))
+        : null,
     };
   }
 
@@ -282,7 +294,14 @@ export class EndlessController {
       this.momentumActive &&
       this.warbandUnits(state).every((u) => u.state !== "dead")
     ) {
-      state.teamMods.player.dmgMult *= 1 + ENDLESS_MOMENTUM_PER_WAVE;
+      // ADDITIVE stacking: total bonus is +5% × stacks, not ×1.05^stacks — the
+      // compounding version eventually outruns the horde's own curve and makes
+      // runs literally unkillable. Fold in the ratio that moves the team mult
+      // from the old additive total to the new one.
+      this.momentumStacks++;
+      state.teamMods.player.dmgMult *=
+        (1 + ENDLESS_MOMENTUM_PER_WAVE * this.momentumStacks) /
+        (1 + ENDLESS_MOMENTUM_PER_WAVE * (this.momentumStacks - 1));
     }
 
     // Baseline (+ Field Medicine) recovery on the living warband.
@@ -293,7 +312,7 @@ export class EndlessController {
     }
 
     const hasDead = this.warbandUnits(state).some((u) => u.state === "dead");
-    this.offers = rollBoonOffers(this.wave, this.rng, hasDead);
+    this.offers = rollBoonOffers(this.wave, this.rng, hasDead, new Set(this.picks));
     this.phase = "intermission";
   }
 
@@ -405,13 +424,29 @@ export class EndlessController {
   }
 
   /** Wave-start boons on the living warband: refresh shields, (re)apply the regen
-   *  HoT, and arm the Last Breath charge. Also resets the rhythm ramp and summons
-   *  fresh pets. Called at the top of every wave. */
+   *  HoT, and arm the Last Breath charge. Also re-arms the units' own once-per-
+   *  battle one-shots, resets the rhythm ramp and summons fresh pets. Called at
+   *  the top of every wave. */
   private applyWaveStartBoons(state: SimState): void {
     const lastBreath = state.teamMods.player.lastBreath;
     for (const u of this.warbandUnits(state)) {
       if (u.state === "dead") continue;
       if (lastBreath) u.cheatDeathReady = true;
+      // Each wave is a fresh fight: re-arm the once-per-battle one-shots — the
+      // death-cheats (Vanish / Second Wind / Last Stand), the Phasecloak item's
+      // one-time stealth, and the Ambush opener (flag is only ever set for
+      // ability "ambush"; re-arming includes its opening stealth, like onSpawn).
+      u.vanishUsed = false;
+      u.secondWindUsed = false;
+      u.lastStandUsed = false;
+      u.stealthTriggerUsed = false;
+      if (u.ability === "ambush") {
+        u.ambushReady = true;
+        applyEffect(
+          u,
+          makeEffect("stealth", { source: u.uid, durationSec: ENDLESS_WAVE_TIME_SEC })
+        );
+      }
       if (this.shieldPerWave > 0) {
         u.shieldHp = Math.max(u.shieldHp, this.shieldPerWave);
         u.shieldHpMax = Math.max(u.shieldHpMax, this.shieldPerWave);

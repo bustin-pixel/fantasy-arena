@@ -69,6 +69,10 @@ export interface BattleUiState {
   intermission: { wave: number; offers: BoonOffer[] } | null;
   /** Endless: the boons picked so far this run (for the "your boons" strip). */
   boonsPicked: BoonTally[];
+  /** Endless: Momentum stacks banked, or null when the boon isn't owned. */
+  momentumStacks: number | null;
+  /** Endless: Berserker's Rhythm's live attack-speed bonus, or null if unowned. */
+  rhythmBonus: number | null;
 }
 
 /** Live snapshot of one combatant, for the in-battle stat tooltip. */
@@ -109,6 +113,8 @@ export interface UseBattleEngine {
   enemyLedger: () => { seen: string[]; slain: string[] };
   /** Endless: apply the boon at `offerIndex` from the current intermission. */
   pickBoon: (offerIndex: number) => void;
+  /** Endless: retire at an intermission, banking the cleared waves' rewards. */
+  retireEndless: () => void;
   /** Endless: waves fully cleared this run (0 outside endless). */
   wavesSurvived: () => number;
 }
@@ -162,6 +168,8 @@ export function useBattleEngine(
     waveNumber: mode === "endless" ? 1 : null,
     intermission: null,
     boonsPicked: [],
+    momentumStacks: null,
+    rhythmBonus: null,
   });
   const [speed, setSpeedState] = useState<number>(initialSpeed);
 
@@ -260,6 +268,8 @@ export function useBattleEngine(
           waveNumber: est ? est.wave : null,
           intermission: est?.intermission ?? null,
           boonsPicked: est?.boonsPicked ?? [],
+          momentumStacks: est?.momentumStacks ?? null,
+          rhythmBonus: est?.rhythmBonus ?? null,
         });
       }
 
@@ -368,6 +378,16 @@ export function useBattleEngine(
     }));
   }, []);
 
+  const retireEndless = useCallback(() => {
+    const c = controllerRef.current;
+    if (!c) return;
+    if (c.retireEndless()) {
+      // Close the intermission overlay and surface the end-of-run immediately
+      // rather than waiting for the throttled sync.
+      setUi((prev) => ({ ...prev, phase: "defeat", intermission: null }));
+    }
+  }, []);
+
   const wavesSurvived = useCallback((): number => {
     return controllerRef.current?.wavesSurvived() ?? 0;
   }, []);
@@ -383,6 +403,7 @@ export function useBattleEngine(
     inspectUnit,
     enemyLedger,
     pickBoon,
+    retireEndless,
     wavesSurvived,
   };
 }

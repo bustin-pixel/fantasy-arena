@@ -310,6 +310,95 @@ describe("endless — boon offer gating", () => {
     expect(withDead.length).toBe(3);
     expect(new Set(withDead).size).toBe(3);
   });
+
+  it("owned unique boons leave the offer pool; stackable ones stay", () => {
+    // A second copy of a unique boon (Momentum, Overkill, …) is a no-op, so it
+    // must never be re-offered. Stackable boons may repeat.
+    const uniques = new Set([
+      "overkill",
+      "last_breath",
+      "overheal_ward",
+      "berserkers_rhythm",
+      "momentum",
+    ]);
+    for (let seed = 1; seed <= 40; seed++) {
+      const offers = rollBoonOffers(12, new RNG(seed), false, uniques);
+      for (const id of offers) expect(uniques.has(id)).toBe(false);
+    }
+    // Sanity: with nothing owned, uniques CAN appear (find at least one).
+    let sawUnique = false;
+    for (let seed = 1; seed <= 40 && !sawUnique; seed++) {
+      sawUnique = rollBoonOffers(12, new RNG(seed), false).some((id) =>
+        uniques.has(id)
+      );
+    }
+    expect(sawUnique).toBe(true);
+  });
+});
+
+describe("endless — once-per-battle passives re-arm each wave", () => {
+  it("spent one-shots reset and Ambush re-stealths when the next wave opens", () => {
+    const mc = new MatchController(
+      321,
+      ["ogre", "assassin", "berserker", "archer"],
+      [],
+      { mode: "endless" }
+    );
+    let guard = 0;
+    while (guard < 12000 && !mc.endlessStatus()?.intermission) {
+      mc.tick();
+      guard++;
+      // God-mode heal so the whole warband reliably survives to the intermission.
+      for (const u of mc.state.units) {
+        if (u.team === "player" && u.state !== "dead") metaHeal(mc.state, u, u.maxHp);
+      }
+    }
+    expect(mc.endlessStatus()?.intermission).toBeTruthy();
+
+    // Mark every one-shot as spent, as a long wave would have.
+    const warband = mc.state.units.filter((u) => u.team === "player");
+    const assassin = warband.find((u) => u.defId === "assassin")!;
+    for (const u of warband) {
+      u.vanishUsed = true;
+      u.secondWindUsed = true;
+      u.lastStandUsed = true;
+      u.stealthTriggerUsed = true;
+      u.ambushReady = false;
+    }
+    assassin.effects = assassin.effects.filter((e) => e.type !== "stealth");
+
+    mc.pickBoon(0); // next wave opens -> wave-start prep runs
+
+    for (const u of warband) {
+      expect(u.vanishUsed).toBe(false);
+      expect(u.secondWindUsed).toBe(false);
+      expect(u.lastStandUsed).toBe(false);
+      expect(u.stealthTriggerUsed).toBe(false);
+    }
+    // Ambush re-arms only on the assassin (flag + fresh opening stealth).
+    expect(assassin.ambushReady).toBe(true);
+    expect(assassin.effects.some((e) => e.type === "stealth")).toBe(true);
+    const ogre = warband.find((u) => u.defId === "ogre")!;
+    expect(ogre.ambushReady).toBe(false);
+  });
+});
+
+describe("endless — retire", () => {
+  it("retiring is only legal at an intermission; it ends the run keeping the score", () => {
+    const mc = new MatchController(777, DECK, [], { mode: "endless" });
+    expect(mc.retireEndless()).toBe(false); // mid-wave: refused
+    let guard = 0;
+    while (guard < 8000 && !mc.endlessStatus()?.intermission) {
+      mc.tick();
+      guard++;
+    }
+    expect(mc.endlessStatus()?.intermission).toBeTruthy();
+    const cleared = mc.wavesSurvived();
+    expect(cleared).toBeGreaterThanOrEqual(1);
+    expect(mc.retireEndless()).toBe(true);
+    expect(mc.phase).toBe("defeat"); // the endless end-of-run phase
+    expect(mc.wavesSurvived()).toBe(cleared); // the banked score is untouched
+  });
 });
 
 describe("endless — proc boon mechanics (via teamMods funnels)", () => {

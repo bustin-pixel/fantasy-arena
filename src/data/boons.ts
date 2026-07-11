@@ -11,11 +11,13 @@
 //
 // Rarity follows the house rule: common = one small stat %, rare = one meaningful
 // mechanic, epic = build-defining (may bundle two effects). Boons stack; the same
-// boon can be offered again.
+// boon can be offered again — EXCEPT `unique` boons (pure on/off switches like
+// Momentum), which leave the offer pool once owned since a second copy is a no-op.
 // ============================================================================
 
 import { RNG } from "@/utils/rng";
 import type { StatusEffectType } from "@/types";
+import { ENDLESS_INTERMISSION_HEAL } from "./endless";
 
 export type BoonRarity = "common" | "rare" | "epic";
 
@@ -85,6 +87,9 @@ export interface BoonDef {
   /** Offer gate. "allyDead" boons are only offered when a warband unit is down
    *  (and never appear otherwise). */
   offerIf?: "allyDead";
+  /** One-time switches (booleans / overwrites in TeamMods): a second copy does
+   *  nothing, so once owned the boon is excluded from future offers. */
+  unique?: boolean;
 }
 
 export const BOONS: Record<string, BoonDef> = {
@@ -192,25 +197,25 @@ export const BOONS: Record<string, BoonDef> = {
     id: "bloodlust",
     name: "Bloodlust",
     rarity: "epic",
-    description: "+15% attack speed and 8% melee lifesteal.",
+    description: "+20% attack speed and 10% melee lifesteal.",
     effects: [
-      { type: "teamMod", field: "atkDelayMult", value: 0.15 },
-      { type: "teamMod", field: "lifestealBonus", value: 0.08 },
+      { type: "teamMod", field: "atkDelayMult", value: 0.2 },
+      { type: "teamMod", field: "lifestealBonus", value: 0.1 },
     ],
   },
   aegis: {
     id: "aegis",
     name: "Aegis",
     rarity: "epic",
-    description: "The warband takes 15% less damage.",
-    effects: [{ type: "teamMod", field: "damageTakenMult", value: 0.15 }],
+    description: "The warband takes 20% less damage.",
+    effects: [{ type: "teamMod", field: "damageTakenMult", value: 0.2 }],
   },
   overwhelm: {
     id: "overwhelm",
     name: "Overwhelm",
     rarity: "epic",
-    description: "+25% attack damage to the whole warband.",
-    effects: [{ type: "teamMod", field: "dmgMult", value: 0.25 }],
+    description: "+35% attack damage to the whole warband.",
+    effects: [{ type: "teamMod", field: "dmgMult", value: 0.35 }],
   },
 
   // -- Slice 2: proc / mechanic boons (build-defining). --------------------
@@ -266,6 +271,7 @@ export const BOONS: Record<string, BoonDef> = {
     id: "overkill",
     name: "Overkill",
     rarity: "rare",
+    unique: true,
     description: "Every 4th attack strikes for double damage.",
     effects: [{ type: "crit", everyNth: 4 }],
   },
@@ -305,6 +311,7 @@ export const BOONS: Record<string, BoonDef> = {
     id: "last_breath",
     name: "Last Breath",
     rarity: "epic",
+    unique: true,
     description: "Once per wave, a fatal blow leaves a unit at 1 HP instead.",
     effects: [{ type: "lastBreath" }],
   },
@@ -312,6 +319,7 @@ export const BOONS: Record<string, BoonDef> = {
     id: "overheal_ward",
     name: "Overheal Ward",
     rarity: "epic",
+    unique: true,
     description: "Healing beyond max HP banks as a damage-soaking shield.",
     effects: [{ type: "overheal" }],
   },
@@ -319,6 +327,7 @@ export const BOONS: Record<string, BoonDef> = {
     id: "berserkers_rhythm",
     name: "Berserker's Rhythm",
     rarity: "epic",
+    unique: true,
     description: "Attack speed climbs the longer a wave lasts, resetting each wave.",
     effects: [{ type: "rhythm" }],
   },
@@ -326,6 +335,7 @@ export const BOONS: Record<string, BoonDef> = {
     id: "momentum",
     name: "Momentum",
     rarity: "epic",
+    unique: true,
     description: "+5% damage for the rest of the run each wave cleared with no death.",
     effects: [{ type: "momentum" }],
   },
@@ -340,6 +350,117 @@ export const BOONS: Record<string, BoonDef> = {
 
 /** Stable insertion order — the offer roller iterates this deterministically. */
 export const ALL_BOON_IDS: string[] = Object.keys(BOONS);
+
+// -- Stack math (info panel) --------------------------------------------------
+// What `count` copies of a boon amount to, as human-readable lines. The math
+// mirrors EXACTLY how each effect folds in the EndlessController/CombatSystem:
+// team multipliers and maxHp compound multiplicatively per copy; lifesteal,
+// thorns, execute, heals and shields add; unique boons don't stack at all.
+
+const asPct = (x: number): string => `${Math.round(x * 100)}%`;
+
+/** Total gain of a per-copy multiplier applied `n` times: (1+v)^n - 1. */
+const compounded = (v: number, n: number): number => Math.pow(1 + v, n) - 1;
+
+export function boonStackSummary(id: string, count: number): string[] {
+  const boon = BOONS[id];
+  if (!boon) return [];
+  if (boon.unique) return ["Unique — one copy per run."];
+  const lines: string[] = [];
+  for (const eff of boon.effects) {
+    switch (eff.type) {
+      case "teamMod": {
+        const v = eff.value;
+        switch (eff.field) {
+          case "dmgMult":
+            lines.push(`+${asPct(compounded(v, count))} attack damage`);
+            break;
+          case "atkDelayMult":
+            lines.push(`+${asPct(compounded(v, count))} attack speed`);
+            break;
+          case "moveSpeedMult":
+            lines.push(`+${asPct(compounded(v, count))} move speed`);
+            break;
+          case "damageTakenMult":
+            // Positive = reduction (compounds down); negative = Reckless's tax
+            // (compounds up).
+            lines.push(
+              v >= 0
+                ? `−${asPct(1 - Math.pow(1 - v, count))} damage taken`
+                : `+${asPct(compounded(-v, count))} damage taken`
+            );
+            break;
+          case "lifestealBonus":
+            lines.push(`${asPct(v * count)} melee lifesteal`);
+            break;
+        }
+        break;
+      }
+      case "maxHp":
+        lines.push(`+${asPct(compounded(eff.pct, count))} max HP`);
+        break;
+      case "intermissionHeal":
+        lines.push(
+          `heal ${asPct(
+            Math.min(0.9, ENDLESS_INTERMISSION_HEAL + eff.addPct * count)
+          )} of missing HP between waves`
+        );
+        break;
+      case "regen":
+        lines.push(`${eff.hpPerSec * count} HP/sec regeneration in combat`);
+        break;
+      case "waveShield":
+        lines.push(`${eff.amount * count} HP shield at each wave start`);
+        break;
+      case "revive":
+        lines.push(`revived ${count === 1 ? "an ally" : `${count} allies`} at ${asPct(eff.hpPct)} HP`);
+        break;
+      case "execute":
+        lines.push(
+          `+${asPct(eff.bonus * count)} damage vs enemies below ${asPct(EXECUTE_THRESHOLD)} HP`
+        );
+        break;
+      case "thorns":
+        lines.push(`reflect ${asPct(eff.frac * count)} of damage taken`);
+        break;
+      case "killHeal":
+        lines.push(`${eff.amount * count} HP to the warband per kill`);
+        break;
+      case "bounty":
+        lines.push(`+${eff.hp * count} permanent max HP to the slayer per kill`);
+        break;
+      case "rangedLifesteal":
+        lines.push(`${asPct(eff.frac * count)} ranged lifesteal`);
+        break;
+      case "onHitRider":
+        lines.push(
+          eff.damagePerTick != null
+            ? `every ${nth(eff.everyNth)} attack: ${eff.effectType} for ${
+                eff.damagePerTick * count
+              } dmg/sec (${eff.durationSec}s)`
+            : `every ${nth(eff.everyNth)} attack: ${eff.effectType} (${eff.durationSec}s)`
+        );
+        break;
+      case "waveSummon":
+        lines.push(
+          `${eff.count * count} compan${eff.count * count === 1 ? "ion" : "ions"} at each wave start`
+        );
+        break;
+      // crit / overheal / lastBreath / rhythm / momentum are all `unique` and
+      // returned above.
+      default:
+        break;
+    }
+  }
+  return lines;
+}
+
+function nth(n: number): string {
+  if (n === 1) return "1st";
+  if (n === 2) return "2nd";
+  if (n === 3) return "3rd";
+  return `${n}th`;
+}
 
 /** Rarity odds by wave band — deeper runs weight toward rare/epic. */
 export function boonRarityWeights(wave: number): Record<BoonRarity, number> {
@@ -362,10 +483,20 @@ function rollRarity(wave: number, rng: RNG): BoonRarity {
  * The three boon ids offered after clearing `wave`. Fully seeded from `rng`
  * (never Math.random) so an offer sequence is replayable. Slots are distinct.
  * When a warband unit is dead the third slot is forced to the revive boon; when
- * none is dead, offer-gated boons are excluded entirely.
+ * none is dead, offer-gated boons are excluded entirely. `owned` (the run's
+ * picks so far) removes already-owned `unique` boons — a second copy of those
+ * is a no-op, so re-offering one would be a dead card.
  */
-export function rollBoonOffers(wave: number, rng: RNG, hasDead: boolean): string[] {
-  const pool = ALL_BOON_IDS.filter((id) => BOONS[id].offerIf == null);
+export function rollBoonOffers(
+  wave: number,
+  rng: RNG,
+  hasDead: boolean,
+  owned: ReadonlySet<string> = new Set()
+): string[] {
+  const pool = ALL_BOON_IDS.filter(
+    (id) =>
+      BOONS[id].offerIf == null && !(BOONS[id].unique && owned.has(id))
+  );
   const offers: string[] = [];
   const slots = hasDead ? 2 : 3;
   let guard = 0;

@@ -70,6 +70,25 @@ export function BattleHud({ ui, speed, onSpeed, mode, onExit }: Props) {
         </div>
       )}
 
+      {/* Endless: the epic engine boons get live chips so their ramp is visible —
+          Momentum's banked stacks and Rhythm's climbing attack-speed bonus. */}
+      {mode === "endless" &&
+        ui.phase === "battle" &&
+        (ui.momentumStacks != null || ui.rhythmBonus != null) && (
+          <div className="hud-boon-strip">
+            {ui.momentumStacks != null && (
+              <span className="hud-boon-chip momentum">
+                Momentum ×{ui.momentumStacks}
+              </span>
+            )}
+            {ui.rhythmBonus != null && (
+              <span className="hud-boon-chip rhythm">
+                Rhythm +{Math.round(ui.rhythmBonus * 100)}%
+              </span>
+            )}
+          </div>
+        )}
+
       {/* Telegraph banners: a boss/rare walking in, or (Endless) a new wave. */}
       {ui.phase === "battle" && ui.banner && (
         <div className={`wave-banner wave-banner-${ui.banner.kind}`} role="alert">
