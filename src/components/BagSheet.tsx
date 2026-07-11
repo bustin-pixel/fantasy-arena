@@ -33,6 +33,7 @@ import { getUnitDef } from "@/data/units";
 import { useGameState } from "@/state/GameStateContext";
 import { ItemIcon } from "@/components/ItemIcon";
 import { CombineCeremony } from "@/components/CombineCeremony";
+import { playSfx } from "@/audio/sfx";
 
 interface Props {
   onClose: () => void;
@@ -158,9 +159,10 @@ export function BagSheet({ onClose }: Props) {
                         key={key}
                         type="button"
                         className={`bag-cell${selected === key ? " selected" : ""}`}
-                        onClick={() =>
-                          setSelected(selected === key ? null : key)
-                        }
+                        onClick={() => {
+                          playSfx("uiSelect");
+                          setSelected(selected === key ? null : key);
+                        }}
                         aria-label={ITEM_LINES[parseItemKey(key)!.lineId].name}
                       >
                         <ItemIcon itemKey={key} size={56} />

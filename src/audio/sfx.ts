@@ -66,9 +66,15 @@ function ensureBus(): AudioContext | null {
   return ctx;
 }
 
+/** While true, voices skip the echo send — UI/meta sounds are dry (a menu tap
+ *  repeating through the dungeon delay reads as a bug). Set around the SOUNDS
+ *  dispatch in playSfx; safe because every recipe builds its graph
+ *  synchronously. */
+let dryOnly = false;
+
 function route(g: GainNode): void {
   g.connect(out!);
-  g.connect(echoSend!);
+  if (!dryOnly) g.connect(echoSend!);
 }
 
 /** Oscillator blip with a pitch ramp. All frequencies scale by `r` (the
@@ -144,7 +150,47 @@ export type SfxKey =
   | "fireBoom" | "frostShatter" | "zap" | "arcaneWarp" | "curse" | "heal"
   | "summon" | "roar" | "shieldGong" | "slimeSquish" | "boneRattle" | "death"
   | "deploy" | "trapSet" | "trapSnap" | "chestCreak" | "chestOpen" | "polymorph"
-  | "anvil" | "itemReveal" | "coinSpend";
+  | "anvil" | "itemReveal" | "coinSpend"
+  // UI/meta family (soundboard-auditioned 2026-07-11: Glasswork sine base with
+  // the Woodwork triangle tap + equip pair)
+  | "uiTap" | "uiOpen" | "uiClose" | "uiSelect" | "uiConfirm" | "uiDeny"
+  | "uiEquip" | "uiUnequip" | "deckAdd" | "deckRemove" | "deckShuffle"
+  | "compendiumReveal"
+  // battle-flow
+  | "countTick" | "countGo" | "waveHorn" | "bossAlarm" | "boonChime"
+  | "boonPick" | "retireBank"
+  // reward/economy
+  | "coinTick" | "unlockFanfare" | "questSting" | "chestShine" | "coinShower"
+  // Grubbins' gibberish barks (Warm timbre)
+  | "grubbinsGreet" | "grubbinsHappy" | "grubbinsSad" | "grubbinsNeutral"
+  // combat hit layer (Crunchy knock)
+  | "hitSoft" | "hitBig";
+
+/** Keys that skip the dungeon-echo bus. Battle sounds (hits, horns) stay wet;
+ *  everything the player clicks in menus is dry. */
+const DRY_KEYS: Set<SfxKey> = new Set([
+  "uiTap", "uiOpen", "uiClose", "uiSelect", "uiConfirm", "uiDeny",
+  "uiEquip", "uiUnequip", "deckAdd", "deckRemove", "deckShuffle",
+  "compendiumReveal", "countTick", "countGo", "boonChime", "boonPick",
+  "retireBank", "coinTick", "unlockFanfare", "questSting", "chestShine",
+  "coinShower", "grubbinsGreet", "grubbinsHappy", "grubbinsSad",
+  "grubbinsNeutral",
+]);
+
+// --- Grubbins' voice: Animal-Crossing-style gibberish ----------------------
+// One syllable = a triangle "glottal" blip + a bandpass formant puff; a bark
+// is 2–4 syllables walked along a pitch contour (mood). Warm timbre picked on
+// the 2026-07-11 soundboard. `durMul` scales the whole syllable rate — the
+// sad bark's 1.4 was auditioned as-is, so it stays even though it also lifts
+// the formant register.
+const GRUB_BASE = 140;
+function syllable(r: number, at: number, f: number): void {
+  blip(r, at, f, f * 0.9, 0.08, "triangle", 0.13, 0.02);
+  burst(r, at, 0.04, 0.025, "bandpass", f * 5, f * 4);
+}
+function mumble(r: number, contour: number[], step: number, durMul: number): void {
+  contour.forEach((c, i) => syllable(r * durMul, i * step, GRUB_BASE * c));
+}
 
 const SOUNDS: Record<SfxKey, (r: number) => void> = {
   // metallic clang (A)
@@ -205,6 +251,70 @@ const SOUNDS: Record<SfxKey, (r: number) => void> = {
   // shop purchase: coins clinking into Grubbins' palm (quick metallic double
   // tap + a couple of stray pouch jingles). First UI/meta sound — kept gentle.
   coinSpend(r) { ring(r, 0, [2520, 3810], 0.1, 0.07); ring(r, 0.07, [2930, 4420], 0.12, 0.06); [0.16, 0.23].forEach((at, i) => ring(r, at, [3350 + i * 420], 0.08, 0.035)); burst(r, 0, 0.03, 0.08, "highpass", 5200, 8200); },
+
+  // ----- UI/meta family (all dry; quiet by design — vol ≤ .08) -------------
+  // warm wood tap (nav, chips, retire-arm, deploy-zone ack)
+  uiTap(r) { blip(r, 0, 820, 760, 0.04, "triangle", 0.06); },
+  // rising glass pair (sheet/panel opens)
+  uiOpen(r) { blip(r, 0, 1100, 1250, 0.055, "sine", 0.05); blip(r, 0.055, 1500, 1650, 0.055, "sine", 0.05); },
+  // mirrored falling pair (sheet/panel closes)
+  uiClose(r) { blip(r, 0, 1650, 1500, 0.055, "sine", 0.05); blip(r, 0.055, 1250, 1100, 0.055, "sine", 0.05); },
+  // tiny glass tick (picking an option: floor, avatar, speed)
+  uiSelect(r) { blip(r, 0, 1900, 1750, 0.025, "sine", 0.045); },
+  // two-note up + faint ring (committing: Descend, save)
+  uiConfirm(r) { blip(r, 0, 1320, 1320, 0.06, "sine", 0.05); blip(r, 0.07, 1760, 1760, 0.09, "sine", 0.05); ring(r, 0.13, [2640], 0.12, 0.03); },
+  // dull low double-thunk (blocked: can't afford, deck full)
+  uiDeny(r) { blip(r, 0, 240, 200, 0.06, "triangle", 0.07); blip(r, 0.09, 240, 200, 0.06, "triangle", 0.07); },
+  // wood-warm buckle snick (item onto unit)
+  uiEquip(r) { ring(r, 0, [1800, 2700], 0.07, 0.05); burst(r, 0, 0.025, 0.06, "lowpass", 1400, 700); },
+  // reverse snick (item off)
+  uiUnequip(r) { burst(r, 0, 0.025, 0.06, "lowpass", 1400, 700); blip(r, 0.025, 1400, 1000, 0.06, "triangle", 0.05); },
+  // rising third (unit into deck)
+  deckAdd(r) { blip(r, 0, 1320, 1320, 0.05, "sine", 0.05); blip(r, 0.05, 1660, 1660, 0.07, "sine", 0.05); },
+  // falling third (unit out)
+  deckRemove(r) { blip(r, 0, 1660, 1660, 0.05, "sine", 0.05); blip(r, 0.05, 1320, 1320, 0.07, "sine", 0.05); },
+  // card riffle (auto-fill / randomize)
+  deckShuffle(r) { for (let i = 0; i < 5; i++) burst(r, i * 0.04, 0.03, 0.06, "bandpass", 1200, 900); },
+  // page-turn + faint ring (opening a revealed bestiary entry)
+  compendiumReveal(r) { burst(r, 0, 0.12, 0.06, "bandpass", 900, 2000); ring(r, 0.1, [2800], 0.1, 0.03); },
+
+  // ----- battle-flow --------------------------------------------------------
+  // woodblock tick (3-2-1; caller raises rate per step so the count climbs)
+  countTick(r) { blip(r, 0, 880, 860, 0.05, "triangle", 0.12); ring(r, 0.01, [1760], 0.05, 0.03); },
+  // bright "Fight!" hit
+  countGo(r) { blip(r, 0, 1046, 1046, 0.1, "sine", 0.12); ring(r, 0.04, [1568, 2093], 0.25, 0.08); burst(r, 0, 0.04, 0.06, "highpass", 3500, 5000); },
+  // three ascending horn stabs (Endless: new wave) — wet
+  waveHorn(r) { [147, 165, 196].forEach((f, i) => { blip(r, i * 0.15, f, f * 0.96, 0.18, "sawtooth", 0.1, 0.03); blip(r, i * 0.15, f * 1.02, f * 0.98, 0.18, "sawtooth", 0.07, 0.03); }); },
+  // dread drop + low ring (boss telegraph; rare-spawn plays at rate 1.3) — wet
+  bossAlarm(r) { blip(r, 0, 130, 75, 0.6, "triangle", 0.22, 0.06); ring(r, 0.05, [220, 262], 0.5, 0.09); burst(r, 0, 0.5, 0.1, "lowpass", 400, 120); },
+  // harp gliss (Endless intermission opens)
+  boonChime(r) { [523, 659, 784, 1047, 1319].forEach((f, i) => blip(r, i * 0.035, f, f * 1.02, 0.12, "sine", 0.04, 0.008)); },
+  // confirm + sparkle (boon chosen)
+  boonPick(r) { blip(r, 0, 1320, 1320, 0.06, "sine", 0.05); blip(r, 0.07, 1760, 1760, 0.09, "sine", 0.05); ring(r, 0.13, [3140], 0.12, 0.04); },
+  // big payout: ascending coin rings + shimmer (banking Endless gold)
+  retireBank(r) { ring(r, 0, [2520, 2930], 0.1, 0.06); ring(r, 0.08, [3350, 3810], 0.1, 0.055); ring(r, 0.16, [4200, 4700], 0.12, 0.05); [1568, 2093].forEach((f, i) => blip(r, 0.24 + i * 0.05, f, f * 1.03, 0.12, "sine", 0.04, 0.008)); },
+
+  // ----- reward/economy -----------------------------------------------------
+  // one tiny coin ring (gold count-up; caller jitters rate + throttles)
+  coinTick(r) { ring(r, 0, [3800], 0.05, 0.04); },
+  // heraldic triangle stabs (new unit/item unlocked; end ping cut per user)
+  unlockFanfare(r) { [[440, 554, 659], [440, 554, 659], [554, 659, 880]].forEach((chord, i) => chord.forEach((f) => blip(r, i * 0.18, f, f, i === 2 ? 0.3 : 0.12, "triangle", 0.05, 0.01))); },
+  // deep bell + rising whisper (hidden quest discovered — mysterious)
+  questSting(r) { ring(r, 0, [294, 588, 882], 0.6, 0.09); blip(r, 0.15, 800, 1600, 0.3, "sine", 0.03, 0.05); },
+  // frosty sparkle (silver-tier chest flourish)
+  chestShine(r) { [2600, 3300, 4100].forEach((f, i) => ring(r, i * 0.07, [f], 0.12, 0.05)); burst(r, 0, 0.06, 0.04, "highpass", 6000, 8000); },
+  // coin scatter + low thump (gold-tier chest flourish)
+  coinShower(r) { for (let i = 0; i < 8; i++) ring(r, i * 0.05, [2400 + ((i * 733) % 2200)], 0.07, 0.045); blip(r, 0.02, 120, 60, 0.1, "triangle", 0.12); burst(r, 0, 0.04, 0.06, "highpass", 5000, 7500); },
+
+  // ----- Grubbins' barks (ShopScreen say() adds a little rate jitter) -------
+  grubbinsGreet(r) { mumble(r, [1.0, 1.12, 1.28], 0.11, 1); },
+  grubbinsHappy(r) { mumble(r, [1.15, 1.35, 1.45, 1.2], 0.09, 0.9); },
+  grubbinsSad(r) { mumble(r, [1.0, 0.78], 0.16, 1.4); },
+  grubbinsNeutral(r) { mumble(r, [1.0, 1.06, 0.97], 0.11, 1); },
+
+  // ----- hit layer (quiet texture under the combat palette) — wet -----------
+  hitSoft(r) { burst(r, 0, 0.035, 0.1, "bandpass", 900, 350); blip(r, 0, 300, 120, 0.04, "triangle", 0.05); },
+  hitBig(r) { burst(r, 0, 0.06, 0.16, "bandpass", 700, 250); blip(r, 0, 220, 80, 0.07, "triangle", 0.12); ring(r, 0.01, [95], 0.1, 0.05); },
 };
 
 // ---------------------------------------------------------------------------
@@ -273,6 +383,15 @@ const MIN_GAP_MS: Partial<Record<SfxKey, number>> = {
   heal: 450, sword: 90, dagger: 90, slam: 120, bow: 70, bolt: 80,
   death: 120, deploy: 100, zap: 140, fireBoom: 150, frostShatter: 140,
   slimeSquish: 120, shieldGong: 200,
+  uiTap: 50, uiOpen: 120, uiClose: 120, uiSelect: 50, uiConfirm: 150,
+  uiDeny: 200, uiEquip: 120, uiUnequip: 120, deckAdd: 80, deckRemove: 80,
+  deckShuffle: 250, compendiumReveal: 200,
+  countTick: 300, countGo: 500, waveHorn: 1000, bossAlarm: 1000,
+  boonChime: 400, boonPick: 300, retireBank: 500,
+  coinTick: 40, unlockFanfare: 800, questSting: 800, chestShine: 300,
+  coinShower: 500,
+  grubbinsGreet: 300, grubbinsHappy: 300, grubbinsSad: 300, grubbinsNeutral: 300,
+  hitSoft: 140, hitBig: 260,
 };
 const DEFAULT_GAP_MS = 60;
 const MAX_PER_OBSERVE = 6;
@@ -288,7 +407,9 @@ export function playSfx(key: SfxKey, rate = 1): void {
   const last = lastPlayed.get(key) ?? -Infinity;
   if (now - last < (MIN_GAP_MS[key] ?? DEFAULT_GAP_MS)) return;
   lastPlayed.set(key, now);
+  dryOnly = DRY_KEYS.has(key);
   SOUNDS[key](rate);
+  dryOnly = false;
 }
 
 // ---------------------------------------------------------------------------
@@ -302,6 +423,12 @@ interface UnitMemo {
   sheeped: boolean;
 }
 
+/** Damage at/above this reads as a "big hit" (hitBig). Tunable — calibrated
+ *  against mid-floor numbers; late-floor sweeps may want it higher. */
+const BIG_HIT_DMG = 35;
+/** Shared gate across hitSoft+hitBig so the layer stays a texture. */
+const HIT_FAMILY_GAP_MS = 140;
+
 export class SfxObserver {
   private baselined = false;
   private units = new Map<string, UnitMemo>();
@@ -309,6 +436,8 @@ export class SfxObserver {
   private vfx = new Set<string>();
   private texts = new Set<string>();
   private traps = new Set<string>();
+  private banner: string | null = null;
+  private lastHitMs = -Infinity;
 
   observe(snap: BattleSnapshot): void {
     const first = !this.baselined;
@@ -385,13 +514,39 @@ export class SfxObserver {
       }
     }
 
-    // --- heals (floating text) ---------------------------------------------
+    // --- floating text: heals + the hit layer ------------------------------
+    // Hits get their OWN budget (1/frame + family gate), outside play()'s
+    // MAX_PER_OBSERVE pool, so a brawl's thud texture never starves deaths,
+    // casts, or deploys — and vice versa.
+    let hitBudget = first ? 0 : 1;
     for (const ft of snap.floatingTexts) {
       if (this.texts.has(ft.id)) continue;
       this.texts.add(ft.id);
       if (first) continue;
-      if (ft.kind === "heal") play("heal");
+      if (ft.kind === "heal") {
+        play("heal");
+      } else {
+        // damage | crit
+        const now = performance.now();
+        if (hitBudget > 0 && now - this.lastHitMs >= HIT_FAMILY_GAP_MS) {
+          hitBudget--;
+          this.lastHitMs = now;
+          const amt = Number(ft.value.replace(/[^0-9]/g, "")) || 0;
+          const big = ft.kind === "crit" || amt >= BIG_HIT_DMG;
+          // Rate jitter is presentation-only (never touches the sim).
+          playSfx(big ? "hitBig" : "hitSoft", big ? 0.9 : 1 + (Math.random() - 0.5) * 0.15);
+        }
+      }
     }
+
+    // --- telegraph banners: boss/rare incoming, or a new Endless wave -------
+    const b = snap.waveBanner;
+    const bannerId = b ? `${b.kind}:${b.name}` : null;
+    if (!first && b && bannerId !== this.banner) {
+      if (b.kind === "wave") playSfx("waveHorn");
+      else playSfx("bossAlarm", b.kind === "rare" ? 1.3 : 1);
+    }
+    this.banner = bannerId;
 
     // --- traps: armed / sprung ---------------------------------------------
     const nowTraps = new Set<string>();

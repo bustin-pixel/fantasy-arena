@@ -9,6 +9,7 @@ import { getDungeon } from "@/data/dungeons";
 import { endlessBestWave, highestClearedFloorOf } from "@/state/persistence";
 import { dayIndexLocal } from "@/meta/shop";
 import type { BattleMode } from "@/hooks/useBattleEngine";
+import { playSfx } from "@/audio/sfx";
 
 /** Endless unlocks once the player has cleared the fifth Depths floor — the same
  *  gate the themed legendary dungeons use. */
@@ -58,7 +59,7 @@ export function HomeScreen({ onBattle, onOpenBag, onOpenShop }: Props) {
         avatarId={save.avatarId}
         wins={save.wins}
         losses={save.losses}
-        onEdit={() => setEditingProfile(true)}
+        onEdit={() => { playSfx("uiOpen"); setEditingProfile(true); }}
       />
 
       <div className="mode-cards">
@@ -66,7 +67,7 @@ export function HomeScreen({ onBattle, onOpenBag, onOpenShop }: Props) {
           type="button"
           className="mode-card arena"
           disabled={!ready}
-          onClick={() => onBattle("solo")}
+          onClick={() => { playSfx("uiConfirm"); onBattle("solo"); }}
         >
           <ArenaIcon />
           <span className="mode-card-title">Arena</span>
@@ -79,7 +80,7 @@ export function HomeScreen({ onBattle, onOpenBag, onOpenShop }: Props) {
           type="button"
           className="mode-card swarm"
           disabled={!ready}
-          onClick={() => setMapOpen(true)}
+          onClick={() => { playSfx("uiOpen"); setMapOpen(true); }}
         >
           <SwarmIcon />
           <span className="mode-card-title">Dungeons</span>
@@ -92,7 +93,7 @@ export function HomeScreen({ onBattle, onOpenBag, onOpenShop }: Props) {
           type="button"
           className="mode-card endless"
           disabled={!ready || !endlessUnlocked}
-          onClick={() => onBattle("endless")}
+          onClick={() => { playSfx("uiConfirm"); onBattle("endless"); }}
         >
           <EndlessIcon />
           <span className="mode-card-title">Endless</span>
@@ -131,7 +132,7 @@ export function HomeScreen({ onBattle, onOpenBag, onOpenShop }: Props) {
         type="button"
         className="home-shop-fab"
         aria-label="Open Shop"
-        onClick={onOpenShop}
+        onClick={() => { playSfx("uiOpen"); onOpenShop(); }}
       >
         <span className="home-shop-emoji" aria-hidden>
           💰
@@ -151,7 +152,7 @@ export function HomeScreen({ onBattle, onOpenBag, onOpenShop }: Props) {
             setMapOpen(false);
             setPickDungeonId(id);
           }}
-          onClose={() => setMapOpen(false)}
+          onClose={() => { playSfx("uiClose"); setMapOpen(false); }}
         />
       )}
 
@@ -163,7 +164,7 @@ export function HomeScreen({ onBattle, onOpenBag, onOpenShop }: Props) {
             setPickDungeonId(null);
             onBattle("depths", floor, pickDungeon.id);
           }}
-          onClose={() => setPickDungeonId(null)}
+          onClose={() => { playSfx("uiClose"); setPickDungeonId(null); }}
         />
       )}
     </div>

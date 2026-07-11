@@ -11,6 +11,7 @@ import { levelFromXp } from "@/meta/leveling";
 import { MAX_DECK } from "@/utils/constants";
 import { generateSeed } from "@/utils/rng";
 import { useGameState } from "@/state/GameStateContext";
+import { playSfx } from "@/audio/sfx";
 
 export function HubScreen() {
   const { save, setDeck, purchaseUnit, equipItem, unequipItem } = useGameState();
@@ -30,12 +31,14 @@ export function HubScreen() {
   const toggle = (id: string) => {
     if (isLocked(id)) return; // buy it first (detail panel)
     if (deck.includes(id)) {
+      playSfx("deckRemove");
       setDeck(deck.filter((d) => d !== id));
       return;
     }
     if (deck.length >= MAX_DECK) return;
     // One-legendary-per-deck rule.
     if (getUnitDef(id).rarity === "legendary" && hasLegendary) return;
+    playSfx("deckAdd");
     setDeck([...deck, id]);
   };
 
@@ -43,11 +46,17 @@ export function HubScreen() {
   // draw randomness outside the deterministic battle (like generateSeed itself).
   const autoFill = () => {
     if (deck.length >= MAX_DECK) return;
+    playSfx("deckShuffle");
     setDeck(generateRandomDeck(generateSeed(), MAX_DECK, deck, unlockedUnits));
   };
-  const randomize = () =>
+  const randomize = () => {
+    playSfx("deckShuffle");
     setDeck(generateRandomDeck(generateSeed(), MAX_DECK, [], unlockedUnits));
-  const clearDeck = () => setDeck([]);
+  };
+  const clearDeck = () => {
+    playSfx("uiClose");
+    setDeck([]);
+  };
 
   // Roster for the card grid: "All" shows rarest-first (Legendary > Epic > Rare;
   // ties keep their stable data order), a rarity chip narrows to that rarity.
@@ -131,7 +140,7 @@ export function HubScreen() {
           <button
             type="button"
             className={`filter-chip${rarityFilter === "all" ? " active" : ""}`}
-            onClick={() => setRarityFilter("all")}
+            onClick={() => { playSfx("uiTap"); setRarityFilter("all"); }}
             aria-pressed={rarityFilter === "all"}
           >
             All
@@ -142,7 +151,7 @@ export function HubScreen() {
               type="button"
               className={`filter-chip${rarityFilter === r ? " active" : ""}`}
               style={{ "--chip": RARITIES[r].color } as React.CSSProperties}
-              onClick={() => setRarityFilter(r)}
+              onClick={() => { playSfx("uiTap"); setRarityFilter(r); }}
               aria-pressed={rarityFilter === r}
             >
               {RARITIES[r].label}
@@ -178,7 +187,7 @@ export function HubScreen() {
                 defId={id}
                 addState={addState}
                 onToggle={() => toggle(id)}
-                onInfo={() => setDetailId(id)}
+                onInfo={() => { playSfx("uiOpen"); setDetailId(id); }}
                 lockLabel={lockLabel}
                 level={levelFromXp(save.unitXp[id] ?? 0)}
               />
@@ -198,10 +207,10 @@ export function HubScreen() {
           defId={detailId}
           deck={deck}
           onToggle={toggle}
-          onClose={() => setDetailId(null)}
+          onClose={() => { playSfx("uiClose"); setDetailId(null); }}
           locked={isLocked(detailId)}
           gold={save.gold}
-          onBuy={() => purchaseUnit(detailId)}
+          onBuy={() => { playSfx("unlockFanfare"); purchaseUnit(detailId); }}
           unlockPrice={detailQuest?.price}
           lockHint={detailLockHint}
           // Level UI only for owned units — a locked unit has no XP story yet.
