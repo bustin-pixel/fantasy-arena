@@ -2559,7 +2559,8 @@ body.modal-open .pager-nav {
 .shop-bark {
   position: absolute;
   left: 5%;
-  top: 14%;
+  /* Clear the Home button / currency pills row however short the scene gets. */
+  top: calc(14% + 40px);
   max-width: 46%;
   z-index: 2;
   background: #efe3c8;
