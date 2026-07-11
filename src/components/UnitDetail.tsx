@@ -21,6 +21,7 @@ import {
 } from "@/data/items";
 import { availableCount } from "@/meta/inventory";
 import { ItemIcon } from "@/components/ItemIcon";
+import { playSfx } from "@/audio/sfx";
 import type { ItemLoadouts, ItemSlot, UnitDef } from "@/types";
 
 interface Props {
@@ -419,9 +420,10 @@ export function UnitDetail({
                       key={slot}
                       type="button"
                       className={`equip-slot${pickerSlot === slot ? " open" : ""}`}
-                      onClick={() =>
-                        setPickerSlot(pickerSlot === slot ? null : slot)
-                      }
+                      onClick={() => {
+                        playSfx("uiTap");
+                        setPickerSlot(pickerSlot === slot ? null : slot);
+                      }}
                       aria-label={`${slot} slot`}
                     >
                       {key && p ? (
@@ -455,10 +457,12 @@ export function UnitDetail({
                   items={items!}
                   loadouts={loadouts!}
                   onEquip={(key) => {
+                    playSfx("uiEquip");
                     onEquip!(key);
                     setPickerSlot(null);
                   }}
                   onUnequip={() => {
+                    playSfx("uiUnequip");
                     onUnequip!(pickerSlot);
                     setPickerSlot(null);
                   }}

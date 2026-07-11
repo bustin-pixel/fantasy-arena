@@ -7,6 +7,7 @@ import { playSfx } from "@/audio/sfx";
  *  from the gear button beside the gold pill (shell only). */
 export function SettingsPanel({ onClose }: { onClose: () => void }) {
   const [s, setS] = useState<GameSettings>(getSettings());
+  const close = () => { playSfx("uiClose"); onClose(); };
   // Two-step reset guard; arms for 3 seconds, then relaxes.
   const [resetArmed, setResetArmed] = useState(false);
   const disarmTimer = useRef<number>(0);
@@ -15,14 +16,14 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
   const set = (patch: Partial<GameSettings>) => setS(updateSettings(patch));
 
   return (
-    <div className="detail-overlay" onClick={onClose}>
+    <div className="detail-overlay" onClick={close}>
       <div
         className="detail-modal settings-modal"
         role="dialog"
         aria-label="Settings"
         onClick={(e) => e.stopPropagation()}
       >
-        <button className="detail-close" onClick={onClose} aria-label="Close settings">
+        <button className="detail-close" onClick={close} aria-label="Close settings">
           ✕
         </button>
         <div className="settings-body">
@@ -34,7 +35,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
             <input
               type="checkbox"
               checked={s.muted}
-              onChange={(e) => set({ muted: e.target.checked })}
+              onChange={(e) => { set({ muted: e.target.checked }); playSfx("uiSelect"); }}
             />
           </label>
           <label className="settings-row">
@@ -69,7 +70,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
                 <button
                   key={v}
                   className={`settings-seg-btn${s.defaultSpeed === v ? " active" : ""}`}
-                  onClick={() => set({ defaultSpeed: v })}
+                  onClick={() => { playSfx("uiSelect", 1 + (v - 1) * 0.1); set({ defaultSpeed: v }); }}
                 >
                   {v}×
                 </button>
@@ -85,7 +86,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
             <input
               type="checkbox"
               checked={s.ambientFx}
-              onChange={(e) => set({ ambientFx: e.target.checked })}
+              onChange={(e) => { playSfx("uiSelect"); set({ ambientFx: e.target.checked }); }}
             />
           </label>
 
@@ -94,6 +95,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
             className={`settings-reset${resetArmed ? " armed" : ""}`}
             onClick={() => {
               if (!resetArmed) {
+                playSfx("uiTap");
                 setResetArmed(true);
                 clearTimeout(disarmTimer.current);
                 disarmTimer.current = window.setTimeout(() => setResetArmed(false), 3000);

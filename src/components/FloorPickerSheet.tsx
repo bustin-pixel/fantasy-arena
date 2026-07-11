@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { isBossFloorIn, monsterLevelFor, type Dungeon } from "@/data/dungeons";
 import { GOLD_REWARDS } from "@/meta/economy";
 import { bossChestTierFor } from "@/meta/rewards";
+import { playSfx } from "@/audio/sfx";
 
 interface Props {
   dungeon: Dungeon;
@@ -73,7 +74,7 @@ export function FloorPickerSheet({
                   className={`floor-row ${selected === floor ? "selected" : ""} ${
                     boss ? "boss" : ""
                   }`}
-                  onClick={() => setSelected(floor)}
+                  onClick={() => { playSfx("uiSelect"); setSelected(floor); }}
                 >
                   <span className="floor-num">
                     {boss ? "☠ " : ""}Floor {floor}
@@ -101,7 +102,7 @@ export function FloorPickerSheet({
           <button className="btn btn-close-ghost" onClick={onClose}>
             Close
           </button>
-          <button className="btn btn-gold" onClick={() => onDescend(selected)}>
+          <button className="btn btn-gold" onClick={() => { playSfx("uiConfirm"); onDescend(selected); }}>
             Descend — Floor {selected}
           </button>
         </div>

@@ -9,6 +9,7 @@ import { SettingsPanel } from "@/components/SettingsPanel";
 import { BagSheet } from "@/components/BagSheet";
 import { GoldPill, ShardPill } from "@/components/CurrencyPills";
 import type { BattleMode } from "@/hooks/useBattleEngine";
+import { playSfx } from "@/audio/sfx";
 
 interface Props {
   /** Launch a battle in the given mode (from a Home mode card). Depths passes
@@ -183,13 +184,13 @@ export function AppShell({ onBattle, onOpenShop }: Props) {
           type="button"
           className="settings-btn"
           aria-label="Settings"
-          onClick={() => setSettingsOpen(true)}
+          onClick={() => { playSfx("uiOpen"); setSettingsOpen(true); }}
         >
           ⚙️
         </button>
       </div>
       {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
-      {bagOpen && <BagSheet onClose={() => setBagOpen(false)} />}
+      {bagOpen && <BagSheet onClose={() => { playSfx("uiClose"); setBagOpen(false); }} />}
       <div className="shell-bg" aria-hidden="true">
         {/* One continuous hall (3 pages wide) panned 1:1 with the pager. Brick
             spans it all; the gate lives in the middle (Home) third. */}
@@ -223,7 +224,7 @@ export function AppShell({ onBattle, onOpenShop }: Props) {
         <section className="pager-page" aria-label="Home">
           <HomeScreen
             onBattle={onBattle}
-            onOpenBag={() => setBagOpen(true)}
+            onOpenBag={() => { playSfx("uiOpen"); setBagOpen(true); }}
             onOpenShop={onOpenShop}
           />
         </section>
@@ -238,7 +239,7 @@ export function AppShell({ onBattle, onOpenShop }: Props) {
             type="button"
             className={`pager-tab${page === i ? " active" : ""}`}
             aria-current={page === i}
-            onClick={() => goTo(i)}
+            onClick={() => { playSfx("uiTap"); goTo(i); }}
           >
             {label}
           </button>

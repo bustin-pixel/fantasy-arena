@@ -14,6 +14,7 @@ import { getUnitDef } from "@/data/units";
 import { RARITIES } from "@/data/rarities";
 import { averageDeckLevel, levelFromXp } from "@/meta/leveling";
 import { highestClearedFloorOf, type PlayerSave } from "@/state/persistence";
+import { playSfx } from "@/audio/sfx";
 
 interface Props {
   save: PlayerSave;
@@ -91,7 +92,7 @@ export function DungeonMapSheet({ save, onPick, onClose }: Props) {
                   type="button"
                   className="floor-row"
                   disabled={locked}
-                  onClick={() => !locked && onPick(d.id)}
+                  onClick={() => { if (!locked) { playSfx("uiSelect"); onPick(d.id); } }}
                   style={{
                     display: "flex",
                     flexDirection: "column",

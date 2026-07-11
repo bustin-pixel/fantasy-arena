@@ -21,6 +21,7 @@ import { ITEM_LINES } from "@/data/items";
 import { ChestSprite } from "@/components/ChestSprite";
 import { renderPortrait } from "@/engine/Renderer";
 import { playStinger } from "@/audio/music";
+import { playSfx } from "@/audio/sfx";
 
 /** One deck unit's XP movement this battle (both values pre-clamped by the
  *  same addXp the grant used, so the animation ends exactly on the saved value). */
@@ -52,10 +53,34 @@ type ChestPhase = "closed" | "opening" | "open";
 
 export function RewardPanel({ rewards, floor, mode, xpGains }: Props) {
   const [chestPhase, setChestPhase] = useState<ChestPhase>("closed");
-  const shownGold = useCountUp(rewards.gold);
+  const shownGold = useCountUp(rewards.gold, true);
 
   const milestoneId =
     mode === "depths" && rewards.firstClear ? MILESTONE_UNLOCKS[floor] : undefined;
+
+  // Milestone/quest stings, staggered off the victory stinger (and each other)
+  // so the panel's arrival isn't a pile-up.
+  useEffect(() => {
+    const timers: number[] = [];
+    if (milestoneId) timers.push(window.setTimeout(() => playSfx("unlockFanfare"), 400));
+    if (rewards.questUnlock) timers.push(window.setTimeout(() => playSfx("questSting"), milestoneId ? 1100 : 400));
+    return () => timers.forEach(clearTimeout);
+    // Mount-only ceremony: rewards are frozen for this panel's lifetime.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Chest reveal: a unit or item inside is fanfare-worthy (delayed past the
+  // chestOpen jingle + tier flourish).
+  useEffect(() => {
+    if (chestPhase !== "open") return;
+    const worthy = rewards.chest?.contents.some(
+      (e) => e.kind === "unit" || e.kind === "item"
+    );
+    if (!worthy) return;
+    const t = window.setTimeout(() => playSfx("unlockFanfare"), 450);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chestPhase]);
 
   return (
     <div className="reward-panel">
@@ -275,20 +300,31 @@ function useXpReveal(gains: XpGain[]): number[] {
 }
 
 /** Animate 0 → target over ~800ms. Presentation only — the real value is
- *  already in the save. */
-function useCountUp(target: number): number {
+ *  already in the save. With `tick`, plays a coin tick as the counter rolls —
+ *  time-throttled (≥90ms) rather than per-value so big totals don't machine-gun;
+ *  the ease-out makes the ticks decelerate like coins settling, pitch rising
+ *  as the count lands. */
+function useCountUp(target: number, tick = false): number {
   const [value, setValue] = useState(0);
   const rafRef = useRef(0);
+  const prevRef = useRef(0);
+  const lastTickRef = useRef(0);
   useEffect(() => {
     const start = performance.now();
     const DURATION = 800;
     const step = (now: number) => {
       const t = Math.min(1, (now - start) / DURATION);
-      setValue(Math.round(target * (1 - Math.pow(1 - t, 3)))); // ease-out cubic
+      const v = Math.round(target * (1 - Math.pow(1 - t, 3))); // ease-out cubic
+      if (tick && v !== prevRef.current && now - lastTickRef.current >= 90) {
+        lastTickRef.current = now;
+        playSfx("coinTick", 1 + t * 0.25);
+      }
+      prevRef.current = v;
+      setValue(v);
       if (t < 1) rafRef.current = requestAnimationFrame(step);
     };
     rafRef.current = requestAnimationFrame(step);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [target]);
+  }, [target, tick]);
   return value;
 }
