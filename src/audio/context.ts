@@ -41,8 +41,29 @@ function createCtx(): void {
     noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
     const d = noiseBuf.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    installResumeWatchers();
   }
   if (ctx.state === "suspended") void ctx.resume();
+}
+
+// Browsers suspend the AudioContext when the tab is backgrounded/slept
+// (Edge sleeping tabs, Chrome Memory Saver, iOS "interrupted"). These
+// watchers are permanent: wake the context whenever the page becomes
+// visible again, and on any gesture (some browsers only allow resume
+// from a user gesture).
+let watchersInstalled = false;
+
+function installResumeWatchers(): void {
+  if (watchersInstalled) return;
+  watchersInstalled = true;
+  const resumeIfSleeping = () => {
+    if (ctx && ctx.state !== "running" && ctx.state !== "closed") void ctx.resume();
+  };
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) resumeIfSleeping();
+  });
+  window.addEventListener("pointerdown", resumeIfSleeping);
+  window.addEventListener("keydown", resumeIfSleeping);
 }
 
 /** Arm a one-shot listener on the first gesture; safe to call repeatedly. */

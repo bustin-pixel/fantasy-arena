@@ -904,6 +904,10 @@ function startTrack(id: MusicTrackId): void {
   // Lookahead scheduler: top up the next loop shortly before the current one
   // ends. Wide margin so background-tab timer throttling doesn't cause gaps.
   const timer = window.setInterval(() => {
+    // If the schedule fell far behind the audio clock (hidden-tab timers can
+    // throttle to ~1/min while the context keeps running), skip the missed
+    // loops instead of replaying them one per tick.
+    if (nextT < c.currentTime - 1) nextT = c.currentTime + 0.08;
     if (c.currentTime > nextT - 0.4) {
       def.schedule(nextT, gain, st);
       nextT += loopDur;
