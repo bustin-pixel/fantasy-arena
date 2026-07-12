@@ -350,9 +350,9 @@ body {
   align-items: center;
   justify-content: center;
   gap: 2px;
-  /* Matches a filled slot's height (sprite + labels) so empty slots stay the
-     same size even when the whole deck is cleared. */
-  min-height: 104px;
+  /* Matches a filled slot's height (sprite + labels + button row) so empty
+     slots stay the same size even when the whole deck is cleared. */
+  min-height: 128px;
   padding: 6px 4px;
   border: 2px solid #57432c;
   border-radius: 10px;
@@ -366,6 +366,8 @@ body {
 }
 .deck-slot.filled {
   cursor: grab;
+  /* Lets the drag z-index take effect so the dragged slot rides on top. */
+  position: relative;
   /* Let vertical page scroll pass through; we claim horizontal for reordering. */
   touch-action: pan-y;
   -webkit-user-select: none;
@@ -401,6 +403,43 @@ body {
   font-size: 0.56rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+}
+/* Remove / Info row on a filled slot (tapping the face also inspects). */
+.deck-slot-actions {
+  display: flex;
+  gap: 4px;
+  width: 100%;
+  margin-top: 3px;
+}
+.deck-slot-btn {
+  flex: 1;
+  min-width: 0;
+  height: 21px;
+  padding: 0;
+  border-radius: 6px;
+  border: 1px solid var(--stone-dark);
+  background: transparent;
+  color: var(--stone);
+  font-family: inherit;
+  font-size: 0.56rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+}
+.deck-slot-btn:hover,
+.deck-slot-btn:active {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--parchment);
+}
+.deck-slot-btn.remove {
+  border-color: #6f2f39;
+  color: #d98a95;
+}
+.deck-slot-btn.remove:hover,
+.deck-slot-btn.remove:active {
+  background: rgba(122, 32, 48, 0.35);
+  color: #f0b6be;
 }
 
 /* ---- Deck shortcut buttons (auto-fill / randomize / clear) ---------------- */
@@ -999,6 +1038,7 @@ body.modal-open .pager-nav {
   font-family: inherit;
 }
 .detail-art {
+  position: relative; /* anchors the .art-slot item buttons */
   height: 150px;
   display: flex;
   align-items: center;
@@ -3026,44 +3066,47 @@ body.modal-open .pager-nav {
   font-weight: 700;
 }
 
-/* ---- Equipment section (UnitDetail) --------------------------------------- */
-.equip-slots {
+/* ---- Equipment (UnitDetail) ------------------------------------------------
+   The three item slots sit ON the portrait alcove: weapon top-left, armor
+   bottom-left, trinket bottom-right. Tapping one opens the picker below. */
+.art-slot {
+  position: absolute;
+  width: 48px;
+  height: 48px;
   display: flex;
-  gap: 8px;
-  margin-top: 6px;
-}
-.equip-slot {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: 8px 4px 6px;
+  justify-content: center;
+  padding: 0;
   border-radius: 10px;
-  border: 1px solid rgba(236, 227, 207, 0.18);
-  background: rgba(10, 8, 5, 0.4);
+  border: 1px solid rgba(236, 227, 207, 0.22);
+  background: rgba(10, 8, 5, 0.5);
   cursor: pointer;
-  min-width: 0;
 }
-.equip-slot.open {
+.art-slot.open {
   border-color: #ece3cf;
 }
-.equip-slot-glyph {
-  font-size: 1.5rem;
-  line-height: 44px;
-  height: 44px;
+.art-slot-weapon {
+  left: 14px;
+  top: 14px;
+}
+.art-slot-armor {
+  left: 14px;
+  bottom: 14px;
+}
+.art-slot-trinket {
+  right: 14px;
+  bottom: 14px;
+}
+.art-slot-glyph {
+  font-size: 1.3rem;
+  line-height: 1;
   opacity: 0.4;
 }
-.equip-slot-name {
-  font-size: 0.68rem;
-  font-weight: 700;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.equip-slot-name.empty {
-  opacity: 0.5;
+/* Picker / gear-summary strip sandwiched between the portrait and the body. */
+.equip-dropdown {
+  padding: 10px 16px 12px;
+  background: rgba(10, 8, 5, 0.35);
+  border-bottom: 1px solid #57432c;
 }
 .equip-picker {
   margin-top: 8px;
@@ -3584,7 +3627,6 @@ body.modal-open .pager-nav {
   transform-origin: left center;
   transform-style: preserve-3d;
   transform: rotateY(0deg);
-  transition: transform 0.75s cubic-bezier(0.55, 0.06, 0.35, 1);
   z-index: 6;
 }
 .book-cover-face {
@@ -3592,6 +3634,11 @@ body.modal-open .pager-nav {
   inset: 0;
   backface-visibility: hidden;
   border-radius: 0 6px 6px 0;
+  /* Same as .book-leaf-face: the clip flattens children (the splash <canvas>
+   * especially) into THIS face's compositing layer, so backface-visibility
+   * governs the whole face as one unit. Without it the canvas is its own
+   * layer and paints mirrored through the cover past 90°. */
+  overflow: hidden;
 }
 .book-cover-face.front {
   background: linear-gradient(120deg, var(--leather-dk) 0%, var(--leather) 45%, var(--leather-lt) 100%);
@@ -3628,7 +3675,9 @@ body.modal-open .pager-nav {
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85), 0 0 8px rgba(0, 0, 0, 0.9);
   letter-spacing: 0.6px;
 }
-/* The lore page's framed painting. */
+/* The lore page's framed painting. The cover wears the SAME vignette, so the
+ * page's copy stays hidden until the cover has swung open and faded — a
+ * crossfade, never two paintings at once mid-flip. */
 .book-splash-plate {
   width: 100%;
   aspect-ratio: 3 / 2;
@@ -3639,6 +3688,13 @@ body.modal-open .pager-nav {
   border-image: linear-gradient(135deg, #a8842e, #e6c86a 30%, #8a6a24 60%, #d9b455) 1;
   box-shadow: 0 2px 6px rgba(40, 25, 8, 0.45);
   flex-shrink: 0;
+  opacity: 0;
+}
+.phase-open .book-splash-plate {
+  opacity: 1;
+  /* Timed to hit full opacity right as the turning cover lands (0.56s), so
+   * the cover-back's plate snaps away over an already-identical page. */
+  transition: opacity 0.25s ease 0.3s;
 }
 .book-splash-canvas {
   width: 100%;
@@ -3648,15 +3704,50 @@ body.modal-open .pager-nav {
 .book-cover-face.back {
   transform: rotateY(180deg);
   border-radius: 6px 0 0 6px;
-  background: linear-gradient(105deg, #d8ccb0, #e7dcc2);
+  /* Identical to .book-page.left (gradient + gutter shadow): this face lands
+   * AS the left page, and the unmount swap must be invisible. */
+  background: linear-gradient(105deg, #e7dcc2, #f2ead6 45%, #e2d6ba);
+  box-shadow: inset -14px 0 18px -12px rgba(60, 40, 10, 0.55);
+  overflow: hidden;
+}
+/* The cover-back carries the lore page (it lands AS page one), so its plate
+ * must already be painted when the swing passes 90° — exempt from the
+ * delayed fade below. */
+.book-cover-face.back .book-splash-plate {
+  opacity: 1;
+  transition: none;
+}
+/* The cover opens EXACTLY like the page-turn leaf below — same angle, same
+ * duration, same bezier, same backface-hidden overflow-clipped faces, and
+ * TRANSFORM ONLY. Never animate opacity here: opacity is a grouping property,
+ * so animating it flattens the preserve-3d context and the front face paints
+ * mirrored through the back mid-turn (the "painting on both sides" bug).
+ * Like the leaf, the cover doesn't fade — React unmounts it when the turn
+ * lands (BookOverlay's coverGone), revealing the identical static lore page
+ * beneath. Front = the painted cover, back = the lore page. */
+@keyframes book-cover-open {
+  from {
+    transform: rotateY(0);
+  }
+  to {
+    transform: rotateY(-178deg);
+  }
 }
 .phase-open .book-cover {
-  transform: rotateY(-172deg);
+  animation: book-cover-open 0.56s cubic-bezier(0.5, 0.1, 0.4, 1) forwards;
   pointer-events: none;
 }
+/* Closing: the cover remounts and the same turn runs in reverse. */
+@keyframes book-cover-close {
+  from {
+    transform: rotateY(-178deg);
+  }
+  to {
+    transform: rotateY(0);
+  }
+}
 .phase-closing .book-cover {
-  transform: rotateY(0deg);
-  transition-duration: 0.3s;
+  animation: book-cover-close 0.3s cubic-bezier(0.5, 0.1, 0.4, 1) forwards;
 }
 
 /* the flipping leaf */
@@ -3677,14 +3768,19 @@ body.modal-open .pager-nav {
   backface-visibility: hidden;
   overflow: hidden;
 }
+/* Leaf faces match the static pages EXACTLY (same parchment gradient + spine
+ * gutter shadow), so the crease at the book's center persists through the
+ * turn and the landed face is indistinguishable from the page beneath it. */
 .book-leaf-face.front {
   background: linear-gradient(105deg, #e7dcc2, #f2ead6 45%, #e2d6ba);
   border-radius: 0 6px 6px 0;
+  box-shadow: inset 14px 0 18px -12px rgba(60, 40, 10, 0.55);
 }
 .book-leaf-face.back {
   transform: rotateY(180deg);
-  background: linear-gradient(105deg, #d8ccb0, #eee4ca);
+  background: linear-gradient(105deg, #e7dcc2, #f2ead6 45%, #e2d6ba);
   border-radius: 6px 0 0 6px;
+  box-shadow: inset -14px 0 18px -12px rgba(60, 40, 10, 0.55);
 }
 @keyframes book-flip-next {
   from { transform: rotateY(0); }
@@ -3809,4 +3905,297 @@ body.modal-open .pager-nav {
 @media (max-width: 380px) {
   .shelf-book { width: 32px; }
   .athenaeum-books { gap: 5px; }
+}
+
+/* ---- Quest board --------------------------------------------------------- */
+/* The Quests FAB — bottom-center between Shop (left) and Bag (right); same
+   52×52 gold-frame recipe. The centering transform must survive :active. */
+.home-quest-fab {
+  position: absolute;
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  border: 2px solid var(--gold);
+  background: linear-gradient(180deg, #2c2118, #191209);
+  color: var(--parchment);
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(236, 227, 207, 0.08),
+    0 0 20px rgba(245, 179, 1, 0.2), 0 6px 16px rgba(0, 0, 0, 0.5);
+  transition: transform 0.08s ease, filter 0.15s ease;
+}
+.home-quest-fab:active {
+  transform: translateX(-50%) translateY(1px) scale(0.98);
+}
+/* The classic quest-giver "!": a fat gold glyph with a warm glow. */
+.home-quest-glyph {
+  font-family: var(--font-display);
+  font-size: 1.55rem;
+  font-weight: 900;
+  line-height: 1;
+  color: var(--gold);
+  text-shadow: 0 0 8px rgba(245, 179, 1, 0.85), 0 2px 3px rgba(0, 0, 0, 0.6);
+}
+.home-quest-text {
+  font-family: var(--font-display);
+  font-size: 0.58rem;
+  font-weight: 700;
+  color: var(--gold);
+  letter-spacing: 0.02em;
+}
+/* "New notices / claim ready" pip — same pulse as the shop's. */
+.home-quest-dot {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 35% 30%, #ffe08a, var(--gold) 70%);
+  border: 1.5px solid #1b1510;
+  box-shadow: 0 0 10px rgba(245, 179, 1, 0.7);
+  animation: shop-dot-pulse 1.6s ease-in-out infinite;
+}
+
+/* The bulletin-board sheet (BagSheet sizing). */
+.quest-board {
+  max-width: 460px;
+  width: min(94vw, 460px);
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+}
+.quest-board-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 44px 8px 16px;
+}
+.quest-board-title {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+.quest-board-gold {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--gold);
+}
+.quest-board-body {
+  overflow-y: auto;
+  padding: 0 14px 16px;
+}
+.quest-section-title {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.7;
+  margin: 14px 2px 6px;
+}
+.quest-offers-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.quest-empty {
+  opacity: 0.75;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  padding: 10px 6px;
+}
+/* One pinned notice: parchment card with a nail-hole and a wax-ish stamp. */
+.quest-card {
+  position: relative;
+  margin: 8px 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1.5px solid #6b5636;
+  background: linear-gradient(180deg, #efe2bd, #dfcb9c);
+  color: #2c2013;
+  box-shadow: inset 0 0 18px rgba(107, 78, 34, 0.28),
+    0 3px 8px rgba(0, 0, 0, 0.4);
+}
+/* The pin holding the notice to the board. */
+.quest-card::before {
+  content: "";
+  position: absolute;
+  top: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #d8dee6, #5a626e 75%);
+  border: 1px solid #23272d;
+  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.45);
+}
+.quest-card.complete {
+  border-color: var(--gold);
+  box-shadow: inset 0 0 18px rgba(107, 78, 34, 0.28),
+    0 0 14px rgba(245, 179, 1, 0.35), 0 3px 8px rgba(0, 0, 0, 0.4);
+}
+.quest-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.quest-card-title {
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+/* Difficulty / COMPLETE stamp — slightly tilted, like inked rubber. */
+.quest-stamp {
+  font-size: 0.6rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 1px 7px;
+  border-radius: 4px;
+  border: 1.5px solid currentColor;
+  transform: rotate(-3deg);
+  opacity: 0.85;
+}
+.quest-stamp.easy { color: #2e7d32; }
+.quest-stamp.medium { color: #b26a00; }
+.quest-stamp.hard { color: #b3261e; }
+.quest-card.complete .quest-stamp { color: #8a6a00; }
+.quest-card-ask {
+  margin-top: 5px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.quest-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 7px;
+}
+.quest-progress-bar {
+  flex: 1;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(44, 32, 19, 0.25);
+  overflow: hidden;
+}
+.quest-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #8a6a00, var(--gold));
+  transition: width 0.3s ease;
+}
+.quest-progress-num {
+  font-size: 0.72rem;
+  font-weight: 800;
+  opacity: 0.8;
+}
+.quest-reward-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 7px;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+.quest-reward-gold {
+  color: #8a6a00;
+}
+.quest-reward-chest.tier-wooden { color: #6d4a24; }
+.quest-reward-chest.tier-silver { color: #5a6c80; }
+.quest-reward-chest.tier-gold { color: #a87a12; }
+.quest-reward-chest.tier-arcane { color: #6d3fa8; }
+.quest-reward-chest.tier-dragon { color: #a83232; }
+.quest-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+.quest-abandon-ask {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #b3261e;
+}
+.quest-btn {
+  padding: 5px 14px;
+  border-radius: 8px;
+  border: 1.5px solid #6b5636;
+  background: rgba(44, 32, 19, 0.12);
+  color: #2c2013;
+  font-family: var(--font-display);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+.quest-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.quest-btn.accept,
+.quest-btn.claim {
+  border-color: #145a24;
+  background: linear-gradient(180deg, #2e8b3d, #1f6b2c);
+  color: #f2f7ea;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+.quest-btn.danger {
+  border-color: #7a1a14;
+  background: linear-gradient(180deg, #b3392f, #8a241c);
+  color: #f7ecea;
+}
+.quest-btn.subtle {
+  opacity: 0.7;
+}
+/* Refresh lives on the dark sheet chrome, not a parchment card. */
+.quest-btn.refresh {
+  border-color: var(--gold);
+  background: rgba(245, 179, 1, 0.1);
+  color: var(--gold);
+}
+/* Claim ceremony — dark veil over the sheet; reuses the reward-chest look. */
+.quest-ceremony {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 6, 3, 0.88);
+  border-radius: 14px;
+}
+.quest-ceremony-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 18px;
+  max-height: 100%;
+  overflow-y: auto;
+}
+.quest-ceremony-title {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--gold);
+  letter-spacing: 0.03em;
+}
+.quest-ceremony-gold {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: var(--gold);
 }

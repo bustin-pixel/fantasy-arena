@@ -151,6 +151,7 @@ export function BattleScreen({
         wavesSurvived: survived,
         bestWave: endlessBestWave(save),
         itemLoadouts, // Lucky Coin: gold boost + seeded chest-tier upgrade
+        itemPity: save.itemPity, // dry-streak insurance — forces the item roll at the threshold
       });
       grantBattleRewards(bundle, {
         mode,
@@ -158,6 +159,9 @@ export function BattleScreen({
         dungeonId,
         wavesSurvived: survived,
         deck,
+        // Quest-board progress facts (accepted quests tick in the grant fold).
+        outcome,
+        slain,
       });
       setRewards(bundle);
       setTimeout(() => setShowResult(true), 700);

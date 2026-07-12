@@ -108,14 +108,20 @@ export const MILESTONE_UNLOCKS: Record<number, string> = {
 // ---------------------------------------------------------------------------
 
 /** Chance a chest contains an item drop (rolled after gold/unit, so legacy
- *  chest seeds keep their old contents byte-identical). */
+ *  chest seeds keep their old contents byte-identical). Buffed 2026-07-12 —
+ *  the repeatable grind (arena woodens) was starving the merge ladder. */
 export const ITEM_DROP_CHANCE: Record<ChestTier, number> = {
-  wooden: 0.25,
-  silver: 0.4,
-  gold: 0.6,
-  arcane: 0.85,
+  wooden: 0.5,
+  silver: 0.65,
+  gold: 0.8,
+  arcane: 1,
   dragon: 1,
 };
+
+/** Item pity: after this many consecutive itemless chests, the next chest is
+ *  FORCED to contain an item (rollChest opts.forceItem). The counter lives in
+ *  the save (itemPity) and resets whenever any chest drops an item. */
+export const ITEM_PITY_THRESHOLD = 3;
 
 /** Item QUALITY odds by chest tier (normalized weights). Low chests feed the
  *  rare merge ladder; arcane/dragon can shortcut straight to epic/legendary —
@@ -208,6 +214,50 @@ export const SHOP_PREMIUM_PACKS: readonly {
   { id: "gold_m", kind: "gold", amount: 3200, label: "Coin Chest" },
   { id: "gold_l", kind: "gold", amount: 8000, label: "Dragon's Hoard" },
 ];
+
+// ---------------------------------------------------------------------------
+// Quest board (the bulletin board) — daily-notice acquisition numbers. The
+// board roll and progress/claim folds live in meta/quests.ts; these are the
+// tunables.
+// ---------------------------------------------------------------------------
+
+/** Notices pinned on the daily board. */
+export const QUEST_BOARD_SIZE = 4;
+
+/** Accepted quests the player can carry at once. */
+export const QUEST_ACTIVE_MAX = 3;
+
+/** Gold price per manual board refresh AFTER the daily free one. */
+export const QUEST_REFRESH_COST = 100;
+
+/** Free manual refreshes per day (further refreshes cost gold, uncapped). */
+export const QUEST_FREE_REFRESHES = 1;
+
+export type QuestDifficulty = "easy" | "medium" | "hard";
+
+/** Board difficulty mix (normalized weights): hard quests — the gold-chest
+ *  payouts — stay the rare big asks. */
+export const QUEST_DIFFICULTY_WEIGHTS: Record<QuestDifficulty, number> = {
+  easy: 0.45,
+  medium: 0.35,
+  hard: 0.2,
+};
+
+/** Flat gold paid on claim, rolled uniformly in range at board-roll time. */
+export const QUEST_GOLD_RANGE: Record<QuestDifficulty, [number, number]> = {
+  easy: [60, 90],
+  medium: [120, 180],
+  hard: [200, 300],
+};
+
+/** Chest tier paid on claim — every quest pays a chest (locked design
+ *  decision: harder notices climb the tier ladder, capped at gold; arcane/
+ *  dragon stay dungeon-capstone achievements). */
+export const QUEST_CHEST_TIER: Record<QuestDifficulty, ChestTier> = {
+  easy: "wooden",
+  medium: "silver",
+  hard: "gold",
+};
 
 /** How many FRESH 5-wave milestones this endless run crossed — the shard twin
  *  of endlessMilestoneChestTier (which pays one chest for the deepest); shards

@@ -104,8 +104,13 @@ export function HubScreen() {
         </div>
 
         {/* Current deck, in deploy order (front-to-back). Drag to reorder; tap
-            a slot to remove. */}
-        <DeckStrip deck={deck} onReorder={setDeck} onRemove={toggle} />
+            a slot for its detail panel; the corner ✕ removes. */}
+        <DeckStrip
+          deck={deck}
+          onReorder={setDeck}
+          onRemove={toggle}
+          onInspect={(id) => { playSfx("uiOpen"); setDetailId(id); }}
+        />
 
         {/* Quick deck-building shortcuts. */}
         <div className="deck-actions" role="group" aria-label="Deck shortcuts">

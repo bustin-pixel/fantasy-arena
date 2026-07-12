@@ -1455,6 +1455,10 @@ export const SUMMONED_UNIT_IDS = new Set<string>([
  *  for "is this a summon?" semantics use SUMMONED_UNIT_IDS. */
 export const NON_DECK_UNITS = new Set<string>([
   ...SUMMONED_UNIT_IDS,
+  // Retired from decks 2026-07-12 (was a purchasable legendary): the Slime
+  // now exists only as The Depths' floor-5 rare spawn — the Slime Knight
+  // quest catalyst (RARE_SPAWN_QUESTS in data/depths.ts).
+  "slime",
   "giant_rat",
   "zombie_shambler",
   "bloater",

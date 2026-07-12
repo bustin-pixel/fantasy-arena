@@ -5,7 +5,7 @@ import { renderPortrait } from "@/engine/Renderer";
 import { MAX_DECK } from "@/utils/constants";
 
 const DECK_ART = 46;
-/** Pointer travel (px) before a press becomes a drag instead of a tap-to-remove. */
+/** Pointer travel (px) before a press becomes a drag instead of a tap-to-inspect. */
 const DRAG_THRESHOLD = 6;
 
 /** The small unit sprite shown inside a filled deck slot. */
@@ -24,8 +24,10 @@ interface Props {
   deck: string[];
   /** Called with the full reordered deck when a drag settles. */
   onReorder: (deck: string[]) => void;
-  /** Called when a slot is tapped (without dragging) to remove that unit. */
+  /** Called when a slot's Remove button is pressed to remove that unit. */
   onRemove: (id: string) => void;
+  /** Called via the Info button (or a plain tap) to open the unit's detail panel. */
+  onInspect: (id: string) => void;
 }
 
 /** Live gesture data kept in a ref so pointer handlers don't fight React state. */
@@ -42,10 +44,11 @@ interface Gesture {
 
 /**
  * The current-warband strip. Filled slots can be dragged horizontally to
- * reorder deploy order (works with touch + mouse via pointer events); a plain
- * tap still removes the unit. Empty slots are inert placeholders.
+ * reorder deploy order (works with touch + mouse via pointer events); each
+ * carries a Remove / Info button row, and a plain tap on the face also opens
+ * the detail panel. Empty slots are inert placeholders.
  */
-export function DeckStrip({ deck, onReorder, onRemove }: Props) {
+export function DeckStrip({ deck, onReorder, onRemove, onInspect }: Props) {
   const stripRef = useRef<HTMLDivElement>(null);
   const gesture = useRef<Gesture | null>(null);
   const [drag, setDrag] = useState<{ from: number; over: number; dx: number } | null>(
@@ -102,7 +105,7 @@ export function DeckStrip({ deck, onReorder, onRemove }: Props) {
       // pointer may already be released
     }
     if (!g.moved) {
-      onRemove(deck[g.from]); // a tap (no drag) removes the unit
+      onInspect(deck[g.from]); // a tap (no drag) opens the detail panel
       return;
     }
     if (g.over !== g.from) {
@@ -155,9 +158,12 @@ export function DeckStrip({ deck, onReorder, onRemove }: Props) {
         }
 
         return (
-          <button
+          // A div-with-button-role (not <button>) so the ✕ remove control can
+          // be a real nested <button> — buttons can't contain buttons.
+          <div
             key={id}
-            type="button"
+            role="button"
+            tabIndex={0}
             className={`deck-slot filled${dragging ? " dragging" : ""}`}
             style={{
               borderColor: rarity.color,
@@ -170,18 +176,18 @@ export function DeckStrip({ deck, onReorder, onRemove }: Props) {
               // finger 1:1, and the resting state snaps (no post-drop wobble).
               transition: drag && !dragging ? "transform 0.18s ease" : "none",
               zIndex: dragging ? 5 : undefined,
-              position: dragging ? "relative" : undefined,
             }}
             onPointerDown={(e) => beginDrag(e, slot)}
             onPointerMove={moveDrag}
             onPointerUp={endDrag}
             onPointerCancel={cancelDrag}
-            onClick={(e) => {
-              // Pointer taps remove via onPointerUp; this only catches keyboard
-              // activation (Enter/Space), which dispatches a click with detail 0.
-              if (e.detail === 0) onRemove(id);
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onInspect(id);
+              }
             }}
-            title={`Drag to reorder · tap to remove ${def.name}`}
+            title={`Tap for details · drag to reorder ${def.name}`}
           >
             <span className="deck-slot-num">{slot + 1}</span>
             <DeckSlotArt defId={id} />
@@ -189,7 +195,30 @@ export function DeckStrip({ deck, onReorder, onRemove }: Props) {
             <span className="deck-slot-rarity" style={{ color: rarity.color }}>
               {rarity.label}
             </span>
-          </button>
+            {/* Presses stop here so the buttons never start a slot drag/inspect. */}
+            <div
+              className="deck-slot-actions"
+              onPointerDown={(e) => e.stopPropagation()}
+              onPointerUp={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                className="deck-slot-btn remove"
+                aria-label={`Remove ${def.name}`}
+                onClick={() => onRemove(id)}
+              >
+                Remove
+              </button>
+              <button
+                type="button"
+                className="deck-slot-btn"
+                aria-label={`${def.name} details`}
+                onClick={() => onInspect(id)}
+              >
+                Info
+              </button>
+            </div>
+          </div>
         );
       })}
     </div>

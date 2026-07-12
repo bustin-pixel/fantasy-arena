@@ -76,8 +76,18 @@ function Portrait({
 }
 
 /** An oil-vignette painting, sized to whatever box CSS gives it. Painted once
- *  per book (the splash PRNG is seeded, so repaints are identical anyway). */
-function SplashArt({ bookId, className }: { bookId: string; className: string }) {
+ *  per book (the splash PRNG is seeded, so repaints are identical anyway).
+ *  `cover` marks the portrait book-cover box, where some paintings crop a
+ *  plate-scale cutout instead of squeezing (see COVER_FOCAL in splashArt). */
+function SplashArt({
+  bookId,
+  className,
+  cover,
+}: {
+  bookId: string;
+  className: string;
+  cover?: boolean;
+}) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const canvas = ref.current;
@@ -89,8 +99,8 @@ function SplashArt({ bookId, className }: { bookId: string; className: string })
     canvas.width = w * dpr;
     canvas.height = h * dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    drawSplash(ctx, bookId, w, h);
-  }, [bookId]);
+    drawSplash(ctx, bookId, w, h, { cover });
+  }, [bookId, cover]);
   return <canvas ref={ref} className={className} aria-hidden />;
 }
 
@@ -192,6 +202,8 @@ function PageView({
             {revealed ? "Slain — lore recorded" : tier === "encountered" ? "Sighted" : "Awaits below"}
           </span>
         </button>
+        {page.rareTag && <div className="book-rare-tag">{page.rareTag}</div>}
+        {page.note && <p className="book-page-note">{page.note}</p>}
         {pageNo != null && <span className="book-pgno">{pageNo}</span>}
       </div>
     );
@@ -262,6 +274,9 @@ export function BookOverlay({
   const [idx, setIdx] = useState(0);
   const [flip, setFlip] = useState<Flip | null>(null);
   const [itemSel, setItemSel] = useState<string | null>(null);
+  /** The opening turn has landed → the cover unmounts (the leaf pattern: never
+   *  fade a preserve-3d flipper, remove it). Remounts for the closing swing. */
+  const [coverGone, setCoverGone] = useState(false);
   const closingRef = useRef(false);
   // Swipe-to-turn bookkeeping: where the pointer went down on the spread, and
   // whether that gesture became a swipe (so the click it ends with is eaten
@@ -281,16 +296,19 @@ export function BookOverlay({
     window.setTimeout(onClose, CLOSE_MS);
   };
 
-  // Entrance timeline: scale in off the shelf, then the cover swings.
+  // Entrance timeline: scale in off the shelf, the cover turns like a leaf,
+  // then unmounts once landed (the static lore page beneath is identical).
   useEffect(() => {
     const t1 = window.setTimeout(() => setPhase("pull"), 20);
     const t2 = window.setTimeout(() => {
       playSfx("bookOpen");
       setPhase("open");
     }, PULL_MS);
+    const t3 = window.setTimeout(() => setCoverGone(true), PULL_MS + FLIP_MS);
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
+      clearTimeout(t3);
     };
   }, []);
 
@@ -426,14 +444,21 @@ export function BookOverlay({
           )}
         </div>
 
-        <div className="book-cover" aria-hidden={phase === "open"}>
-          <div className="book-cover-face front">
-            <SplashArt bookId={book.id} className="book-cover-art" />
-            <span className="book-cover-scrim" aria-hidden />
-            <span className="book-cover-title">{book.title}</span>
+        {(!coverGone || phase === "closing") && (
+          <div className="book-cover" aria-hidden={phase === "open"}>
+            <div className="book-cover-face front">
+              <SplashArt bookId={book.id} className="book-cover-art" cover />
+              <span className="book-cover-scrim" aria-hidden />
+              <span className="book-cover-title">{book.title}</span>
+            </div>
+            {/* Like a real book: the inside of the cover IS the first page, so
+             *  the turn lands showing the lore page (square plate and all) and
+             *  hands off to the identical static left page beneath. */}
+            <div className="book-cover-face back">
+              <PageView page={spreads[0].left} {...pageProps} />
+            </div>
           </div>
-          <div className="book-cover-face back" />
-        </div>
+        )}
 
         <button className="detail-close book-close" onClick={beginClose} aria-label="Close the book">
           ✕

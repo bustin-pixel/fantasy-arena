@@ -317,103 +317,241 @@ function eclipseSpire(g: Ctx, w: number, h: number, rnd: () => number): void {
   void rnd;
 }
 
-/** Heroes of the Arena — banners over the colosseum sand. */
+/** Heroes of the Arena — "The Victor's Dawn": a caped champion raises a
+ *  gleaming blade into a huge low sun; god-rays, colosseum arches, crowd
+ *  flecks, drifting petals ("visual upgrade" mockup 1, built 2026-07-12). */
 function heroes(g: Ctx, w: number, h: number, rnd: () => number): void {
-  sky(g, w, h, "#3a5a8a", "#1a2c4a");
-  glow(g, w * 0.76, h * 0.18, w * 0.3, "rgba(255,220,140,.5)");
-  // tiered stands
-  for (let i = 0; i < 3; i++) {
-    g.fillStyle = `rgb(${70 - i * 12},${58 - i * 10},${44 - i * 8})`;
-    g.beginPath();
-    g.ellipse(w * 0.5, h * (0.52 + i * 0.07), w * (0.62 - i * 0.09), h * 0.13, 0, Math.PI, 0, true);
-    g.fill();
-  }
-  // the sand
-  const sand = g.createLinearGradient(0, h * 0.55, 0, h);
-  sand.addColorStop(0, "#c8a45e");
-  sand.addColorStop(1, "#7a5c2c");
-  g.fillStyle = sand;
+  const s = g.createLinearGradient(0, 0, 0, h);
+  s.addColorStop(0, "#2c2440");
+  s.addColorStop(0.45, "#8a4e2a");
+  s.addColorStop(0.62, "#e09850");
+  s.addColorStop(1, "#5a3a1c");
+  g.fillStyle = s;
+  g.fillRect(0, 0, w, h);
+  // the low sun + corona
+  glow(g, w * 0.5, h * 0.45, w * 0.5, "rgba(255,200,110,.55)");
+  g.fillStyle = "#ffe2a0";
   g.beginPath();
-  g.ellipse(w * 0.5, h * 0.86, w * 0.56, h * 0.32, 0, 0, 7);
+  g.arc(w * 0.5, h * 0.45, w * 0.15, 0, 7);
   g.fill();
-  // crossed sword + axe planted in the sand
-  g.strokeStyle = "#d8dce6";
-  g.lineWidth = 3.4;
-  g.beginPath();
-  g.moveTo(w * 0.38, h * 0.5);
-  g.lineTo(w * 0.56, h * 0.88);
-  g.stroke();
-  g.strokeStyle = "#b8bcc8";
-  g.beginPath();
-  g.moveTo(w * 0.62, h * 0.52);
-  g.lineTo(w * 0.46, h * 0.88);
-  g.stroke();
-  g.fillStyle = "#8a6a24";
-  g.fillRect(w * 0.365, h * 0.545, w * 0.05, 3.4);
-  g.fillRect(w * 0.585, h * 0.565, w * 0.05, 3.4);
-  // banners
-  for (const [x, c] of [[0.16, "#c23a3a"], [0.84, "#3b82f6"]] as Array<[number, string]>) {
-    g.fillStyle = "#241708";
-    g.fillRect(w * x - 1, h * 0.3, 2, h * 0.3);
-    g.fillStyle = c;
+  // god-rays
+  g.save();
+  g.globalAlpha = 0.1;
+  g.fillStyle = "#ffd88a";
+  for (let i = 0; i < 7; i++) {
+    const a = -Math.PI / 2 + (i - 3) * 0.32;
     g.beginPath();
-    g.moveTo(w * x, h * 0.3);
-    g.lineTo(w * x + w * 0.09, h * 0.32);
-    g.lineTo(w * x + w * 0.09, h * 0.44);
-    g.lineTo(w * x, h * 0.42);
+    g.moveTo(w * 0.5, h * 0.45);
+    g.lineTo(w * 0.5 + Math.cos(a - 0.05) * w, h * 0.45 + Math.sin(a - 0.05) * w);
+    g.lineTo(w * 0.5 + Math.cos(a + 0.05) * w, h * 0.45 + Math.sin(a + 0.05) * w);
     g.closePath();
     g.fill();
   }
-  void rnd;
-}
-
-/** Arms & Relics — an armory still-life by candlelight. */
-function items(g: Ctx, w: number, h: number, rnd: () => number): void {
-  sky(g, w, h, "#3a2415", "#170d06");
-  glow(g, w * 0.35, h * 0.3, w * 0.4, "rgba(255,190,90,.3)");
-  g.fillStyle = "#2a1a0c";
-  g.fillRect(0, h * 0.68, w, h * 0.32);
-  g.fillStyle = "#3c2712";
-  g.fillRect(0, h * 0.68, w, 4);
-  // shield
-  g.fillStyle = "#5b8dd9";
+  g.restore();
+  // colosseum ring: dark band with sun-lit arches
+  g.fillStyle = "#2a1a10";
+  g.fillRect(0, h * 0.42, w, h * 0.16);
+  for (let i = 0; i < 7; i++) {
+    const x = w * (0.06 + i * 0.15);
+    g.fillStyle = "rgba(224,152,80,.8)";
+    g.beginPath();
+    g.arc(x, h * 0.52, w * 0.032, Math.PI, 0);
+    g.fill();
+    g.fillRect(x - w * 0.032, h * 0.52, w * 0.064, h * 0.045);
+  }
+  // crowd flecks above the band
+  for (let i = 0; i < 40; i++) {
+    g.fillStyle = `rgba(255,220,160,${0.15 + rnd() * 0.25})`;
+    g.fillRect(rnd() * w, h * (0.43 + rnd() * 0.05), 1.6, 1.6);
+  }
+  // sand
+  const sand = g.createLinearGradient(0, h * 0.58, 0, h);
+  sand.addColorStop(0, "#d8b06a");
+  sand.addColorStop(1, "#6e5228");
+  g.fillStyle = sand;
   g.beginPath();
-  g.moveTo(w * 0.3, h * 0.34);
-  g.quadraticCurveTo(w * 0.44, h * 0.4, w * 0.3, h * 0.72);
-  g.quadraticCurveTo(w * 0.16, h * 0.4, w * 0.3, h * 0.34);
+  g.ellipse(w * 0.5, h * 0.92, w * 0.62, h * 0.36, 0, 0, 7);
   g.fill();
-  g.strokeStyle = "#d9b455";
-  g.lineWidth = 2.5;
-  g.stroke();
-  // sword leaning across it
-  g.strokeStyle = "#c8ccd6";
-  g.lineWidth = 4;
+  // champion mound shadow
+  g.fillStyle = "rgba(60,38,14,.55)";
   g.beginPath();
-  g.moveTo(w * 0.62, h * 0.2);
-  g.lineTo(w * 0.4, h * 0.7);
-  g.stroke();
-  g.strokeStyle = "#8a6a24";
-  g.lineWidth = 5;
-  g.beginPath();
-  g.moveTo(w * 0.585, h * 0.3);
-  g.lineTo(w * 0.505, h * 0.44);
-  g.stroke();
-  // potion + gem
-  g.fillStyle = "#7c4fd0";
-  g.beginPath();
-  g.arc(w * 0.72, h * 0.62, w * 0.055, 0, 7);
+  g.ellipse(w * 0.5, h * 0.88, w * 0.2, h * 0.05, 0, 0, 7);
   g.fill();
-  g.fillStyle = "#caa84a";
-  g.fillRect(w * 0.705, h * 0.5, w * 0.03, h * 0.07);
-  g.fillStyle = "#e05a5a";
-  g.beginPath();
-  g.moveTo(w * 0.84, h * 0.6);
-  g.lineTo(w * 0.89, h * 0.66);
-  g.lineTo(w * 0.84, h * 0.72);
-  g.lineTo(w * 0.79, h * 0.66);
+  // the champion — dark silhouette, sword raised into the sun
+  g.fillStyle = "#221208";
+  g.beginPath(); // torso + skirt
+  g.moveTo(w * 0.455, h * 0.86);
+  g.lineTo(w * 0.468, h * 0.62);
+  g.lineTo(w * 0.532, h * 0.62);
+  g.lineTo(w * 0.545, h * 0.86);
   g.closePath();
   g.fill();
-  void rnd;
+  g.beginPath();
+  g.arc(w * 0.5, h * 0.575, w * 0.032, 0, 7);
+  g.fill(); // head
+  // raised sword arm
+  g.strokeStyle = "#221208";
+  g.lineWidth = w * 0.022;
+  g.beginPath();
+  g.moveTo(w * 0.525, h * 0.65);
+  g.lineTo(w * 0.575, h * 0.52);
+  g.stroke();
+  // the blade catching light
+  g.strokeStyle = "#fff2c8";
+  g.lineWidth = w * 0.014;
+  g.beginPath();
+  g.moveTo(w * 0.578, h * 0.51);
+  g.lineTo(w * 0.6, h * 0.3);
+  g.stroke();
+  glow(g, w * 0.6, h * 0.3, w * 0.07, "rgba(255,240,190,.9)");
+  // flowing cape
+  g.fillStyle = "#7a1e1e";
+  g.beginPath();
+  g.moveTo(w * 0.468, h * 0.63);
+  g.quadraticCurveTo(w * 0.38, h * 0.7, w * 0.36, h * 0.85);
+  g.quadraticCurveTo(w * 0.43, h * 0.8, w * 0.462, h * 0.84);
+  g.closePath();
+  g.fill();
+  // gold rim-light on the sun side
+  g.strokeStyle = "rgba(255,216,138,.85)";
+  g.lineWidth = 1.6;
+  g.beginPath();
+  g.moveTo(w * 0.532, h * 0.62);
+  g.lineTo(w * 0.545, h * 0.86);
+  g.stroke();
+  g.beginPath();
+  g.arc(w * 0.5, h * 0.575, w * 0.032, -0.9, 0.9);
+  g.stroke();
+  // drifting petals
+  for (let i = 0; i < 14; i++) {
+    g.fillStyle = `rgba(255,${140 + ((rnd() * 60) | 0)},120,${0.4 + rnd() * 0.4})`;
+    g.fillRect(rnd() * w, h * (0.1 + rnd() * 0.6), 2.4, 1.6);
+  }
+}
+
+/** Arms & Relics — "The Trophy Wall": a mounted shield with crossed
+ *  greatswords over a candlelit mantel of relics — crown, potion, gem,
+ *  scroll — against a patterned tapestry ("visual upgrade" mockup 2,
+ *  built 2026-07-12). */
+function items(g: Ctx, w: number, h: number, rnd: () => number): void {
+  sky(g, w, h, "#301c10", "#140a05");
+  // tapestry panel
+  g.fillStyle = "#422512";
+  g.fillRect(w * 0.16, 0, w * 0.68, h * 0.66);
+  g.strokeStyle = "#5c3a1c";
+  g.lineWidth = 2;
+  g.strokeRect(w * 0.16, 0, w * 0.68, h * 0.66);
+  g.fillStyle = "rgba(216,180,85,.14)";
+  for (let i = 0; i < 5; i++) {
+    for (let j = 0; j < 4; j++) {
+      const x = w * (0.22 + i * 0.13);
+      const y = h * (0.08 + j * 0.15);
+      g.beginPath();
+      g.moveTo(x, y - 4);
+      g.lineTo(x + 4, y);
+      g.lineTo(x, y + 4);
+      g.lineTo(x - 4, y);
+      g.closePath();
+      g.fill();
+    }
+  }
+  // crossed greatswords behind the shield
+  g.strokeStyle = "#c8ccd6";
+  g.lineWidth = w * 0.018;
+  g.beginPath();
+  g.moveTo(w * 0.32, h * 0.1);
+  g.lineTo(w * 0.68, h * 0.52);
+  g.stroke();
+  g.beginPath();
+  g.moveTo(w * 0.68, h * 0.1);
+  g.lineTo(w * 0.32, h * 0.52);
+  g.stroke();
+  g.strokeStyle = "#8a6a24";
+  g.lineWidth = w * 0.02;
+  g.beginPath();
+  g.moveTo(w * 0.355, h * 0.145);
+  g.lineTo(w * 0.41, h * 0.205);
+  g.stroke();
+  g.beginPath();
+  g.moveTo(w * 0.645, h * 0.145);
+  g.lineTo(w * 0.59, h * 0.205);
+  g.stroke();
+  // the mounted shield
+  glow(g, w * 0.5, h * 0.32, w * 0.22, "rgba(255,190,90,.30)");
+  g.fillStyle = "#4d7fd0";
+  g.beginPath();
+  g.moveTo(w * 0.5, h * 0.14);
+  g.quadraticCurveTo(w * 0.66, h * 0.2, w * 0.5, h * 0.52);
+  g.quadraticCurveTo(w * 0.34, h * 0.2, w * 0.5, h * 0.14);
+  g.fill();
+  g.strokeStyle = "#d9b455";
+  g.lineWidth = 3;
+  g.stroke();
+  g.fillStyle = "#e6c86a";
+  g.beginPath();
+  g.arc(w * 0.5, h * 0.3, w * 0.03, 0, 7);
+  g.fill(); // boss
+  g.strokeStyle = "rgba(255,255,255,.35)";
+  g.lineWidth = 2;
+  g.beginPath();
+  g.moveTo(w * 0.44, h * 0.2);
+  g.quadraticCurveTo(w * 0.47, h * 0.3, w * 0.45, h * 0.42);
+  g.stroke(); // sheen
+  // the mantel shelf
+  g.fillStyle = "#241207";
+  g.fillRect(w * 0.12, h * 0.66, w * 0.76, h * 0.05);
+  g.fillStyle = "#3c2712";
+  g.fillRect(w * 0.12, h * 0.66, w * 0.76, 3);
+  g.fillStyle = "#170d06";
+  g.fillRect(0, h * 0.71, w, h * 0.29);
+  // relics on the shelf: crown, potion, gem, scroll
+  g.fillStyle = "#e6c86a"; // crown
+  g.beginPath();
+  g.moveTo(w * 0.24, h * 0.66);
+  g.lineTo(w * 0.24, h * 0.615);
+  g.lineTo(w * 0.265, h * 0.638);
+  g.lineTo(w * 0.285, h * 0.605);
+  g.lineTo(w * 0.305, h * 0.638);
+  g.lineTo(w * 0.33, h * 0.615);
+  g.lineTo(w * 0.33, h * 0.66);
+  g.closePath();
+  g.fill();
+  g.fillStyle = "#e05a5a";
+  g.fillRect(w * 0.279, h * 0.618, 4, 4);
+  g.fillStyle = "#7c4fd0"; // potion
+  g.beginPath();
+  g.arc(w * 0.46, h * 0.635, w * 0.026, 0, 7);
+  g.fill();
+  g.fillStyle = "#caa84a";
+  g.fillRect(w * 0.452, h * 0.585, w * 0.015, h * 0.035);
+  g.fillStyle = "#59c9d9"; // gem
+  g.beginPath();
+  g.moveTo(w * 0.6, h * 0.6);
+  g.lineTo(w * 0.625, h * 0.632);
+  g.lineTo(w * 0.6, h * 0.66);
+  g.lineTo(w * 0.575, h * 0.632);
+  g.closePath();
+  g.fill();
+  g.fillStyle = "#d9c9a0"; // scroll
+  g.fillRect(w * 0.7, h * 0.635, w * 0.075, h * 0.025);
+  g.fillStyle = "#b09868";
+  g.fillRect(w * 0.7, h * 0.635, w * 0.01, h * 0.025);
+  g.fillRect(w * 0.765, h * 0.635, w * 0.01, h * 0.025);
+  // candles flanking the shelf
+  for (const x of [0.16, 0.84]) {
+    g.fillStyle = "#d9c9a0";
+    g.fillRect(w * x - 2.5, h * 0.6, 5, h * 0.06);
+    glow(g, w * x, h * 0.575, w * 0.09, "rgba(255,190,90,.65)");
+    g.fillStyle = "#ffcf70";
+    g.beginPath();
+    g.ellipse(w * x, h * 0.575, 2.2, 4.4, 0, 0, 7);
+    g.fill();
+  }
+  // warm gleams
+  for (let i = 0; i < 8; i++) {
+    g.fillStyle = `rgba(255,224,150,${0.3 + rnd() * 0.4})`;
+    g.fillRect(w * (0.2 + rnd() * 0.6), h * (0.15 + rnd() * 0.5), 1.6, 1.6);
+  }
 }
 
 // --- the gallery -------------------------------------------------------------
@@ -430,9 +568,45 @@ const SCENES: Record<string, (g: Ctx, w: number, h: number, rnd: () => number) =
   items,
 };
 
+/** Books whose portrait COVER shows a plate-scale cutout of the landscape
+ *  painting (a window centered on this focal x) instead of squeezing the whole
+ *  scene into the portrait box. The dungeon books keep the squeeze — their
+ *  scenes (spire, trunk, vault door) read fine tall. */
+const COVER_FOCAL: Record<string, number> = { heroes: 0.53, items: 0.5 };
+
 /** Paint `bookId`'s splash vignette onto a w×h context (unknown ids get the
- *  armory still-life rather than a blank plate). */
-export function drawSplash(g: Ctx, bookId: string, w: number, h: number): void {
+ *  armory still-life rather than a blank plate). Pass `cover: true` when
+ *  painting a portrait book cover so COVER_FOCAL books crop instead of
+ *  squeezing; the painterly finish is applied after the crop so the vignette
+ *  frames the cover itself, not a cut-off corner of the plate's. */
+export function drawSplash(
+  g: Ctx,
+  bookId: string,
+  w: number,
+  h: number,
+  opts?: { cover?: boolean }
+): void {
+  const focal = opts?.cover ? COVER_FOCAL[bookId] : undefined;
+  if (focal !== undefined && w < h * 1.5) {
+    // Paint the 3:2 plate at this height offscreen, then crop a w-wide window.
+    const dpr = g.getTransform().a || 1; // callers pre-scale the ctx by dpr
+    const sw = Math.round(h * 1.5);
+    const off = document.createElement("canvas");
+    off.width = sw * dpr;
+    off.height = h * dpr;
+    const og = off.getContext("2d");
+    if (og) {
+      og.setTransform(dpr, 0, 0, dpr, 0, 0);
+      (SCENES[bookId] ?? items)(og, sw, h, prng(bookId));
+      const sx = Math.max(0, Math.min(sw - w, Math.round(focal * sw - w / 2)));
+      g.save();
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.drawImage(off, sx * dpr, 0, w * dpr, h * dpr, 0, 0, w * dpr, h * dpr);
+      g.restore();
+      finish(g, w, h, prng(bookId + "-cover"));
+      return;
+    }
+  }
   const rnd = prng(bookId);
   (SCENES[bookId] ?? items)(g, w, h, rnd);
   finish(g, w, h, rnd);

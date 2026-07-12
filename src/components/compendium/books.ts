@@ -151,10 +151,12 @@ function dungeonBook(dungeon: Dungeon, save: PlayerSave): BookDef {
     ...headed("Denizens", chunk(fodder.map((defId) => ({ kind: "monster", defId }) as PageEntry), PER_PAGE)),
   ];
   const quest = dungeon.quest;
+  // The rare gets the same big showcase frame as the boss facing it.
   const rarePage: BookPage = quest
     ? {
         heading: "Rare Sighting",
-        entries: [{ kind: "monster", defId: quest.spawnId }],
+        entries: [],
+        boss: { defId: quest.spawnId },
         rareTag: `Unlocks ${getUnitDef(quest.unlocks).name}`,
         note: quest.hint,
       }

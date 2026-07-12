@@ -30,10 +30,23 @@ import {
   applyShopReroll,
   normalizeShopDay,
 } from "@/meta/shop";
+import {
+  applyAbandonQuest,
+  applyAcceptQuest,
+  applyBoardRefresh,
+  applyClaimQuest,
+  normalizeQuestBoard,
+  tickQuestProgress,
+} from "@/meta/quests";
 import { questForUnlock } from "@/data/dungeons";
-import { makeItemKey, parseItemKey, type ItemKey } from "@/data/items";
+import { parseItemKey, type ItemKey } from "@/data/items";
 import type { ItemSlot } from "@/types";
-import type { BattleRewards } from "@/meta/rewards";
+import {
+  foldChestContents,
+  nextItemPity,
+  type BattleRewards,
+  type ChestContent,
+} from "@/meta/rewards";
 import type { BattleMode } from "@/hooks/useBattleEngine";
 import { UNITS } from "@/data/units";
 
@@ -62,6 +75,9 @@ interface GameStateValue {
       wavesSurvived?: number;
       /** The warband fielded this battle — every unit in it earns rewards.xp. */
       deck?: readonly string[];
+      /** How the battle ended + what died — the quest-progress facts. */
+      outcome?: "victory" | "defeat" | "draw";
+      slain?: readonly string[];
     }
   ) => void;
   /** Buy a locked unit with gold. No-op unless locked and affordable. */
@@ -83,6 +99,20 @@ interface GameStateValue {
   purchaseShopItem: (todayIdx: number, slotIdx: number) => void;
   /** Pay to re-roll today's shelf (once, and only before the first buy). */
   rerollShop: (todayIdx: number) => void;
+  /** Roll the quest board's day forward (clears the Home FAB's "new day" pip).
+   *  Accepted quests always carry across the rollover. */
+  visitQuestBoard: (todayIdx: number) => void;
+  /** Accept a pinned notice into an active slot (max QUEST_ACTIVE_MAX). */
+  acceptQuest: (todayIdx: number, noticeId: string) => void;
+  /** Drop an accepted quest — no refund (the sheet confirms first). */
+  abandonQuest: (questId: string) => void;
+  /** Re-pin the un-accepted notices: first refresh of the day free, then
+   *  QUEST_REFRESH_COST gold each. */
+  refreshQuestBoard: (todayIdx: number) => void;
+  /** Claim a completed quest: pays its gold + the pre-rolled chest contents
+   *  (rolled in the sheet, RNG-before-fold like battle rewards) in one atomic
+   *  write, steps the item-pity counter, and retires the quest. */
+  claimQuest: (questId: string, chestContents: ChestContent[]) => void;
 }
 
 const GameStateContext = createContext<GameStateValue | null>(null);
@@ -140,11 +170,11 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       dungeonId: string;
       wavesSurvived?: number;
       deck?: readonly string[];
+      outcome?: "victory" | "defeat" | "draw";
+      slain?: readonly string[];
     }
   ) =>
     setSave((s) => {
-      let gold = s.gold + rewards.gold;
-      let soulShards = s.soulShards + rewards.shards;
       // Whole-deck XP: every fielded unit earns the full amount (addXp is the
       // same clamp the RewardPanel preview uses, so preview ≡ persisted).
       const unitXp = { ...s.unitXp };
@@ -153,19 +183,33 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
           unitXp[id] = addXp(unitXp[id] ?? 0, rewards.xp);
         }
       }
-      const unlocked = new Set(s.unlockedUnits);
-      const items = { ...s.items };
-      for (const entry of rewards.chest?.contents ?? []) {
-        if (entry.kind === "gold") gold += entry.amount;
-        else if (entry.kind === "duplicate") gold += entry.gold;
-        else if (entry.kind === "unit") unlocked.add(entry.unitId);
-        else if (entry.kind === "shards") soulShards += entry.amount;
-        else {
-          // Item drops arrive at 1★ — stars only ever come from merging.
-          const key = makeItemKey(entry.lineId, entry.quality, 1);
-          items[key] = (items[key] ?? 0) + 1;
-        }
-      }
+      // Chest contents → currency/unlocks/stacks (the fold shared with quest
+      // claims), on top of the flat battle gold/shards.
+      const folded = foldChestContents(
+        {
+          gold: s.gold + rewards.gold,
+          soulShards: s.soulShards + rewards.shards,
+          items: s.items,
+          unlockedUnits: s.unlockedUnits,
+        },
+        rewards.chest?.contents ?? []
+      );
+      const gold = folded.gold;
+      const soulShards = folded.soulShards;
+      const items = folded.items;
+      const unlocked = new Set(folded.unlockedUnits);
+      // Quest progress: fold this battle's facts into the accepted quests.
+      const activeQuests = tickQuestProgress(s.quests.active, {
+        mode: ctx.mode,
+        outcome: ctx.outcome ?? "draw",
+        deck: ctx.deck ?? [],
+        slain: ctx.slain ?? [],
+        wavesSurvived: ctx.wavesSurvived ?? 0,
+      });
+      const quests =
+        activeQuests === s.quests.active
+          ? s.quests
+          : { ...s.quests, active: activeQuests };
       // Endless: fold the run's depth into the best-wave high-water mark.
       const endless =
         ctx.mode === "endless"
@@ -198,6 +242,8 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
         dungeons,
         questUnlocks: [...questUnlocks],
         endless,
+        quests,
+        itemPity: nextItemPity(s.itemPity, rewards.chest?.contents ?? null),
       };
     });
 
@@ -273,6 +319,24 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
   const rerollShop = (todayIdx: number) =>
     setSave((s) => applyShopReroll(s, todayIdx));
 
+  // ---- quest board — folds live in meta/quests (pure, StrictMode-safe);
+  // these wrappers only bind them to setSave. ------------------------------
+  const visitQuestBoard = (todayIdx: number) =>
+    setSave((s) => {
+      const quests = normalizeQuestBoard(s.quests, todayIdx);
+      return quests === s.quests ? s : { ...s, quests };
+    });
+  const acceptQuest = (todayIdx: number, noticeId: string) =>
+    setSave((s) => applyAcceptQuest(s, todayIdx, noticeId));
+  const abandonQuest = (questId: string) =>
+    setSave((s) => applyAbandonQuest(s, questId));
+  const refreshQuestBoard = (todayIdx: number) =>
+    setSave((s) => applyBoardRefresh(s, todayIdx));
+  // The chest was rolled in the sheet BEFORE this fold (grant-then-reveal),
+  // so the updater stays pure; the active-quest gate makes re-runs no-op.
+  const claimQuest = (questId: string, chestContents: ChestContent[]) =>
+    setSave((s) => applyClaimQuest(s, questId, chestContents));
+
   return (
     <GameStateContext.Provider
       value={{
@@ -290,6 +354,11 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
         visitShop,
         purchaseShopItem,
         rerollShop,
+        visitQuestBoard,
+        acceptQuest,
+        abandonQuest,
+        refreshQuestBoard,
+        claimQuest,
       }}
     >
       {children}
