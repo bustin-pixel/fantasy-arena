@@ -20,6 +20,7 @@ import {
   BASE_LINES_BY_SLOT,
   ITEM_SLOTS,
   luckyCoinBonus,
+  makeItemKey,
   signatureLineFor,
   type ItemQuality,
 } from "@/data/items";
@@ -34,6 +35,7 @@ import {
   freshMilestonesCrossed,
   GOLD_REWARDS,
   ITEM_DROP_CHANCE,
+  ITEM_PITY_THRESHOLD,
   ITEM_QUALITY_WEIGHTS,
   SHARD_CHEST_DRIP,
   SHARD_REWARDS,
@@ -89,12 +91,16 @@ export interface BattleRewards {
  *  The item-era rolls (shard drip → item → dungeon signature) are APPENDED
  *  after the legacy gold/unit rolls, so any pre-items seed keeps its old
  *  gold/unit contents byte-identical. `opts.dungeonId` enables the extra
- *  signature-line roll (themed BOSS chests only — callers gate it). */
+ *  signature-line roll (themed BOSS chests only — callers gate it).
+ *
+ *  `opts.forceItem` is the pity valve: the item roll still CONSUMES its
+ *  rng.next() (so a non-forced roll from the same seed stays byte-identical)
+ *  but the outcome is treated as a hit regardless. */
 export function rollChest(
   seed: number,
   tier: ChestTier,
   unlockedUnits: readonly string[],
-  opts?: { dungeonId?: string }
+  opts?: { dungeonId?: string; forceItem?: boolean }
 ): ChestContent[] {
   const rng = new RNG(seed);
   const [min, max] = CHEST_GOLD_RANGE[tier];
@@ -117,8 +123,10 @@ export function rollChest(
   }
 
   // Item drop: slot first (so 6 weapons aren't drowned by 8 trinkets), then a
-  // uniform line within the slot; quality weighted by tier.
-  if (rng.next() < ITEM_DROP_CHANCE[tier]) {
+  // uniform line within the slot; quality weighted by tier. The chance roll
+  // happens unconditionally so forceItem never desyncs the stream.
+  const itemHit = rng.next() < ITEM_DROP_CHANCE[tier];
+  if (itemHit || opts?.forceItem) {
     const quality = pickWeightedQuality(rng, tier);
     const slot = ITEM_SLOTS[rng.int(0, ITEM_SLOTS.length - 1)];
     const pool = BASE_LINES_BY_SLOT[slot];
@@ -207,6 +215,9 @@ export function computeBattleRewards(input: {
   /** Equipped items by defId — read ONLY for the Lucky Coin (gold boost +
    *  seeded chest-tier upgrade). Combat item effects never reach this layer. */
   itemLoadouts?: ItemLoadouts;
+  /** Consecutive itemless chests so far (save.itemPity). At the threshold the
+   *  chest's item roll is forced — see rollChest opts.forceItem. */
+  itemPity?: number;
 }): BattleRewards {
   const {
     mode,
@@ -222,6 +233,7 @@ export function computeBattleRewards(input: {
     wavesSurvived = 0,
     bestWave = 0,
     itemLoadouts,
+    itemPity = 0,
   } = input;
   const none: BattleRewards = {
     gold: 0,
@@ -250,12 +262,10 @@ export function computeBattleRewards(input: {
     return {
       tier: t,
       seed: chestSeed,
-      contents: rollChest(
-        chestSeed,
-        t,
-        unlockedUnits,
-        sigDungeonId ? { dungeonId: sigDungeonId } : undefined
-      ),
+      contents: rollChest(chestSeed, t, unlockedUnits, {
+        ...(sigDungeonId ? { dungeonId: sigDungeonId } : {}),
+        forceItem: itemPity >= ITEM_PITY_THRESHOLD,
+      }),
     };
   };
 
@@ -355,4 +365,47 @@ export function computeBattleRewards(input: {
     shards: 0,
     firstClear: false,
   };
+}
+
+/** The save slice chest contents fold into — PlayerSave satisfies it. */
+export interface ChestGrantSlice {
+  gold: number;
+  soulShards: number;
+  items: Record<string, number>;
+  unlockedUnits: string[];
+}
+
+/** Fold rolled chest contents into a save slice — the ONE place a chest's
+ *  entries become currency/unlocks/stacks, shared by the battle grant and the
+ *  quest-claim fold so the two can't drift. Pure (fresh objects, inputs
+ *  untouched); items land at 1★ — stars only ever come from merging. */
+export function foldChestContents<S extends ChestGrantSlice>(
+  save: S,
+  contents: readonly ChestContent[]
+): S {
+  let gold = save.gold;
+  let soulShards = save.soulShards;
+  const items = { ...save.items };
+  const unlocked = new Set(save.unlockedUnits);
+  for (const entry of contents) {
+    if (entry.kind === "gold") gold += entry.amount;
+    else if (entry.kind === "duplicate") gold += entry.gold;
+    else if (entry.kind === "unit") unlocked.add(entry.unitId);
+    else if (entry.kind === "shards") soulShards += entry.amount;
+    else {
+      const key = makeItemKey(entry.lineId, entry.quality, 1);
+      items[key] = (items[key] ?? 0) + 1;
+    }
+  }
+  return { ...save, gold, soulShards, items, unlockedUnits: [...unlocked] };
+}
+
+/** The pity counter's step: no chest → unchanged; itemless chest → +1;
+ *  any item inside → reset. Battle grants and quest claims both use this. */
+export function nextItemPity(
+  prev: number,
+  chestContents: readonly ChestContent[] | null
+): number {
+  if (!chestContents) return prev;
+  return chestContents.some((e) => e.kind === "item") ? 0 : prev + 1;
 }

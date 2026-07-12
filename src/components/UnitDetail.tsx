@@ -322,7 +322,75 @@ export function UnitDetail({
 
         <div className="detail-art">
           <canvas ref={canvasRef} width={ART_SIZE} height={ART_SIZE} />
+          {/* Item slots live on the portrait itself: weapon top-left, armor
+              bottom-left, trinket bottom-right. Tapping one opens the picker
+              in the body below. */}
+          {equipEnabled &&
+            ITEM_SLOTS.map((slot) => {
+              const key = loadout?.[slot];
+              const p = key ? parseItemKey(key) : null;
+              return (
+                <button
+                  key={slot}
+                  type="button"
+                  className={`art-slot art-slot-${slot}${pickerSlot === slot ? " open" : ""}`}
+                  style={p ? { borderColor: RARITIES[p.quality].color } : undefined}
+                  onClick={() => {
+                    playSfx("uiTap");
+                    setPickerSlot(pickerSlot === slot ? null : slot);
+                  }}
+                  aria-label={`${slot} slot`}
+                  title={p ? p.line.name : slot[0].toUpperCase() + slot.slice(1)}
+                >
+                  {key && p ? (
+                    <ItemIcon itemKey={key} size={38} />
+                  ) : (
+                    <span className="art-slot-glyph" aria-hidden>
+                      {slot === "weapon" ? "⚔" : slot === "armor" ? "🛡" : "◈"}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
         </div>
+
+        {/* The slot picker (and the gear summary) drops down directly under
+            the portrait, right where the tapped slot lives. */}
+        {equipEnabled && (pickerSlot !== null || equipSummary.length > 0) && (
+          <div className="equip-dropdown">
+            <div className="detail-skill-head">
+              <span className="detail-skill-name">
+                {pickerSlot
+                  ? pickerSlot[0].toUpperCase() + pickerSlot.slice(1)
+                  : "Equipment"}
+              </span>
+            </div>
+            {pickerSlot ? (
+              <EquipPicker
+                slot={pickerSlot}
+                defId={defId}
+                items={items!}
+                loadouts={loadouts!}
+                onEquip={(key) => {
+                  playSfx("uiEquip");
+                  onEquip!(key);
+                  setPickerSlot(null);
+                }}
+                onUnequip={() => {
+                  playSfx("uiUnequip");
+                  onUnequip!(pickerSlot);
+                  setPickerSlot(null);
+                }}
+              />
+            ) : (
+              <ul className="equip-effects">
+                {equipSummary.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
 
         <div className="detail-body">
           <div className="detail-head">
@@ -419,78 +487,6 @@ export function UnitDetail({
               fill="#5dcaa5"
             />
           </div>
-
-          {equipEnabled && (
-            <div className="detail-section equip-section">
-              <div className="detail-skill-head">
-                <span className="detail-skill-name">Equipment</span>
-              </div>
-              <div className="equip-slots">
-                {ITEM_SLOTS.map((slot) => {
-                  const key = loadout?.[slot];
-                  const p = key ? parseItemKey(key) : null;
-                  return (
-                    <button
-                      key={slot}
-                      type="button"
-                      className={`equip-slot${pickerSlot === slot ? " open" : ""}`}
-                      onClick={() => {
-                        playSfx("uiTap");
-                        setPickerSlot(pickerSlot === slot ? null : slot);
-                      }}
-                      aria-label={`${slot} slot`}
-                    >
-                      {key && p ? (
-                        <>
-                          <ItemIcon itemKey={key} size={44} />
-                          <span
-                            className="equip-slot-name"
-                            style={{ color: RARITIES[p.quality].color }}
-                          >
-                            {p.line.name}
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          <span className="equip-slot-glyph" aria-hidden>
-                            {slot === "weapon" ? "⚔" : slot === "armor" ? "🛡" : "◈"}
-                          </span>
-                          <span className="equip-slot-name empty">
-                            {slot[0].toUpperCase() + slot.slice(1)}
-                          </span>
-                        </>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-              {pickerSlot && (
-                <EquipPicker
-                  slot={pickerSlot}
-                  defId={defId}
-                  items={items!}
-                  loadouts={loadouts!}
-                  onEquip={(key) => {
-                    playSfx("uiEquip");
-                    onEquip!(key);
-                    setPickerSlot(null);
-                  }}
-                  onUnequip={() => {
-                    playSfx("uiUnequip");
-                    onUnequip!(pickerSlot);
-                    setPickerSlot(null);
-                  }}
-                />
-              )}
-              {equipSummary.length > 0 && (
-                <ul className="equip-effects">
-                  {equipSummary.map((line) => (
-                    <li key={line}>{line}</li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
 
           {abilityIds.map((id) => {
             const ab = ABILITIES[id];

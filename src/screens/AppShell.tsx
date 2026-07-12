@@ -7,6 +7,7 @@ import { DungeonVines } from "@/components/DungeonVines";
 import { DungeonGate } from "@/components/DungeonGate";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import { BagSheet } from "@/components/BagSheet";
+import { QuestBoardSheet } from "@/components/QuestBoardSheet";
 import { GoldPill, ShardPill } from "@/components/CurrencyPills";
 import type { BattleMode } from "@/hooks/useBattleEngine";
 import { playSfx } from "@/audio/sfx";
@@ -39,6 +40,7 @@ export function AppShell({ onBattle, onOpenShop }: Props) {
   const [page, setPage] = useState(1); // land on Home (center)
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [bagOpen, setBagOpen] = useState(false);
+  const [questsOpen, setQuestsOpen] = useState(false);
   // Live drag state in a ref so pointer handlers never trigger re-renders.
   const drag = useRef({
     pending: false,
@@ -191,6 +193,9 @@ export function AppShell({ onBattle, onOpenShop }: Props) {
       </div>
       {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
       {bagOpen && <BagSheet onClose={() => { playSfx("uiClose"); setBagOpen(false); }} />}
+      {questsOpen && (
+        <QuestBoardSheet onClose={() => { playSfx("uiClose"); setQuestsOpen(false); }} />
+      )}
       <div className="shell-bg" aria-hidden="true">
         {/* One continuous hall (3 pages wide) panned 1:1 with the pager. Brick
             spans it all; the gate lives in the middle (Home) third. */}
@@ -226,6 +231,7 @@ export function AppShell({ onBattle, onOpenShop }: Props) {
             onBattle={onBattle}
             onOpenBag={() => { playSfx("uiOpen"); setBagOpen(true); }}
             onOpenShop={onOpenShop}
+            onOpenQuests={() => { playSfx("uiOpen"); setQuestsOpen(true); }}
           />
         </section>
         <section className="pager-page" aria-label="Compendium">

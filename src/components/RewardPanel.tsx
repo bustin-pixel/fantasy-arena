@@ -40,7 +40,7 @@ interface Props {
   xpGains?: XpGain[];
 }
 
-const CHEST_LABEL: Record<ChestTier, string> = {
+export const CHEST_LABEL: Record<ChestTier, string> = {
   wooden: "Wooden Chest",
   silver: "Silver Chest",
   gold: "Golden Chest",

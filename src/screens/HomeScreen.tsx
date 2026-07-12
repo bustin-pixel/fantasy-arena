@@ -21,6 +21,8 @@ interface Props {
   onOpenBag: () => void;
   /** Open Grubbins' shop (a full-screen App view). */
   onOpenShop: () => void;
+  /** Open the quest bulletin board (rendered by AppShell, like the Bag). */
+  onOpenQuests: () => void;
 }
 
 /**
@@ -28,13 +30,18 @@ interface Props {
  * (mode "solo"); the Dungeons card opens the dungeon-select map (The Depths +
  * the themed legendary dungeons), then a floor picker for the chosen dungeon.
  */
-export function HomeScreen({ onBattle, onOpenBag, onOpenShop }: Props) {
+export function HomeScreen({ onBattle, onOpenBag, onOpenShop, onOpenQuests }: Props) {
   const { save } = useGameState();
   // Total items owned (across all stacks) for the Bag button's count badge.
   const bagCount = Object.values(save.items).reduce((n, c) => n + c, 0);
   // Shop pip: today's shelf hasn't been seen yet (opening the shop rolls
   // save.shop.day forward via visitShop, which clears this).
   const newStock = save.shop.day !== dayIndexLocal();
+  // Quest pip: fresh notices today (board day is stale) OR an accepted quest
+  // is ready to claim. Opening the board clears the day half.
+  const questAlert =
+    save.quests.day !== dayIndexLocal() ||
+    save.quests.active.some((q) => q.progress >= q.goal);
   // A single unit is enough to battle — the engine fields whatever you bring
   // (readiness is min(deckSize, activeCap)); an empty deck is the only block.
   const ready = save.deck.length >= 1;
@@ -139,6 +146,21 @@ export function HomeScreen({ onBattle, onOpenBag, onOpenShop }: Props) {
         </span>
         <span className="home-shop-text">Shop</span>
         {newStock && <span className="home-shop-dot" />}
+      </button>
+
+      {/* Floating Quests button — bottom-center between Shop and Bag. The
+          gold "!" is a styled glyph (the classic quest-giver marker). */}
+      <button
+        type="button"
+        className="home-quest-fab"
+        aria-label="Open Quests"
+        onClick={onOpenQuests}
+      >
+        <span className="home-quest-glyph" aria-hidden>
+          !
+        </span>
+        <span className="home-quest-text">Quests</span>
+        {questAlert && <span className="home-quest-dot" />}
       </button>
 
       {editingProfile && (

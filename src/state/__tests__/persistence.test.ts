@@ -41,8 +41,15 @@ function v2Save(): Partial<PlayerSave> {
 describe("migrateSave", () => {
   it("null (new player) → defaults: starter units, 0 gold, floor 0", () => {
     const save = migrateSave(null);
-    expect(save.version).toBe(10);
+    expect(save.version).toBe(11);
     expect(save.shop).toEqual({ day: -1, rerolls: 0, bought: [] });
+    expect(save.quests).toEqual({
+      day: -1,
+      refreshes: 0,
+      taken: [],
+      active: [],
+    });
+    expect(save.itemPity).toBe(0);
     expect(save.soulShards).toBe(0);
     expect(save.items).toEqual({});
     expect(save.loadouts).toEqual({});

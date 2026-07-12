@@ -12,6 +12,7 @@ import { STARTER_UNIT_IDS } from "@/meta/economy";
 import { TOTAL_XP_CAP } from "@/meta/leveling";
 import { sanitizeItems, sanitizeLoadouts } from "@/meta/inventory";
 import { sanitizeShop, type ShopState } from "@/meta/shop";
+import { sanitizeQuests, type QuestSaveState } from "@/meta/quests";
 import { DEFAULT_AVATAR_ID, isAvatarUnlocked } from "@/meta/avatars";
 import { DUNGEON_IDS, DUNGEONS, QUEST_LOCKED_UNITS } from "@/data/dungeons";
 
@@ -102,6 +103,12 @@ export interface PlayerSave {
    *  rerolls used, and shelf slots bought. The STOCK itself is never stored:
    *  it's re-derived from (day, rerolls) in meta/shop. (Save v10.) */
   shop: ShopState;
+  /** Quest-board bookkeeping + accepted quests. Offers are never stored —
+   *  re-derived from (day, refreshes) in meta/quests. (Save v11.) */
+  quests: QuestSaveState;
+  /** Consecutive chests opened without an item drop — at ITEM_PITY_THRESHOLD
+   *  the next chest is forced to contain one. (Save v11.) */
+  itemPity: number;
 }
 
 // The key names the storage SLOT, not the schema — the version lives inside
@@ -109,7 +116,7 @@ export interface PlayerSave {
 const KEY = "fantasy-arena/save/v1";
 
 export const DEFAULT_SAVE: PlayerSave = {
-  version: 10,
+  version: 11,
   username: "Champion",
   avatarId: DEFAULT_AVATAR_ID,
   deck: ["ogre", "archer", "knight", "fire_mage"],
@@ -126,6 +133,8 @@ export const DEFAULT_SAVE: PlayerSave = {
   items: {},
   loadouts: {},
   shop: { day: -1, rerolls: 0, bought: [] },
+  quests: { day: -1, refreshes: 0, taken: [], active: [] },
+  itemPity: 0,
 };
 
 export function loadSave(): PlayerSave {
@@ -196,6 +205,12 @@ export function migrateSave(parsed: Partial<PlayerSave> | null): PlayerSave {
   // v10: shop bookkeeping — rebuilt defensively; older saves get the fresh
   // "never visited" state (day -1), which normalizes on first shop open.
   merged.shop = sanitizeShop(parsed.shop);
+  // v11: quest-board bookkeeping + accepted quests, and the item-pity counter.
+  merged.quests = sanitizeQuests(parsed.quests);
+  const rawPity = Number(parsed.itemPity ?? 0);
+  merged.itemPity = Number.isFinite(rawPity)
+    ? Math.max(0, Math.floor(rawPity))
+    : 0;
 
   // Grandfathering: saves from before the unlock system keep every unit that
   // exists today — EXCEPT quest-locked ones, whose purchase must always be
@@ -253,6 +268,11 @@ function structuredCloneSave(save: PlayerSave): PlayerSave {
       Object.entries(save.loadouts).map(([id, l]) => [id, { ...l }])
     ),
     shop: { ...save.shop, bought: [...save.shop.bought] },
+    quests: {
+      ...save.quests,
+      taken: [...save.quests.taken],
+      active: save.quests.active.map((q) => ({ ...q })),
+    },
   };
 }
 
