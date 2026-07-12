@@ -3238,3 +3238,575 @@ body.modal-open .pager-nav {
   font-size: 1.05rem;
   animation: combine-pop 0.45s cubic-bezier(0.2, 1.6, 0.4, 1);
 }
+
+/* ---- Library Compendium — the Grand Athenaeum ----------------------------
+   Shelf of tomes on the Compendium page (spine palette comes from books.ts as
+   CSS vars --leather/--leather-dk/--leather-lt/--accent per book) plus the
+   BookOverlay open-ceremony: tome scale-in, 3D cover swing, page spreads
+   with a real flipping leaf. Mockup variant 1, auditioned 2026-07-11. */
+
+.athenaeum {
+  position: relative;
+  border-radius: 12px;
+  border: 1px solid #2a2320;
+  padding: 20px 10px 8px;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 300px 200px at 78% 4%, rgba(255, 170, 60, 0.14), transparent 70%),
+    linear-gradient(180deg, #171017, #241722 55%, #1a1119);
+}
+/* Candlelight breathing in the upper corner. */
+.athenaeum::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse 260px 170px at 78% 2%, rgba(255, 180, 70, 0.12), transparent 70%);
+  animation: athenaeum-candle 3.4s ease-in-out infinite;
+}
+@keyframes athenaeum-candle {
+  0%, 100% { opacity: 0.55; }
+  30% { opacity: 1; }
+  55% { opacity: 0.7; }
+  80% { opacity: 0.95; }
+}
+.athenaeum-books {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 6px;
+  position: relative;
+  z-index: 1;
+}
+.athenaeum-board {
+  height: 14px;
+  margin: 0 4px 16px;
+  border-radius: 2px;
+  position: relative;
+  z-index: 2;
+  background: linear-gradient(180deg, #5a3a20, #3a2412 60%, #241608);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 200, 120, 0.25);
+  border-bottom: 3px solid #140c04;
+}
+.athenaeum-row:last-child .athenaeum-board {
+  margin-bottom: 4px;
+}
+.athenaeum-hint {
+  font-size: 0.75rem;
+  color: var(--stone);
+  margin: 8px 2px 0;
+}
+
+/* -- a spine on the shelf -- */
+.shelf-book {
+  position: relative;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  width: 36px;
+  height: var(--h, 128px);
+  border-radius: 4px 4px 2px 2px;
+  background: linear-gradient(
+    90deg,
+    var(--leather-dk) 0%,
+    var(--leather) 22%,
+    var(--leather-lt) 50%,
+    var(--leather) 78%,
+    var(--leather-dk) 100%
+  );
+  box-shadow: 2px 3px 6px rgba(0, 0, 0, 0.55), inset 0 2px 3px rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: transform 0.18s ease;
+  font-family: inherit;
+}
+.shelf-book:hover {
+  transform: translateY(-7px);
+}
+/* Raised gold bands. */
+.shelf-book::before,
+.shelf-book::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  opacity: 0.75;
+}
+.shelf-book::before { top: 26px; }
+.shelf-book::after { bottom: 24px; }
+.shelf-book-glyph {
+  font-size: 13px;
+  margin-top: 9px;
+  filter: drop-shadow(0 1px 1px #000);
+}
+.shelf-book-title {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  flex: 1;
+  margin-top: 5px;
+  overflow: hidden;
+  font-family: var(--font-display);
+  font-variant: small-caps;
+  font-size: 12px;
+  letter-spacing: 0.4px;
+  color: var(--accent);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+.shelf-book-plaque {
+  font-size: 9px;
+  font-weight: 700;
+  color: #e8dcbe;
+  background: rgba(0, 0, 0, 0.42);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  padding: 0 4px;
+  margin: 4px 0 7px;
+  line-height: 13px;
+}
+/* Chained shut (dungeon gate unmet). */
+.shelf-book.locked {
+  cursor: not-allowed;
+  filter: saturate(0.45) brightness(0.75);
+}
+.shelf-book-chains {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(-38deg, transparent 0 12px, rgba(190, 195, 205, 0.42) 12px 16px, rgba(90, 95, 105, 0.5) 16px 18px, transparent 18px 30px),
+    repeating-linear-gradient(38deg, transparent 0 15px, rgba(160, 165, 175, 0.32) 15px 18px, transparent 18px 34px);
+}
+.shelf-book-lock {
+  position: absolute;
+  top: 44%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 15px;
+  filter: drop-shadow(0 1px 2px #000);
+}
+@keyframes shelf-rattle {
+  0%, 100% { transform: translateX(0) rotate(0); }
+  20% { transform: translateX(-2px) rotate(-1.4deg); }
+  40% { transform: translateX(2px) rotate(1.2deg); }
+  60% { transform: translateX(-2px) rotate(-1deg); }
+  80% { transform: translateX(1px) rotate(0.8deg); }
+}
+.shelf-book.rattling {
+  animation: shelf-rattle 0.38s ease;
+}
+.gate-toast {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  z-index: 3;
+  background: rgba(12, 9, 6, 0.92);
+  border: 1px solid var(--gold-soft);
+  color: var(--parchment);
+  font-size: 0.72rem;
+  padding: 6px 12px;
+  border-radius: 6px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* -- the open-book ceremony (root also carries .detail-overlay) -- */
+.book-ceremony {
+  perspective: 1000px;
+  background: rgba(6, 4, 3, 0.78);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.book-ceremony.phase-pull,
+.book-ceremony.phase-open {
+  opacity: 1;
+}
+.book-ceremony.phase-closing {
+  opacity: 0;
+  transition-delay: 0.15s;
+}
+.book-tome {
+  position: relative;
+  width: min(94vw, 560px);
+  height: min(118vw, 430px);
+  transform-style: preserve-3d;
+  transform: scale(0.16) translateY(50px);
+  opacity: 0;
+  transition: transform 0.34s cubic-bezier(0.2, 0.7, 0.3, 1.15), opacity 0.25s;
+}
+.phase-pull .book-tome,
+.phase-open .book-tome {
+  transform: scale(1) translateY(0);
+  opacity: 1;
+}
+.phase-closing .book-tome {
+  transform: scale(0.2) translateY(50px);
+  opacity: 0;
+}
+
+/* pages */
+.book-spread {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  border-radius: 6px;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.7);
+  /* Horizontal drags are page turns (pointer events), vertical stays native. */
+  touch-action: pan-y;
+  user-select: none;
+}
+.book-page {
+  width: 50%;
+  height: 100%;
+  position: relative;
+  background: linear-gradient(105deg, #e7dcc2, #f2ead6 45%, #e2d6ba);
+}
+.book-page.left {
+  border-radius: 6px 0 0 6px;
+  box-shadow: inset -14px 0 18px -12px rgba(60, 40, 10, 0.55);
+}
+.book-page.right {
+  border-radius: 0 6px 6px 0;
+  box-shadow: inset 14px 0 18px -12px rgba(60, 40, 10, 0.55);
+}
+.book-pagebody {
+  position: relative;
+  height: 100%;
+  padding: 12px 10px 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.book-page-heading {
+  margin: 0 0 8px;
+  font-family: var(--font-display);
+  font-variant: small-caps;
+  font-size: 0.85rem;
+  color: #5a3d1c;
+  text-align: center;
+  border-bottom: 1px solid rgba(90, 61, 28, 0.35);
+  padding-bottom: 4px;
+  letter-spacing: 0.6px;
+}
+.book-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+  gap: 8px;
+  justify-items: center;
+}
+/* Bestiary cards shrink onto the parchment page. */
+.comp-card.book-card {
+  width: 100%;
+  max-width: 96px;
+  padding: 4px 4px 5px;
+  border-radius: 10px;
+  border-width: 1.5px;
+}
+.comp-card.book-card .card-name {
+  font-size: 0.62rem;
+  line-height: 1.15;
+  text-align: center;
+}
+.book-rare-tag {
+  margin: 8px auto 0;
+  width: fit-content;
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: var(--ink);
+  background: linear-gradient(180deg, var(--gold), var(--gold-soft));
+  border-radius: 5px;
+  padding: 2px 8px;
+}
+.book-page-note {
+  margin: 10px 4px 0;
+  font-size: 0.68rem;
+  font-style: italic;
+  color: #6a4a1c;
+  text-align: center;
+}
+.book-pgno {
+  position: absolute;
+  bottom: 4px;
+  right: 10px;
+  font-size: 0.58rem;
+  color: #8a6a3a;
+}
+
+/* boss showcase page */
+.book-bossbox {
+  margin: 4px auto 0;
+  width: min(100%, 150px);
+  text-align: center;
+  padding: 10px 6px 8px;
+  border: 3px double #8a6a3a;
+  border-radius: 8px;
+  background: rgba(138, 106, 58, 0.1);
+  cursor: pointer;
+  font-family: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.book-bossbox:disabled {
+  cursor: default;
+}
+.book-bossbox.defeated {
+  border-color: var(--gold-soft);
+  box-shadow: 0 0 14px rgba(245, 179, 1, 0.3);
+}
+.book-boss-name {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  color: #4a2d0e;
+  letter-spacing: 0.5px;
+  margin-top: 4px;
+}
+.book-boss-tag {
+  font-size: 0.56rem;
+  color: #8a5a1c;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+}
+
+/* the cover (3D swing) */
+.book-cover {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 50%;
+  height: 100%;
+  transform-origin: left center;
+  transform-style: preserve-3d;
+  transform: rotateY(0deg);
+  transition: transform 0.75s cubic-bezier(0.55, 0.06, 0.35, 1);
+  z-index: 6;
+}
+.book-cover-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  border-radius: 0 6px 6px 0;
+}
+.book-cover-face.front {
+  background: linear-gradient(120deg, var(--leather-dk) 0%, var(--leather) 45%, var(--leather-lt) 100%);
+  border: 2px solid var(--accent);
+}
+/* Splash painting fills the cover behind the title (leather shows as a rim). */
+.book-cover-art {
+  position: absolute;
+  inset: 6px;
+  width: calc(100% - 12px);
+  height: calc(100% - 12px);
+  border-radius: 0 5px 5px 0;
+}
+.book-cover-scrim {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: 6px;
+  height: 30%;
+  border-radius: 0 0 5px 0;
+  background: linear-gradient(180deg, transparent, rgba(10, 6, 2, 0.72));
+}
+.book-cover-title {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 16px;
+  font-family: var(--font-display);
+  font-variant: small-caps;
+  font-size: 1.05rem;
+  color: var(--accent);
+  text-align: center;
+  padding: 0 10px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85), 0 0 8px rgba(0, 0, 0, 0.9);
+  letter-spacing: 0.6px;
+}
+/* The lore page's framed painting. */
+.book-splash-plate {
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  margin: 2px 0 4px;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 4px solid transparent;
+  border-image: linear-gradient(135deg, #a8842e, #e6c86a 30%, #8a6a24 60%, #d9b455) 1;
+  box-shadow: 0 2px 6px rgba(40, 25, 8, 0.45);
+  flex-shrink: 0;
+}
+.book-splash-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.book-cover-face.back {
+  transform: rotateY(180deg);
+  border-radius: 6px 0 0 6px;
+  background: linear-gradient(105deg, #d8ccb0, #e7dcc2);
+}
+.phase-open .book-cover {
+  transform: rotateY(-172deg);
+  pointer-events: none;
+}
+.phase-closing .book-cover {
+  transform: rotateY(0deg);
+  transition-duration: 0.3s;
+}
+
+/* the flipping leaf */
+.book-leaf {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 50%;
+  height: 100%;
+  transform-origin: left center;
+  transform-style: preserve-3d;
+  z-index: 5;
+  pointer-events: none;
+}
+.book-leaf-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  overflow: hidden;
+}
+.book-leaf-face.front {
+  background: linear-gradient(105deg, #e7dcc2, #f2ead6 45%, #e2d6ba);
+  border-radius: 0 6px 6px 0;
+}
+.book-leaf-face.back {
+  transform: rotateY(180deg);
+  background: linear-gradient(105deg, #d8ccb0, #eee4ca);
+  border-radius: 6px 0 0 6px;
+}
+@keyframes book-flip-next {
+  from { transform: rotateY(0); }
+  to { transform: rotateY(-178deg); }
+}
+@keyframes book-flip-prev {
+  from { transform: rotateY(-178deg); }
+  to { transform: rotateY(0); }
+}
+.book-leaf.next {
+  animation: book-flip-next 0.56s cubic-bezier(0.5, 0.1, 0.4, 1) forwards;
+}
+.book-leaf.prev {
+  animation: book-flip-prev 0.56s cubic-bezier(0.5, 0.1, 0.4, 1) forwards;
+}
+
+/* chrome around the tome */
+.book-close.detail-close {
+  top: -38px;
+  right: 0;
+}
+.book-nav {
+  position: absolute;
+  bottom: -42px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 14px;
+}
+.book-nav button {
+  background: rgba(20, 14, 8, 0.85);
+  color: var(--gold-soft);
+  cursor: pointer;
+  border: 1px solid var(--gold-soft);
+  border-radius: 6px;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 5px 14px;
+  font-family: var(--font-display);
+}
+.book-nav button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.book-nav-count {
+  font-size: 0.7rem;
+  color: var(--gold-soft);
+}
+
+/* -- Arms & Relics entry sheet -- */
+.item-pane-overlay {
+  z-index: 60;
+}
+.item-pane {
+  padding: 16px 14px 14px;
+}
+.item-pane-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.item-pane-name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  color: var(--gold);
+}
+.item-pane-slot {
+  font-size: 0.72rem;
+  color: var(--stone);
+}
+.item-pane-sig {
+  color: var(--gold-soft);
+}
+.item-pane-desc {
+  margin: 10px 0 8px;
+  font-size: 0.78rem;
+  font-style: italic;
+  color: var(--parchment);
+  opacity: 0.85;
+}
+.item-pane-ladder {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.item-pane-ladder li {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 0.74rem;
+  border-top: 1px solid rgba(87, 67, 44, 0.45);
+  padding-top: 5px;
+}
+.item-pane-q {
+  font-weight: 700;
+  white-space: nowrap;
+  min-width: 86px;
+}
+.item-pane-mods {
+  color: var(--parchment);
+  opacity: 0.9;
+}
+.item-pane-note {
+  margin: 10px 0 0;
+  font-size: 0.68rem;
+  color: var(--stone);
+}
+.item-pane-owned {
+  margin-top: 10px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--gold-soft);
+}
+
+/* Narrow phones: slim the spines a touch so 5 fit a row. */
+@media (max-width: 380px) {
+  .shelf-book { width: 32px; }
+  .athenaeum-books { gap: 5px; }
+}

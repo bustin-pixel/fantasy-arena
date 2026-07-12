@@ -156,6 +156,8 @@ export type SfxKey =
   | "uiTap" | "uiOpen" | "uiClose" | "uiSelect" | "uiConfirm" | "uiDeny"
   | "uiEquip" | "uiUnequip" | "deckAdd" | "deckRemove" | "deckShuffle"
   | "compendiumReveal"
+  // library compendium (book ceremony, mockup-auditioned 2026-07-11)
+  | "bookOpen" | "pageFlip" | "bookClose" | "chainRattle"
   // battle-flow
   | "countTick" | "countGo" | "waveHorn" | "bossAlarm" | "boonChime"
   | "boonPick" | "retireBank"
@@ -171,7 +173,8 @@ export type SfxKey =
 const DRY_KEYS: Set<SfxKey> = new Set([
   "uiTap", "uiOpen", "uiClose", "uiSelect", "uiConfirm", "uiDeny",
   "uiEquip", "uiUnequip", "deckAdd", "deckRemove", "deckShuffle",
-  "compendiumReveal", "countTick", "countGo", "boonChime", "boonPick",
+  "compendiumReveal", "bookOpen", "pageFlip", "bookClose", "chainRattle",
+  "countTick", "countGo", "boonChime", "boonPick",
   "retireBank", "coinTick", "unlockFanfare", "questSting", "chestShine",
   "coinShower", "grubbinsGreet", "grubbinsHappy", "grubbinsSad",
   "grubbinsNeutral",
@@ -277,6 +280,14 @@ const SOUNDS: Record<SfxKey, (r: number) => void> = {
   deckShuffle(r) { for (let i = 0; i < 5; i++) burst(r, i * 0.04, 0.03, 0.06, "bandpass", 1200, 900); },
   // page-turn + faint ring (opening a revealed bestiary entry)
   compendiumReveal(r) { burst(r, 0, 0.12, 0.06, "bandpass", 900, 2000); ring(r, 0.1, [2800], 0.1, 0.03); },
+  // leather creak rising into a soft cover thump (library book opens)
+  bookOpen(r) { burst(r, 0, 0.42, 0.05, "bandpass", 420, 950); burst(r, 0.08, 0.3, 0.035, "bandpass", 600, 1400); blip(r, 0.34, 95, 58, 0.22, "sine", 0.1); burst(r, 0.34, 0.12, 0.06, "lowpass", 300, 120); },
+  // dry paper flick (spread turn; drier/quicker than compendiumReveal)
+  pageFlip(r) { burst(r, 0, 0.09, 0.06, "highpass", 1400, 2600); burst(r, 0.05, 0.07, 0.045, "bandpass", 2400, 1200); },
+  // muffled clap (cover falls shut)
+  bookClose(r) { burst(r, 0, 0.1, 0.09, "lowpass", 700, 200); blip(r, 0, 110, 60, 0.14, "sine", 0.09); },
+  // chain links jangle over a low deny (tapping a gated dungeon's book)
+  chainRattle(r) { [0, 0.06, 0.13, 0.22].forEach((at, i) => { blip(r, at, 2400 + i * 420, 2100 + i * 380, 0.05, "triangle", 0.028); burst(r, at, 0.04, 0.02, "highpass", 3000, 4200); }); blip(r, 0.05, 160, 120, 0.16, "sine", 0.05); },
 
   // ----- battle-flow --------------------------------------------------------
   // woodblock tick (3-2-1; caller raises rate per step so the count climbs)
@@ -386,6 +397,7 @@ const MIN_GAP_MS: Partial<Record<SfxKey, number>> = {
   uiTap: 50, uiOpen: 120, uiClose: 120, uiSelect: 50, uiConfirm: 150,
   uiDeny: 200, uiEquip: 120, uiUnequip: 120, deckAdd: 80, deckRemove: 80,
   deckShuffle: 250, compendiumReveal: 200,
+  bookOpen: 400, pageFlip: 150, bookClose: 300, chainRattle: 350,
   countTick: 300, countGo: 500, waveHorn: 1000, bossAlarm: 1000,
   boonChime: 400, boonPick: 300, retireBank: 500,
   coinTick: 40, unlockFanfare: 800, questSting: 800, chestShine: 300,
