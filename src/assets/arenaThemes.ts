@@ -31,7 +31,8 @@ export type ArenaThemeId =
   | "mire"
   | "feyCourt"
   | "shadowPit"
-  | "hollow";
+  | "hollow"
+  | "fallenCathedral";
 
 export interface ArenaTheme {
   id: ArenaThemeId;
@@ -2242,6 +2243,172 @@ function accentsHollow(g: Ctx, t: number): void {
 }
 
 // ---------------------------------------------------------------------------
+// The Fallen Cathedral — the Seraph's dungeon (see data/dungeons). A desecrated
+// nave: cracked marble, a shattered rose window bleeding one great light shaft
+// across the field, a toppled altar, and guttering votive candles (animated).
+// ---------------------------------------------------------------------------
+
+/** Votive candle clusters (flames animate in accents). */
+const CATHEDRAL_CANDLES: Array<[number, number]> = [
+  [64, 180], [78, 196], [402, 240], [388, 226],
+  [70, 560], [410, 540], [396, 556], [232, 92],
+];
+
+function buildFallenCathedral(g: Ctx): void {
+  vgrad(g, "#26222c", "#2b2531", "#1c1922");
+
+  // Cracked marble checker — alternating pale/dark tiles, worn through.
+  const T = 60;
+  for (let ty = 0; ty < H / T; ty++) {
+    for (let tx = 0; tx <= W / T; tx++) {
+      const r = prand(tx * 31 + ty * 13);
+      const pale = (tx + ty) % 2 === 0;
+      g.fillStyle = pale
+        ? `rgba(196,188,176,${0.1 + r * 0.06})`
+        : `rgba(20,16,26,${0.12 + r * 0.06})`;
+      g.fillRect(tx * T, ty * T, T, T);
+    }
+  }
+  g.strokeStyle = "rgba(0,0,0,0.35)";
+  g.lineWidth = 1.5;
+  for (let y = 0; y <= H; y += T) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
+  for (let x = 0; x <= W; x += T) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); }
+
+  // Long nave runner, wine-red and threadbare.
+  g.fillStyle = "rgba(88,22,34,0.5)";
+  g.fillRect(W / 2 - 46, 0, 92, H);
+  g.fillStyle = "rgba(140,44,56,0.25)";
+  g.fillRect(W / 2 - 38, 0, 76, H);
+  // Moth-holes worn through the runner.
+  for (let i = 0; i < 14; i++) {
+    const hx = W / 2 - 36 + prand(i * 7) * 72;
+    const hy = prand(i * 11 + 3) * H;
+    g.fillStyle = "rgba(20,16,26,0.5)";
+    g.beginPath(); g.ellipse(hx, hy, 3 + prand(i) * 6, 2 + prand(i + 1) * 4, prand(i) * 3, 0, Math.PI * 2); g.fill();
+  }
+
+  // The shattered rose window (top wall, enemy side) — a broken wheel of
+  // stained glass, several petals gone dark.
+  const rx = W / 2, ry = 34, rr = 58;
+  g.save();
+  g.beginPath(); g.arc(rx, ry, rr, 0, Math.PI * 2); g.clip();
+  const petals = 12;
+  for (let i = 0; i < petals; i++) {
+    const broken = prand(i * 5 + 2) < 0.35;
+    g.fillStyle = broken
+      ? "rgba(18,14,24,0.9)"
+      : ["#7c3aed", "#b91c1c", "#b45309", "#1d4ed8"][i % 4];
+    g.globalAlpha = broken ? 0.9 : 0.55;
+    g.beginPath();
+    g.moveTo(rx, ry);
+    g.arc(rx, ry, rr, (i / petals) * Math.PI * 2, ((i + 1) / petals) * Math.PI * 2);
+    g.closePath(); g.fill();
+  }
+  g.globalAlpha = 1;
+  g.restore();
+  // Wheel tracery + hub.
+  g.strokeStyle = "rgba(200,188,160,0.6)";
+  g.lineWidth = 2.5;
+  g.beginPath(); g.arc(rx, ry, rr, 0, Math.PI * 2); g.stroke();
+  for (let i = 0; i < petals; i++) {
+    const a = (i / petals) * Math.PI * 2;
+    g.beginPath(); g.moveTo(rx, ry); g.lineTo(rx + Math.cos(a) * rr, ry + Math.sin(a) * rr); g.stroke();
+  }
+  g.fillStyle = "rgba(232,176,75,0.8)";
+  g.beginPath(); g.arc(rx, ry, 9, 0, Math.PI * 2); g.fill();
+
+  // One great light shaft from the broken window, falling across the nave.
+  const shaft = g.createLinearGradient(rx, ry, rx - 120, H * 0.72);
+  shaft.addColorStop(0, "rgba(255,226,150,0.22)");
+  shaft.addColorStop(1, "rgba(255,226,150,0)");
+  g.fillStyle = shaft;
+  g.beginPath();
+  g.moveTo(rx - 34, ry + 30);
+  g.lineTo(rx + 44, ry + 30);
+  g.lineTo(rx - 30, H * 0.74);
+  g.lineTo(rx - 190, H * 0.7);
+  g.closePath(); g.fill();
+
+  // Fallen column drums along the flanks.
+  for (const [cx, cy, cr, rot] of [
+    [58, 320, 22, 0.4], [86, 352, 18, 0.9], [418, 400, 24, -0.5], [396, 128, 17, -1.0],
+  ]) {
+    g.save();
+    g.translate(cx, cy);
+    g.rotate(rot);
+    g.fillStyle = "#6b6560";
+    g.fillRect(-cr, -cr * 0.55, cr * 2, cr * 1.1);
+    g.fillStyle = "#7d7770";
+    g.beginPath(); g.ellipse(cr, 0, cr * 0.28, cr * 0.55, 0, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = "rgba(0,0,0,0.35)";
+    g.lineWidth = 1.5;
+    for (const fx of [-cr * 0.5, 0, cr * 0.5]) {
+      g.beginPath(); g.moveTo(fx, -cr * 0.55); g.lineTo(fx, cr * 0.55); g.stroke();
+    }
+    g.restore();
+  }
+
+  // The toppled altar — a great slab pitched off its plinth mid-field, where
+  // the light shaft lands.
+  g.save();
+  g.translate(W / 2 - 66, H * 0.62);
+  g.rotate(-0.16);
+  g.fillStyle = "#8d8478";
+  g.fillRect(-44, -14, 88, 28);
+  g.fillStyle = "#a29a8c";
+  g.fillRect(-44, -14, 88, 7);
+  g.strokeStyle = "rgba(40,30,30,0.5)";
+  g.lineWidth = 2;
+  g.beginPath(); g.moveTo(-20, -14); g.lineTo(-8, 14); g.stroke(); // crack
+  g.restore();
+  // Its empty plinth.
+  g.fillStyle = "rgba(60,54,64,0.9)";
+  g.fillRect(W / 2 - 24, H * 0.585, 48, 18);
+
+  // Scattered votive candles (lit — flames animate in accents).
+  for (const [vx, vy] of CATHEDRAL_CANDLES) {
+    g.fillStyle = "#d8cfb8";
+    g.fillRect(vx - 2.5, vy - 8, 5, 8);
+    g.fillStyle = "rgba(0,0,0,0.4)";
+    g.beginPath(); g.ellipse(vx, vy + 1, 5, 2, 0, 0, Math.PI * 2); g.fill();
+  }
+
+  speckle(g, 0.015, 0.06);
+  vignette(g, "rgba(8,4,12,1)", 0.66);
+}
+
+function accentsFallenCathedral(g: Ctx, t: number): void {
+  g.save();
+  // Guttering votive flames + pooled amber glow.
+  for (let i = 0; i < CATHEDRAL_CANDLES.length; i++) {
+    const [vx, vy] = CATHEDRAL_CANDLES[i];
+    const f = 0.75 + Math.sin(t * 9 + i * 2.1) * 0.18 + Math.sin(t * 23 + i * 5.3) * 0.07;
+    g.globalAlpha = 0.5 * f;
+    const glow = g.createRadialGradient(vx, vy - 10, 0, vx, vy - 10, 22);
+    glow.addColorStop(0, "rgba(255,196,90,0.6)");
+    glow.addColorStop(1, "rgba(255,196,90,0)");
+    g.fillStyle = glow;
+    g.beginPath(); g.arc(vx, vy - 10, 22, 0, Math.PI * 2); g.fill();
+    g.globalAlpha = 0.9 * f;
+    g.fillStyle = "#ffd76a";
+    g.beginPath();
+    g.ellipse(vx, vy - 11, 2, 4 + f * 2, Math.sin(t * 7 + i) * 0.2, 0, Math.PI * 2);
+    g.fill();
+  }
+  // Dust motes drifting down the light shaft.
+  g.fillStyle = "#ffe9b8";
+  for (let i = 0; i < 16; i++) {
+    const p = (t * 0.03 + prand(i * 3)) % 1;
+    const mx = W / 2 + 30 - p * 150 + Math.sin(t * 0.8 + i) * 8;
+    const my = 64 + p * (H * 0.66);
+    g.globalAlpha = 0.28 * Math.sin(p * Math.PI);
+    g.beginPath(); g.arc(mx, my, 1.4, 0, Math.PI * 2); g.fill();
+  }
+  g.restore();
+  g.globalAlpha = 1;
+}
+
+// ---------------------------------------------------------------------------
 // Registry + per-match selection
 // ---------------------------------------------------------------------------
 
@@ -2398,6 +2565,15 @@ export const ARENA_THEMES: Record<ArenaThemeId, ArenaTheme> = {
     zoneBottom: "rgba(70,150,255,0.08)",
     midline: "rgba(178,139,255,0.35)",
   },
+  fallenCathedral: {
+    id: "fallenCathedral",
+    name: "The Fallen Cathedral",
+    build: buildFallenCathedral,
+    accents: accentsFallenCathedral,
+    zoneTop: "rgba(220,60,90,0.08)",
+    zoneBottom: "rgba(70,150,255,0.08)",
+    midline: "rgba(255,215,106,0.30)",
+  },
 };
 
 /** The themes Arena mode rotates through (Depths pins `dungeon`; PVP keeps
@@ -2419,6 +2595,7 @@ const ARENA_ROTATION: ArenaThemeId[] = [
   "feyCourt",
   "shadowPit",
   "hollow",
+  "fallenCathedral",
 ];
 
 /** Dev/testing override: set localStorage "fantasy-arena/arena-theme" to a

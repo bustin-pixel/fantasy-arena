@@ -22,6 +22,28 @@ export const FIELD_HEIGHT = 720;
 export const ENEMY_ZONE = { top: 40, bottom: FIELD_HEIGHT * 0.4 };
 export const PLAYER_ZONE = { top: FIELD_HEIGHT * 0.6, bottom: FIELD_HEIGHT - 40 };
 
+/** Contain-fit transform that places the fixed FIELD_WIDTH×FIELD_HEIGHT world,
+ *  centered and uniformly scaled (never distorted), inside a render buffer of
+ *  arbitrary size. The battle canvas buffer is sized to the display box's
+ *  aspect (see BattleScreen's ResizeObserver) so the arena background + zone
+ *  bands can fill it edge-to-edge; the world is re-centered inside it via this
+ *  transform, and the leftover margin is where the art bleeds to the screen
+ *  edge. A 480×720 buffer yields the identity transform (scale 1, no offset),
+ *  so any code path that reads it before the buffer is measured behaves exactly
+ *  as it did before. Shared by the Renderer (draw), BattleScreen (tap→world),
+ *  and BattleUnitTip (world→screen) so the three can never drift. */
+export function fieldTransform(
+  bufW: number,
+  bufH: number
+): { scale: number; offsetX: number; offsetY: number } {
+  const scale = Math.min(bufW / FIELD_WIDTH, bufH / FIELD_HEIGHT);
+  return {
+    scale,
+    offsetX: (bufW - FIELD_WIDTH * scale) / 2,
+    offsetY: (bufH - FIELD_HEIGHT * scale) / 2,
+  };
+}
+
 // Match rules.
 export const MATCH_TIME_SEC = 120; // 2:00
 /** The Depths run on a longer clock — floors are hordes, not duels, and on

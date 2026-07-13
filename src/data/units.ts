@@ -303,6 +303,33 @@ export const UNITS: Record<string, UnitDef> = {
       },
     ],
   },
+  outlaw: {
+    id: "outlaw",
+    name: "Outlaw",
+    rarity: "legendary",
+    role: "Evasive Duelist",
+    hp: 120,
+    damage: 17,
+    attackSpeed: 0.8, // fast
+    moveSpeed: 102, // fastest legendary (just under the Assassin)
+    range: MELEE,
+    ability: "killing_spree",
+    tendency: "backline_stalker", // slips past the front line for the soft targets
+    color: "#2f2a33", // dusk-grey duster
+    accent: "#e8b04b", // brass / gold trim
+    traits: [
+      {
+        name: "Slippery",
+        description:
+          "A 50% chance to completely dodge any incoming hit — the blow simply misses and deals no damage.",
+      },
+      {
+        name: "Ghost",
+        description:
+          "Deploys hidden in stealth — untargetable until its first strike gives it away.",
+      },
+    ],
+  },
   healer: {
     id: "healer",
     name: "Cleric",
@@ -570,6 +597,38 @@ export const UNITS: Record<string, UnitDef> = {
       },
     ],
   },
+  priest: {
+    id: "priest",
+    name: "Priest",
+    rarity: "epic",
+    role: "Support / Healer",
+    hp: 125,
+    damage: 8,
+    attackSpeed: 1.6,
+    moveSpeed: 58,
+    range: FIELD_WIDTH * 0.3, // medium, stays back
+    ability: "flash_heal",
+    abilities: ["renew"], // a second, instant heal-over-time
+    school: "magic", // holy — its smite counts as magic damage
+    color: "#e6dfc4",
+    accent: "#ffe08a",
+  },
+  seraph: {
+    id: "seraph",
+    name: "Seraph",
+    rarity: "legendary",
+    role: "Support / Raid Healer",
+    hp: 130, // squishy backline capstone healer, a hair above the Priest
+    damage: 7, // token attack — it heals, it doesn't fight
+    attackSpeed: 1.6,
+    moveSpeed: 56, // hangs back
+    range: FIELD_WIDTH * 0.3, // medium, like the Priest
+    ability: "divine_light", // the big 1.5s cast heal (cast pipeline)
+    abilities: ["sanctuary", "renewal"], // two instant team-wide supports
+    school: "magic", // radiant / holy
+    color: "#f4ecd6", // pale ivory
+    accent: "#ffd76a", // radiant gold
+  },
   engineer: {
     id: "engineer",
     name: "Engineer",
@@ -656,6 +715,7 @@ export const UNITS: Record<string, UnitDef> = {
   bloater: {
     id: "bloater",
     name: "Bloater",
+    battleScale: 2.1, // boss — towers over rank-and-file on the battlefield
     rarity: "epic",
     role: "Bloated Horror",
     hp: 800, // rebalanced up from 380 — the winrate sweep had it folding to 4 units
@@ -765,6 +825,7 @@ export const UNITS: Record<string, UnitDef> = {
   abomination: {
     id: "abomination",
     name: "Abomination",
+    battleScale: 2.1, // boss — towers over rank-and-file on the battlefield
     rarity: "epic",
     role: "Undead Horror",
     hp: 900,
@@ -882,6 +943,7 @@ export const UNITS: Record<string, UnitDef> = {
   dire_alpha: {
     id: "dire_alpha",
     name: "Dire Alpha",
+    battleScale: 2.1, // boss — towers over rank-and-file on the battlefield
     rarity: "epic",
     role: "Pack Alpha",
     hp: 850,
@@ -997,6 +1059,7 @@ export const UNITS: Record<string, UnitDef> = {
   rune_golem: {
     id: "rune_golem",
     name: "Rune Golem",
+    battleScale: 2.1, // boss — towers over rank-and-file on the battlefield
     rarity: "epic",
     role: "Warded Construct",
     hp: 750,
@@ -1116,6 +1179,7 @@ export const UNITS: Record<string, UnitDef> = {
   elder_treant: {
     id: "elder_treant",
     name: "Elder Treant",
+    battleScale: 2.1, // boss — towers over rank-and-file on the battlefield
     rarity: "epic",
     role: "Ancient Guardian",
     hp: 1000,
@@ -1236,6 +1300,7 @@ export const UNITS: Record<string, UnitDef> = {
   eclipse_warden: {
     id: "eclipse_warden",
     name: "Eclipse Warden",
+    battleScale: 2.1, // boss — towers over rank-and-file on the battlefield
     rarity: "epic",
     role: "Warden of Dusk",
     hp: 680,
@@ -1343,6 +1408,7 @@ export const UNITS: Record<string, UnitDef> = {
   forge_golem: {
     id: "forge_golem",
     name: "Forge Golem",
+    battleScale: 2.1, // boss — towers over rank-and-file on the battlefield
     rarity: "epic",
     role: "Molten Colossus",
     hp: 900,
@@ -1395,6 +1461,245 @@ export const UNITS: Record<string, UnitDef> = {
       {
         name: "Relic",
         description: "A construct from a forgotten age, built to outlast armies.",
+      },
+    ],
+  },
+  // -------------------------------------------------------------------------
+  // The Fallen Cathedral — desecrated-sanctum tier (the Seraph's dungeon; see
+  // data/dungeons). Gated behind Eclipse Spire floor 5; boss floor hosts the
+  // rare Penitent fusion quest (Priest + Penitent → Seraph). The Penitent
+  // reuses the Priest kit — the first SUPPORT rare, it heals its own wave —
+  // and Seraphiel the boss reuses the Seraph kit (a dark mirror of the prize).
+  // -------------------------------------------------------------------------
+  heretic_zealot: {
+    id: "heretic_zealot",
+    name: "Heretic Zealot",
+    rarity: "rare",
+    role: "Frenzied Faithful",
+    hp: 60,
+    damage: 12,
+    attackSpeed: 0.9, // fast, frothing swings
+    moveSpeed: 88,
+    range: MELEE,
+    ability: "lifesteal", // passive filler — never casts
+    color: "#4c1d24", // wine-dark vestments
+    accent: "#f6c453", // guttering candle gold
+  },
+  gargoyle: {
+    id: "gargoyle",
+    name: "Gargoyle",
+    rarity: "rare",
+    role: "Waking Stone",
+    hp: 130,
+    damage: 10,
+    attackSpeed: 1.8,
+    moveSpeed: 45, // grinding stone gait
+    range: MELEE,
+    ability: "lifesteal", // passive filler — never casts
+    color: "#57534e", // weathered granite
+    accent: "#a8a29e",
+  },
+  grave_chorister: {
+    id: "grave_chorister",
+    name: "Grave Chorister",
+    rarity: "rare",
+    role: "Wailing Spirit",
+    hp: 45,
+    damage: 12,
+    attackSpeed: 1.4,
+    moveSpeed: 60,
+    range: FIELD_WIDTH * 0.3,
+    ability: "lifesteal", // passive filler — never casts
+    school: "magic",
+    tags: ["undead"],
+    color: "#8b93a7", // faded shroud grey
+    accent: "#dbe4ff", // spectral glow
+  },
+  // Seraphiel the Forsworn — the Cathedral boss. A fallen mirror of the Seraph
+  // itself: it bubbles and mends itself with the same raid-healer kit while its
+  // burning blade does the arguing (reuses the Seraph kit).
+  fallen_seraph: {
+    id: "fallen_seraph",
+    name: "Seraphiel the Forsworn",
+    battleScale: 2.1, // boss — towers over rank-and-file on the battlefield
+    rarity: "epic",
+    role: "Fallen Radiance",
+    hp: 640,
+    damage: 22,
+    attackSpeed: 1.2,
+    moveSpeed: 50,
+    range: FIELD_WIDTH * 0.3,
+    ability: "divine_light",
+    abilities: ["sanctuary", "renewal"],
+    school: "magic",
+    wardedAgainst: ["polymorph"], // bosses don't fit in a sheep
+    color: "#3f3348", // ash-stained ivory gone dusk
+    accent: "#e8b04b", // tarnished halo gold
+    traits: [
+      {
+        name: "Sanctuary",
+        description:
+          "Wraps itself in absorb bubbles and mends its wounds with Divine Light — outlast the halo or be outlasted.",
+      },
+      {
+        name: "Burned Wings",
+        description:
+          "What it once shielded armies with, it now spends only on itself.",
+      },
+    ],
+  },
+  // The Penitent — the rare Cathedral catalyst (the fusion quest's spawn). A
+  // fallen angel that KEEPS HEALING its own wave (reuses the Priest kit — the
+  // first support rare). Grant it rest with a Priest fielded to earn the Seraph.
+  penitent: {
+    id: "penitent",
+    name: "The Penitent",
+    rarity: "legendary",
+    role: "Fallen Angel",
+    hp: 260,
+    damage: 10,
+    attackSpeed: 1.6,
+    moveSpeed: 56,
+    range: FIELD_WIDTH * 0.3,
+    ability: "flash_heal",
+    abilities: ["renew"],
+    school: "magic",
+    wardedAgainst: ["polymorph"],
+    color: "#cfc6b8", // ash-dusted alabaster
+    accent: "#9db8ff", // cold votive light
+    traits: [
+      {
+        name: "Unending Vigil",
+        description:
+          "It cannot stop tending the fallen — Flash Heal and Renew keep its wave standing long past its welcome.",
+      },
+      {
+        name: "Seeking Rest",
+        description: "It does not flee the blade. It is waiting for the right one.",
+      },
+    ],
+  },
+  // -------------------------------------------------------------------------
+  // The Rogue's Den — thieves'-guild tier (the Outlaw's dungeon; see
+  // data/dungeons). Gated behind Eclipse Spire floor 5; boss floor hosts the
+  // rare Silencer fusion quest (any stealth unit + Silencer → Outlaw). The
+  // Silencer reuses the Outlaw kit (a taste of dodge + Killing Spree before you
+  // own it) and the Bandit King the Berserker kit.
+  // -------------------------------------------------------------------------
+  cutpurse: {
+    id: "cutpurse",
+    name: "Cutpurse",
+    rarity: "rare",
+    role: "Gutter Blade",
+    hp: 42,
+    damage: 10,
+    attackSpeed: 0.75, // flurry of quick dagger jabs
+    moveSpeed: 100, // darts across the field
+    range: MELEE,
+    ability: "lifesteal", // passive filler — never casts
+    color: "#3b3347", // patched dusk-grey hood
+    accent: "#d4a017", // stolen-coin glint
+  },
+  knife_thrower: {
+    id: "knife_thrower",
+    name: "Knife Thrower",
+    rarity: "rare",
+    role: "Poisoned Steel",
+    hp: 50,
+    damage: 11,
+    attackSpeed: 1.1,
+    moveSpeed: 70,
+    range: FIELD_WIDTH * 0.28,
+    ability: "lifesteal", // passive filler — never casts
+    basicShotRider: {
+      everyNthAttack: 3,
+      rider: {
+        effectType: "poison",
+        durationSec: 3,
+        damagePerTick: 5,
+        tickIntervalSec: 1,
+        vfxKind: "burn_burst", // reused burst, tinted venom-lime
+        color: "#84cc16", // venom-slick blade
+      },
+    },
+    color: "#2c333d", // oiled leather
+    accent: "#84cc16", // venom lime
+  },
+  den_bruiser: {
+    id: "den_bruiser",
+    name: "Den Bruiser",
+    rarity: "rare",
+    role: "Guild Muscle",
+    hp: 125,
+    damage: 14,
+    attackSpeed: 1.7,
+    moveSpeed: 50,
+    range: MELEE,
+    ability: "lifesteal", // passive filler — never casts
+    color: "#5b4632", // scarred hide vest
+    accent: "#c98a3d", // brass knuckles
+  },
+  // The Bandit King — the Den boss. A roaring crowned brute whose rage only
+  // builds: cleaving sabers, ramping bloodrage, and one spiteful refusal to die
+  // (reuses the Berserker kit).
+  bandit_king: {
+    id: "bandit_king",
+    name: "The Bandit King",
+    battleScale: 2.1, // boss — towers over rank-and-file on the battlefield
+    rarity: "epic",
+    role: "Crowned Cutthroat",
+    hp: 780,
+    damage: 22,
+    attackSpeed: 1.4,
+    moveSpeed: 62,
+    range: MELEE,
+    ability: "bloodrage",
+    tendency: "executioner",
+    wardedAgainst: ["polymorph"], // bosses don't fit in a sheep
+    color: "#4a2c3a", // wine-stained leathers
+    accent: "#e8b04b", // stolen crown gold
+    traits: [
+      {
+        name: "Twin Sabers",
+        description:
+          "Each swing cleaves every enemy in reach — the King doesn't pick favorites.",
+      },
+      {
+        name: "King's Ransom",
+        description:
+          "Once per battle, a killing blow leaves him at 1 HP and unkillable — long enough to rage back.",
+      },
+    ],
+  },
+  // The Silencer — the rare Den catalyst (the fusion quest's spawn). The
+  // guild's masked executioner (reuses the Outlaw kit: stealth deploy, 50%
+  // dodge, Killing Spree). Cut it down with a stealth unit fielded — Assassin,
+  // Rogue, or Trickster — to earn the Outlaw.
+  silencer: {
+    id: "silencer",
+    name: "The Silencer",
+    rarity: "legendary",
+    role: "Guild Executioner",
+    hp: 300,
+    damage: 16,
+    attackSpeed: 0.85,
+    moveSpeed: 100,
+    range: MELEE,
+    ability: "killing_spree",
+    tendency: "backline_stalker",
+    wardedAgainst: ["polymorph"],
+    color: "#1c1a22", // featureless black mask
+    accent: "#b91c1c", // a single red thread
+    traits: [
+      {
+        name: "Slippery",
+        description:
+          "Half of all blows simply never find it — a 50% chance to dodge any hit.",
+      },
+      {
+        name: "Killing Spree",
+        description:
+          "Builds toward an untouchable rampage, teleporting blade-first between victims.",
       },
     ],
   },
@@ -1498,6 +1803,18 @@ export const NON_DECK_UNITS = new Set<string>([
   "animated_armor",
   "forge_golem",
   "ancient_automaton",
+  // The Fallen Cathedral (desecrated sanctum) tier.
+  "heretic_zealot",
+  "gargoyle",
+  "grave_chorister",
+  "fallen_seraph",
+  "penitent",
+  // The Rogue's Den (thieves' guild) tier.
+  "cutpurse",
+  "knife_thrower",
+  "den_bruiser",
+  "bandit_king",
+  "silencer",
 ]);
 
 /** Units that can appear in a player/AI deck or the hub card grid. */

@@ -63,7 +63,7 @@ export interface ItemLineDef {
   id: string;
   name: string;
   slot: ItemSlot;
-  /** Set on the six dungeon-signature lines: excluded from the base chest
+  /** Set on the eight dungeon-signature lines: excluded from the base chest
    *  pool, dropped only by this dungeon's boss chest. */
   dungeonId?: string;
   /** One-line flavor for the Bag / detail panel. */
@@ -169,6 +169,13 @@ const TRINKET_MIRROR_PCT = [
   [9, 11, 13],
 ];
 
+/** Fallen Halo absorb-bubble size, % of max HP (legendary re-forms it). */
+const HALO_SHIELD_PCT = [
+  [6, 8, 10],
+  [12, 15, 18],
+  [22, 26, 30],
+];
+
 const LEG = 2; // legendary quality index
 
 const pct = (table: number[][], q: number, s: number) => table[q][s] / 100;
@@ -213,7 +220,7 @@ const silenceRider = (s: number): ShotRider => ({
 });
 
 // ---------------------------------------------------------------------------
-// The 25 lines. Base pool: 6 weapons / 5 armors / 8 trinkets. Six more carry
+// The 27 lines. Base pool: 6 weapons / 5 armors / 8 trinkets. Eight more carry
 // a `dungeonId` — each themed dungeon's boss-chest signature drop.
 // ---------------------------------------------------------------------------
 
@@ -340,6 +347,29 @@ export const ITEM_LINES: Record<string, ItemLineDef> = {
     mods: (q, s) => ({
       ...dmgOf(PRIMARY_PCT)(q, s),
       ...(q === LEG ? { critEveryNth: 5 } : {}),
+    }),
+  },
+  guildmasters_dirk: {
+    id: "guildmasters_dirk",
+    name: "Guildmaster's Dirk",
+    slot: "weapon",
+    dungeonId: "rogues_den",
+    desc: "Guild arithmetic: every kill pays the next one forward.",
+    icon: "daggers",
+    color: "#e8b04b",
+    mods: (q, s) => ({
+      ...dmgOf(PRIMARY_PCT)(q, s),
+      ...(q === LEG
+        ? {
+            effects: [
+              {
+                kind: "hasteOnKill",
+                durationSec: [2, 2.5, 3][s],
+                magnitude: 0.3,
+              },
+            ] as ItemEffect[],
+          }
+        : {}),
     }),
   },
   // ---- armors (base) --------------------------------------------------------
@@ -655,6 +685,24 @@ export const ITEM_LINES: Record<string, ItemLineDef> = {
           bonus: ECLIPSE_BONUS[q][s],
           ...(q === LEG ? { stunSec: 0.4 } : {}),
         },
+      ] as ItemEffect[],
+    }),
+  },
+  fallen_halo: {
+    id: "fallen_halo",
+    name: "Fallen Halo",
+    slot: "trinket",
+    dungeonId: "fallen_cathedral",
+    desc: "Tarnished and tilted, it still keeps one last sanctuary lit.",
+    icon: "ring",
+    color: "#ffd76a",
+    // A Sanctuary bubble of its own: an absorb shield at deploy; the legendary
+    // halo relights it every 14s instead of granting it once.
+    mods: (q, s) => ({
+      effects: [
+        q === LEG
+          ? { kind: "runicBarrier", frac: HALO_SHIELD_PCT[q][s] / 100, intervalSec: 14 }
+          : { kind: "startShield", frac: HALO_SHIELD_PCT[q][s] / 100 },
       ] as ItemEffect[],
     }),
   },

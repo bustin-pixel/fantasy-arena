@@ -314,6 +314,19 @@ function makeDamageDealer(
 
     const kit = getKit(target.defId);
 
+    // [seam] kit full-negate veto: the target avoids the hit entirely and shows
+    // its own text (Outlaw's 50% Slippery dodge; Killing Spree damage immunity).
+    // Runs before shield/mitigation so a dodged blow costs nothing — no HP change,
+    // no hit flash, no "-0". Identity for every unit without the hook (the guard
+    // is false), so no other unit's digest moves.
+    if (
+      amount > 0 &&
+      kit?.onWouldTakeDamage &&
+      kit.onWouldTakeDamage(target, amount, source, makeKitCtx(target, true))
+    ) {
+      return;
+    }
+
     // Shield fully blocks a single hit.
     if (tryConsumeShield(target)) {
       spawnFloatingText(state, target, "Block", "heal");
@@ -795,6 +808,68 @@ function stepArcaneBarrage(
   unit.barrageTimer = unit.barrageShots > 0 ? ARCANE_VOLLEY_GAP : 0;
 }
 
+// Killing Spree (Outlaw ultimate). While spreeTicks is live the Outlaw teleports
+// between enemies, striking each — this streamer owns the blink + strike cadence.
+// Field-gated on spreeTicks (not defId), exactly like stepArcaneBarrage/stepCharge:
+// the kit ARMS it (charge-up in kits/outlaw.ts onTick) and the funnel veto grants
+// the immunity; here we just drive the hops. Fully deterministic — the enemy
+// rotation is uid-sorted, no RNG.
+const SPREE_JUMP_INTERVAL = secToTicks(0.5); // a blink-strike every ~0.5s (~10 over 5s)
+const SPREE_JUMP_DAMAGE = 26; // ~260 total across a full spree
+
+function stepKillingSpree(
+  state: SimState,
+  unit: Unit,
+  dealDamage: (target: Unit, amount: number, source: Unit) => void
+): void {
+  unit.spreeTicks--;
+
+  if (unit.spreeJumpTimer > 0) {
+    unit.spreeJumpTimer--;
+  } else {
+    // Uid-sorted living enemies → a deterministic round-robin the blink walks.
+    const enemies = state.units
+      .filter((e) => e.team !== unit.team && e.state !== "dead")
+      .sort((a, b) => (a.uid < b.uid ? -1 : 1));
+    if (enemies.length > 0) {
+      const target = enemies[unit.spreeIndex % enemies.length];
+      unit.spreeIndex++;
+
+      // Blink in just short of the target along the line of approach (as the
+      // Trickster's Shadow Step lands), then strike.
+      let toward = dir(unit.pos, target.pos);
+      if (toward.x === 0 && toward.y === 0) {
+        toward = { x: 0, y: unit.team === "player" ? -1 : 1 };
+      }
+      const standoff = unit.radius + target.radius - 4;
+      unit.pos.x = clamp(
+        target.pos.x - toward.x * standoff,
+        unit.radius,
+        FIELD_WIDTH - unit.radius
+      );
+      unit.pos.y = clamp(
+        target.pos.y - toward.y * standoff,
+        unit.radius,
+        FIELD_HEIGHT - unit.radius
+      );
+      unit.facing = target.pos.x >= unit.pos.x ? 1 : -1;
+
+      dealDamage(target, SPREE_JUMP_DAMAGE, unit);
+      spawnVfx(state, {
+        kind: "slam",
+        pos: { x: target.pos.x, y: target.pos.y },
+        life: secToTicks(0.35),
+        maxLife: secToTicks(0.35),
+        color: getUnitDef(unit.defId).accent,
+      });
+      unit.spreeJumpTimer = SPREE_JUMP_INTERVAL;
+    }
+  }
+
+  // Reads as an active strike; MovementSystem declines to move a spreeing unit.
+  transitionTo(unit, "attacking");
+}
+
 // (Arcane Mage Blink now lives in kits/arcaneMage.ts onReactTick — the pre-idle
 // reactive teleport away from a closing melee threat, on its own blinkCooldown.)
 
@@ -888,6 +963,7 @@ export function stepSimulation(state: SimState): void {
     return {
       unit: subject,
       tick: state.tick,
+      rng: state.rng,
       unitsByUid: byUid,
       enemies: liveNow.filter((e) => e.team !== subject.team),
       allies: liveNow.filter(
@@ -953,6 +1029,9 @@ export function stepSimulation(state: SimState): void {
     if (unit.shadowCooldown > 0) unit.shadowCooldown--;
     if (unit.curseCooldown > 0) unit.curseCooldown--;
     if (unit.rejuvCooldown > 0) unit.rejuvCooldown--;
+    if (unit.renewCooldown > 0) unit.renewCooldown--;
+    if (unit.sanctuaryCooldown > 0) unit.sanctuaryCooldown--;
+    if (unit.renewalCooldown > 0) unit.renewalCooldown--;
 
     // Equipment upkeep (Heartwood regen, Runeward barrier) — pre-gate like kit
     // onTick, so it runs even while stunned. No-op for unequipped units.
@@ -972,6 +1051,16 @@ export function stepSimulation(state: SimState): void {
     {
       const kit = getKit(unit.defId);
       if (kit?.onTick) kit.onTick(unit, makeKitCtx(unit));
+    }
+
+    // [driver] Killing Spree — while a spree is live the Outlaw owns its whole
+    // turn: it teleports between enemies (stepKillingSpree) and is immune to all
+    // damage (the funnel veto) and to crowd control. Placed BEFORE the stun / fear
+    // / polymorph gates below so nothing can interrupt the rampage. Field-gated on
+    // spreeTicks, not defId — the same engine-driver pattern as stepCharge.
+    if (unit.spreeTicks > 0) {
+      stepKillingSpree(state, unit, dealDamage);
+      continue;
     }
 
     // (Engineer Field Repairs now lives in kits/engineer.ts onTick — the pre-gate
@@ -1084,6 +1173,7 @@ export function stepSimulation(state: SimState): void {
     const abilityCtx: AbilityContext = {
       unit,
       tick: state.tick,
+      rng: state.rng,
       unitsByUid: byUid,
       enemies,
       allies,

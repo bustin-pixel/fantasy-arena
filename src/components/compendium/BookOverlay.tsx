@@ -9,7 +9,7 @@
 // via onOpenUnit — the screen renders the existing UnitDetail on top.
 // ============================================================================
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { getUnitDef } from "@/data/units";
 import { RARITIES } from "@/data/rarities";
 import { ITEM_LINES, makeItemKey } from "@/data/items";
@@ -62,7 +62,10 @@ function Portrait({
   size: number;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
+  // Paint BEFORE the browser shows the frame (not useEffect, which runs after):
+  // a page turn mounts fresh card canvases as the leaf lands, and a one-frame
+  // blank canvas reads as a flicker of the cards on mobile.
+  useLayoutEffect(() => {
     const ctx = ref.current?.getContext("2d");
     if (!ctx) return;
     renderPortrait(
@@ -89,7 +92,9 @@ function SplashArt({
   cover?: boolean;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
+  // Layout effect: paint the splash before the frame is shown so a page turn
+  // never flashes a blank plate (same reason as Portrait above).
+  useLayoutEffect(() => {
     const canvas = ref.current;
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
@@ -182,6 +187,16 @@ function PageView({
   onOpenUnit: (defId: string) => void;
   onPickItem: (lineId: string) => void;
 }) {
+  if (page.title) {
+    return (
+      <div className="book-pagebody book-titlepage">
+        <span className="book-title-rule" aria-hidden />
+        <h2 className="book-title-plate">{page.heading}</h2>
+        <span className="book-title-rule" aria-hidden />
+        {pageNo != null && <span className="book-pgno">{pageNo}</span>}
+      </div>
+    );
+  }
   if (page.boss) {
     const tier = tierOf(save.bestiary[page.boss.defId]);
     const def = getUnitDef(page.boss.defId);
@@ -213,7 +228,7 @@ function PageView({
       {page.heading && <h4 className="book-page-heading">{page.heading}</h4>}
       {page.art && (
         <div className="book-splash-plate">
-          <SplashArt bookId={page.art} className="book-splash-canvas" />
+          <SplashArt bookId={page.art} className="book-splash-canvas" cover />
         </div>
       )}
       {page.entries.length > 0 && (
@@ -274,10 +289,9 @@ export function BookOverlay({
   const [idx, setIdx] = useState(0);
   const [flip, setFlip] = useState<Flip | null>(null);
   const [itemSel, setItemSel] = useState<string | null>(null);
-  /** The opening turn has landed → the cover unmounts (the leaf pattern: never
-   *  fade a preserve-3d flipper, remove it). Remounts for the closing swing. */
-  const [coverGone, setCoverGone] = useState(false);
   const closingRef = useRef(false);
+  /** Guards the one-shot opening auto-turn so it fires only on first open. */
+  const autoTurnedRef = useRef(false);
   // Swipe-to-turn bookkeeping: where the pointer went down on the spread, and
   // whether that gesture became a swipe (so the click it ends with is eaten
   // instead of opening whatever card it landed on).
@@ -296,19 +310,19 @@ export function BookOverlay({
     window.setTimeout(onClose, CLOSE_MS);
   };
 
-  // Entrance timeline: scale in off the shelf, the cover turns like a leaf,
-  // then unmounts once landed (the static lore page beneath is identical).
+  // Entrance timeline: the tome scales up off the shelf already open to the
+  // title spread (no cover swing — the book has no painted cover page). `pull`
+  // starts the scale-in; `open` (a beat later) enables page turns and plays the
+  // open cue.
   useEffect(() => {
     const t1 = window.setTimeout(() => setPhase("pull"), 20);
     const t2 = window.setTimeout(() => {
       playSfx("bookOpen");
       setPhase("open");
     }, PULL_MS);
-    const t3 = window.setTimeout(() => setCoverGone(true), PULL_MS + FLIP_MS);
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
-      clearTimeout(t3);
     };
   }, []);
 
@@ -354,6 +368,17 @@ export function BookOverlay({
       setFlip(null);
     }, FLIP_MS);
   };
+
+  // Opening ceremony: once the tome has settled open on the title page, turn a
+  // single leaf on its own so the book "opens to" its first content spread
+  // (square art + denizens). One-shot — manual turns take over afterward.
+  useEffect(() => {
+    if (phase !== "open" || autoTurnedRef.current) return;
+    autoTurnedRef.current = true;
+    const t = window.setTimeout(() => doFlip(1), 480);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
 
   // Static pages under the flipping leaf: during a forward flip the left page
   // stays on the OLD spread while the right already shows the NEW one (the
@@ -443,22 +468,6 @@ export function BookOverlay({
             </div>
           )}
         </div>
-
-        {(!coverGone || phase === "closing") && (
-          <div className="book-cover" aria-hidden={phase === "open"}>
-            <div className="book-cover-face front">
-              <SplashArt bookId={book.id} className="book-cover-art" cover />
-              <span className="book-cover-scrim" aria-hidden />
-              <span className="book-cover-title">{book.title}</span>
-            </div>
-            {/* Like a real book: the inside of the cover IS the first page, so
-             *  the turn lands showing the lore page (square plate and all) and
-             *  hands off to the identical static left page beneath. */}
-            <div className="book-cover-face back">
-              <PageView page={spreads[0].left} {...pageProps} />
-            </div>
-          </div>
-        )}
 
         <button className="detail-close book-close" onClick={beginClose} aria-label="Close the book">
           ✕

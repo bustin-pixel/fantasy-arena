@@ -83,6 +83,26 @@ function matchClockSec(mode: MatchMode): number {
   return MATCH_TIME_SEC;
 }
 
+/** Post-battle enemy ledger from a final unit list. `seen` = the DISTINCT enemy
+ *  defIds encountered (for the compendium). `slain` = a MULTISET, one entry per
+ *  dead enemy — slay bounties count individual kills, so this must NOT dedupe
+ *  (a "slay 18× Spore Pod" quest folds `slain.filter(id => id===target).length`).
+ *  Arena/Depths/dungeon corpses persist in the unit list, so this final scan sees
+ *  every kill; Endless prunes corpses mid-run and keeps its own running kill log
+ *  (see EndlessController.ledger), which the hook prefers over this scan. */
+export function battleEnemyLedger(
+  units: readonly Unit[]
+): { seen: string[]; slain: string[] } {
+  const seen = new Set<string>();
+  const slain: string[] = [];
+  for (const u of units) {
+    if (u.team !== "enemy") continue;
+    seen.add(u.defId);
+    if (u.state === "dead") slain.push(u.defId);
+  }
+  return { seen: [...seen], slain };
+}
+
 export class MatchController {
   state: SimState;
   playerDeck: string[];

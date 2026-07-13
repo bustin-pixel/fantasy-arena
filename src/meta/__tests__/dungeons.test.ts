@@ -1,7 +1,8 @@
 // Dungeon registry sanity — the gate chain and the monster-level ladder.
-// These are DATA specs (guards designer typos): the chain must stay a single
-// acyclic walk rooted at The Depths, and the ladder must track the player's
-// expected arrival level (see data/dungeons.ts registry comment).
+// These are DATA specs (guards designer typos): every gate walk must be an
+// acyclic path rooted at The Depths (the chain FORKS after the Eclipse Spire
+// into the Fallen Cathedral and the Rogue's Den), and the ladder must track
+// the player's expected arrival level (see data/dungeons.ts registry comment).
 import { describe, expect, it } from "vitest";
 import {
   DUNGEONS,
@@ -43,7 +44,7 @@ describe("dungeon registry — gate chain sanity", () => {
     }
   });
 
-  it("the chain runs Depths → Bonefields → Wilds → Overgrowth → Vault → Forge → Spire", () => {
+  it("the chain runs Depths → … → Spire, then forks into Cathedral and Den", () => {
     const prereqOf = (id: string) => getDungeon(id).gate?.dungeonId;
     expect(prereqOf("bonefields")).toBe("depths");
     expect(prereqOf("wilds")).toBe("bonefields");
@@ -51,6 +52,9 @@ describe("dungeon registry — gate chain sanity", () => {
     expect(prereqOf("sealed_vault")).toBe("overgrowth");
     expect(prereqOf("deep_forge")).toBe("sealed_vault");
     expect(prereqOf("eclipse_spire")).toBe("deep_forge");
+    // The fork: both endgame dungeons open off the Spire's last floor.
+    expect(prereqOf("fallen_cathedral")).toBe("eclipse_spire");
+    expect(prereqOf("rogues_den")).toBe("eclipse_spire");
     // The registry lists them in chain order (the dungeon map reads this).
     expect(DUNGEON_IDS).toEqual([
       "depths",
@@ -60,24 +64,41 @@ describe("dungeon registry — gate chain sanity", () => {
       "sealed_vault",
       "deep_forge",
       "eclipse_spire",
+      "fallen_cathedral",
+      "rogues_den",
     ]);
+  });
+
+  it("clearing the Spire opens BOTH forks at once", () => {
+    const cleared = clearedFrom({
+      depths: 5, bonefields: 5, wilds: 5, overgrowth: 5,
+      sealed_vault: 5, deep_forge: 5, eclipse_spire: 5,
+    });
+    expect(isDungeonUnlocked(getDungeon("fallen_cathedral"), cleared)).toBe(true);
+    expect(isDungeonUnlocked(getDungeon("rogues_den"), cleared)).toBe(true);
+    // One floor short of the Spire's last, both stay shut.
+    const nearly = clearedFrom({ eclipse_spire: 4 });
+    expect(isDungeonUnlocked(getDungeon("fallen_cathedral"), nearly)).toBe(false);
+    expect(isDungeonUnlocked(getDungeon("rogues_den"), nearly)).toBe(false);
   });
 });
 
 describe("monster-level ladder", () => {
-  it("holds the tuned ladder 1/3/5/6/7/8/9 along the chain", () => {
+  it("holds the tuned ladder 1/3/5/6/7/8/9, then 10/10 past the fork", () => {
     expect(DUNGEON_IDS.map((id) => getDungeon(id).monsterLevel)).toEqual([
-      1, 3, 5, 6, 7, 8, 9,
+      1, 3, 5, 6, 7, 8, 9, 10, 10,
     ]);
   });
 
-  it("levels climb the chain and elites never exceed the player level cap", () => {
-    let prev = 0;
+  it("every dungeon outlevels its own prerequisite; elites never exceed the player cap", () => {
+    // Post-fork the registry ORDER isn't strictly increasing (the two forks tie
+    // at 10) — the real invariant is per-gate: harder than what unlocked you.
     for (const id of DUNGEON_IDS) {
       const d = getDungeon(id);
-      expect(d.monsterLevel).toBeGreaterThan(prev);
+      if (d.gate) {
+        expect(d.monsterLevel).toBeGreaterThan(getDungeon(d.gate.dungeonId).monsterLevel);
+      }
       expect(monsterLevelFor(d, "boss")).toBeLessThanOrEqual(LEVEL_CAP);
-      prev = d.monsterLevel;
     }
   });
 
@@ -86,6 +107,15 @@ describe("monster-level ladder", () => {
     expect(monsterLevelFor(d, "fodder")).toBe(d.monsterLevel);
     expect(monsterLevelFor(d, "rare")).toBe(d.monsterLevel + ELITE_LEVEL_BONUS);
     expect(monsterLevelFor(d, "boss")).toBe(d.monsterLevel + ELITE_LEVEL_BONUS);
+  });
+
+  it("cap-tier elites TIE the player cap instead of exceeding it (the fork dungeons)", () => {
+    for (const id of ["fallen_cathedral", "rogues_den"]) {
+      const d = getDungeon(id);
+      expect(d.monsterLevel).toBe(LEVEL_CAP);
+      expect(monsterLevelFor(d, "boss")).toBe(LEVEL_CAP);
+      expect(monsterLevelFor(d, "rare")).toBe(LEVEL_CAP);
+    }
   });
 });
 

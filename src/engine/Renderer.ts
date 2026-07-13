@@ -12,6 +12,7 @@ import {
   FIELD_HEIGHT,
   FIELD_WIDTH,
   PLAYER_ZONE,
+  fieldTransform,
 } from "@/utils/constants";
 import { drawUnitSprite } from "@/assets/sprites";
 import { getUnitDef } from "@/data/units";
@@ -23,6 +24,24 @@ import {
 import { getSettings } from "@/state/settings";
 
 type Ctx = CanvasRenderingContext2D;
+
+// Sprite geometry in normalized sprite space (see assets/sprites.ts): a body
+// spans roughly head y≈-27 to feet y≈+26 around the draw origin. Bosses are
+// drawn enlarged and anchored at their feet, so the extra height rises upward;
+// the HP bar / status icons follow the top of the enlarged sprite.
+const SPRITE_HEAD = 27;
+const SPRITE_FEET = 26;
+
+/** A unit's battlefield sprite enlargement (bosses only). 1 for normal units. */
+function bossScaleOf(u: Unit): number {
+  return getUnitDef(u.defId).battleScale ?? 1;
+}
+/** Screen-y of the top of a unit's drawn sprite. For an enlarged boss the sprite
+ *  grows up from its feet, so the head sits higher than the collision radius. */
+function spriteTopY(u: Unit): number {
+  const bs = bossScaleOf(u);
+  return u.pos.y - SPRITE_FEET * (bs - 1) - SPRITE_HEAD * bs;
+}
 
 // Static theme backdrops, pre-rendered once per theme to offscreen canvases.
 const bgCache = new Map<ArenaThemeId, HTMLCanvasElement>();
@@ -39,34 +58,42 @@ function getBackground(theme: ArenaTheme): HTMLCanvasElement {
   return bg;
 }
 
-function drawZones(ctx: Ctx, theme: ArenaTheme): void {
+/** Deployment bands + midline. Drawn in BUFFER space so they span the full
+ *  width (edge-to-edge), with world-Y mapped through the fit transform so they
+ *  still line up with the centered world layer. */
+function drawZones(
+  ctx: Ctx,
+  theme: ArenaTheme,
+  bufW: number,
+  scale: number,
+  offsetY: number
+): void {
+  const y = (worldY: number): number => offsetY + worldY * scale;
   ctx.save();
   ctx.fillStyle = theme.zoneTop;
-  ctx.fillRect(0, ENEMY_ZONE.top, FIELD_WIDTH, ENEMY_ZONE.bottom - ENEMY_ZONE.top);
+  ctx.fillRect(0, y(ENEMY_ZONE.top), bufW, (ENEMY_ZONE.bottom - ENEMY_ZONE.top) * scale);
   ctx.fillStyle = theme.zoneBottom;
-  ctx.fillRect(
-    0,
-    PLAYER_ZONE.top,
-    FIELD_WIDTH,
-    PLAYER_ZONE.bottom - PLAYER_ZONE.top
-  );
+  ctx.fillRect(0, y(PLAYER_ZONE.top), bufW, (PLAYER_ZONE.bottom - PLAYER_ZONE.top) * scale);
   // midline
   ctx.strokeStyle = theme.midline;
   ctx.lineWidth = 1;
   ctx.setLineDash([6, 6]);
   ctx.beginPath();
-  ctx.moveTo(0, FIELD_HEIGHT / 2);
-  ctx.lineTo(FIELD_WIDTH, FIELD_HEIGHT / 2);
+  ctx.moveTo(0, y(FIELD_HEIGHT / 2));
+  ctx.lineTo(bufW, y(FIELD_HEIGHT / 2));
   ctx.stroke();
   ctx.setLineDash([]);
   ctx.restore();
 }
 
 function drawHealthBar(ctx: Ctx, u: Unit): void {
-  const w = 34;
+  const bs = bossScaleOf(u);
   const h = 4;
+  // Bosses get a wider bar sitting above their enlarged sprite; normal units
+  // keep the exact original bar (radius-relative), byte-for-byte unchanged.
+  const w = bs > 1 ? 34 * bs : 34;
   const x = u.pos.x - w / 2;
-  const y = u.pos.y - u.radius - 14;
+  const y = bs > 1 ? spriteTopY(u) - 10 : u.pos.y - u.radius - 14;
   const pct = Math.max(0, u.hp / u.maxHp);
   ctx.fillStyle = "rgba(0,0,0,0.6)";
   ctx.fillRect(x - 1, y - 1, w + 2, h + 2);
@@ -119,6 +146,22 @@ function drawHealthBar(ctx: Ctx, u: Unit): void {
     ctx.fillStyle = "#fde047";
     ctx.fillRect(x, cy, w * progress, ch);
   }
+
+  // Ultimate charge bar (Outlaw's Killing Spree): a gold meter under the HP bar,
+  // filling as the ult charges (and refilling through its cooldown). It glows
+  // red-hot and full while a spree is active. ultChargeMax is 0 for every other
+  // unit, so this draws only for the Outlaw. (No overlap with the cast bar — the
+  // Outlaw never uses the engine's cast pipeline.)
+  if ((u.ultChargeMax ?? 0) > 0) {
+    const cy = y + h + 2;
+    const ch = 3;
+    const spreeing = (u.spreeTicks ?? 0) > 0;
+    const progress = spreeing ? 1 : Math.min(1, u.ultCharge / u.ultChargeMax);
+    ctx.fillStyle = "rgba(0,0,0,0.6)";
+    ctx.fillRect(x - 1, cy - 1, w + 2, ch + 2);
+    ctx.fillStyle = spreeing ? "#f87171" : "#fbbf24";
+    ctx.fillRect(x, cy, w * progress, ch);
+  }
 }
 
 function drawStatusIcons(ctx: Ctx, u: Unit): void {
@@ -138,13 +181,15 @@ function drawStatusIcons(ctx: Ctx, u: Unit): void {
     taunt: "❗",
     fear: "😱",
   };
+  const bs = bossScaleOf(u);
+  const iconY = bs > 1 ? spriteTopY(u) - 22 : u.pos.y - u.radius - 20;
   let i = 0;
   ctx.font = "10px sans-serif";
   ctx.textAlign = "center";
   for (const e of u.effects) {
     const icon = icons[e.type];
     if (!icon) continue;
-    ctx.fillText(icon, u.pos.x - 14 + i * 12, u.pos.y - u.radius - 20);
+    ctx.fillText(icon, u.pos.x - 14 + i * 12, iconY);
     i++;
   }
 }
@@ -160,14 +205,19 @@ function drawUnit(ctx: Ctx, u: Unit): void {
     ctx.globalAlpha = 0.3;
   }
 
-  drawUnitSprite(ctx, u, u.pos.x, u.pos.y);
+  drawUnitSprite(ctx, u, u.pos.x, u.pos.y, { battle: true });
+
+  // Boss VFX overlays scale with the enlarged sprite and ride its raised body
+  // centre; normal units (bs === 1) keep the original radius-relative circles.
+  const bs = bossScaleOf(u);
+  const bodyY = u.pos.y - SPRITE_FEET * (bs - 1);
 
   // Red damage flash overlay (not while stealthed).
   if (u.hitFlash > 0 && u.state !== "dead" && !stealthed) {
     ctx.globalAlpha = (u.hitFlash / 4) * 0.5;
     ctx.fillStyle = "#ff3030";
     ctx.beginPath();
-    ctx.arc(u.pos.x, u.pos.y - 4, u.radius * 0.7, 0, Math.PI * 2);
+    ctx.arc(u.pos.x, bodyY - 4, u.radius * 0.7 * bs, 0, Math.PI * 2);
     ctx.fill();
     ctx.globalAlpha = stealthed ? 0.3 : 1;
   }
@@ -177,7 +227,7 @@ function drawUnit(ctx: Ctx, u: Unit): void {
     ctx.strokeStyle = "rgba(226,232,240,0.8)";
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(u.pos.x, u.pos.y - 2, u.radius * 0.9, 0, Math.PI * 2);
+    ctx.arc(u.pos.x, bodyY - 2, u.radius * 0.9 * bs, 0, Math.PI * 2);
     ctx.stroke();
   }
 
@@ -365,8 +415,23 @@ export function renderBattle(
   themeId: ArenaThemeId = "grassField"
 ): void {
   const theme = ARENA_THEMES[themeId];
-  ctx.drawImage(getBackground(theme), 0, 0);
-  drawZones(ctx, theme);
+  const bufW = ctx.canvas.width;
+  const bufH = ctx.canvas.height;
+  const { scale, offsetX, offsetY } = fieldTransform(bufW, bufH);
+
+  // --- Fill layer: background + zones span the WHOLE buffer, so the arena
+  // reaches the screen edges with no black letterbox bars. The buffer is sized
+  // to the display box's aspect (BattleScreen), and the background art is
+  // abstract, so stretching it to fill is imperceptible. ---
+  ctx.drawImage(getBackground(theme), 0, 0, FIELD_WIDTH, FIELD_HEIGHT, 0, 0, bufW, bufH);
+  drawZones(ctx, theme, bufW, scale, offsetY);
+
+  // --- World layer: everything positional lives in the fixed 480×720 world
+  // space, translated + uniformly scaled so the fight sits centered and
+  // undistorted; the margin either side is filled by the layer above. ---
+  ctx.save();
+  ctx.translate(offsetX, offsetY);
+  ctx.scale(scale, scale);
 
   // Ambient theme animation (embers, fireflies, glyphs) — drawn under the
   // units so combat readability is never compromised. Wall-clock time keeps
@@ -384,6 +449,8 @@ export function renderBattle(
   for (const v of snap.vfx) drawVfx(ctx, v);
   for (const p of snap.projectiles) drawProjectile(ctx, p);
   for (const ft of snap.floatingTexts) drawFloatingText(ctx, ft);
+
+  ctx.restore();
 }
 
 /** Draw a single unit portrait into a small canvas context (for card art).

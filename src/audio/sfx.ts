@@ -342,6 +342,7 @@ const RATE: Record<string, number> = {
   archer: 1.0, ranger: 1.05, hunter: 0.95, mystic_archer: 1.1, turret: 1.35,
   mage: 1.0, fire_mage: 0.95, ice_mage: 1.1, electric_mage: 1.15,
   arcane_mage: 1.0, necromancer: 0.8, healer: 1.1, summoner: 0.9, engineer: 1.0,
+  priest: 1.15,
 };
 
 /** Melee swing sound per defId (ranged/caster attacks sound on projectile

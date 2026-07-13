@@ -12,5 +12,8 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  server: { port: 5173, open: true },
+  // `host: true` binds to 0.0.0.0 so other devices on your LAN (e.g. your phone
+  // on the same WiFi) can load the dev server at http://<your-PC-IP>:5173 — handy
+  // for testing touch/mobile behavior without deploying. Dev-only; unused by build.
+  server: { port: 5173, open: true, host: true },
 });

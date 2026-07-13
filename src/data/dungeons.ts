@@ -11,6 +11,7 @@
 // ============================================================================
 
 import type { ArenaThemeId } from "@/assets/arenaThemes";
+import { LEVEL_CAP } from "@/meta/leveling"; // leaf constants module — no cycle
 import {
   BOSS_FLOOR_FODDER_SHARE,
   BOSS_FLOOR_INTERVAL,
@@ -51,10 +52,10 @@ export interface Dungeon {
    *  floor). Absent = no quest. */
   quest?: RareSpawnQuest;
   /** Availability gate: locked until `floor` of dungeon `dungeonId` is cleared.
-   *  Absent = always available (The Depths itself). The gates form a single
-   *  chain (each dungeon requires the previous one's last floor); a dungeon
-   *  with any cleared progress of its own never re-locks — see
-   *  isDungeonUnlocked. */
+   *  Absent = always available (The Depths itself). The gates form a chain
+   *  through the Eclipse Spire, then FORK: the Fallen Cathedral and the
+   *  Rogue's Den both open off the Spire's last floor. A dungeon with any
+   *  cleared progress of its own never re-locks — see isDungeonUnlocked. */
   gate?: { dungeonId: string; floor: number };
   /** Lore blurb shown on the dungeon-select card. */
   entryHint: string;
@@ -63,11 +64,14 @@ export interface Dungeon {
 // ---------------------------------------------------------------------------
 // The registry, in gate-chain order (each dungeon requires the previous one's
 // floor 5): Depths → Bonefields → Wilds → Overgrowth → Sealed Vault →
-// Deep Forge → Eclipse Spire. The Depths wraps the legacy tuning from depths.ts
+// Deep Forge → Eclipse Spire, where the chain FORKS: the Fallen Cathedral and
+// the Rogue's Den both open off Eclipse Spire floor 5 (both Lv 10 — the
+// player picks their path). The Depths wraps the legacy tuning from depths.ts
 // unchanged. The themed dungeons are shorter self-contained trials whose boss
 // floor hosts the legendary rare-spawn quest; their monsterLevel ladder
-// (1/3/5/6/7/8/9) tracks the player's expected warband level walking the chain,
-// running one level hot from the Sealed Vault on.
+// (1/3/5/6/7/8/9, then 10/10 past the fork) tracks the player's expected
+// warband level walking the chain, running one level hot from the Sealed
+// Vault on.
 // ---------------------------------------------------------------------------
 
 /** Fire Mage + Lich = Necromancer: end the rare Lich in The Bonefields with a
@@ -141,6 +145,31 @@ const DEEP_FORGE_QUEST: RareSpawnQuest = {
   unlocks: "engineer",
   price: 2500,
   hint: "Deep in the forge, a giant who wrecks an ancient automaton may salvage the secrets of its making.",
+};
+
+/** Priest + Penitent = Seraph: grant the rare fallen angel its final rest in
+ *  The Fallen Cathedral with a Priest fielded to unlock buying the Seraph. */
+const FALLEN_CATHEDRAL_QUEST: RareSpawnQuest = {
+  floor: 5,
+  spawnId: "penitent",
+  chance: 0.15,
+  requires: "priest",
+  unlocks: "seraph",
+  price: 2500,
+  hint: "Within the fallen cathedral, a priest who grants a penitent angel its final rest may rise on burned wings.",
+};
+
+/** Any stealth unit + The Silencer = Outlaw: cut down the guild's masked
+ *  executioner in The Rogue's Den with an Assassin, Rogue, or Trickster
+ *  fielded to unlock buying the Outlaw. */
+const ROGUES_DEN_QUEST: RareSpawnQuest = {
+  floor: 5,
+  spawnId: "silencer",
+  chance: 0.15,
+  requires: ["assassin", "rogue", "trickster"],
+  unlocks: "outlaw",
+  price: 2500,
+  hint: "Beneath the city they whisper that one who strikes from the shadows and silences the Silencer may claim the Outlaw's price.",
 };
 
 export const DUNGEONS: Record<string, Dungeon> = {
@@ -305,6 +334,54 @@ export const DUNGEONS: Record<string, Dungeon> = {
     entryHint:
       "A tower where light and dark war without end — motes, shades, and the Warden between them.",
   },
+  fallen_cathedral: {
+    id: "fallen_cathedral",
+    name: "The Fallen Cathedral",
+    theme: "fallenCathedral",
+    floors: 5,
+    tiers: [
+      {
+        floors: [1, 5],
+        monsters: { heretic_zealot: 1, grave_chorister: 2, gargoyle: 3 },
+        boss: "fallen_seraph",
+      },
+    ],
+    bossFloorInterval: 5,
+    bossFloorFodderShare: BOSS_FLOOR_FODDER_SHARE,
+    budgetBase: 25,
+    budgetPerFloor: 3,
+    hpPerFloor: DEPTHS_HP_PER_FLOOR,
+    dmgPerFloor: DEPTHS_DMG_PER_FLOOR,
+    monsterLevel: 10,
+    quest: FALLEN_CATHEDRAL_QUEST,
+    gate: { dungeonId: "eclipse_spire", floor: 5 },
+    entryHint:
+      "A desecrated sanctum where hymns curdled into heresy — something holy fell here.",
+  },
+  rogues_den: {
+    id: "rogues_den",
+    name: "The Rogue's Den",
+    theme: "shadowPit",
+    floors: 5,
+    tiers: [
+      {
+        floors: [1, 5],
+        monsters: { cutpurse: 1, knife_thrower: 2, den_bruiser: 3 },
+        boss: "bandit_king",
+      },
+    ],
+    bossFloorInterval: 5,
+    bossFloorFodderShare: BOSS_FLOOR_FODDER_SHARE,
+    budgetBase: 25,
+    budgetPerFloor: 3,
+    hpPerFloor: DEPTHS_HP_PER_FLOOR,
+    dmgPerFloor: DEPTHS_DMG_PER_FLOOR,
+    monsterLevel: 10,
+    quest: ROGUES_DEN_QUEST,
+    gate: { dungeonId: "eclipse_spire", floor: 5 },
+    entryHint:
+      "A lantern-lit warren of cutthroats and coin — the guild does not welcome guests.",
+  },
 };
 
 export function getDungeon(id: string): Dungeon {
@@ -318,7 +395,8 @@ export const DUNGEON_IDS: string[] = Object.keys(DUNGEONS);
 
 /** Bosses and telegraphed rare quest catalysts spawn this many levels above the
  *  dungeon's fodder (uniform rule: the Depths Bloater is Lv 2, the Eclipse
- *  Warden Lv 10). */
+ *  Warden Lv 10), clamped to the player LEVEL_CAP — the fork dungeons run AT
+ *  the cap, so their elites tie it rather than exceed the leveling curve. */
 export const ELITE_LEVEL_BONUS = 1;
 
 export type MonsterSpawnKind = "fodder" | "rare" | "boss";
@@ -328,7 +406,10 @@ export function monsterLevelFor(
   dungeon: Dungeon,
   kind: MonsterSpawnKind
 ): number {
-  return dungeon.monsterLevel + (kind === "fodder" ? 0 : ELITE_LEVEL_BONUS);
+  return Math.min(
+    LEVEL_CAP,
+    dungeon.monsterLevel + (kind === "fodder" ? 0 : ELITE_LEVEL_BONUS)
+  );
 }
 
 /** Gate check for the dungeon-select map. `clearedFloorOf` abstracts the save

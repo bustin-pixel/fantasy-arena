@@ -554,6 +554,141 @@ function items(g: Ctx, w: number, h: number, rnd: () => number): void {
   }
 }
 
+/** The Fallen Cathedral — one shaft of light through a shattered rose window,
+ *  falling on a toppled altar amid guttering votives. */
+function fallenCathedral(g: Ctx, w: number, h: number, rnd: () => number): void {
+  sky(g, w, h, "#241f2c", "#0d0a12");
+  // far nave columns
+  for (const x of [0.12, 0.3, 0.7, 0.88]) {
+    g.fillStyle = "#181420";
+    g.fillRect(w * x - w * 0.025, h * 0.18, w * 0.05, h * 0.68);
+    g.fillStyle = "#2a2433";
+    g.fillRect(w * x - w * 0.025, h * 0.18, w * 0.012, h * 0.68);
+  }
+  // the shattered rose window, high center
+  const rx = w * 0.5, ry = h * 0.2, rr = w * 0.11;
+  glow(g, rx, ry, rr * 2.6, "rgba(255,214,120,.4)");
+  g.save();
+  g.beginPath();
+  g.arc(rx, ry, rr, 0, 7);
+  g.clip();
+  const petals = ["#7c3aed", "#b91c1c", "#b45309", "#1d4ed8"];
+  for (let i = 0; i < 12; i++) {
+    g.fillStyle = rnd() < 0.35 ? "#0d0a12" : petals[i % 4];
+    g.globalAlpha = 0.75;
+    g.beginPath();
+    g.moveTo(rx, ry);
+    g.arc(rx, ry, rr, (i / 12) * Math.PI * 2, ((i + 1) / 12) * Math.PI * 2);
+    g.closePath();
+    g.fill();
+  }
+  g.globalAlpha = 1;
+  g.restore();
+  g.strokeStyle = "rgba(220,205,170,.55)";
+  g.lineWidth = 1.4;
+  g.beginPath();
+  g.arc(rx, ry, rr, 0, 7);
+  g.stroke();
+  // the light shaft, window to floor
+  const shaft = g.createLinearGradient(rx, ry, rx - w * 0.06, h * 0.86);
+  shaft.addColorStop(0, "rgba(255,226,150,.34)");
+  shaft.addColorStop(1, "rgba(255,226,150,0)");
+  g.fillStyle = shaft;
+  g.beginPath();
+  g.moveTo(rx - rr * 0.55, ry + rr * 0.6);
+  g.lineTo(rx + rr * 0.7, ry + rr * 0.6);
+  g.lineTo(rx + w * 0.16, h * 0.88);
+  g.lineTo(rx - w * 0.24, h * 0.88);
+  g.closePath();
+  g.fill();
+  // floor line + the toppled altar slab where the light lands
+  g.fillStyle = "#141018";
+  g.fillRect(0, h * 0.84, w, h * 0.16);
+  g.save();
+  g.translate(w * 0.47, h * 0.83);
+  g.rotate(-0.1);
+  g.fillStyle = "#7d7466";
+  g.fillRect(-w * 0.09, -h * 0.035, w * 0.18, h * 0.07);
+  g.fillStyle = "#948a7a";
+  g.fillRect(-w * 0.09, -h * 0.035, w * 0.18, h * 0.018);
+  g.restore();
+  // votive candles, a few still lit
+  for (const [x, y] of [[0.2, 0.87], [0.24, 0.89], [0.78, 0.86], [0.82, 0.885]]) {
+    g.fillStyle = "#d9c9a0";
+    g.fillRect(w * x - 2, h * y - 6, 4, 6);
+    glow(g, w * x, h * y - 8, w * 0.05, "rgba(255,190,90,.6)");
+    g.fillStyle = "#ffcf70";
+    g.beginPath();
+    g.ellipse(w * x, h * y - 8, 1.8, 3.6, 0, 0, 7);
+    g.fill();
+  }
+  // dust motes in the shaft
+  g.fillStyle = "rgba(255,233,184,.5)";
+  for (let i = 0; i < 9; i++) {
+    g.fillRect(rx - w * 0.1 + rnd() * w * 0.18, h * (0.3 + rnd() * 0.5), 1.5, 1.5);
+  }
+}
+
+/** The Rogue's Den — a fence's lantern table piled with coin, daggers pinning
+ *  the take, watchful eyes in the dark beyond. */
+function roguesDen(g: Ctx, w: number, h: number, rnd: () => number): void {
+  sky(g, w, h, "#161219", "#08060b");
+  // rough stone walls hinted in the gloom
+  for (let i = 0; i < 8; i++) {
+    g.fillStyle = `rgba(120,95,110,${0.04 + rnd() * 0.05})`;
+    g.fillRect(rnd() * w, rnd() * h * 0.5, w * (0.08 + rnd() * 0.1), h * 0.06);
+  }
+  // the hanging lantern — one warm pool of light
+  const lx = w * 0.5, ly = h * 0.3;
+  g.strokeStyle = "#3a3340";
+  g.lineWidth = 2;
+  g.beginPath();
+  g.moveTo(lx, 0);
+  g.lineTo(lx, ly - h * 0.07);
+  g.stroke();
+  glow(g, lx, ly, w * 0.34, "rgba(255,190,100,.5)");
+  g.fillStyle = "#2c2530";
+  g.fillRect(lx - 7, ly - h * 0.07, 14, h * 0.1);
+  g.fillStyle = "#ffcf70";
+  g.fillRect(lx - 4, ly - h * 0.045, 8, h * 0.05);
+  // the table
+  g.fillStyle = "#3a2c1e";
+  g.beginPath();
+  g.ellipse(w * 0.5, h * 0.74, w * 0.36, h * 0.13, 0, 0, 7);
+  g.fill();
+  g.fillStyle = "#4a3826";
+  g.beginPath();
+  g.ellipse(w * 0.5, h * 0.72, w * 0.36, h * 0.12, 0, 0, 7);
+  g.fill();
+  // coin piles catching the lantern
+  for (const [x, y, n] of [[0.38, 0.7, 7], [0.55, 0.74, 9], [0.66, 0.69, 5]] as const) {
+    for (let i = 0; i < n; i++) {
+      g.fillStyle = rnd() < 0.5 ? "#e8b04b" : "#c98a2d";
+      g.beginPath();
+      g.ellipse(w * x + (rnd() - 0.5) * w * 0.06, h * y + (rnd() - 0.5) * h * 0.02, 3.2, 1.4, 0, 0, 7);
+      g.fill();
+    }
+  }
+  glow(g, w * 0.52, h * 0.71, w * 0.14, "rgba(255,214,120,.28)");
+  // a dagger pinning the ledger to the boards
+  g.fillStyle = "#d6cbb2";
+  g.fillRect(w * 0.42, h * 0.75, w * 0.1, h * 0.045);
+  g.strokeStyle = "#cfd6dd";
+  g.lineWidth = 2.2;
+  g.beginPath();
+  g.moveTo(w * 0.47, h * 0.7);
+  g.lineTo(w * 0.47, h * 0.785);
+  g.stroke();
+  g.fillStyle = "#5a4632";
+  g.fillRect(w * 0.462, h * 0.665, w * 0.016, h * 0.038);
+  // watchful eyes paired in the dark beyond the lamplight
+  for (const [x, y] of [[0.14, 0.42], [0.85, 0.38], [0.2, 0.58]]) {
+    g.fillStyle = "rgba(232,176,75,.85)";
+    g.fillRect(w * x, h * y, 2.2, 2.2);
+    g.fillRect(w * x + 6, h * y, 2.2, 2.2);
+  }
+}
+
 // --- the gallery -------------------------------------------------------------
 
 const SCENES: Record<string, (g: Ctx, w: number, h: number, rnd: () => number) => void> = {
@@ -564,6 +699,8 @@ const SCENES: Record<string, (g: Ctx, w: number, h: number, rnd: () => number) =
   sealed_vault: sealedVault,
   deep_forge: deepForge,
   eclipse_spire: eclipseSpire,
+  fallen_cathedral: fallenCathedral,
+  rogues_den: roguesDen,
   heroes,
   items,
 };

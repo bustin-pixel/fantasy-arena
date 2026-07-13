@@ -168,7 +168,12 @@ handshake with file anchors + commit sequencing in
    slice shipped separately via PR #50 — Bonefields → Necromancer, Wilds →
    Hunter, Sealed Vault → Aegis Knight, Overgrowth → Druid, Eclipse Spire →
    Mystic Archer, Deep Forge → Engineer; every existing legendary is
-   quest-exclusive, spec in the `themed-legendary-dungeons` memory.)
+   quest-exclusive, spec in the `themed-legendary-dungeons` memory. The two
+   NEW legendaries got theirs 2026-07-13 — the gate chain now FORKS after the
+   Eclipse Spire into The Fallen Cathedral → Seraph (Priest anchor) and The
+   Rogue's Den → Outlaw (any stealth-unit anchor, the first any-of quest);
+   both Lv 10 with cap-clamped elites, built + verified, UNSHIPPED on the
+   compendium/bosses/HUD batch branch — see `two-endgame-dungeons-built`.)
 6. **Later:** Endless mode, per-monster kill crests, trophies/ranks → Arena
    enemy-deck budget scaling via the existing `budget` param, PvP rewards
    (server-side — PvP pays nothing today by design).

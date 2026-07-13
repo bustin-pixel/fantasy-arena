@@ -94,7 +94,9 @@ const QUEST_GOALS: Record<QuestKind, Record<QuestDifficulty, number>> = {
  *  bosses or rare spawns (a "slay 3 Liches" notice would be a boss-floor
  *  treadmill, not a grind). Filtered to bestiary-ENCOUNTERED at roll time so
  *  a bounty never names something the player has no idea how to find. */
-const SLAY_CANDIDATES: readonly string[] = [
+// Exported for the invariant spec that every candidate is a real, spawnable
+// enemy defId (a typo here would silently make a bounty unreachable).
+export const SLAY_CANDIDATES: readonly string[] = [
   "giant_rat",
   "zombie_shambler",
   "skeleton_archer",
@@ -119,7 +121,7 @@ const SLAY_CANDIDATES: readonly string[] = [
 
 /** Floor-1/2 Depths fodder — the slay fallback for a fresh bestiary, so even
  *  a brand-new player's bounty is reachable. */
-const SLAY_FALLBACK: readonly string[] = ["giant_rat", "zombie_shambler"];
+export const SLAY_FALLBACK: readonly string[] = ["giant_rat", "zombie_shambler"];
 
 /** Endless quests only roll once the mode itself is unlocked (clear Depths
  *  floor 5 — HomeScreen's ENDLESS_GATE_FLOOR twin; keep in sync). */

@@ -107,6 +107,43 @@ export const ABILITIES: Record<AbilityId, AbilityDef> = {
       "Instant: lays a healing-over-time on an injured ally — 6 HP every 2s for 8s (24 total).",
     cooldown: 16,
   },
+  flash_heal: {
+    id: "flash_heal",
+    name: "Flash Heal",
+    description:
+      "A 1s prayer that restores 22 HP to the most-wounded ally in range (itself included).",
+    cooldown: 3,
+    castTimeSec: 1,
+  },
+  renew: {
+    id: "renew",
+    name: "Renew",
+    description:
+      "Instant: lays a healing-over-time on the most-wounded ally in range — 5 HP every 1s for 6s (30 total).",
+    cooldown: 6,
+  },
+  divine_light: {
+    id: "divine_light",
+    name: "Divine Light",
+    description:
+      "A 1.5s prayer that pours 100 HP into the most-wounded ally in range (itself included) — a big emergency heal.",
+    cooldown: 6,
+    castTimeSec: 1.5,
+  },
+  sanctuary: {
+    id: "sanctuary",
+    name: "Sanctuary",
+    description:
+      "Instant: bathes the whole team in a +55 absorb bubble (itself included), stacking on any existing shield, capped at 150 per ally.",
+    cooldown: 11,
+  },
+  renewal: {
+    id: "renewal",
+    name: "Renewal",
+    description:
+      "Instant: blankets the whole team in a healing-over-time (itself included) — 6 HP every 1s for 6s (36 total each).",
+    cooldown: 9,
+  },
   polymorph: {
     id: "polymorph",
     name: "Polymorph",
@@ -163,6 +200,13 @@ export const ABILITIES: Record<AbilityId, AbilityDef> = {
     description:
       "On death it bursts and flings out 3 slime blobs that ignore the fight and ooze back to its corpse. Cut them all down before one arrives (they burst when killed) or the knight is reborn at half HP — and each rebirth flings one fewer blob (3 → 2 → 1), so a fully-intercepted knight stays dead.",
     cooldown: 0,
+  },
+  killing_spree: {
+    id: "killing_spree",
+    name: "Killing Spree",
+    description:
+      "Charges up over its first 10s alive (a gold bar fills under its health — it still moves and fights while it charges). At full it erupts into a 5s spree, blinking between enemies and striking each one, all while immune to every source of damage and crowd control — stuns included. 60s cooldown.",
+    cooldown: 60,
   },
   // The Mystic Archer's headline passive is now `momentum`; `mystic_shift` is kept
   // only as the projectile tag that drives the Light/Dark on-hit resolution (its

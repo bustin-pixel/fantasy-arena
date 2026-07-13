@@ -12,10 +12,11 @@
 // The six original tracks were auditioned with the user as widget mockups
 // (2026-07-04): Emberfall (hub) · Blackblade (Arena battle) · The Long Dark /
 // Cold Vigil / Catacomb Hymn (random per Depths floor) · The Warden (Depths
-// boss floors). The 18 themed-dungeon tracks (two floor tracks + one boss
-// track per dungeon) were auditioned the same way (2026-07-06) over eight
-// revisions; each boss track has its own rhythmic engine (see the per-track
-// comments). All tracks are A-rooted so any crossfade lands consonantly, and
+// boss floors). The themed-dungeon tracks (two floor tracks + one boss track
+// per dungeon — 24 across eight themed dungeons) were auditioned the same way
+// (2026-07-06) over eight revisions; each boss track has its own rhythmic
+// engine (see the per-track comments). All tracks are A-rooted so any
+// crossfade lands consonantly, and
 // the palette rule holds throughout: drones and triangle/sine voices — no
 // chirpy square leads (squares appear nowhere anymore).
 // ============================================================================
@@ -55,6 +56,12 @@ export type MusicTrackId =
   | "coldAnvil"
   | "emberHalls"
   | "forgeGolem"
+  | "hollowHymn"
+  | "votiveLight"
+  | "theForsworn"
+  | "thievesCant"
+  | "lanternAlley"
+  | "kingsRansom"
   | "shopTheme";
 
 interface TrackDef {
@@ -831,6 +838,171 @@ const shopTheme: TrackDef = {
   },
 };
 
+/** Fallen Cathedral floor — a hollow hymn: organ-like detuned triangle chords
+ *  moving at a funeral pace, a lone choir voice wandering above, one distant
+ *  toll per loop. The nave is empty; the music remembers when it wasn't. */
+const hollowHymn: TrackDef = {
+  bpm: 62,
+  steps: 64,
+  schedule(t0, out, st) {
+    drone(t0, 33, st * 64, "sine", 0.06, out); // A1 — sine only, down low
+    // organ: detuned triangle pairs breathe through Am — F — Dm — Em
+    const prog = [[45, 52, 60], [41, 48, 57], [38, 45, 53], [40, 47, 55]];
+    prog.forEach((ch, b) => {
+      for (const m of ch)
+        for (const dt of [-0.06, 0.06])
+          drone(t0 + b * 16 * st, m + dt, 16 * st, "triangle", 0.02, out);
+    });
+    // the lone chorister — long unhurried phrases
+    const voice = [[2, 69, 8], [12, 72, 4], [18, 71, 8], [28, 67, 4], [34, 65, 10], [46, 64, 6], [54, 62, 9]];
+    for (const [s, m, d] of voice) tone(t0 + s * st, m, d * st, "sine", 0.026, out);
+    // one distant toll, felt more than heard
+    thump(t0 + 40 * st, 0.08, out, 68, 30);
+    tone(t0 + 40 * st, 45, st * 10, "sine", 0.028, out);
+    noiseHit(t0, st * 64, 0.011, out, "lowpass", 420); // draught through broken glass
+  },
+};
+
+/** Fallen Cathedral floor — votive light: a music-box of small bells over warm
+ *  pads, candle-flicker ticks, and one slow swell mid-loop where the shaft of
+ *  window-light crosses the floor. */
+const votiveLight: TrackDef = {
+  bpm: 70,
+  steps: 64,
+  schedule(t0, out, st) {
+    drone(t0, 45, st * 64, "triangle", 0.05, out);
+    drone(t0, 57, st * 64, "sine", 0.018, out);
+    // votive music-box, a candle lit per note
+    const box = [[0, 69], [6, 72], [12, 76], [20, 74], [28, 72], [32, 69], [38, 74], [44, 77], [52, 76], [58, 72]];
+    for (const [s, m] of box) tone(t0 + s * st, m, st * 4.5, "sine", 0.018, out);
+    // the light shaft swells across the second half
+    for (const dt of [-0.07, 0.07]) drone(t0 + 32 * st, 64 + dt, 32 * st, "triangle", 0.014, out);
+    tone(t0 + 48 * st, 81, st * 8, "sine", 0.01, out);
+    // candle flicker — the faintest ticks
+    for (let s = 4; s < 64; s += 8) noiseHit(t0 + s * st, 0.03, 0.008, out, "highpass", 6200);
+    thump(t0 + 32 * st, 0.05, out, 62, 28);
+    noiseHit(t0, st * 64, 0.009, out, "lowpass", 480);
+  },
+};
+
+/** Fallen Cathedral boss — the desecration engine: each hymn phrase is sung
+ *  (organ + choir, bars 1 and 3), then burned (the same phrase dragged minor
+ *  and low under tolling bells, bars 2 and 4) — call and desecration, ending
+ *  in a rising ember hiss as the wings spread for the next verse. */
+const theForsworn: TrackDef = {
+  bpm: 76,
+  steps: 64,
+  schedule(t0, out, st) {
+    drone(t0, 33, st * 64, "sine", 0.07, out);
+    noiseHit(t0, st * 64, 0.013, out, "lowpass", 440);
+    const hymn = [[0, 69, 3], [4, 72, 3], [8, 76, 4], [12, 74, 3]]; // the phrase, sung
+    const burned = [[0, 45, 3], [4, 44, 3], [8, 41, 4], [12, 40, 4]]; // the phrase, burned
+    for (const b of [0, 2]) {
+      const bt = t0 + b * 16 * st;
+      // sung: organ pad + choir line + a bright answering bell
+      for (const m of [57, 61, 64]) drone(bt, m, 16 * st, "triangle", 0.018, out);
+      for (const [s, m, d] of hymn) tone(bt + s * st, m + (b === 2 ? 2 : 0), d * st, "sine", 0.028, out);
+      tone(bt + 14 * st, 88, st * 2, "sine", 0.012, out);
+      thump(bt, 0.1, out, 90, 34);
+    }
+    for (const b of [1, 3]) {
+      const bt = t0 + b * 16 * st;
+      // burned: the same shape an octave and a half down, tolls on the beat
+      for (const m of [45, 48]) drone(bt, m, 16 * st, "triangle", 0.02, out);
+      for (const [s, m, d] of burned) tone(bt + s * st, m + (b === 3 ? -1 : 0), d * st, "triangle", 0.09, out);
+      for (const s of [0, 4, 8, 12]) thump(bt + s * st, s === 0 ? 0.24 : 0.16, out, 120, 26);
+      tone(bt + 10 * st, 76, 5 * st, "sine", 0.013, out, 69); // a cry falling
+      noiseHit(bt + 14 * st, 0.1, 0.04, out, "highpass", 1500);
+    }
+    // wings spread: embers rise into the loop point
+    noiseHit(t0 + 56 * st, st * 8, 0.04, out, "highpass", 1200, true);
+    thump(t0 + 62 * st, 0.12, out, 60, 24);
+  },
+};
+
+/** Rogue's Den floor — thieves' cant: a sneaking staccato bass that talks in
+ *  short phrases, coin-glint ticks answering from the dark, brushed snares.
+ *  Everything held close to the chest. */
+const thievesCant: TrackDef = {
+  bpm: 92,
+  steps: 64,
+  schedule(t0, out, st) {
+    drone(t0, 33, st * 64, "sine", 0.045, out);
+    // the cant — tiptoe bass, one phrase per bar, never quite repeating
+    const bars = [
+      [[0, 45], [3, 45], [6, 48], [10, 47], [12, 45]],
+      [[0, 45], [3, 48], [6, 50], [10, 48], [14, 44]],
+      [[0, 45], [3, 45], [6, 48], [10, 52], [12, 50]],
+      [[0, 43], [3, 45], [6, 48], [10, 47], [12, 40]],
+    ];
+    bars.forEach((bar, b) => {
+      for (const [s, m] of bar) tone(t0 + (b * 16 + s) * st, m, st * 1.6, "triangle", 0.06, out);
+    });
+    // coin glints answering
+    for (const [s, m] of [[7, 88], [23, 93], [39, 88], [55, 91]]) tone(t0 + s * st, m, st * 1.5, "sine", 0.011, out);
+    // brushed snare + soft heel-toe thumps
+    for (const s of [4, 12, 20, 28, 36, 44, 52, 60]) noiseHit(t0 + s * st, 0.05, 0.016, out, "bandpass", 2000);
+    for (const s of [0, 16, 32, 48]) thump(t0 + s * st, 0.09, out, 85, 34);
+    noiseHit(t0, st * 64, 0.008, out, "lowpass", 500);
+  },
+};
+
+/** Rogue's Den floor — lantern alley: a three-note prowl that climbs a
+ *  semitone each bar (closing in), with a soft signal-whistle answered from a
+ *  rooftop at the loop's far end. */
+const lanternAlley: TrackDef = {
+  bpm: 86,
+  steps: 64,
+  schedule(t0, out, st) {
+    drone(t0, 33, st * 64, "sine", 0.05, out);
+    drone(t0, 45, st * 64, "triangle", 0.022, out);
+    // the prowl — up a semitone per bar, then home
+    const bars = [[45, 48, 52], [46, 49, 53], [47, 50, 54], [45, 48, 52]];
+    bars.forEach((bar, b) => {
+      bar.forEach((m, i) => tone(t0 + (b * 16 + i * 5) * st, m, st * 3, "triangle", 0.05, out));
+    });
+    // the whistle and its distant answer
+    tone(t0 + 26 * st, 76, st * 5, "sine", 0.014, out, 81);
+    tone(t0 + 58 * st, 81, st * 4, "sine", 0.009, out, 78);
+    for (const s of [12, 28, 44, 60]) noiseHit(t0 + s * st, 0.06, 0.018, out, "bandpass", 1800);
+    for (const s of [8, 24, 40, 56]) thump(t0 + s * st, 0.07, out, 80, 32);
+    noiseHit(t0, st * 64, 0.009, out, "lowpass", 520);
+  },
+};
+
+/** Rogue's Den boss — the brawl engine: a four-on-the-floor tavern-smashing
+ *  stomp under a swaggering riff that adds a note every bar (the King's rage
+ *  ramping like his Bloodrage), saber-hiss offbeats, and a double-time final
+ *  bar where the whole den piles in. */
+const kingsRansom: TrackDef = {
+  bpm: 108,
+  steps: 64,
+  schedule(t0, out, st) {
+    drone(t0, 33, st * 64, "sine", 0.06, out);
+    noiseHit(t0, st * 64, 0.01, out, "lowpass", 480);
+    // the stomp — four on the floor, all four bars
+    for (let s = 0; s < 64; s += 4) thump(t0 + s * st, 0.18, out, 115, 32);
+    // saber hiss on the off-beats
+    for (let s = 2; s < 64; s += 4) noiseHit(t0 + s * st, 0.04, 0.02, out, "highpass", 2600);
+    // the riff gains a note per bar — rage arithmetic
+    const riff: number[][][] = [
+      [[0, 45, 3], [8, 48, 3]],
+      [[0, 45, 3], [6, 48, 2], [10, 50, 3]],
+      [[0, 45, 2], [4, 48, 2], [8, 50, 2], [12, 52, 3]],
+      [[0, 45, 2], [3, 48, 2], [6, 50, 2], [9, 52, 2], [12, 53, 2], [14, 55, 2]],
+    ];
+    riff.forEach((bar, b) => {
+      for (const [s, m, d] of bar) tone(t0 + (b * 16 + s) * st, m, d * st, "triangle", 0.085, out);
+    });
+    // a crown's worth of coin glints between phrases
+    for (const [s, m] of [[14, 88], [30, 91], [46, 93]]) tone(t0 + s * st, m, st * 1.5, "sine", 0.012, out);
+    // final bar: the whole den piles in — double-time stomp + rising roar
+    for (let i = 0; i < 8; i++) thump(t0 + (48 + i * 2) * st, 0.08 + i * 0.02, out, 120, 28);
+    noiseHit(t0 + 48 * st, st * 16, 0.045, out, "highpass", 1100, true);
+    tone(t0 + 60 * st, 57, 4 * st, "triangle", 0.06, out, 45); // the King's falling bellow
+  },
+};
+
 const TRACKS: Record<MusicTrackId, TrackDef> = {
   emberfall,
   blackblade,
@@ -856,6 +1028,12 @@ const TRACKS: Record<MusicTrackId, TrackDef> = {
   coldAnvil,
   emberHalls,
   forgeGolem,
+  hollowHymn,
+  votiveLight,
+  theForsworn,
+  thievesCant,
+  lanternAlley,
+  kingsRansom,
   shopTheme,
 };
 
@@ -965,6 +1143,8 @@ const DUNGEON_TRACKS: Record<string, { floors: MusicTrackId[]; boss: MusicTrackI
   overgrowth: { floors: ["blightedGrove", "sporefall"], boss: "elderTreant" },
   eclipse_spire: { floors: ["twinLight", "shadowclimb"], boss: "totality" },
   deep_forge: { floors: ["coldAnvil", "emberHalls"], boss: "forgeGolem" },
+  fallen_cathedral: { floors: ["hollowHymn", "votiveLight"], boss: "theForsworn" },
+  rogues_den: { floors: ["thievesCant", "lanternAlley"], boss: "kingsRansom" },
 };
 
 /** Dungeon floor soundtrack: the dungeon's boss floors get its boss track;

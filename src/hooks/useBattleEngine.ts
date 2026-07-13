@@ -22,7 +22,7 @@ import type {
   Vec2,
   WaveBanner,
 } from "@/types";
-import { MatchController } from "@/engine/MatchController";
+import { MatchController, battleEnemyLedger } from "@/engine/MatchController";
 import type { BoonOffer, BoonTally } from "@/engine/EndlessController";
 import { renderBattle } from "@/engine/Renderer";
 import { SfxObserver } from "@/audio/sfx";
@@ -351,16 +351,9 @@ export function useBattleEngine(
     // list would miss most of the roster — the controller keeps the run ledger.
     const endless = c?.endlessLedger();
     if (endless) return endless;
-    const seen = new Set<string>();
-    const slain = new Set<string>();
-    if (c) {
-      for (const u of c.state.units) {
-        if (u.team !== "enemy") continue;
-        seen.add(u.defId);
-        if (u.state === "dead") slain.add(u.defId);
-      }
-    }
-    return { seen: [...seen], slain: [...slain] };
+    // `slain` is a MULTISET (one entry per kill) so slay bounties count each
+    // Spore Pod, not one per run — see battleEnemyLedger.
+    return c ? battleEnemyLedger(c.state.units) : { seen: [], slain: [] };
   }, []);
 
   const pickBoon = useCallback((offerIndex: number) => {

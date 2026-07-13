@@ -14,12 +14,17 @@ import { ABILITIES } from "@/data/abilities";
 import { getUnitDef } from "@/data/units";
 import { secToTicks } from "@/utils/constants";
 import { dist } from "@/utils/math";
+import type { RNG } from "@/utils/rng";
 import { applyEffect, isStealthed, makeEffect } from "./StatusEffectSystem";
 
 export interface AbilityContext {
   unit: Unit;
   /** The current global sim tick (for tick-synced periodics like Raise Dead). */
   tick: number;
+  /** The seeded sim RNG. The engine tick itself is otherwise RNG-free; a kit that
+   *  needs a random decision (the Outlaw's 50% dodge) draws from this so replays
+   *  stay byte-identical. Never call Math.random(). */
+  rng: RNG;
   unitsByUid: Map<string, Unit>;
   enemies: Unit[];
   /** Living allies (same team, excluding self) — for healing/support abilities. */

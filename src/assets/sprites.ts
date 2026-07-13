@@ -31,6 +31,11 @@ interface SpriteAnim {
   cast: number;
   /** False for static hub portraits — suppress motion-only particle emitters. */
   live: boolean;
+  /** True only on the battlefield draw (opts.battle). Portraits — the hub card and
+   *  the info panel — are false. Lets a unit vary its animation by context (the
+   *  Outlaw's phantom flicker: a trailing after-image in battle, a slide-out loop
+   *  in the info panel). */
+  battle: boolean;
 }
 
 /** Wall-clock seconds. Presentation-only: never read by the simulation, so this
@@ -182,6 +187,9 @@ interface DrawOpts {
   scale?: number;
   /** Force a static idle pose (portraits). */
   staticPose?: boolean;
+  /** Battlefield draw: apply the unit's `def.battleScale` boss enlargement.
+   *  Portraits omit this so bosses keep their normal card size. */
+  battle?: boolean;
 }
 
 /** Ground-shadow ellipse at the humanoid foot line — the default for most units. */
@@ -195,6 +203,17 @@ const SHADOW_BY_ID: Record<string, typeof DEFAULT_SHADOW> = {
   // Abomination is drawn 1.25× at the call site; drop + widen the shadow so it
   // sits under the scaled-up feet instead of cutting through its shins.
   abomination: { y: 28, rx: 22, ry: 6.5 },
+  // Same 1.25× call-site scaling as the Abomination.
+  fallen_seraph: { y: 28, rx: 22, ry: 6.5 },
+  bandit_king: { y: 28, rx: 22, ry: 6.5 },
+  // Airborne — it hovers, so the shadow sits on the ground below the talons.
+  gargoyle: { y: 24, rx: 12, ry: 4 },
+  // Hunched grappler; feet bottom out around y23.5.
+  den_bruiser: { y: 24, rx: 15, ry: 5 },
+  // Lunging thrower; feet bottom out around y21.
+  knife_thrower: { y: 24, rx: 13, ry: 4.5 },
+  // Drawn 0.9× at the call site; tighten so it hugs the smaller body.
+  cutpurse: { y: 21.5, rx: 11, ry: 4 },
 };
 
 /**
@@ -210,7 +229,12 @@ export function drawUnitSprite(
   opts: DrawOpts = {}
 ): void {
   const def = getUnitDef(unit.defId);
-  const scale = opts.scale ?? 1;
+  // Bosses render larger on the battlefield (opts.battle) but keep their normal
+  // size in the fixed-size hub portrait (which passes an explicit opts.scale).
+  // Presentation only — the sim never reads battleScale, so collision `radius`
+  // and the determinism digest are untouched.
+  const bossScale = opts.battle ? def.battleScale ?? 1 : 1;
+  const scale = (opts.scale ?? 1) * bossScale;
   const live = !opts.staticPose;
   const { bob, lunge, cast } = live
     ? animOffsets(unit)
@@ -218,10 +242,20 @@ export function drawUnitSprite(
 
   // Presentation clock, offset per-unit so identical units desync.
   const t = (live ? nowSeconds() : 0) + phaseOf(unit.uid);
-  const A: SpriteAnim = { t, glow: 0.5 + 0.5 * Math.sin(t * 3), cast, live };
+  const A: SpriteAnim = {
+    t,
+    glow: 0.5 + 0.5 * Math.sin(t * 3),
+    cast,
+    live,
+    battle: opts.battle === true,
+  };
 
+  const sh = SHADOW_BY_ID[def.id] ?? DEFAULT_SHADOW;
   ctx.save();
-  ctx.translate(cx, cy - bob);
+  // Anchor an enlarged boss by its feet (shadow line) so it stands on the same
+  // spot a normal unit would — the extra height rises UPWARD instead of sinking
+  // the sprite into the ground. No-op when bossScale === 1.
+  ctx.translate(cx, cy - bob - sh.y * (bossScale - 1));
 
   // Facing flip + attack lunge toward facing direction.
   const dirX = unit.facing;
@@ -235,7 +269,6 @@ export function drawUnitSprite(
 
   // Shadow.
   if (!opts.staticPose) {
-    const sh = SHADOW_BY_ID[def.id] ?? DEFAULT_SHADOW;
     ctx.save();
     ctx.globalAlpha = 0.25;
     ctx.fillStyle = "#000";
@@ -326,8 +359,19 @@ export function drawUnitSprite(
     case "trickster":
       drawAssassin(ctx, body, dark, light, accent, A);
       break;
+    case "outlaw":
+      drawOutlaw(ctx, body, dark, light, accent, A);
+      break;
     case "healer":
       drawHealer(ctx, body, dark, light, accent, A);
+      break;
+    // Placeholder: the Priest reuses the Cleric's robed body (recolored ivory/
+    // gold via its def) until bespoke art lands via /mockup.
+    case "priest":
+      drawHealer(ctx, body, dark, light, accent, A);
+      break;
+    case "seraph":
+      drawSeraph(ctx, body, dark, light, accent, A);
       break;
     case "summoner":
       drawSummoner(ctx, body, dark, light, accent, A);
@@ -482,6 +526,46 @@ export function drawUnitSprite(
     case "ancient_automaton":
       ctx.scale(1.15, 1.15); // a relic construct
       drawAncientAutomaton(ctx, body, dark, light, accent, A);
+      break;
+    // The Fallen Cathedral (desecrated sanctum) tier — bespoke sprites; the two
+    // angels compose the Seraph's wings in their ashen tone.
+    case "heretic_zealot":
+      drawHereticZealot(ctx, body, dark, light, accent, A);
+      break;
+    case "gargoyle":
+      // Two airborne bodies picked per-unit (uid parity) so a pack reads as a
+      // flock: 0 = stocky Stone Imp, 1 = broad slab-chested Ravager.
+      drawGargoyle(ctx, body, dark, light, accent, A, variantOf(unit.uid));
+      break;
+    case "grave_chorister":
+      drawGraveChorister(ctx, body, dark, light, accent, A);
+      break;
+    case "fallen_seraph":
+      ctx.scale(1.25, 1.25); // a towering fallen angel
+      drawFallenSeraph(ctx, body, dark, light, accent, A);
+      break;
+    case "penitent":
+      ctx.scale(1.1, 1.1); // a grand, grieving rare
+      drawPenitent(ctx, body, dark, light, accent, A);
+      break;
+    // The Rogue's Den (thieves' guild) tier — all bespoke sprites now; the
+    // Silencer wears the Outlaw's own phasing draw.
+    case "cutpurse":
+      ctx.scale(0.9, 0.9); // a small, quick gutter blade
+      drawCutpurse(ctx, body, dark, light, accent, A);
+      break;
+    case "knife_thrower":
+      drawKnifeThrower(ctx, body, dark, light, accent, A);
+      break;
+    case "den_bruiser":
+      drawDenBruiser(ctx, body, dark, light, accent, A);
+      break;
+    case "bandit_king":
+      ctx.scale(1.25, 1.25); // a crowned colossus of a cutthroat
+      drawBanditKing(ctx, body, dark, light, accent, A);
+      break;
+    case "silencer":
+      drawOutlaw(ctx, body, dark, light, accent, A);
       break;
     default:
       drawBrute(ctx, body, dark, light, accent, A);
@@ -3098,6 +3182,72 @@ function drawDagger(ctx: Ctx, hx: number, hy: number, side: number, accent: stri
   ctx.restore();
 }
 
+// Outlaw (defId "outlaw") — the legendary gunslinger reuses the hooded-duelist
+// body (drawAssassin) but layers a context-aware "phantom flicker" on top:
+//   - Battlefield: an after-image trails the unit's recent phase positions, so it
+//     always fades BEHIND the way it's moving (facing is already applied by the
+//     outer frame, so local -x = behind). Echoes are static-pose ghosts (no
+//     doubled particles); the solid body keeps its full animation.
+//   - Info panel (live portrait): the original flicker — a ghost peels off to the
+//     side and fades on a loop.
+//   - Static card (!live): just the body, no flicker motion.
+// All presentation-only (reads the wall clock via A.t), so determinism is untouched.
+const OUTLAW_FLICKER_AMP = 6.5;
+function outlawPhasePos(t: number): number {
+  return Math.sin(t * 3.0) * OUTLAW_FLICKER_AMP;
+}
+function drawOutlaw(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {
+  if (!A.live) {
+    drawAssassin(ctx, body, dark, light, accent, A);
+    return;
+  }
+  const ghost: SpriteAnim = { t: A.t, glow: A.glow, cast: 0, live: false, battle: A.battle };
+
+  if (A.battle) {
+    const bx = outlawPhasePos(A.t);
+    for (let g = 4; g >= 1; g--) {
+      const ex = outlawPhasePos(A.t - g * 0.085);
+      ctx.save();
+      ctx.globalAlpha = 0.06 + 0.18 * (1 - g / 5);
+      ctx.translate(ex, 0);
+      drawAssassin(ctx, body, dark, light, accent, ghost);
+      ctx.restore();
+    }
+    ctx.save();
+    ctx.translate(bx, 0);
+    drawAssassin(ctx, body, dark, light, accent, A);
+    ctx.restore();
+  } else {
+    const cyc = (A.t % 1.5) / 1.5;
+    const gx = -16 * cyc,
+      ga = 1 - cyc;
+    ctx.save();
+    ctx.globalAlpha = ga * 0.28;
+    ctx.translate(gx, 0);
+    drawAssassin(ctx, body, dark, light, accent, ghost);
+    ctx.restore();
+    ctx.save();
+    ctx.globalAlpha = ga * 0.16;
+    ctx.translate(gx * 0.5, 0);
+    drawAssassin(ctx, body, dark, light, accent, ghost);
+    ctx.restore();
+    drawAssassin(ctx, body, dark, light, accent, A);
+    ctx.save();
+    ctx.strokeStyle = accent;
+    ctx.globalAlpha = 0.3 * ga;
+    ctx.lineWidth = 1;
+    ctx.shadowColor = accent;
+    ctx.shadowBlur = 4;
+    ctx.beginPath();
+    ctx.moveTo(gx, 3);
+    ctx.lineTo(-3, 3);
+    ctx.moveTo(gx, 7);
+    ctx.lineTo(-3, 7);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
 /** A chunky two-handed-style axe at (hx,hy): wooden haft + big steel bit.
  *  `side` mirrors it (1 = bit faces right, -1 = left). */
 function drawBigAxe(ctx: Ctx, hx: number, hy: number, side: number) {
@@ -3395,6 +3545,129 @@ function drawHealer(ctx: Ctx, body: string, dark: string, light: string, accent:
     }
     ctx.restore();
   }
+}
+
+// A real angel wing built like a feathered reference: dense flight feathers FAN
+// from a wrist pivot (up-and-out at the tip, hanging down at the bottom), with
+// several layered rows of short covert feathers shingled over their roots, cool
+// blue-white primaries + warm gold-lit coverts, and a soft golden glow along the
+// covert seam. dir -1 = left, 1 = right; `sc` scales the span; `glow` (0..1) the
+// seam-glow strength. Reads no unit fields — safe for the portrait stub.
+function angelWing(
+  ctx: Ctx,
+  dir: number,
+  beat: number,
+  sc: number,
+  glow: number,
+  tone: "radiant" | "ashen" = "radiant"
+) {
+  ctx.save();
+  ctx.scale(dir, 1);
+  ctx.translate(2, -3);
+  ctx.rotate(-beat); // gentle flap around a raised rest angle
+  ctx.scale(sc, sc);
+  const piv = { x: 2, y: 7 }; // wrist: the point every feather fans from
+  const thT = -1.28,
+    thB = 1.24; // tip direction (up-out) -> bottom primary (down)
+  const primLen = (f: number) =>
+    27 * (1 - 0.3 * f) * (0.55 + 0.45 * Math.sin((1 - f) * Math.PI * 0.5 + 0.12));
+  const fan = (
+    count: number,
+    lenScale: number,
+    wid: number,
+    pivShift: number,
+    cols: [string, string, string],
+    edge: string | null
+  ) => {
+    for (let i = 0; i < count; i++) {
+      const f = i / (count - 1);
+      const th = thT + (thB - thT) * f;
+      const L = primLen(f) * lenScale;
+      const c = Math.cos(th),
+        s = Math.sin(th);
+      const bx = piv.x + c * pivShift,
+        by = piv.y + s * pivShift;
+      const tx = piv.x + c * (pivShift + L),
+        ty = piv.y + s * (pivShift + L);
+      const perp = th + Math.PI / 2,
+        wx = Math.cos(perp) * wid,
+        wy = Math.sin(perp) * wid;
+      const g = ctx.createLinearGradient(bx, by, tx, ty);
+      g.addColorStop(0, cols[0]);
+      g.addColorStop(0.72, cols[1]);
+      g.addColorStop(1, cols[2]);
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.moveTo(bx, by);
+      ctx.quadraticCurveTo((bx + tx) / 2 + wx, (by + ty) / 2 + wy, tx, ty);
+      ctx.quadraticCurveTo((bx + tx) / 2 - wx, (by + ty) / 2 - wy, bx, by);
+      ctx.closePath();
+      ctx.fill();
+      if (edge) {
+        ctx.strokeStyle = edge;
+        ctx.lineWidth = 0.4;
+        ctx.stroke();
+      }
+    }
+  };
+  // Feather palettes: radiant blue-white/gold, or ashen char with ember light
+  // (the Fallen Cathedral's burned angels).
+  const radiant = tone === "radiant";
+  // 1) long primaries — the back layer
+  fan(
+    15, 1.0, 2.5, 2,
+    radiant ? ["#f2f5fa", "#e2e7f0", "#c8cfdd"] : ["#57505c", "#3f3945", "#2a252f"],
+    radiant ? "rgba(120,132,152,0.30)" : "rgba(12,8,16,0.4)"
+  );
+  // 2) warm glow washing along the covert/primary seam (embers when ashen)
+  ctx.save();
+  ctx.globalAlpha = 0.35 + glow * 0.2;
+  const gcx = piv.x + Math.cos(-0.1) * 11,
+    gcy = piv.y + Math.sin(-0.1) * 11;
+  const rg = ctx.createRadialGradient(gcx, gcy, 1, gcx, gcy, 15);
+  if (radiant) {
+    rg.addColorStop(0, "#ffe6a6");
+    rg.addColorStop(0.6, "rgba(255,214,120,0.35)");
+    rg.addColorStop(1, "rgba(255,214,120,0)");
+  } else {
+    rg.addColorStop(0, "#e8843c");
+    rg.addColorStop(0.6, "rgba(200,92,40,0.3)");
+    rg.addColorStop(1, "rgba(200,92,40,0)");
+  }
+  ctx.fillStyle = rg;
+  ctx.beginPath();
+  ctx.arc(gcx, gcy, 15, 0, PI2);
+  ctx.fill();
+  ctx.restore();
+  // 3) secondary coverts — mid length
+  fan(
+    15, 0.6, 2.1, 2,
+    radiant ? ["#fbfcff", "#edf1f8", "#d8dfec"] : ["#635b68", "#4a434f", "#332d3a"],
+    radiant ? "rgba(120,132,152,0.26)" : "rgba(12,8,16,0.35)"
+  );
+  // 4) small coverts near the leading edge
+  fan(
+    13, 0.34, 1.8, 2,
+    radiant ? ["#fffaf0", "#fdeecb", "#f0d497"] : ["#77636a", "#5c4a50", "#42353c"],
+    radiant ? "rgba(196,164,92,0.30)" : "rgba(120,60,40,0.30)"
+  );
+  // 5) tiny shoulder coverts capping the roots
+  fan(
+    10, 0.18, 1.5, 1.5,
+    radiant ? ["#fffdf8", "#fbeecb", "#f3daa2"] : ["#8a6f6a", "#6b544f", "#4d3c3a"],
+    null
+  );
+  ctx.restore();
+}
+
+// Seraph (defId "seraph") — the legendary raid healer. A pair of grand angel
+// wings behind the Cleric/Priest robed body (drawHealer): the wings are the
+// legendary signature; the rest keeps it in the holy-healer family.
+function drawSeraph(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {
+  const beat = (A.live ? Math.sin(A.t * 2.0) * 0.12 : 0) + 0.28;
+  angelWing(ctx, -1, beat, 1.28, A.glow);
+  angelWing(ctx, 1, beat, 1.28, A.glow);
+  drawHealer(ctx, body, dark, light, accent, A);
 }
 
 function drawSummoner(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {
@@ -8099,4 +8372,1313 @@ function drawAncientAutomaton(ctx: Ctx, body: string, dark: string, light: strin
   ctx.fill();
   ctx.restore();
   ctx.restore(); // hover
+}
+
+// ---------------------------------------------------------------------------
+// The Fallen Cathedral tier (see data/dungeons) — bespoke sprites. The two
+// angels (the Penitent catalyst, Seraphiel the boss) compose the Seraph's
+// angelWing in its "ashen" tone over the robed healer body: burned mirrors of
+// the legendary the dungeon awards.
+// ---------------------------------------------------------------------------
+
+function drawHereticZealot(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {
+  // frayed robe with a jagged hem (acolyte family, but torn and stained)
+  const rg = ctx.createLinearGradient(0, -12, 0, 20);
+  rg.addColorStop(0, light);
+  rg.addColorStop(0.6, body);
+  rg.addColorStop(1, dark);
+  ctx.fillStyle = rg;
+  ctx.beginPath();
+  ctx.moveTo(0, -13);
+  ctx.lineTo(10, 20);
+  const hem: [number, number][] = [[6, 16], [3, 20], [0, 16], [-3, 20], [-6, 16], [-9, 20], [-10, 20]];
+  for (const [hx, hy] of hem) ctx.lineTo(hx, hy);
+  ctx.closePath();
+  ctx.fill();
+  // rope belt, ends swinging
+  ctx.strokeStyle = "#a08a5a";
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(-7, 6);
+  ctx.quadraticCurveTo(0, 8, 7, 6);
+  ctx.moveTo(3, 7);
+  const sway = A.live ? Math.sin(A.t * 2.4) * 1.5 : 0;
+  ctx.quadraticCurveTo(4 + sway, 12, 3 + sway, 16);
+  ctx.stroke();
+  // deep hood — a void with two candle-gold glints
+  ctx.fillStyle = dark;
+  ctx.beginPath();
+  ctx.moveTo(-6, -6);
+  ctx.quadraticCurveTo(-8, -16, 0, -17);
+  ctx.quadraticCurveTo(8, -16, 6, -6);
+  ctx.quadraticCurveTo(0, -9, -6, -6);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "#0c0810";
+  ctx.beginPath();
+  ctx.ellipse(1, -11, 4.4, 5, 0, 0, PI2);
+  ctx.fill();
+  ctx.save();
+  ctx.fillStyle = accent;
+  ctx.shadowColor = accent;
+  ctx.shadowBlur = 4 + A.glow * 3;
+  ctx.beginPath(); ctx.arc(-0.5, -11.5, 0.9, 0, PI2); ctx.fill();
+  ctx.beginPath(); ctx.arc(3, -11, 0.9, 0, PI2); ctx.fill();
+  ctx.restore();
+  // arm thrust forward brandishing a curved knife
+  ctx.strokeStyle = body;
+  ctx.lineWidth = 3;
+  ctx.lineCap = "round";
+  const jab = A.live ? Math.max(0, Math.sin(A.t * 5)) * 2 : 0;
+  ctx.beginPath();
+  ctx.moveTo(4, -2);
+  ctx.quadraticCurveTo(10, -4, 14 + jab, -6);
+  ctx.stroke();
+  ctx.lineCap = "butt";
+  ctx.strokeStyle = "#cfc8bd";
+  ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  ctx.moveTo(14 + jab, -7);
+  ctx.quadraticCurveTo(18 + jab, -10, 19 + jab, -14);
+  ctx.stroke();
+  // heretic sun-mark daubed on the chest — a circle struck through
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = 1.1;
+  ctx.globalAlpha = 0.85;
+  ctx.beginPath();
+  ctx.arc(-1, 0, 3.4, 0, PI2);
+  ctx.moveTo(-5, 4);
+  ctx.lineTo(3, -4);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+}
+
+/** Falling particles (stone dust shed downward). Motion only. */
+function falling(
+  ctx: Ctx,
+  cx: number,
+  spread: number,
+  baseY: number,
+  fallH: number,
+  color: string,
+  A: SpriteAnim,
+  n = 4
+): void {
+  if (!A.live) return;
+  ctx.save();
+  ctx.fillStyle = color;
+  for (let i = 0; i < n; i++) {
+    const seed = i * 1.7;
+    const life = (A.t * 0.55 + seed) % 1;
+    const x = cx + Math.sin(seed * 5 + A.t) * spread + (i - n / 2);
+    const y = baseY + life * fallH;
+    ctx.globalAlpha = (1 - life) * 0.6;
+    ctx.beginPath();
+    ctx.arc(x, y, 1.1 * (1 - life) + 0.3, 0, PI2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/** Imp-style bat wings behind the torso (drawImp's construction, scaled). */
+function gargoyleWings(
+  ctx: Ctx,
+  dark: string,
+  A: SpriteAnim,
+  span: number,
+  flapSpeed: number,
+  flapAmp: number
+): void {
+  const flap = A.live ? Math.sin(A.t * flapSpeed) * flapAmp : 0;
+  ctx.fillStyle = dark;
+  for (const s of [-1, 1] as const) {
+    ctx.beginPath();
+    ctx.moveTo(s * 4, -3);
+    ctx.quadraticCurveTo(s * span * 0.85, -13 - flap, s * span, -1 - flap);
+    ctx.quadraticCurveTo(s * span * 0.72, -2, s * span * 0.8, 5 - flap);
+    ctx.quadraticCurveTo(s * span * 0.55, 3, s * 4, 5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = withShade(dark, -14);
+    ctx.lineWidth = 0.9;
+    ctx.beginPath();
+    ctx.moveTo(s * 5, 0);
+    ctx.lineTo(s * span * 0.75, -6 - flap);
+    ctx.stroke();
+  }
+}
+
+/** Snarling granite head: horns, pricked ears, fangs, glowing eyes. */
+function gargoyleHead(
+  ctx: Ctx,
+  body: string,
+  light: string,
+  dark: string,
+  A: SpriteAnim,
+  hx: number,
+  hy: number,
+  eyeCol: string,
+  swept: boolean
+): void {
+  const g = ctx.createLinearGradient(hx, hy - 5, hx, hy + 5);
+  g.addColorStop(0, light);
+  g.addColorStop(1, withShade(body, -20));
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(hx, hy, 5, 0, PI2);
+  ctx.fill();
+  ctx.fillStyle = dark;
+  if (swept) {
+    for (const s of [-1, 1] as const) {
+      ctx.save();
+      ctx.translate(hx + s * 3, hy - 3.5);
+      ctx.beginPath();
+      ctx.moveTo(-1.4 * s, 0);
+      ctx.quadraticCurveTo(s * 1, -6, s * 5, -7.5);
+      ctx.quadraticCurveTo(s * 1.5, -4.2, 1.4 * s, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+  } else {
+    for (const [ox, oa] of [[-2.5, -0.5], [2.5, 0.5]] as const) {
+      ctx.save();
+      ctx.translate(hx + ox, hy - 4);
+      ctx.rotate(oa);
+      ctx.beginPath();
+      ctx.moveTo(-1.5, 0);
+      ctx.lineTo(0, -5.5);
+      ctx.lineTo(1.5, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+  // pricked ears
+  ctx.fillStyle = withShade(body, -10);
+  for (const s of [-1, 1] as const) {
+    ctx.beginPath();
+    ctx.moveTo(hx + s * 4.4, hy - 1);
+    ctx.lineTo(hx + s * 7, hy - 3);
+    ctx.lineTo(hx + s * 4.2, hy + 1.2);
+    ctx.closePath();
+    ctx.fill();
+  }
+  // snarl + fangs
+  ctx.strokeStyle = withShade(body, -30);
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(hx - 2, hy + 3);
+  ctx.quadraticCurveTo(hx, hy + 3.8, hx + 2, hy + 3);
+  ctx.stroke();
+  ctx.fillStyle = "#e9e4d4";
+  ctx.beginPath();
+  ctx.moveTo(hx - 2, hy + 3.2);
+  ctx.lineTo(hx - 1.4, hy + 4.8);
+  ctx.lineTo(hx - 0.8, hy + 3.3);
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(hx + 0.8, hy + 3.3);
+  ctx.lineTo(hx + 1.4, hy + 4.8);
+  ctx.lineTo(hx + 2, hy + 3.2);
+  ctx.closePath();
+  ctx.fill();
+  // glowing eyes
+  ctx.save();
+  ctx.fillStyle = eyeCol;
+  ctx.shadowColor = eyeCol;
+  ctx.shadowBlur = 4 + A.glow * 5;
+  ctx.beginPath(); ctx.arc(hx - 1.8, hy - 0.6, 1.1, 0, PI2); ctx.fill();
+  ctx.beginPath(); ctx.arc(hx + 1.8, hy - 0.6, 1.1, 0, PI2); ctx.fill();
+  ctx.restore();
+}
+
+/** Airborne gargoyle, hovering on imp-style wingbeats. Two bodies by uid
+ *  parity: 0 = stocky Stone Imp, 1 = broad slab-chested Ravager. */
+function drawGargoyle(
+  ctx: Ctx,
+  body: string,
+  dark: string,
+  light: string,
+  accent: string,
+  A: SpriteAnim,
+  variant: 0 | 1
+) {
+  ctx.lineCap = "round";
+  if (variant === 0) {
+    // --- Stone Imp: compact granite flier, quick wingbeats -----------------
+    const bob = A.live ? Math.sin(A.t * 1.9) * 2 : 0;
+    ctx.save();
+    ctx.translate(0, -7 + bob);
+    gargoyleWings(ctx, dark, A, 21, 6, 3.5);
+    // barbed tail sway
+    const tw = A.live ? Math.sin(A.t * 3) * 3 : 0;
+    ctx.strokeStyle = body;
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(-2, 9);
+    ctx.quadraticCurveTo(-8, 14, -7 + tw, 19);
+    ctx.stroke();
+    ctx.fillStyle = dark;
+    ctx.beginPath();
+    ctx.moveTo(-7 + tw, 19);
+    ctx.lineTo(-9.4 + tw, 22.5);
+    ctx.lineTo(-4.6 + tw, 22.5);
+    ctx.closePath();
+    ctx.fill();
+    // stocky granite body
+    const g = ctx.createLinearGradient(0, -5, 0, 12);
+    g.addColorStop(0, light);
+    g.addColorStop(1, dark);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(0, 4, 7.5, 7.5, 0, 0, PI2);
+    ctx.fill();
+    // chest cracks
+    ctx.strokeStyle = withShade(body, -34);
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(-3, 0); ctx.lineTo(-1, 4); ctx.lineTo(-3, 7);
+    ctx.moveTo(3, 1); ctx.lineTo(4, 5);
+    ctx.stroke();
+    // dangling clawed legs, drifting with the hover
+    const drift = A.live ? Math.sin(A.t * 1.9 + 1) * 1 : 0;
+    ctx.strokeStyle = dark;
+    ctx.lineWidth = 2.6;
+    ctx.beginPath();
+    ctx.moveTo(-3, 10); ctx.quadraticCurveTo(-4, 13, -3.4 + drift, 16);
+    ctx.moveTo(3, 10); ctx.quadraticCurveTo(4, 13, 4.4 + drift, 16);
+    ctx.stroke();
+    ctx.strokeStyle = withShade(body, 18);
+    ctx.lineWidth = 1;
+    for (const fx of [-3.4 + drift, 4.4 + drift]) {
+      for (let i = -1; i <= 1; i++) {
+        ctx.beginPath();
+        ctx.moveTo(fx, 16);
+        ctx.lineTo(fx + i * 1.5, 18.6);
+        ctx.stroke();
+      }
+    }
+    gargoyleHead(ctx, body, light, dark, A, 0, -7, "#cdd2d8", false);
+    ctx.restore();
+    // stone dust shaken loose by the wingbeats (accent = pale stone grey)
+    falling(ctx, 0, 7, 10, 12, accent, A, 4);
+  } else {
+    // --- Ravager: broad slab chest, slow heavy beats that lift the body ----
+    const lift = A.live ? Math.sin(A.t * 4.2) * 1.6 : 0;
+    const bob = A.live ? Math.sin(A.t * 1.4) * 1.4 : 0;
+    ctx.save();
+    ctx.translate(0, -6 + bob + lift * 0.5);
+    gargoyleWings(ctx, dark, A, 24, 4.2, 5);
+    const tw = A.live ? Math.sin(A.t * 2.4) * 3 : 0;
+    ctx.strokeStyle = body;
+    ctx.lineWidth = 2.6;
+    ctx.beginPath();
+    ctx.moveTo(2, 9);
+    ctx.quadraticCurveTo(9, 14, 8 + tw, 20);
+    ctx.stroke();
+    ctx.fillStyle = dark;
+    ctx.beginPath();
+    ctx.moveTo(8 + tw, 20);
+    ctx.lineTo(5.8 + tw, 23.2);
+    ctx.lineTo(10.2 + tw, 23.2);
+    ctx.closePath();
+    ctx.fill();
+    // broad slab chest
+    const g = ctx.createLinearGradient(0, -6, 0, 12);
+    g.addColorStop(0, light);
+    g.addColorStop(1, dark);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(0, 4, 9.2, 8, 0, 0, PI2);
+    ctx.fill();
+    // pectoral seams
+    ctx.strokeStyle = withShade(body, -28);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, -2); ctx.lineTo(0, 6);
+    ctx.moveTo(-6, 1); ctx.quadraticCurveTo(-3, 3, -0.6, 1.6);
+    ctx.moveTo(6, 1); ctx.quadraticCurveTo(3, 3, 0.6, 1.6);
+    ctx.stroke();
+    // heavy talon legs, spread
+    const drift = A.live ? Math.sin(A.t * 1.4 + 1) * 0.8 : 0;
+    ctx.strokeStyle = dark;
+    ctx.lineWidth = 3.2;
+    ctx.beginPath();
+    ctx.moveTo(-4.4, 10); ctx.quadraticCurveTo(-6, 13, -5.6 + drift, 16.4);
+    ctx.moveTo(4.4, 10); ctx.quadraticCurveTo(6, 13, 6.6 + drift, 16.4);
+    ctx.stroke();
+    ctx.strokeStyle = withShade(body, 18);
+    ctx.lineWidth = 1.2;
+    for (const fx of [-5.6 + drift, 6.6 + drift]) {
+      for (let i = -1; i <= 1; i++) {
+        ctx.beginPath();
+        ctx.moveTo(fx, 16.4);
+        ctx.lineTo(fx + i * 1.8, 19.4);
+        ctx.stroke();
+      }
+    }
+    gargoyleHead(ctx, body, light, dark, A, 0, -8, "#9db8ff", true);
+    // second inner horn pair
+    ctx.fillStyle = dark;
+    for (const [ox, oa] of [[-1.2, -0.3], [1.2, 0.3]] as const) {
+      ctx.save();
+      ctx.translate(ox, -12.4);
+      ctx.rotate(oa);
+      ctx.beginPath();
+      ctx.moveTo(-1, 0);
+      ctx.lineTo(0, -3.4);
+      ctx.lineTo(1, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+    ctx.restore();
+    // orbiting shed stone chips
+    if (A.live) {
+      ctx.save();
+      ctx.fillStyle = withShade(body, 24);
+      for (let i = 0; i < 3; i++) {
+        const a = A.t * 1.0 + i * (PI2 / 3);
+        ctx.globalAlpha = 0.5 + 0.3 * Math.sin(a);
+        ctx.save();
+        ctx.translate(Math.cos(a) * 17, -2 + Math.sin(a) * 5);
+        ctx.rotate(a * 2);
+        ctx.beginPath();
+        ctx.moveTo(-1.4, 1);
+        ctx.lineTo(0, -1.6);
+        ctx.lineTo(1.4, 0.7);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+      ctx.restore();
+    }
+  }
+  ctx.lineCap = "butt";
+}
+
+function drawGraveChorister(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {
+  const hover = A.live ? Math.sin(A.t * 1.6) * 1.8 : 0;
+  ctx.save();
+  ctx.translate(0, hover);
+  // wailing rings rippling out from the open mouth (its "song")
+  if (A.live) {
+    ctx.save();
+    ctx.strokeStyle = accent;
+    for (let i = 0; i < 3; i++) {
+      const p = (A.t * 0.7 + i / 3) % 1;
+      ctx.globalAlpha = (1 - p) * 0.4;
+      ctx.lineWidth = 1.1;
+      ctx.beginPath();
+      ctx.arc(2, -8, 4 + p * 14, -0.7, 0.7);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+  // spectral glow
+  ctx.save();
+  ctx.globalAlpha = 0.3 + 0.12 * A.glow;
+  const bl = ctx.createRadialGradient(0, -2, 2, 0, -2, 20);
+  bl.addColorStop(0, withAlpha(accent, 0.7));
+  bl.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = bl;
+  ctx.beginPath();
+  ctx.arc(0, -2, 20, 0, PI2);
+  ctx.fill();
+  ctx.restore();
+  // burial-shroud body tapering to tattered wisps (no legs — it drifts)
+  const rg = ctx.createLinearGradient(0, -16, 0, 20);
+  rg.addColorStop(0, light);
+  rg.addColorStop(0.55, body);
+  rg.addColorStop(1, withAlpha(dark, 0.15));
+  ctx.fillStyle = rg;
+  ctx.beginPath();
+  ctx.moveTo(-6, -8);
+  ctx.quadraticCurveTo(-9, 8, -5, 19);
+  ctx.lineTo(-2, 13);
+  ctx.lineTo(0, 20);
+  ctx.lineTo(2, 13);
+  ctx.lineTo(5, 19);
+  ctx.quadraticCurveTo(9, 8, 6, -8);
+  ctx.quadraticCurveTo(0, -13, -6, -8);
+  ctx.closePath();
+  ctx.fill();
+  // shroud hood cinched at the crown
+  ctx.fillStyle = withShade(body, -18);
+  ctx.beginPath();
+  ctx.moveTo(-6, -8);
+  ctx.quadraticCurveTo(-7, -16, 0, -17);
+  ctx.quadraticCurveTo(7, -16, 6, -8);
+  ctx.quadraticCurveTo(0, -11, -6, -8);
+  ctx.closePath();
+  ctx.fill();
+  // the singing face: hollow eyes and a long open mouth
+  ctx.fillStyle = "#10131d";
+  ctx.beginPath(); ctx.ellipse(-1.5, -11, 1.3, 1.8, 0, 0, PI2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(3, -10.6, 1.3, 1.8, 0, 0, PI2); ctx.fill();
+  const oo = A.live ? 1 + Math.sin(A.t * 3.2) * 0.5 : 1; // mouth swells with the wail
+  ctx.beginPath(); ctx.ellipse(1, -6, 1.7, 2.6 * oo, 0, 0, PI2); ctx.fill();
+  // faint candle it still carries
+  ctx.fillStyle = "#d8cfb8";
+  ctx.fillRect(-8.5, -2, 3, 5);
+  ctx.save();
+  ctx.fillStyle = "#ffd76a";
+  ctx.shadowColor = "#ffd76a";
+  ctx.shadowBlur = 5;
+  ctx.globalAlpha = 0.75 + 0.25 * A.glow;
+  ctx.beginPath();
+  ctx.ellipse(-7, -4.5, 1.1, 2, 0, 0, PI2);
+  ctx.fill();
+  ctx.restore();
+  ctx.restore();
+}
+
+function drawPenitent(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {
+  // drooped, ash-charred wings — held low in mourning, barely beating
+  const beat = (A.live ? Math.sin(A.t * 1.2) * 0.05 : 0) - 0.08;
+  angelWing(ctx, -1, beat, 1.1, A.glow, "ashen");
+  angelWing(ctx, 1, beat, 1.1, A.glow, "ashen");
+  // dim halo, guttering like a low candle
+  ctx.save();
+  ctx.strokeStyle = accent;
+  ctx.shadowColor = accent;
+  ctx.shadowBlur = 5;
+  ctx.globalAlpha = 0.35 + 0.25 * A.glow;
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.ellipse(0, -21, 7, 2.4, 0, 0, PI2);
+  ctx.stroke();
+  ctx.restore();
+  drawHealer(ctx, body, dark, light, accent, A);
+}
+
+function drawFallenSeraph(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {
+  // full charred wingspan — it still flies, but nothing about it is white now
+  const beat = (A.live ? Math.sin(A.t * 2.0) * 0.12 : 0) + 0.28;
+  angelWing(ctx, -1, beat, 1.28, A.glow, "ashen");
+  angelWing(ctx, 1, beat, 1.28, A.glow, "ashen");
+  // ember motes shed from the wing roots
+  if (A.live) {
+    ctx.save();
+    ctx.fillStyle = "#e8843c";
+    ctx.shadowColor = "#e8843c";
+    ctx.shadowBlur = 4;
+    for (let i = 0; i < 4; i++) {
+      const p = (A.t * 0.5 + i / 4) % 1;
+      ctx.globalAlpha = (1 - p) * 0.6;
+      const s = i % 2 ? 1 : -1;
+      ctx.beginPath();
+      ctx.arc(s * (8 + p * 6), -4 + p * 22, 1, 0, PI2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+  // the broken halo — tilted, hanging on by habit
+  ctx.save();
+  ctx.translate(1.5, -21);
+  ctx.rotate(0.5);
+  ctx.strokeStyle = accent;
+  ctx.shadowColor = accent;
+  ctx.shadowBlur = 6;
+  ctx.globalAlpha = 0.6 + 0.3 * A.glow;
+  ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 7.5, 2.6, 0, 0.5, PI2 - 0.35); // a bite missing from the ring
+  ctx.stroke();
+  ctx.restore();
+  drawHealer(ctx, body, dark, light, accent, A);
+}
+
+// ---------------------------------------------------------------------------
+// The Rogue's Den tier (see data/dungeons) — all bespoke sprites (2026-07-13
+// glow-up via /mockup; losing variants archived in docs/rogue-sprites-mockups.md).
+// The Silencer reuses the Outlaw's phasing draw — the guild taught it everything.
+// ---------------------------------------------------------------------------
+
+/** A small throwing knife at (x,y): steel tip + wooden grip. */
+function heldKnife(ctx: Ctx, x: number, y: number, rot: number, alpha = 1): void {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rot);
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = "#dde3e9";
+  ctx.beginPath();
+  ctx.moveTo(0, -4.5);
+  ctx.lineTo(1.4, 0);
+  ctx.lineTo(-1.4, 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "#5a4632";
+  ctx.fillRect(-1.1, 0, 2.2, 3);
+  ctx.restore();
+}
+
+/** Knife Thrower — caught mid-throw: lead arm in full follow-through with a
+ *  spinning knife streaking away, while the off-hand draws the next blade from
+ *  the bandolier. Red bandit mask, normal eyes (per the approved mockup). */
+function drawKnifeThrower(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {
+  ctx.lineCap = "round";
+  // lunge legs: back extended, front bent
+  ctx.strokeStyle = dark;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(-2, 8); ctx.lineTo(-9, 14); ctx.lineTo(-11, 21);
+  ctx.moveTo(3, 8); ctx.lineTo(8, 13); ctx.lineTo(8, 21);
+  ctx.stroke();
+  const cyc = A.live ? (A.t % 1.2) / 1.2 : 0.8; // static pose = next knife drawn
+  ctx.save();
+  ctx.rotate(-0.14); // torso pitched into the throw
+  // oiled-leather jerkin
+  const g = ctx.createLinearGradient(0, -10, 0, 12);
+  g.addColorStop(0, light);
+  g.addColorStop(1, dark);
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.moveTo(-7, -7);
+  ctx.quadraticCurveTo(-9, 4, -5, 10);
+  ctx.lineTo(5, 10);
+  ctx.quadraticCurveTo(9, 4, 7, -7);
+  ctx.quadraticCurveTo(0, -10, -7, -7);
+  ctx.closePath();
+  ctx.fill();
+  // chest bandolier + spare knives
+  ctx.strokeStyle = withShade(body, -30);
+  ctx.lineWidth = 2.6;
+  ctx.beginPath();
+  ctx.moveTo(-6, -5);
+  ctx.lineTo(6, 7);
+  ctx.stroke();
+  ctx.strokeStyle = "#cfd6dd";
+  ctx.lineWidth = 1.2;
+  for (const f of [0.3, 0.6]) {
+    const kx = -6 + 12 * f;
+    const ky = -5 + 12 * f;
+    ctx.beginPath();
+    ctx.moveTo(kx + 1.6, ky - 1.6);
+    ctx.lineTo(kx - 1.6, ky + 1.6);
+    ctx.stroke();
+  }
+  // off-hand drawing the NEXT knife from the bandolier (slides on the cycle)
+  const draw2 = cyc < 0.35 ? cyc / 0.35 : 1;
+  ctx.strokeStyle = body;
+  ctx.lineWidth = 2.7;
+  ctx.beginPath();
+  ctx.moveTo(-4, -3);
+  ctx.quadraticCurveTo(-4, 1, -1, 2.4);
+  ctx.stroke();
+  heldKnife(ctx, 0, 1 - draw2 * 3, -0.9, 0.95);
+  // lead arm fully extended, follow-through, open hand
+  ctx.beginPath();
+  ctx.moveTo(4, -4);
+  ctx.quadraticCurveTo(10, -7, 14.5, -7.5);
+  ctx.stroke();
+  ctx.lineWidth = 1.3;
+  ctx.beginPath();
+  ctx.moveTo(14.5, -7.5); ctx.lineTo(16.6, -9);
+  ctx.moveTo(14.5, -7.5); ctx.lineTo(17, -7.4);
+  ctx.stroke();
+  // bare head: normal eyes + the red bandit mask (matches the Bandit King's)
+  const hx = 1, hy = -12.5;
+  ctx.fillStyle = "#c99b6a";
+  ctx.beginPath();
+  ctx.arc(hx, hy, 4.6, 0, PI2);
+  ctx.fill();
+  ctx.fillStyle = dark; // dark cropped hair
+  ctx.beginPath();
+  ctx.arc(hx, hy - 1, 4.6, Math.PI, PI2);
+  ctx.fill();
+  ctx.fillStyle = "#14181d"; // normal eyes
+  ctx.beginPath(); ctx.arc(hx - 1.7, hy - 0.6, 0.75, 0, PI2); ctx.fill();
+  ctx.beginPath(); ctx.arc(hx + 1.9, hy - 0.6, 0.75, 0, PI2); ctx.fill();
+  // red mask over the lower face
+  ctx.fillStyle = "#c22f2f";
+  ctx.beginPath();
+  ctx.moveTo(hx - 4.8, hy + 0.6);
+  ctx.lineTo(hx + 4.8, hy + 0.6);
+  ctx.lineTo(hx + 3.5, hy + 3.8);
+  ctx.lineTo(hx, hy + 6.2);
+  ctx.lineTo(hx - 3.5, hy + 3.8);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "#8f1f1f";
+  ctx.lineWidth = 0.7;
+  ctx.beginPath();
+  ctx.moveTo(hx - 3.6, hy + 2.2);
+  ctx.quadraticCurveTo(hx, hy + 3.2, hx + 3.6, hy + 2.2);
+  ctx.stroke();
+  // fluttering knot tails
+  const fl = A.live ? Math.sin(A.t * 4) * 1.4 : 0;
+  ctx.strokeStyle = "#c22f2f";
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(hx - 4.5, hy + 1.2);
+  ctx.quadraticCurveTo(hx - 8, hy + fl, hx - 11, hy + 1.5 + fl * 1.3);
+  ctx.moveTo(hx - 4.5, hy + 2);
+  ctx.quadraticCurveTo(hx - 7.5, hy + 3 + fl * 0.5, hx - 9.8, hy + 4.5 + fl);
+  ctx.stroke();
+  ctx.restore();
+  // the thrown knife streaks away, spinning, with a venom glint trail
+  if (A.live && cyc < 0.6) {
+    const p = cyc / 0.6;
+    const x = 16 + p * 22;
+    const y = -12 + p * 3;
+    ctx.save();
+    ctx.globalAlpha = 1 - p;
+    ctx.strokeStyle = withAlpha(accent, 0.6);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x - 8, y + 1);
+    ctx.lineTo(x - 2, y);
+    ctx.stroke();
+    heldKnife(ctx, x, y, Math.PI / 2 + p * 11, 1 - p);
+    ctx.restore();
+  }
+  ctx.lineCap = "butt";
+}
+
+/** A spinning gold coin at (x,y): `spin` is the flip phase. */
+function spinCoin(ctx: Ctx, x: number, y: number, r: number, spin: number, gold: string): void {
+  const sq = Math.abs(Math.cos(spin));
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = gold;
+  ctx.shadowColor = gold;
+  ctx.shadowBlur = 4;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, Math.max(0.3, r * sq), r, 0, 0, PI2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = "rgba(255,255,255,0.55)";
+  ctx.lineWidth = 0.6;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, Math.max(0.25, r * sq * 0.65), r * 0.65, 0, 0, PI2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** A crude prison shiv at (x,y). */
+function shiv(ctx: Ctx, x: number, y: number, rot: number): void {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rot);
+  ctx.fillStyle = "#2a1d12";
+  ctx.fillRect(-1.2, 0, 2.4, 4.5);
+  ctx.fillStyle = "#cfd3da";
+  ctx.beginPath();
+  ctx.moveTo(-1.6, 0);
+  ctx.lineTo(1.6, 0);
+  ctx.lineTo(0.3, -8);
+  ctx.lineTo(-0.3, -8);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.55)";
+  ctx.lineWidth = 0.6;
+  ctx.beginPath();
+  ctx.moveTo(-0.8, -1);
+  ctx.lineTo(0, -7);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** Cutpurse — mid-getaway: masked face, streaming scarf, loot sack hugged
+ *  under one arm and a trail of spilled coins arcing away behind. Deliberately
+ *  NOT the Outlaw's hooded-duelist silhouette (no deep hood, no twin daggers). */
+function drawCutpurse(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {
+  ctx.lineCap = "round";
+  // spilling coin trail arcing away behind — it's mid-getaway
+  if (A.live) {
+    ctx.save();
+    for (let i = 0; i < 5; i++) {
+      const life = (A.t * 0.8 + i * 0.37) % 1;
+      const x = -8 - life * 14;
+      const y = 6 + Math.pow(life, 1.8) * 14 - Math.sin(life * Math.PI) * 5;
+      ctx.globalAlpha = (1 - life) * 0.85;
+      spinCoin(ctx, x, y, 1.3, A.t * 10 + i * 2, accent);
+    }
+    ctx.restore();
+  }
+  ctx.save();
+  ctx.rotate(-0.13); // leaning into the sprint
+  const sway = A.live ? Math.sin(A.t * 2) * 1.4 : 0;
+  // short ragged capelet (hip length — not the Outlaw's floor-length cape)
+  ctx.fillStyle = withShade(body, -26);
+  ctx.beginPath();
+  ctx.moveTo(-5, -8);
+  ctx.lineTo(5, -8);
+  ctx.quadraticCurveTo(9 + sway, 0, 7 + sway, 10);
+  ctx.lineTo(3, 7);
+  ctx.lineTo(0, 11);
+  ctx.lineTo(-3, 7);
+  ctx.lineTo(-7 - sway, 10);
+  ctx.quadraticCurveTo(-9 - sway, 0, -5, -8);
+  ctx.closePath();
+  ctx.fill();
+  // slim jerkin
+  const bg = ctx.createLinearGradient(-7, 0, 7, 0);
+  bg.addColorStop(0, dark);
+  bg.addColorStop(0.5, body);
+  bg.addColorStop(1, withShade(body, -14));
+  ctx.fillStyle = bg;
+  ctx.beginPath();
+  ctx.roundRect(-6.5, -4, 13, 21, 5);
+  ctx.fill();
+  // belt + BULGING coin purse, the identity prop
+  ctx.fillStyle = "#20161a";
+  ctx.fillRect(-6.5, 9, 13, 3);
+  ctx.fillStyle = "#4a3a28";
+  ctx.beginPath();
+  ctx.ellipse(5, 13, 3, 3.6, 0.25, 0, PI2);
+  ctx.fill();
+  ctx.strokeStyle = "#2c2118";
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(3.4, 10.4);
+  ctx.quadraticCurveTo(5, 9.4, 6.6, 10.4);
+  ctx.stroke();
+  ctx.save();
+  ctx.fillStyle = accent;
+  ctx.shadowColor = accent;
+  ctx.shadowBlur = 3 + A.glow * 3;
+  ctx.beginPath();
+  ctx.arc(5, 11, 1, 0, PI2);
+  ctx.fill();
+  ctx.restore();
+  // streaming scarf behind
+  ctx.save();
+  ctx.strokeStyle = "#c94f3d";
+  ctx.lineWidth = 2;
+  const w1 = A.live ? Math.sin(A.t * 5) * 2.2 : 0;
+  const w2 = A.live ? Math.sin(A.t * 5 + 1.3) * 3 : 1.5;
+  ctx.globalAlpha = 0.9;
+  ctx.beginPath();
+  ctx.moveTo(-3, -9);
+  ctx.quadraticCurveTo(-9, -9 + w1, -15, -7 + w2);
+  ctx.stroke();
+  ctx.globalAlpha = 0.55;
+  ctx.beginPath();
+  ctx.moveTo(-3, -8);
+  ctx.quadraticCurveTo(-8, -6 + w2 * 0.6, -13, -4 + w1);
+  ctx.stroke();
+  ctx.restore();
+  // bare head: burglar mask + messy hair + gold-glint eyes
+  ctx.fillStyle = "#c99b6a";
+  ctx.beginPath();
+  ctx.arc(0, -10, 5, 0, PI2);
+  ctx.fill();
+  ctx.fillStyle = "#1c1a22";
+  ctx.fillRect(-5.2, -12, 10.4, 2.8); // burglar band across the eyes
+  ctx.fillStyle = "#3a2c22"; // messy hair
+  ctx.beginPath();
+  ctx.moveTo(-5, -12);
+  ctx.quadraticCurveTo(0, -17.5, 5, -12);
+  ctx.quadraticCurveTo(3, -14.5, 1, -13.4);
+  ctx.quadraticCurveTo(-1, -15, -3, -13.2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.save();
+  ctx.fillStyle = accent;
+  ctx.shadowColor = accent;
+  ctx.shadowBlur = 3 + A.glow * 3;
+  ctx.beginPath(); ctx.arc(-1.8, -10.7, 0.85, 0, PI2); ctx.fill();
+  ctx.beginPath(); ctx.arc(1.8, -10.7, 0.85, 0, PI2); ctx.fill();
+  ctx.restore();
+  // loot sack hugged under the left arm, coins glinting out the top
+  ctx.fillStyle = "#4a3a28";
+  ctx.beginPath();
+  ctx.ellipse(-7.5, 3, 4.4, 5, 0.25, 0, PI2);
+  ctx.fill();
+  ctx.strokeStyle = "#2c2118";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-10.4, -0.5);
+  ctx.quadraticCurveTo(-7.5, -2.4, -4.8, -0.8);
+  ctx.stroke();
+  ctx.save();
+  ctx.fillStyle = accent;
+  ctx.shadowColor = accent;
+  ctx.shadowBlur = 3;
+  for (const [gx, gy] of [[-8.6, -1.3], [-6.6, -1.8]] as const) {
+    ctx.beginPath();
+    ctx.arc(gx, gy, 0.9, 0, PI2);
+    ctx.fill();
+  }
+  ctx.restore();
+  // right hand: shiv out front
+  ctx.strokeStyle = body;
+  ctx.lineWidth = 2.6;
+  ctx.beginPath();
+  ctx.moveTo(5, -2);
+  ctx.quadraticCurveTo(9, -3, 11, -4);
+  ctx.stroke();
+  shiv(ctx, 11.5, -4.5, 1.2);
+  ctx.restore();
+  ctx.lineCap = "butt";
+}
+
+/** Den Bruiser — a human pit-grappler (no more shrunken-ogre recolor): hunched
+ *  wide stance, huge open hands flexing, glowing brass pit-brand, stomp rings. */
+function drawDenBruiser(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {
+  const heave = A.live ? Math.sin(A.t * 2.0) * 0.7 : 0;
+  ctx.lineCap = "round";
+  ctx.save();
+  ctx.translate(0, 1.6); // hunched lower
+  // dust at the feet
+  if (A.live) {
+    ctx.save();
+    ctx.fillStyle = "#a8a29e";
+    for (let i = 0; i < 2; i++) {
+      const life = (A.t * 0.35 + i * 1.3) % 1;
+      ctx.globalAlpha = (1 - life) * 0.2;
+      ctx.beginPath();
+      ctx.arc(-10 + i * 20 + Math.sin(A.t + i) * 2, 22 - life * 4, 1.5 + life * 2.5, 0, PI2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+  // legs planted wide
+  ctx.strokeStyle = dark;
+  ctx.lineWidth = 4.4;
+  ctx.beginPath();
+  ctx.moveTo(-5, 8); ctx.lineTo(-8, 15); ctx.lineTo(-7, 22);
+  ctx.moveTo(5, 8); ctx.lineTo(8, 15); ctx.lineTo(9, 22);
+  ctx.stroke();
+  // barrel torso in a hide vest
+  const g = ctx.createLinearGradient(0, -11 - heave, 0, 11);
+  g.addColorStop(0, light);
+  g.addColorStop(1, dark);
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.moveTo(-11, -7 - heave);
+  ctx.quadraticCurveTo(-13, 3, -8, 10);
+  ctx.lineTo(8, 10);
+  ctx.quadraticCurveTo(13, 3, 11, -7 - heave);
+  ctx.quadraticCurveTo(0, -12 - heave, -11, -7 - heave);
+  ctx.closePath();
+  ctx.fill();
+  // bare chest V between the vest halves
+  ctx.fillStyle = "#b98a5e";
+  ctx.beginPath();
+  ctx.moveTo(-4.5, -8 - heave);
+  ctx.lineTo(4.5, -8 - heave);
+  ctx.lineTo(0, 4);
+  ctx.closePath();
+  ctx.fill();
+  // glowing brass pit-brand on the chest
+  const p = 0.4 + 0.5 * (0.5 + 0.5 * Math.sin(A.t * 2.2));
+  ctx.save();
+  ctx.strokeStyle = accent;
+  ctx.shadowColor = accent;
+  ctx.shadowBlur = 4;
+  ctx.globalAlpha = A.live ? p : 0.6;
+  ctx.lineWidth = 1.1;
+  ctx.beginPath();
+  ctx.arc(0, -3 - heave, 2.2, 0, PI2);
+  ctx.moveTo(-1.4, -1.6 - heave);
+  ctx.lineTo(1.4, -4.4 - heave);
+  ctx.stroke();
+  ctx.restore();
+  // vest stitching
+  ctx.strokeStyle = withShade(body, -30);
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-6, -6 - heave); ctx.lineTo(-6, 8);
+  ctx.moveTo(6, -6 - heave); ctx.lineTo(6, 8);
+  ctx.stroke();
+  // tooth necklace bouncing with the heave
+  ctx.strokeStyle = "#3a2c22";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-5, -8 - heave);
+  ctx.quadraticCurveTo(0, -4 - heave, 5, -8 - heave);
+  ctx.stroke();
+  ctx.fillStyle = "#e9e4d4";
+  for (const tx of [-3, -1, 1, 3]) {
+    const ty = -6.4 - heave + Math.abs(tx) * -0.35 + 1.2;
+    ctx.beginPath();
+    ctx.moveTo(tx - 0.8, ty);
+    ctx.lineTo(tx, ty + 2.4);
+    ctx.lineTo(tx + 0.8, ty);
+    ctx.closePath();
+    ctx.fill();
+  }
+  // belt
+  ctx.fillStyle = "#2c2118";
+  ctx.fillRect(-9, 8.5, 18, 3);
+  ctx.fillStyle = accent;
+  ctx.fillRect(-1.5, 8.7, 3, 2.6);
+  // both huge open hands forward, fingers flexing
+  const flex = 0.5 + 0.5 * Math.sin(A.t * 2.8);
+  ctx.strokeStyle = "#b98a5e";
+  ctx.lineWidth = 3.8;
+  ctx.beginPath();
+  ctx.moveTo(9, -4 - heave); ctx.quadraticCurveTo(15, -4, 17, -1);
+  ctx.moveTo(-9, -4 - heave); ctx.quadraticCurveTo(-13, -2, -14, 2);
+  ctx.stroke();
+  for (const [px, py, s] of [[17.5, 0, 1], [-14.5, 3, -1]] as const) {
+    ctx.fillStyle = "#b98a5e";
+    ctx.beginPath();
+    ctx.arc(px, py, 3, 0, PI2);
+    ctx.fill();
+    ctx.strokeStyle = "#b98a5e";
+    ctx.lineWidth = 1.7;
+    for (let f = 0; f < 3; f++) {
+      const fa = s * (0.5 - f * 0.5) - (s > 0 ? 0 : Math.PI);
+      const flen = 3.4 + flex * 1.8;
+      ctx.beginPath();
+      ctx.moveTo(px, py);
+      ctx.lineTo(px + Math.cos(fa) * flen, py + Math.sin(fa) * flen - flex * 1.2);
+      ctx.stroke();
+    }
+  }
+  // bald scarred head, heavy jaw
+  const hy = -15 - heave;
+  ctx.fillStyle = "#b98a5e";
+  ctx.beginPath();
+  ctx.arc(0, hy, 5.6, 0, PI2);
+  ctx.fill();
+  ctx.fillStyle = "#a5764b";
+  ctx.beginPath();
+  ctx.arc(0, hy, 5.6, 0.2 * Math.PI, 0.8 * Math.PI); // jaw shade
+  ctx.fill();
+  // heavy brow + mean little eyes
+  ctx.fillStyle = "#8a5f3e";
+  ctx.fillRect(-4.6, hy - 2.8, 9.2, 1.6);
+  ctx.fillStyle = "#14181d";
+  ctx.fillRect(-3, hy - 1, 2, 1.6);
+  ctx.fillRect(1.4, hy - 1, 2, 1.6);
+  // broken nose + snarl
+  ctx.strokeStyle = "#8a5f3e";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, hy - 0.6);
+  ctx.lineTo(0.8, hy + 1.6);
+  ctx.stroke();
+  ctx.strokeStyle = "#6e4a30";
+  ctx.lineWidth = 0.9;
+  ctx.beginPath();
+  ctx.moveTo(-2.4, hy + 3);
+  ctx.lineTo(2.4, hy + 2.4);
+  ctx.stroke();
+  // cauliflower ear + head scar
+  ctx.fillStyle = "#a5764b";
+  ctx.beginPath();
+  ctx.arc(5.2, hy + 0.4, 1.4, 0, PI2);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.22)";
+  ctx.lineWidth = 0.9;
+  ctx.beginPath();
+  ctx.moveTo(-3.4, hy - 4.4);
+  ctx.lineTo(-1, hy - 2.6);
+  ctx.stroke();
+  ctx.restore();
+  // stomp shockwave ring at the feet every couple of seconds
+  if (A.live) {
+    const cyc = (A.t % 2.2) / 2.2;
+    if (cyc < 0.4) {
+      const rp = cyc / 0.4;
+      ctx.save();
+      ctx.strokeStyle = accent;
+      ctx.globalAlpha = (1 - rp) * 0.5;
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.ellipse(0, 22, 4 + rp * 14, (4 + rp * 14) * 0.3, 0, 0, PI2);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+  ctx.lineCap = "butt";
+}
+
+/** The king's broad cleaver-falchion, seated properly in the fist: fist at
+ *  (0,0), grip through it, gold guard above the fingers, gold pommel below. */
+function falchionAt(ctx: Ctx, x: number, y: number, rot: number, gold: string, A: SpriteAnim): void {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rot);
+  ctx.fillStyle = "#3a2a20";
+  ctx.fillRect(-1.4, -2.8, 2.8, 6.4); // grip through the hand
+  const fg = ctx.createLinearGradient(0, -17, 6, -3);
+  fg.addColorStop(0, "#e9edf2");
+  fg.addColorStop(1, "#9aa0a8");
+  ctx.fillStyle = fg;
+  ctx.beginPath(); // broad cleaver-falchion blade, rising off the guard
+  ctx.moveTo(-1.6, -2.6);
+  ctx.lineTo(-1, -16);
+  ctx.quadraticCurveTo(0, -21, 5, -23);
+  ctx.quadraticCurveTo(6.5, -18, 5, -13);
+  ctx.lineTo(2.6, -2.6);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.6)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-1, -16);
+  ctx.quadraticCurveTo(0, -21, 5, -23);
+  ctx.stroke();
+  ctx.strokeStyle = gold;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-3.2, -2.8);
+  ctx.lineTo(3.8, -2.8);
+  ctx.stroke(); // gold guard
+  // fist wrapping the grip (drawn last so the fingers sit over it)
+  ctx.fillStyle = "#a97c58";
+  ctx.beginPath();
+  ctx.arc(0, 0, 2.6, 0, PI2);
+  ctx.fill();
+  ctx.strokeStyle = "#8a5f3e";
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.arc(-0.4, -0.4, 1.5, -0.4, 1.8);
+  ctx.stroke(); // thumb crease
+  ctx.save();
+  ctx.fillStyle = gold;
+  ctx.shadowColor = gold;
+  ctx.shadowBlur = 2 + A.glow * 2;
+  ctx.beginPath();
+  ctx.arc(0, 4.4, 1.4, 0, PI2);
+  ctx.fill();
+  ctx.restore(); // gold pommel
+  ctx.restore();
+}
+
+/** The Masked King (2026-07-13 glow-up): the original crowned brute, now with
+ *  a red bandit mask over the whole face, a straight jewelled crown, extra
+ *  gold (chains/medallion/belt/bracer), and a full falchion swing — windup,
+ *  chop with a swoosh trail, recover — on a ~2.2s loop. */
+function drawBanditKing(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {
+  ctx.lineCap = "round";
+  const heave = A.live ? Math.sin(A.t * 2.2) * 0.8 : 0; // big chest heaving
+  // legs planted wide
+  ctx.strokeStyle = dark;
+  ctx.lineWidth = 4.6;
+  ctx.beginPath();
+  ctx.moveTo(-5, 8);
+  ctx.lineTo(-8, 16);
+  ctx.lineTo(-7, 23);
+  ctx.moveTo(5, 8);
+  ctx.lineTo(9, 16);
+  ctx.lineTo(10, 23);
+  ctx.stroke();
+  // fur-trimmed coat over a scarred barrel chest
+  const g = ctx.createLinearGradient(0, -12 - heave, 0, 12);
+  g.addColorStop(0, light);
+  g.addColorStop(1, dark);
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.moveTo(-11, -8 - heave);
+  ctx.quadraticCurveTo(-13, 4, -8, 11);
+  ctx.lineTo(8, 11);
+  ctx.quadraticCurveTo(13, 4, 11, -8 - heave);
+  ctx.quadraticCurveTo(0, -13 - heave, -11, -8 - heave);
+  ctx.closePath();
+  ctx.fill();
+  // fur collar
+  ctx.strokeStyle = "#6e5b45";
+  ctx.lineWidth = 3.4;
+  ctx.beginPath();
+  ctx.moveTo(-10, -7 - heave);
+  ctx.quadraticCurveTo(0, -12 - heave, 10, -7 - heave);
+  ctx.stroke();
+  // bare chest V + old scars
+  ctx.fillStyle = "#a97c58";
+  ctx.beginPath();
+  ctx.moveTo(-4, -8 - heave);
+  ctx.lineTo(4, -8 - heave);
+  ctx.lineTo(0, 2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "#7d5138";
+  ctx.lineWidth = 0.9;
+  ctx.beginPath();
+  ctx.moveTo(-2, -6 - heave);
+  ctx.lineTo(1, -3);
+  ctx.moveTo(2.5, -7 - heave);
+  ctx.lineTo(0.5, -5);
+  ctx.stroke();
+  // looped gold chains + medallion across the coat
+  ctx.save();
+  ctx.strokeStyle = accent;
+  ctx.shadowColor = accent;
+  ctx.shadowBlur = 2;
+  ctx.lineWidth = 1.2;
+  ctx.globalAlpha = 0.95;
+  ctx.beginPath();
+  ctx.moveTo(-8, -6 - heave);
+  ctx.quadraticCurveTo(0, 1 - heave, 8, -6 - heave);
+  ctx.moveTo(-6.5, -7 - heave);
+  ctx.quadraticCurveTo(0, -2 - heave, 6.5, -7 - heave);
+  ctx.stroke();
+  ctx.fillStyle = accent;
+  ctx.beginPath();
+  ctx.arc(0, -0.6 - heave, 1.9, 0, PI2);
+  ctx.fill(); // medallion
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = "#fff4d6";
+  ctx.globalAlpha = 0.8;
+  ctx.beginPath();
+  ctx.arc(-0.6, -1.2 - heave, 0.7, 0, PI2);
+  ctx.fill();
+  ctx.restore();
+  // gold belt with a buckle
+  ctx.save();
+  ctx.fillStyle = accent;
+  ctx.shadowColor = accent;
+  ctx.shadowBlur = 1.5;
+  ctx.fillRect(-8.4, 8.6, 16.8, 1.7);
+  ctx.fillRect(-1.6, 8, 3.2, 3);
+  ctx.restore();
+  // coin-purse spoils at the belt
+  ctx.fillStyle = "#5a4632";
+  ctx.beginPath();
+  ctx.ellipse(-6, 9, 3, 3.6, 0.3, 0, PI2);
+  ctx.fill();
+  ctx.save();
+  ctx.fillStyle = accent;
+  ctx.shadowColor = accent;
+  ctx.shadowBlur = 3;
+  ctx.beginPath(); ctx.arc(-6, 7, 1, 0, PI2); ctx.fill();
+  ctx.restore();
+  // left arm: fist planted on the hip, gold bracer
+  ctx.strokeStyle = body;
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(-9, -5 - heave);
+  ctx.quadraticCurveTo(-14, -1, -12, 4);
+  ctx.stroke();
+  ctx.fillStyle = "#a97c58";
+  ctx.beginPath();
+  ctx.arc(-12, 4.6, 2.6, 0, PI2);
+  ctx.fill();
+  ctx.save();
+  ctx.strokeStyle = accent;
+  ctx.shadowColor = accent;
+  ctx.shadowBlur = 2;
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(-13.6, 0.6);
+  ctx.lineTo(-10.9, 1.4);
+  ctx.stroke();
+  ctx.restore();
+  // right arm swings the falchion: windup -> fast strike -> recover, on a loop
+  const cyc = A.live ? (A.t % 2.2) / 2.2 : 0.2;
+  let ang;
+  if (cyc < 0.4) ang = -1.0 - (cyc / 0.4) * 0.6; // slow windup back
+  else if (cyc < 0.58) ang = -1.6 + ((cyc - 0.4) / 0.18) * 2.2; // fast sweep forward
+  else ang = 0.6 - ((cyc - 0.58) / 0.42) * 1.6; // recover
+  const sx = 9;
+  const sy = -6 - heave;
+  const hx = sx + Math.cos(ang) * 7;
+  const hy = sy + Math.sin(ang) * 7;
+  ctx.strokeStyle = body;
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(sx, sy);
+  ctx.quadraticCurveTo((sx + hx) / 2 + 1, (sy + hy) / 2, hx, hy);
+  ctx.stroke();
+  // swoosh trail during the strike
+  if (A.live && cyc >= 0.42 && cyc < 0.72) {
+    const sp = (cyc - 0.42) / 0.3;
+    ctx.save();
+    ctx.globalAlpha = (1 - sp) * 0.6;
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.arc(sx, sy, 17, ang - 1.0, ang - 0.15);
+    ctx.stroke();
+    ctx.strokeStyle = withAlpha(accent, 0.7);
+    ctx.beginPath();
+    ctx.arc(sx, sy, 14, ang - 0.9, ang - 0.15);
+    ctx.stroke();
+    ctx.restore();
+  }
+  // blade rotation keyframed for a FULL swing: upright -> cocked back ->
+  // big chop through the arc -> ease back upright
+  let rot;
+  if (cyc < 0.4) rot = 0.1 - (cyc / 0.4) * 0.8; // cock back over the shoulder
+  else if (cyc < 0.58) rot = -0.7 + ((cyc - 0.4) / 0.18) * 2.6; // full chopping rotation
+  else rot = 1.9 - ((cyc - 0.58) / 0.42) * 1.8; // recover to upright
+  falchionAt(ctx, hx, hy, rot, accent, A);
+  // bearded head with the stolen crown
+  ctx.fillStyle = "#a97c58";
+  ctx.beginPath();
+  ctx.arc(0, -16 - heave, 6, 0, PI2);
+  ctx.fill();
+  ctx.fillStyle = "#4a3526";
+  ctx.beginPath(); // beard (mostly hidden under the mask now)
+  ctx.moveTo(-5, -14 - heave);
+  ctx.quadraticCurveTo(0, -8 - heave, 5, -14 - heave);
+  ctx.quadraticCurveTo(0, -12 - heave, -5, -14 - heave);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "#14181d";
+  ctx.beginPath(); ctx.arc(-2, -17 - heave, 1, 0, PI2); ctx.fill();
+  ctx.beginPath(); ctx.arc(2.5, -17 - heave, 1, 0, PI2); ctx.fill();
+  // the crown — worn straight now, bigger, with stolen jewels
+  ctx.save();
+  ctx.translate(0.8, -21.9 - heave);
+  ctx.scale(1.2, 1.2);
+  ctx.fillStyle = accent;
+  ctx.shadowColor = accent;
+  ctx.shadowBlur = 2 + A.glow * 5;
+  ctx.beginPath();
+  ctx.moveTo(-5.5, 2);
+  ctx.lineTo(-5.5, -1);
+  ctx.lineTo(-3, 1);
+  ctx.lineTo(-1.5, -2.5);
+  ctx.lineTo(0.5, 1);
+  ctx.lineTo(2.5, -2.5);
+  ctx.lineTo(4, 1);
+  ctx.lineTo(5.5, -1);
+  ctx.lineTo(5.5, 2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.shadowBlur = 3 + A.glow * 4;
+  ctx.fillStyle = "#e04848";
+  ctx.beginPath(); ctx.arc(-1.5, 0.4, 0.8, 0, PI2); ctx.fill();
+  ctx.fillStyle = "#4ad08a";
+  ctx.beginPath(); ctx.arc(2.4, 0.4, 0.7, 0, PI2); ctx.fill();
+  ctx.restore();
+  // red bandit mask covering the whole lower face
+  const hy0 = -16 - heave;
+  ctx.fillStyle = "#c22f2f";
+  ctx.beginPath();
+  ctx.moveTo(-6.4, hy0 - 0.2);
+  ctx.lineTo(6.4, hy0 - 0.2);
+  ctx.lineTo(5, hy0 + 5);
+  ctx.lineTo(0, hy0 + 8.6);
+  ctx.lineTo(-5, hy0 + 5);
+  ctx.closePath();
+  ctx.fill();
+  // mask folds
+  ctx.strokeStyle = "#8f1f1f";
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(-5, hy0 + 2);
+  ctx.quadraticCurveTo(0, hy0 + 3.4, 5, hy0 + 2);
+  ctx.moveTo(-4, hy0 + 4.4);
+  ctx.quadraticCurveTo(0, hy0 + 5.6, 4, hy0 + 4.4);
+  ctx.stroke();
+  // knot tails fluttering off the side
+  const fl = A.live ? Math.sin(A.t * 3.6) * 1.4 : 0;
+  ctx.strokeStyle = "#c22f2f";
+  ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  ctx.moveTo(-5.6, hy0 + 1);
+  ctx.quadraticCurveTo(-9, hy0 + fl, -11.5, hy0 + 2 + fl * 1.4);
+  ctx.moveTo(-5.6, hy0 + 1.8);
+  ctx.quadraticCurveTo(-8.5, hy0 + 3 + fl * 0.6, -10.5, hy0 + 5 + fl);
+  ctx.stroke();
+  // harder eyes: angry brow slashes above the mask line
+  ctx.strokeStyle = "#2c1418";
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(-3.6, hy0 - 2.6);
+  ctx.lineTo(-0.8, hy0 - 1.4);
+  ctx.moveTo(4.1, hy0 - 2.6);
+  ctx.lineTo(1.3, hy0 - 1.4);
+  ctx.stroke();
+  ctx.lineCap = "butt";
 }

@@ -40,6 +40,10 @@ export type PageEntry = MonsterEntry | ItemEntry;
 export interface BookPage {
   heading: string;
   entries: PageEntry[];
+  /** Title page: renders just the book's name on plain parchment (the opening
+   *  leaf). The painted cover already carries the art — this page mustn't
+   *  repeat it. */
+  title?: boolean;
   /** Splash-painting plate (lore pages): the book id whose vignette
    *  components/compendium/splashArt draws. */
   art?: string;
@@ -86,6 +90,8 @@ const SPINES: Record<string, { leather: string; accent: string; glyph: string }>
   sealed_vault: { leather: "#2b3350", accent: "#ffd873", glyph: "✦" },
   deep_forge: { leather: "#402420", accent: "#ff9d4d", glyph: "⚙" },
   eclipse_spire: { leather: "#241a38", accent: "#c4aeff", glyph: "◐" },
+  fallen_cathedral: { leather: "#3d3244", accent: "#ffd76a", glyph: "⚜" },
+  rogues_den: { leather: "#33261a", accent: "#e8b04b", glyph: "🗡" },
   heroes: { leather: "#243a5e", accent: "#f5b301", glyph: "⚔" },
   items: { leather: "#571f1f", accent: "#e8c06a", glyph: "◆" },
 };
@@ -147,6 +153,8 @@ function dungeonBook(dungeon: Dungeon, save: PlayerSave): BookDef {
   // is always rare (left) + boss (right); extra bosses of multi-tier dungeons
   // (the Depths' per-tier Bloaters are one id today) ride the rare page.
   const pages: BookPage[] = [
+    { heading: dungeon.name, entries: [], title: true },
+    { heading: "", entries: [] },
     { heading: dungeon.name, entries: [], art: dungeon.id, note: dungeon.entryHint },
     ...headed("Denizens", chunk(fodder.map((defId) => ({ kind: "monster", defId }) as PageEntry), PER_PAGE)),
   ];
@@ -205,6 +213,8 @@ function heroesBook(save: PlayerSave): BookDef {
     groups.get(label)!.push(id);
   }
   const pages: BookPage[] = [
+    { heading: "Heroes of the Arena", entries: [], title: true },
+    { heading: "", entries: [] },
     {
       heading: "Heroes of the Arena",
       entries: [],
@@ -246,6 +256,8 @@ export function ownsLine(save: PlayerSave, lineId: string): boolean {
 function itemsBook(save: PlayerSave): BookDef {
   const lineIds = Object.keys(ITEM_LINES);
   const pages: BookPage[] = [
+    { heading: "Arms & Relics", entries: [], title: true },
+    { heading: "", entries: [] },
     {
       heading: "Arms & Relics",
       entries: [],
@@ -279,7 +291,7 @@ function itemsBook(save: PlayerSave): BookDef {
 // The shelf
 // ---------------------------------------------------------------------------
 
-/** Every book on the shelf, in shelf order: the seven dungeons down the gate
+/** Every book on the shelf, in shelf order: the nine dungeons down the gate
  *  chain, then the Heroes tome and the item catalog. */
 export function buildBooks(save: PlayerSave): BookDef[] {
   return [

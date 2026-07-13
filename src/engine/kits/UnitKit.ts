@@ -42,9 +42,12 @@ import { mysticArcherKit } from "./mysticArcher";
 import { necromancerKit } from "./necromancer";
 import { ogreKit } from "./ogre";
 import { orcKit } from "./orc";
+import { outlawKit } from "./outlaw";
+import { priestKit } from "./priest";
 import { rangerKit } from "./ranger";
 import { rogueKit } from "./rogue";
 import { runeGolemKit } from "./runeGolem";
+import { seraphKit } from "./seraph";
 import { slimeKit, slimeCloneKit } from "./slime";
 import { slimeKnightKit, slimeBlobKit } from "./slimeKnight";
 import { tricksterKit } from "./trickster";
@@ -91,6 +94,13 @@ export interface UnitKit {
   onReactTick?(unit: Unit, ctx: KitCtx): void;
 
   // --- HP funnel (called from inside dealDamage / heal) ---
+  /** Full-negate veto, run at the very top of dealDamage (before shield /
+   *  mitigation). Return true to make the hit whiff entirely — no HP change, no
+   *  flash, no floating number; the kit spawns its own text. Only called for
+   *  positive incoming damage (the Outlaw's 50% dodge + Killing Spree immunity).
+   *  May draw ctx.rng (deterministic). Distinct from modifyIncomingDamage, which
+   *  scales a hit that still lands. */
+  onWouldTakeDamage?(unit: Unit, amount: number, source: Unit, ctx: KitCtx): boolean;
   /** Transform an incoming heal before it lands (Druid bear form 1.5x). */
   modifyIncomingHeal?(unit: Unit, amount: number, ctx: KitCtx): number;
   /** Reduce an incoming hit before HP is applied (Aegis magic soak → 0.25x).
@@ -165,6 +175,7 @@ export const UNIT_KITS: UnitKitRegistry = {
   archer: archerKit,
   archmage: arcaneMageKit, // Sealed Vault catalyst: Arcane Barrage + Blink (reused)
   assassin: assassinKit,
+  bandit_king: berserkerKit, // Rogue's Den boss: Bloodrage + Cleave + Last Stand (reused)
   berserker: berserkerKit,
   bloater: bloaterKit,
   bloatling: bloatlingKit,
@@ -177,6 +188,7 @@ export const UNIT_KITS: UnitKitRegistry = {
   elder_treant: ogreKit, // The Overgrowth boss: Crushing Slam + Regrowth (reused)
   electric_mage: electricMageKit,
   engineer: engineerKit,
+  fallen_seraph: seraphKit, // Fallen Cathedral boss: Sanctuary + Divine Light (reused)
   fire_mage: fireMageKit,
   forge_golem: ogreKit, // Deep Forge boss: Crushing Slam + Reforge (reused)
   healer: clericKit,
@@ -190,9 +202,14 @@ export const UNIT_KITS: UnitKitRegistry = {
   necromancer: necromancerKit,
   ogre: ogreKit,
   orc: orcKit,
+  outlaw: outlawKit,
+  penitent: priestKit, // Fallen Cathedral catalyst: Flash Heal + Renew — heals its wave (reused)
+  priest: priestKit,
   ranger: rangerKit,
   rogue: rogueKit,
   rune_golem: runeGolemKit, // Sealed Vault boss: Warded Hide (halves all damage)
+  seraph: seraphKit,
+  silencer: outlawKit, // Rogue's Den catalyst: dodge + stealth + Killing Spree (reused)
   slime: slimeKit,
   slime_clone: slimeCloneKit,
   slime_knight: slimeKnightKit,
