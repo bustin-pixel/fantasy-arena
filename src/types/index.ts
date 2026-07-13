@@ -149,6 +149,11 @@ export interface UnitDef {
   /** Targeting personality (see TendencyId). Declarative data like `school` /
    *  `wardedAgainst` — never a kit hook. Absent = "brawler". */
   tendency?: TendencyId;
+  /** Battlefield-only sprite magnification so bosses tower over rank-and-file
+   *  units. Presentation only: read by the Renderer/sprite draw, NEVER by the
+   *  simulation — collision `radius` and the digest are untouched. It does not
+   *  apply to the fixed-size hub portrait, so unit cards stay uniform. Absent = 1. */
+  battleScale?: number;
   /** Human-readable passive traits (engine-coded behaviors) for the detail UI. */
   traits?: { name: string; description: string }[];
 }

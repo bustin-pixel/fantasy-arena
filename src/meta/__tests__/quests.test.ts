@@ -16,6 +16,8 @@ import {
   rollDailyBoard,
   sanitizeQuests,
   tickQuestProgress,
+  SLAY_CANDIDATES,
+  SLAY_FALLBACK,
   type ActiveQuest,
   type QuestBoardCtx,
 } from "@/meta/quests";
@@ -24,6 +26,17 @@ import {
   QUEST_BOARD_SIZE,
   QUEST_REFRESH_COST,
 } from "@/meta/economy";
+import { DUNGEONS } from "@/data/dungeons";
+import { getUnitDef } from "@/data/units";
+
+/** Every enemy defId that a dungeon/Depths tier actually spawns as fodder — the
+ *  pool a slay bounty must draw from (killing one has to land its defId in the
+ *  battle `slain` multiset for the quest to tick). */
+const SPAWNED_FODDER = new Set<string>(
+  Object.values(DUNGEONS).flatMap((d) =>
+    d.tiers.flatMap((t) => Object.keys(t.monsters))
+  )
+);
 
 const DAY = 12345;
 
@@ -127,6 +140,19 @@ describe("normalizeQuestBoard", () => {
     );
     expect(next).toEqual({ day: DAY + 1, refreshes: 0, taken: [], active });
   });
+});
+
+describe("slay bounty targets are real, spawnable enemies", () => {
+  // The multiset kill-count fix only helps if the target's defId actually shows
+  // up in `slain`. Guard against a typo (e.g. "vault_cultist" vs "cultist") or a
+  // fodder rename silently making a whole class of bounty unreachable.
+  it.each([...SLAY_CANDIDATES, ...SLAY_FALLBACK])(
+    "%s is a real unit def and spawns as dungeon fodder",
+    (id) => {
+      expect(getUnitDef(id).id).toBe(id); // real def (getUnitDef throws on unknown)
+      expect(SPAWNED_FODDER.has(id)).toBe(true); // actually spawned, so it can be slain
+    }
+  );
 });
 
 describe("tickQuestProgress", () => {

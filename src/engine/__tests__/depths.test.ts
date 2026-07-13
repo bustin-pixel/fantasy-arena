@@ -3,7 +3,7 @@
 // enemy concurrent cap, victory only once the whole queue is spent, and the
 // two new monster mechanics (Numbing Bite, Putrid Burst).
 import { describe, expect, it } from "vitest";
-import { MatchController } from "@/engine/MatchController";
+import { MatchController, battleEnemyLedger } from "@/engine/MatchController";
 import { WaveController } from "@/engine/WaveController";
 import { stepSimulation, type SimState } from "@/engine/CombatSystem";
 import { createSimState } from "@/engine/CombatSystem";
@@ -64,6 +64,37 @@ function drainQueue(seed: number, floor: number): string[] {
   }
   return out;
 }
+
+describe("battleEnemyLedger — slay-quest kill tally", () => {
+  it("counts each slain enemy individually (multiset), dedupes seen", () => {
+    const s = battleState(1);
+    // Three Spore Pods die; a fourth enemy lives; a player unit is ignored.
+    const corpses = [
+      place(s, "spore_pod", "enemy", 80, 80),
+      place(s, "spore_pod", "enemy", 120, 80),
+      place(s, "spore_pod", "enemy", 160, 80),
+    ];
+    place(s, "thornbeast", "enemy", 200, 80); // still alive → not slain
+    place(s, "knight", "player", 100, 400); // player corpses never count
+    for (const u of corpses) u.state = "dead";
+
+    const { seen, slain } = battleEnemyLedger(s.units);
+    // The reported bug returned 1 here (Set-deduped) instead of 3, so a
+    // "Slay 18× Spore Pod" bounty ticked +1 per run rather than +1 per kill.
+    expect(slain.filter((id) => id === "spore_pod").length).toBe(3);
+    expect([...seen].sort()).toEqual(["spore_pod", "thornbeast"]);
+  });
+
+  it("a slain player corpse is never counted (enemies only)", () => {
+    const s = battleState(2);
+    const foe = place(s, "spore_pod", "enemy", 90, 90);
+    const ally = place(s, "knight", "player", 100, 400);
+    foe.state = "dead";
+    ally.state = "dead";
+    const { slain } = battleEnemyLedger(s.units);
+    expect(slain).toEqual(["spore_pod"]);
+  });
+});
 
 describe("WaveController — wave composition", () => {
   it("same seed + floor => identical wave, deterministic across runs", () => {

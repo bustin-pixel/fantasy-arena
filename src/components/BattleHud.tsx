@@ -40,7 +40,40 @@ function MuteButton() {
   );
 }
 
-export function BattleHud({ ui, speed, onSpeed, mode, onExit }: Props) {
+/** The timer/counter bar. Lives in normal flow ABOVE the field (not overlaid
+ *  on the canvas) so units walking along the top edge are never covered. */
+export function BattleTopBar({
+  ui,
+  mode,
+  onExit,
+}: Pick<Props, "ui" | "mode" | "onExit">) {
+  return (
+    <div className="hud-topbar">
+      {/* Exit and mute live INSIDE the bar so they can never cover the
+          Enemy/You counters, whatever the screen width. */}
+      <button
+        type="button"
+        className="hud-corner-btn"
+        onClick={onExit}
+        aria-label="Leave battle"
+      >
+        ✕
+      </button>
+      <div className="hud-pill enemy">Enemy · {ui.enemyActive}</div>
+      {/* Endless shows the wave number (its clock is just a per-wave stalemate
+          backstop, not a player-facing countdown). */}
+      {mode === "endless" && ui.waveNumber != null ? (
+        <div className="hud-clock hud-wave">Wave {ui.waveNumber}</div>
+      ) : (
+        <div className="hud-clock">{fmtClock(ui.clockSec)}</div>
+      )}
+      <div className="hud-pill player">You · {ui.playerActive}</div>
+      <MuteButton />
+    </div>
+  );
+}
+
+export function BattleHud({ ui, speed, onSpeed, mode }: Omit<Props, "onExit">) {
   const next = ui.playerNext ? getUnitDef(ui.playerNext) : null;
 
   // Countdown ticks: the throttled ui snapshot (~6/s) is plenty for a 1s
@@ -59,29 +92,6 @@ export function BattleHud({ ui, speed, onSpeed, mode, onExit }: Props) {
 
   return (
     <div className="hud">
-      {/* Exit and mute live INSIDE the bar so they can never cover the
-          Enemy/You counters, whatever the screen width. */}
-      <div className="hud-top">
-        <button
-          type="button"
-          className="hud-corner-btn"
-          onClick={onExit}
-          aria-label="Leave battle"
-        >
-          ✕
-        </button>
-        <div className="hud-pill enemy">Enemy · {ui.enemyActive}</div>
-        {/* Endless shows the wave number (its clock is just a per-wave stalemate
-            backstop, not a player-facing countdown). */}
-        {mode === "endless" && ui.waveNumber != null ? (
-          <div className="hud-clock hud-wave">Wave {ui.waveNumber}</div>
-        ) : (
-          <div className="hud-clock">{fmtClock(ui.clockSec)}</div>
-        )}
-        <div className="hud-pill player">You · {ui.playerActive}</div>
-        <MuteButton />
-      </div>
-
       {/* Pre-battle countdown once both sides have their 2 units down. */}
       {ui.phase === "deployment" && ui.startCountdownSec != null && (
         <div className="countdown-overlay">

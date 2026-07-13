@@ -182,6 +182,9 @@ interface DrawOpts {
   scale?: number;
   /** Force a static idle pose (portraits). */
   staticPose?: boolean;
+  /** Battlefield draw: apply the unit's `def.battleScale` boss enlargement.
+   *  Portraits omit this so bosses keep their normal card size. */
+  battle?: boolean;
 }
 
 /** Ground-shadow ellipse at the humanoid foot line — the default for most units. */
@@ -210,7 +213,12 @@ export function drawUnitSprite(
   opts: DrawOpts = {}
 ): void {
   const def = getUnitDef(unit.defId);
-  const scale = opts.scale ?? 1;
+  // Bosses render larger on the battlefield (opts.battle) but keep their normal
+  // size in the fixed-size hub portrait (which passes an explicit opts.scale).
+  // Presentation only — the sim never reads battleScale, so collision `radius`
+  // and the determinism digest are untouched.
+  const bossScale = opts.battle ? def.battleScale ?? 1 : 1;
+  const scale = (opts.scale ?? 1) * bossScale;
   const live = !opts.staticPose;
   const { bob, lunge, cast } = live
     ? animOffsets(unit)
@@ -220,8 +228,12 @@ export function drawUnitSprite(
   const t = (live ? nowSeconds() : 0) + phaseOf(unit.uid);
   const A: SpriteAnim = { t, glow: 0.5 + 0.5 * Math.sin(t * 3), cast, live };
 
+  const sh = SHADOW_BY_ID[def.id] ?? DEFAULT_SHADOW;
   ctx.save();
-  ctx.translate(cx, cy - bob);
+  // Anchor an enlarged boss by its feet (shadow line) so it stands on the same
+  // spot a normal unit would — the extra height rises UPWARD instead of sinking
+  // the sprite into the ground. No-op when bossScale === 1.
+  ctx.translate(cx, cy - bob - sh.y * (bossScale - 1));
 
   // Facing flip + attack lunge toward facing direction.
   const dirX = unit.facing;
@@ -235,7 +247,6 @@ export function drawUnitSprite(
 
   // Shadow.
   if (!opts.staticPose) {
-    const sh = SHADOW_BY_ID[def.id] ?? DEFAULT_SHADOW;
     ctx.save();
     ctx.globalAlpha = 0.25;
     ctx.fillStyle = "#000";

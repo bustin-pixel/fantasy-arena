@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ItemLoadouts } from "@/types";
 import { useBattleEngine, type BattleMode } from "@/hooks/useBattleEngine";
-import { BattleHud } from "@/components/BattleHud";
+import { BattleHud, BattleTopBar } from "@/components/BattleHud";
 import { BattleUnitTip } from "@/components/BattleUnitTip";
 import { BoonPickOverlay, rarityColor } from "@/components/BoonPickOverlay";
 import { CardTray } from "@/components/CardTray";
@@ -212,6 +212,9 @@ export function BattleScreen({
 
   return (
     <div className="screen battle">
+      {/* Counter/timer bar sits ABOVE the field in normal flow so units at the
+          map's top edge are never hidden under it. */}
+      <BattleTopBar ui={ui} mode={mode} onExit={onExit} />
       <div className="field-wrap" ref={wrapRef}>
         <canvas
           ref={canvasRef}
@@ -230,7 +233,7 @@ export function BattleScreen({
             if (t) handleTap(t.clientX, t.clientY);
           }}
         />
-        <BattleHud ui={ui} speed={speed} onSpeed={setSpeed} mode={mode} onExit={onExit} />
+        <BattleHud ui={ui} speed={speed} onSpeed={setSpeed} mode={mode} />
         {inspected && (
           <BattleUnitTip unit={inspected} onClose={() => setInspectedUid(null)} />
         )}

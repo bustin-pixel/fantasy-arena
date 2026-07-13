@@ -24,6 +24,24 @@ import { getSettings } from "@/state/settings";
 
 type Ctx = CanvasRenderingContext2D;
 
+// Sprite geometry in normalized sprite space (see assets/sprites.ts): a body
+// spans roughly head y≈-27 to feet y≈+26 around the draw origin. Bosses are
+// drawn enlarged and anchored at their feet, so the extra height rises upward;
+// the HP bar / status icons follow the top of the enlarged sprite.
+const SPRITE_HEAD = 27;
+const SPRITE_FEET = 26;
+
+/** A unit's battlefield sprite enlargement (bosses only). 1 for normal units. */
+function bossScaleOf(u: Unit): number {
+  return getUnitDef(u.defId).battleScale ?? 1;
+}
+/** Screen-y of the top of a unit's drawn sprite. For an enlarged boss the sprite
+ *  grows up from its feet, so the head sits higher than the collision radius. */
+function spriteTopY(u: Unit): number {
+  const bs = bossScaleOf(u);
+  return u.pos.y - SPRITE_FEET * (bs - 1) - SPRITE_HEAD * bs;
+}
+
 // Static theme backdrops, pre-rendered once per theme to offscreen canvases.
 const bgCache = new Map<ArenaThemeId, HTMLCanvasElement>();
 
@@ -63,10 +81,13 @@ function drawZones(ctx: Ctx, theme: ArenaTheme): void {
 }
 
 function drawHealthBar(ctx: Ctx, u: Unit): void {
-  const w = 34;
+  const bs = bossScaleOf(u);
   const h = 4;
+  // Bosses get a wider bar sitting above their enlarged sprite; normal units
+  // keep the exact original bar (radius-relative), byte-for-byte unchanged.
+  const w = bs > 1 ? 34 * bs : 34;
   const x = u.pos.x - w / 2;
-  const y = u.pos.y - u.radius - 14;
+  const y = bs > 1 ? spriteTopY(u) - 10 : u.pos.y - u.radius - 14;
   const pct = Math.max(0, u.hp / u.maxHp);
   ctx.fillStyle = "rgba(0,0,0,0.6)";
   ctx.fillRect(x - 1, y - 1, w + 2, h + 2);
@@ -138,13 +159,15 @@ function drawStatusIcons(ctx: Ctx, u: Unit): void {
     taunt: "❗",
     fear: "😱",
   };
+  const bs = bossScaleOf(u);
+  const iconY = bs > 1 ? spriteTopY(u) - 22 : u.pos.y - u.radius - 20;
   let i = 0;
   ctx.font = "10px sans-serif";
   ctx.textAlign = "center";
   for (const e of u.effects) {
     const icon = icons[e.type];
     if (!icon) continue;
-    ctx.fillText(icon, u.pos.x - 14 + i * 12, u.pos.y - u.radius - 20);
+    ctx.fillText(icon, u.pos.x - 14 + i * 12, iconY);
     i++;
   }
 }
@@ -160,14 +183,19 @@ function drawUnit(ctx: Ctx, u: Unit): void {
     ctx.globalAlpha = 0.3;
   }
 
-  drawUnitSprite(ctx, u, u.pos.x, u.pos.y);
+  drawUnitSprite(ctx, u, u.pos.x, u.pos.y, { battle: true });
+
+  // Boss VFX overlays scale with the enlarged sprite and ride its raised body
+  // centre; normal units (bs === 1) keep the original radius-relative circles.
+  const bs = bossScaleOf(u);
+  const bodyY = u.pos.y - SPRITE_FEET * (bs - 1);
 
   // Red damage flash overlay (not while stealthed).
   if (u.hitFlash > 0 && u.state !== "dead" && !stealthed) {
     ctx.globalAlpha = (u.hitFlash / 4) * 0.5;
     ctx.fillStyle = "#ff3030";
     ctx.beginPath();
-    ctx.arc(u.pos.x, u.pos.y - 4, u.radius * 0.7, 0, Math.PI * 2);
+    ctx.arc(u.pos.x, bodyY - 4, u.radius * 0.7 * bs, 0, Math.PI * 2);
     ctx.fill();
     ctx.globalAlpha = stealthed ? 0.3 : 1;
   }
@@ -177,7 +205,7 @@ function drawUnit(ctx: Ctx, u: Unit): void {
     ctx.strokeStyle = "rgba(226,232,240,0.8)";
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(u.pos.x, u.pos.y - 2, u.radius * 0.9, 0, Math.PI * 2);
+    ctx.arc(u.pos.x, bodyY - 2, u.radius * 0.9 * bs, 0, Math.PI * 2);
     ctx.stroke();
   }
 

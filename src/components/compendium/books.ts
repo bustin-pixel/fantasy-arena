@@ -40,6 +40,10 @@ export type PageEntry = MonsterEntry | ItemEntry;
 export interface BookPage {
   heading: string;
   entries: PageEntry[];
+  /** Title page: renders just the book's name on plain parchment (the opening
+   *  leaf). The painted cover already carries the art — this page mustn't
+   *  repeat it. */
+  title?: boolean;
   /** Splash-painting plate (lore pages): the book id whose vignette
    *  components/compendium/splashArt draws. */
   art?: string;
@@ -147,6 +151,8 @@ function dungeonBook(dungeon: Dungeon, save: PlayerSave): BookDef {
   // is always rare (left) + boss (right); extra bosses of multi-tier dungeons
   // (the Depths' per-tier Bloaters are one id today) ride the rare page.
   const pages: BookPage[] = [
+    { heading: dungeon.name, entries: [], title: true },
+    { heading: "", entries: [] },
     { heading: dungeon.name, entries: [], art: dungeon.id, note: dungeon.entryHint },
     ...headed("Denizens", chunk(fodder.map((defId) => ({ kind: "monster", defId }) as PageEntry), PER_PAGE)),
   ];
@@ -205,6 +211,8 @@ function heroesBook(save: PlayerSave): BookDef {
     groups.get(label)!.push(id);
   }
   const pages: BookPage[] = [
+    { heading: "Heroes of the Arena", entries: [], title: true },
+    { heading: "", entries: [] },
     {
       heading: "Heroes of the Arena",
       entries: [],
@@ -246,6 +254,8 @@ export function ownsLine(save: PlayerSave, lineId: string): boolean {
 function itemsBook(save: PlayerSave): BookDef {
   const lineIds = Object.keys(ITEM_LINES);
   const pages: BookPage[] = [
+    { heading: "Arms & Relics", entries: [], title: true },
+    { heading: "", entries: [] },
     {
       heading: "Arms & Relics",
       entries: [],

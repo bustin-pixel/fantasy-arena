@@ -135,9 +135,11 @@ export class EndlessController {
   private picks: string[] = [];
   /** Enemy defIds encountered this run (ledger; survives corpse pruning). */
   private bestiary = new Set<string>();
-  /** Enemy defIds that DIED this run — recorded as corpses are pruned, since the
-   *  compendium can't scan them off the field afterward. */
-  private bestiaryDefeated = new Set<string>();
+  /** Every enemy killed this run, recorded as corpses are pruned (the compendium
+   *  can't scan them off the field afterward). A MULTISET — one entry per kill,
+   *  NOT per type — so slay bounties count each kill; the compendium dedupes on
+   *  its own side. */
+  private slainLog: string[] = [];
 
   constructor(seed: number) {
     // Own stream, xor-mixed so it never shares draws with the sim RNG.
@@ -166,7 +168,7 @@ export class EndlessController {
    *  that died to you (`slain`). Accumulated as we spawn + prune, so it survives
    *  corpse pruning that a live-unit scan would miss. */
   ledger(): { seen: string[]; slain: string[] } {
-    return { seen: [...this.bestiary], slain: [...this.bestiaryDefeated] };
+    return { seen: [...this.bestiary], slain: [...this.slainLog] };
   }
 
   status(): EndlessStatus {
@@ -516,7 +518,7 @@ export class EndlessController {
 
   private pruneDeadEnemies(state: SimState): void {
     for (const u of state.units) {
-      if (u.team === "enemy" && u.state === "dead") this.bestiaryDefeated.add(u.defId);
+      if (u.team === "enemy" && u.state === "dead") this.slainLog.push(u.defId);
     }
     state.units = state.units.filter(
       (u) => !(u.team === "enemy" && u.state === "dead")

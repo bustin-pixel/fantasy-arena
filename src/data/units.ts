@@ -656,6 +656,7 @@ export const UNITS: Record<string, UnitDef> = {
   bloater: {
     id: "bloater",
     name: "Bloater",
+    battleScale: 2.1, // boss — towers over rank-and-file on the battlefield
     rarity: "epic",
     role: "Bloated Horror",
     hp: 800, // rebalanced up from 380 — the winrate sweep had it folding to 4 units
@@ -765,6 +766,7 @@ export const UNITS: Record<string, UnitDef> = {
   abomination: {
     id: "abomination",
     name: "Abomination",
+    battleScale: 2.1, // boss — towers over rank-and-file on the battlefield
     rarity: "epic",
     role: "Undead Horror",
     hp: 900,
@@ -882,6 +884,7 @@ export const UNITS: Record<string, UnitDef> = {
   dire_alpha: {
     id: "dire_alpha",
     name: "Dire Alpha",
+    battleScale: 2.1, // boss — towers over rank-and-file on the battlefield
     rarity: "epic",
     role: "Pack Alpha",
     hp: 850,
@@ -997,6 +1000,7 @@ export const UNITS: Record<string, UnitDef> = {
   rune_golem: {
     id: "rune_golem",
     name: "Rune Golem",
+    battleScale: 2.1, // boss — towers over rank-and-file on the battlefield
     rarity: "epic",
     role: "Warded Construct",
     hp: 750,
@@ -1116,6 +1120,7 @@ export const UNITS: Record<string, UnitDef> = {
   elder_treant: {
     id: "elder_treant",
     name: "Elder Treant",
+    battleScale: 2.1, // boss — towers over rank-and-file on the battlefield
     rarity: "epic",
     role: "Ancient Guardian",
     hp: 1000,
@@ -1236,6 +1241,7 @@ export const UNITS: Record<string, UnitDef> = {
   eclipse_warden: {
     id: "eclipse_warden",
     name: "Eclipse Warden",
+    battleScale: 2.1, // boss — towers over rank-and-file on the battlefield
     rarity: "epic",
     role: "Warden of Dusk",
     hp: 680,
@@ -1343,6 +1349,7 @@ export const UNITS: Record<string, UnitDef> = {
   forge_golem: {
     id: "forge_golem",
     name: "Forge Golem",
+    battleScale: 2.1, // boss — towers over rank-and-file on the battlefield
     rarity: "epic",
     role: "Molten Colossus",
     hp: 900,

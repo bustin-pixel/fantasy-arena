@@ -77,6 +77,7 @@ function driveGodMode(
   seed: number,
   tickCap = 20000
 ): {
+  mc: MatchController;
   bannersByWave: Map<number, Set<string>>;
   phase: string;
   reservesEverZero: boolean;
@@ -116,8 +117,19 @@ function driveGodMode(
     }
     if (maxWave >= 6) break; // enough waves to cover the first full cycle
   }
-  return { bannersByWave, phase: mc.phase, reservesEverZero, maxWave };
+  return { mc, bannersByWave, phase: mc.phase, reservesEverZero, maxWave };
 }
+
+describe("endless — slay-quest kill tally", () => {
+  it("the run ledger records every kill (multiset), not just distinct types", () => {
+    // God-mode reliably clears the first 6-wave cycle, killing many repeating
+    // fodder. slain must carry duplicates so a slay bounty counts each kill —
+    // the same defect as the dungeon "Slay 18× Spore Pod" +1/run report.
+    const { mc } = driveGodMode(4242);
+    const led = mc.endlessLedger()!;
+    expect(led.slain.length).toBeGreaterThan(new Set(led.slain).size);
+  });
+});
 
 describe("endless — determinism", () => {
   it("same seed + same pick sequence => byte-identical end state", () => {
