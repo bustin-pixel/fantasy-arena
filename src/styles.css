@@ -1281,15 +1281,23 @@ body.modal-open .pager-nav {
   position: relative;
   background: #0c0a07;
   gap: 8px;
-  padding: 6px 0 calc(6px + env(safe-area-inset-bottom));
+  padding: calc(6px + env(safe-area-inset-top)) 0
+    calc(6px + env(safe-area-inset-bottom));
 }
 .field-wrap {
   position: relative;
-  width: 100%;
-  max-width: 480px;
-  aspect-ratio: 480 / 720;
-  /* Leaves room for the CardTray below AND the top bar above the field. */
-  max-height: calc(100dvh - 158px);
+  /* The field box is the AVAILABLE area, not a 2:3 letterbox: full column width
+     (capped so desktop keeps a sensible frame) × the height left after the
+     chrome — top bar (~40) + two 8px gaps (16) + card tray (104) + 12px padding
+     ≈ 172, plus a 4px cushion, plus the safe-area insets. The canvas fills this
+     box; its render buffer is sized to this box's ASPECT (BattleScreen), and
+     the renderer centres the 480×720 world inside it — so the arena art reaches
+     both edges (no black bars) while the fight stays undistorted, and the
+     column still can't overflow 100dvh (so the top bar is never clipped). */
+  width: min(100%, 560px);
+  height: calc(
+    100dvh - 176px - env(safe-area-inset-top) - env(safe-area-inset-bottom)
+  );
   flex: 0 0 auto;
 }
 .field-canvas {

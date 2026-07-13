@@ -1,6 +1,6 @@
 import type { InspectedUnit } from "@/hooks/useBattleEngine";
 import { RARITIES } from "@/data/rarities";
-import { FIELD_HEIGHT, FIELD_WIDTH } from "@/utils/constants";
+import { FIELD_HEIGHT, fieldTransform } from "@/utils/constants";
 import { clamp } from "@/utils/math";
 
 const EFFECT_LABELS: Record<string, string> = {
@@ -20,15 +20,23 @@ const EFFECT_LABELS: Record<string, string> = {
 /** A small overlay tooltip pinned by a battlefield unit, showing live stats. */
 export function BattleUnitTip({
   unit,
+  bufW,
+  bufH,
   onClose,
 }: {
   unit: InspectedUnit;
+  /** Render-buffer size, so the tip lands on the unit after the arena's
+   *  edge-to-edge fill re-centers the world (see fieldTransform). */
+  bufW: number;
+  bufH: number;
   onClose: () => void;
 }) {
   const rarity = RARITIES[unit.rarity];
   const hpPct = Math.max(0, Math.min(100, (unit.hp / unit.maxHp) * 100));
-  const leftPct = clamp((unit.pos.x / FIELD_WIDTH) * 100, 20, 80);
-  const topPct = (unit.pos.y / FIELD_HEIGHT) * 100;
+  // World point → fraction of the field box (which spans the whole buffer).
+  const { scale, offsetX, offsetY } = fieldTransform(bufW, bufH);
+  const leftPct = clamp(((offsetX + unit.pos.x * scale) / bufW) * 100, 20, 80);
+  const topPct = ((offsetY + unit.pos.y * scale) / bufH) * 100;
   // Flip below the unit when it's near the top so it doesn't clip off-screen.
   const below = unit.pos.y < FIELD_HEIGHT * 0.34;
   const rangeLabel = unit.range <= 80 ? "Melee" : "Ranged";

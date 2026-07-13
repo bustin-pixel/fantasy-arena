@@ -9,7 +9,9 @@ import {
   FIELD_HEIGHT,
   FIELD_WIDTH,
   PLAYER_ZONE,
+  fieldTransform,
 } from "@/utils/constants";
+import { clamp } from "@/utils/math";
 import { useGameState } from "@/state/GameStateContext";
 import { endlessBestWave, highestClearedFloorOf } from "@/state/persistence";
 import { computeBattleRewards, type BattleRewards } from "@/meta/rewards";
@@ -102,6 +104,30 @@ export function BattleScreen({
   // the unit's position stay current; clears itself when the unit dies.
   const inspected = inspectedUid ? inspectUnit(inspectedUid) : null;
 
+  // Size the render buffer to the field box's ASPECT (not a fixed 480×720), so
+  // the arena fills it edge-to-edge instead of leaving black letterbox bars.
+  // Height stays FIELD_HEIGHT (constant vertical resolution); width tracks the
+  // box. The renderer re-centers the 480×720 world inside this wider buffer,
+  // and handleTap/BattleUnitTip invert the same transform. See fieldTransform.
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    const canvas = canvasRef.current;
+    if (!wrap || !canvas) return;
+    const apply = () => {
+      const r = wrap.getBoundingClientRect();
+      if (r.width <= 0 || r.height <= 0) return;
+      const w = Math.max(1, Math.round(FIELD_HEIGHT * (r.width / r.height)));
+      // Assigning canvas.width clears the canvas, so only touch it on a real
+      // change (the rAF loop repaints every frame regardless).
+      if (canvas.width !== w) canvas.width = w;
+      if (canvas.height !== FIELD_HEIGHT) canvas.height = FIELD_HEIGHT;
+    };
+    apply();
+    const ro = new ResizeObserver(apply);
+    ro.observe(wrap);
+    return () => ro.disconnect();
+  }, [canvasRef]);
+
   // Record win/loss + Compendium reveals + rewards once when the match
   // resolves. The bestiary and rewards read the final field from the meta
   // layer — the sim never knows. recordedRef makes this exactly-once (the
@@ -185,8 +211,14 @@ export function BattleScreen({
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
-    const fx = ((clientX - rect.left) / rect.width) * FIELD_WIDTH;
-    const fy = ((clientY - rect.top) / rect.height) * FIELD_HEIGHT;
+    // Screen → buffer → world: the buffer is wider than the 480×720 world (the
+    // arena fills the margins), so undo the renderer's centering transform.
+    // Taps in the side margins clamp onto the field edge.
+    const { scale, offsetX, offsetY } = fieldTransform(canvas.width, canvas.height);
+    const bx = ((clientX - rect.left) / rect.width) * canvas.width;
+    const by = ((clientY - rect.top) / rect.height) * canvas.height;
+    const fx = clamp((bx - offsetX) / scale, 0, FIELD_WIDTH);
+    const fy = clamp((by - offsetY) / scale, 0, FIELD_HEIGHT);
 
     const hitUid = pickUnitAt({ x: fx, y: fy });
     if (hitUid) {
@@ -235,7 +267,12 @@ export function BattleScreen({
         />
         <BattleHud ui={ui} speed={speed} onSpeed={setSpeed} mode={mode} />
         {inspected && (
-          <BattleUnitTip unit={inspected} onClose={() => setInspectedUid(null)} />
+          <BattleUnitTip
+            unit={inspected}
+            bufW={canvasRef.current?.width ?? FIELD_WIDTH}
+            bufH={canvasRef.current?.height ?? FIELD_HEIGHT}
+            onClose={() => setInspectedUid(null)}
+          />
         )}
       </div>
 

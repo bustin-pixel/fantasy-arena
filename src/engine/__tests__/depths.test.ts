@@ -678,6 +678,116 @@ describe("WaveController — The Deep Forge dungeon", () => {
   });
 });
 
+describe("WaveController — The Fallen Cathedral dungeon", () => {
+  const cathedral = getDungeon("fallen_cathedral");
+
+  /** Drain a Cathedral wave with an unlimited-cap dummy state. */
+  const drainCathedral = (seed: number, floor: number): string[] => {
+    const wc = new WaveController(seed, cathedral, floor);
+    const s: SimState = createSimState(seed, 120);
+    s.activeCaps = { player: 4, enemy: 999 };
+    const out: string[] = [];
+    let guard = 0;
+    while (wc.remaining > 0 && guard < 8000) {
+      const before = s.units.length;
+      wc.step(s);
+      if (s.units.length > before) {
+        out.push(s.units[s.units.length - 1].defId);
+        s.units[s.units.length - 1].state = "dead";
+      }
+      guard++;
+    }
+    return out;
+  };
+
+  it("same seed + floor => identical wave (deterministic)", () => {
+    expect(drainCathedral(8, 2)).toEqual(drainCathedral(8, 2));
+  });
+
+  it("floor 5 is the boss floor and ends with Seraphiel the Forsworn", () => {
+    expect(isBossFloorIn(cathedral, 5)).toBe(true);
+    const q = drainCathedral(9, 5);
+    expect(q[q.length - 1]).toBe("fallen_seraph");
+    expect(drainCathedral(9, 1)).not.toContain("fallen_seraph");
+  });
+
+  it("floor 5 can roll the rare Penitent, just before the boss", () => {
+    let withAngel: string[] | null = null;
+    for (let seed = 1; seed <= 500 && !withAngel; seed++) {
+      const q = drainCathedral(seed, 5);
+      if (q.includes("penitent")) withAngel = q;
+    }
+    expect(withAngel).not.toBeNull();
+    expect(withAngel![withAngel!.length - 1]).toBe("fallen_seraph");
+    expect(withAngel!.indexOf("penitent")).toBe(withAngel!.length - 2);
+  });
+
+  it("a full Fallen Cathedral boss-floor descent resolves to a terminal phase", () => {
+    const { mc } = runDepths(
+      44,
+      5,
+      ["knight", "priest", "berserker", "mystic_archer"],
+      "fallen_cathedral"
+    );
+    expect(["victory", "defeat", "draw"]).toContain(mc.phase);
+  });
+});
+
+describe("WaveController — The Rogue's Den dungeon", () => {
+  const den = getDungeon("rogues_den");
+
+  /** Drain a Den wave with an unlimited-cap dummy state. */
+  const drainDen = (seed: number, floor: number): string[] => {
+    const wc = new WaveController(seed, den, floor);
+    const s: SimState = createSimState(seed, 120);
+    s.activeCaps = { player: 4, enemy: 999 };
+    const out: string[] = [];
+    let guard = 0;
+    while (wc.remaining > 0 && guard < 8000) {
+      const before = s.units.length;
+      wc.step(s);
+      if (s.units.length > before) {
+        out.push(s.units[s.units.length - 1].defId);
+        s.units[s.units.length - 1].state = "dead";
+      }
+      guard++;
+    }
+    return out;
+  };
+
+  it("same seed + floor => identical wave (deterministic)", () => {
+    expect(drainDen(8, 2)).toEqual(drainDen(8, 2));
+  });
+
+  it("floor 5 is the boss floor and ends with the Bandit King", () => {
+    expect(isBossFloorIn(den, 5)).toBe(true);
+    const q = drainDen(9, 5);
+    expect(q[q.length - 1]).toBe("bandit_king");
+    expect(drainDen(9, 1)).not.toContain("bandit_king");
+  });
+
+  it("floor 5 can roll the rare Silencer, just before the boss", () => {
+    let withMask: string[] | null = null;
+    for (let seed = 1; seed <= 500 && !withMask; seed++) {
+      const q = drainDen(seed, 5);
+      if (q.includes("silencer")) withMask = q;
+    }
+    expect(withMask).not.toBeNull();
+    expect(withMask![withMask!.length - 1]).toBe("bandit_king");
+    expect(withMask!.indexOf("silencer")).toBe(withMask!.length - 2);
+  });
+
+  it("a full Rogue's Den boss-floor descent resolves to a terminal phase", () => {
+    const { mc } = runDepths(
+      44,
+      5,
+      ["knight", "rogue", "assassin", "trickster"],
+      "rogues_den"
+    );
+    expect(["victory", "defeat", "draw"]).toContain(mc.phase);
+  });
+});
+
 describe("WaveController — boss-floor pacing (fodder pool → rare → boss)", () => {
   const dungeon = getDungeon("bonefields");
   const BOSS = "abomination";

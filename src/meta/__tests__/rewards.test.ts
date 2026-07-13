@@ -27,7 +27,11 @@ import { ITEM_LINES, signatureLineFor } from "@/data/items";
 import { XP_REWARDS } from "@/meta/leveling";
 import { DECKABLE_UNIT_IDS, getUnitDef } from "@/data/units";
 import { RARITY_ORDER } from "@/data/rarities";
-import { DEPTHS_TIERS, rareSpawnQuestForFloor } from "@/data/depths";
+import {
+  DEPTHS_TIERS,
+  questRequiredUnits,
+  rareSpawnQuestForFloor,
+} from "@/data/depths";
 import { DUNGEONS, QUEST_LOCKED_UNITS, getDungeon } from "@/data/dungeons";
 
 const NO_UNITS: string[] = [];
@@ -131,7 +135,7 @@ describe("computeBattleRewards — rare-spawn quest unlock", () => {
     const r = computeBattleRewards({
       ...base, mode: "depths", floor: quest.floor, outcome: "victory",
       highestClearedFloor: quest.floor, // replay branch — isolates the field
-      deck: [quest.requires], slain: [quest.spawnId],
+      deck: questRequiredUnits(quest), slain: [quest.spawnId],
     });
     expect(r.questUnlock).toBe(quest.unlocks);
   });
@@ -139,7 +143,7 @@ describe("computeBattleRewards — rare-spawn quest unlock", () => {
   it("counts even on a loss — clear it during the floor", () => {
     const r = computeBattleRewards({
       ...base, mode: "depths", floor: quest.floor, outcome: "defeat",
-      deck: [quest.requires], slain: [quest.spawnId],
+      deck: questRequiredUnits(quest), slain: [quest.spawnId],
     });
     expect(r.questUnlock).toBe(quest.unlocks);
   });
@@ -151,11 +155,11 @@ describe("computeBattleRewards — rare-spawn quest unlock", () => {
     });
     const noKill = computeBattleRewards({
       ...base, mode: "depths", floor: quest.floor, outcome: "victory",
-      deck: [quest.requires], slain: NO_UNITS,
+      deck: questRequiredUnits(quest), slain: NO_UNITS,
     });
     const wrongFloor = computeBattleRewards({
       ...base, mode: "depths", floor: quest.floor + 1, outcome: "victory",
-      deck: [quest.requires], slain: [quest.spawnId],
+      deck: questRequiredUnits(quest), slain: [quest.spawnId],
     });
     expect(noKnight.questUnlock).toBeUndefined();
     expect(noKill.questUnlock).toBeUndefined();
@@ -165,12 +169,12 @@ describe("computeBattleRewards — rare-spawn quest unlock", () => {
   it("doesn't re-announce once already unlocked or owned", () => {
     const already = computeBattleRewards({
       ...base, mode: "depths", floor: quest.floor, outcome: "victory",
-      deck: [quest.requires], slain: [quest.spawnId],
+      deck: questRequiredUnits(quest), slain: [quest.spawnId],
       questUnlocks: [quest.unlocks],
     });
     const owned = computeBattleRewards({
       ...base, mode: "depths", floor: quest.floor, outcome: "victory",
-      deck: [quest.requires], slain: [quest.spawnId],
+      deck: questRequiredUnits(quest), slain: [quest.spawnId],
       unlockedUnits: [quest.unlocks],
     });
     expect(already.questUnlock).toBeUndefined();
@@ -180,7 +184,7 @@ describe("computeBattleRewards — rare-spawn quest unlock", () => {
   it("arena never triggers a quest unlock (Depths only)", () => {
     const r = computeBattleRewards({
       ...base, mode: "solo", floor: quest.floor, outcome: "victory",
-      deck: [quest.requires], slain: [quest.spawnId],
+      deck: questRequiredUnits(quest), slain: [quest.spawnId],
     });
     expect(r.questUnlock).toBeUndefined();
   });
@@ -195,7 +199,7 @@ describe("computeBattleRewards — themed dungeon quest (The Bonefields)", () =>
     const r = computeBattleRewards({
       ...base, mode: "depths", dungeonId: "bonefields", floor: quest.floor,
       outcome: "victory", highestClearedFloor: quest.floor, // replay isolates the field
-      deck: [quest.requires], slain: [quest.spawnId],
+      deck: questRequiredUnits(quest), slain: [quest.spawnId],
     });
     expect(r.questUnlock).toBe("necromancer");
   });
@@ -216,6 +220,29 @@ describe("computeBattleRewards — themed dungeon quest (The Bonefields)", () =>
       outcome: "victory", highestClearedFloor: 0, // first clear → chest
     });
     expect(r.chest?.tier).toBe("gold");
+  });
+});
+
+describe("computeBattleRewards — any-of quest anchors (The Rogue's Den)", () => {
+  // The Silencer quest accepts ANY stealth unit: Assassin, Rogue, or Trickster.
+  const quest = getDungeon("rogues_den").quest!;
+  const base = { unlockedUnits: NO_UNITS, highestClearedFloor: 0, chestSeed: 7 };
+  const run = (deck: string[]) =>
+    computeBattleRewards({
+      ...base, mode: "depths", dungeonId: "rogues_den", floor: quest.floor,
+      outcome: "victory", highestClearedFloor: quest.floor,
+      deck, slain: [quest.spawnId],
+    });
+
+  it("each stealth unit alone satisfies the quest", () => {
+    for (const id of questRequiredUnits(quest)) {
+      expect(run([id]).questUnlock).toBe("outlaw");
+    }
+    expect(questRequiredUnits(quest)).toEqual(["assassin", "rogue", "trickster"]);
+  });
+
+  it("a deck with no stealth unit earns nothing", () => {
+    expect(run(["knight", "mage"]).questUnlock).toBeUndefined();
   });
 });
 
@@ -383,7 +410,11 @@ describe("economy data sanity (guards designer typos)", () => {
       expect(quest.hint.trim().length).toBeGreaterThan(0);
       // The rare enemy and the required unit must be real unit defs.
       expect(getUnitDef(quest.spawnId).id).toBe(quest.spawnId);
-      expect(DECKABLE_UNIT_IDS).toContain(quest.requires);
+      // Every unit that can satisfy the quest must be a real deckable unit.
+      expect(questRequiredUnits(quest).length).toBeGreaterThan(0);
+      for (const id of questRequiredUnits(quest)) {
+        expect(DECKABLE_UNIT_IDS).toContain(id);
+      }
       // The reward must be a deckable non-starter (you earn it, not start with it).
       expect(DECKABLE_UNIT_IDS).toContain(quest.unlocks);
       expect(STARTER_UNIT_IDS).not.toContain(quest.unlocks);

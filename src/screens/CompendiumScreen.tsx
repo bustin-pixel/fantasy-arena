@@ -1,6 +1,6 @@
 // ============================================================================
 // CompendiumScreen — the Grand Athenaeum. The bestiary is a candlelit library:
-// nine tomes on two walnut shelves (the seven dungeons down the gate chain,
+// eleven tomes on two walnut shelves (the nine dungeons down the gate chain,
 // the Heroes of the Arena, and the Arms & Relics catalog). Tapping a spine
 // runs the BookOverlay ceremony; gated dungeons sit chained shut and rattle
 // with the gate hint instead. Reveal tiers, UnitDetail, and the save's
@@ -18,9 +18,9 @@ import { playSfx } from "@/audio/sfx";
 
 /** Spine heights (px) walked in shelf order — an uneven row reads as a real
  *  shelf, not a bar chart. */
-const SPINE_HEIGHTS = [128, 116, 134, 110, 124, 120, 132, 138, 118];
+const SPINE_HEIGHTS = [128, 116, 134, 110, 124, 120, 132, 126, 114, 138, 118];
 /** Books per shelf row. */
-const ROW_SPLIT = 5;
+const ROW_SPLIT = 6;
 
 function BookSpine({
   book,

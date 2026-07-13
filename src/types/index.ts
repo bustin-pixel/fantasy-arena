@@ -60,12 +60,18 @@ export type AbilityId =
   | "shadow_step"
   | "curse"
   | "rejuvenation"
+  | "flash_heal"
+  | "renew"
   | "polymorph"
   | "mend_beast"
   | "scatter_trap"
   | "summon_wolves"
   | "gelatinous_guard"
-  | "divide_reconvene";
+  | "divide_reconvene"
+  | "killing_spree"
+  | "divine_light"
+  | "sanctuary"
+  | "renewal";
 
 export interface Vec2 {
   x: number;
@@ -257,6 +263,12 @@ export interface Unit {
   curseCooldown: number;
   /** Druid: ticks until Rejuvenation (instant HoT) is ready again. */
   rejuvCooldown: number;
+  /** Priest: ticks until Renew (instant HoT) is ready again. */
+  renewCooldown: number;
+  /** Seraph: ticks until Sanctuary (team-wide absorb bubble) is ready again. */
+  sanctuaryCooldown: number;
+  /** Seraph: ticks until Renewal (team-wide HoT) is ready again. */
+  renewalCooldown: number;
   /** Druid: ticks of Bear Form's 80% damage reduction left (0 = expired). */
   bearGuardTimer: number;
   /** Hunter: ticks until it can re-summon its boar after the boar dies. */
@@ -270,6 +282,21 @@ export interface Unit {
   barrageTimer: number;
   /** Arcane Mage: the target locked for the whole volley (all 3 hit it). */
   barrageTargetUid: string | null;
+  /** Outlaw Killing Spree: the ultimate's charge meter, in ticks. ultChargeMax
+   *  is 0 for every non-ult unit (the Renderer draws no bar and the charge logic
+   *  is off); the Outlaw's kit sets it to 10s at spawn, then the 60s cooldown
+   *  after each spree. When ultCharge reaches ultChargeMax the kit arms a spree. */
+  ultCharge: number;
+  ultChargeMax: number;
+  /** Outlaw Killing Spree: ticks remaining in an ACTIVE spree (0 = not spreeing).
+   *  Gates the engine driver (stepKillingSpree), the movement skip, and the
+   *  funnel's full-damage immunity. */
+  spreeTicks: number;
+  /** Outlaw Killing Spree: ticks until the next blink-strike in the spree. */
+  spreeJumpTimer: number;
+  /** Outlaw Killing Spree: round-robin cursor into the uid-sorted enemy list, so
+   *  successive blinks bounce across every foe deterministically. */
+  spreeIndex: number;
   /** Electric Mage: ticks left in the Chain Lightning cast (0 = not casting).
    *  Drives the cast bar; a stun/fear mid-cast resets it (interrupt). */
   castTicks: number;

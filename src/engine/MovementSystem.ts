@@ -109,6 +109,10 @@ export function stepMovement(ctx: MovementContext): void {
     // skip it here so the dash isn't applied twice in one tick.
     if (unit.chargeTicks > 0) continue;
 
+    // An Outlaw mid-Killing-Spree is teleported by CombatSystem (stepKillingSpree);
+    // skip it here so normal movement never fights the blink.
+    if (unit.spreeTicks > 0) continue;
+
     // --- Homing blob: ooze toward a fixed anchor, ignoring combat ----------
     // A Slime Knight split blob (homeAnchor set, no target) races back to the
     // corpse to reincarnate the knight; its arrival is resolved in the kit's

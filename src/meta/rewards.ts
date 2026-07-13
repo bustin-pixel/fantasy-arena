@@ -9,6 +9,7 @@
 import type { BattleMode } from "@/hooks/useBattleEngine"; // type-only: erased at runtime
 import type { ItemLoadouts } from "@/types";
 import { DECKABLE_UNIT_IDS, getUnitDef } from "@/data/units";
+import { questRequiredUnits } from "@/data/depths";
 import { RARITIES } from "@/data/rarities";
 import {
   getDungeon,
@@ -298,7 +299,7 @@ export function computeBattleRewards(input: {
     const questUnlock =
       quest &&
       slain.includes(quest.spawnId) &&
-      deck.includes(quest.requires) &&
+      questRequiredUnits(quest).some((id) => deck.includes(id)) &&
       !questUnlocks.includes(quest.unlocks) &&
       !unlockedUnits.includes(quest.unlocks)
         ? quest.unlocks

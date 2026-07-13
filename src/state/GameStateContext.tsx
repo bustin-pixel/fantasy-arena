@@ -38,7 +38,7 @@ import {
   normalizeQuestBoard,
   tickQuestProgress,
 } from "@/meta/quests";
-import { questForUnlock } from "@/data/dungeons";
+import { questForUnlock, QUEST_LOCKED_UNITS, DUNGEON_IDS } from "@/data/dungeons";
 import { parseItemKey, type ItemKey } from "@/data/items";
 import type { ItemSlot } from "@/types";
 import {
@@ -48,7 +48,24 @@ import {
   type ChestContent,
 } from "@/meta/rewards";
 import type { BattleMode } from "@/hooks/useBattleEngine";
-import { UNITS } from "@/data/units";
+import { UNITS, DECKABLE_UNIT_IDS } from "@/data/units";
+
+/** Local-only playtest cheats, exposed on the context as `dev`. This whole object
+ *  is `undefined` in production builds (see the provider — the `import.meta.env.DEV`
+ *  gate compiles to `false`, so Vite drops the body and DevPanel tree-shakes out),
+ *  so the deployed site never carries a usable cheat. */
+export interface DevCheats {
+  /** Own every deckable unit and mark every quest-locked one buyable. */
+  unlockAllUnits: () => void;
+  addGold: (amount: number) => void;
+  addShards: (amount: number) => void;
+  /** Mark every dungeon fully cleared (unlocks themed dungeons + Endless). */
+  unlockAllDungeons: () => void;
+  /** Mark every unit/monster defeated in the Compendium (full bestiary pages). */
+  revealBestiary: () => void;
+  /** Wipe back to a brand-new account (to retest the first-run flow). */
+  resetSave: () => void;
+}
 
 interface GameStateValue {
   save: PlayerSave;
@@ -113,6 +130,9 @@ interface GameStateValue {
    *  (rolled in the sheet, RNG-before-fold like battle rewards) in one atomic
    *  write, steps the item-pity counter, and retires the quest. */
   claimQuest: (questId: string, chestContents: ChestContent[]) => void;
+  /** Local-only playtest cheats — `undefined` in production builds, so the live
+   *  site never exposes them (see DevCheats + the DevPanel mount gate). */
+  dev?: DevCheats;
 }
 
 const GameStateContext = createContext<GameStateValue | null>(null);
@@ -337,6 +357,42 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
   const claimQuest = (questId: string, chestContents: ChestContent[]) =>
     setSave((s) => applyClaimQuest(s, questId, chestContents));
 
+  // ---- dev cheats (LOCAL ONLY) — the entire object is undefined in production.
+  // `import.meta.env.DEV` is statically `false` in `vite build`, so this ternary
+  // folds to `undefined`, the closures below are dropped, and DevPanel (mounted
+  // behind the same gate) tree-shakes out. Nothing here reaches the live site.
+  const dev: DevCheats | undefined = import.meta.env.DEV
+    ? {
+        unlockAllUnits: () =>
+          setSave((s) => ({
+            ...s,
+            unlockedUnits: [...new Set([...s.unlockedUnits, ...DECKABLE_UNIT_IDS])],
+            questUnlocks: [...new Set([...s.questUnlocks, ...QUEST_LOCKED_UNITS])],
+          })),
+        addGold: (amount) =>
+          setSave((s) => ({ ...s, gold: Math.max(0, s.gold + amount) })),
+        addShards: (amount) =>
+          setSave((s) => ({ ...s, soulShards: Math.max(0, s.soulShards + amount) })),
+        unlockAllDungeons: () =>
+          setSave((s) => {
+            const dungeons = { ...s.dungeons };
+            for (const id of DUNGEON_IDS) dungeons[id] = { highestClearedFloor: 99 };
+            return { ...s, dungeons };
+          }),
+        revealBestiary: () =>
+          setSave((s) => ({
+            ...s,
+            bestiary: Object.fromEntries(
+              Object.keys(UNITS).map((id) => [
+                id,
+                { encountered: true, defeated: true },
+              ])
+            ),
+          })),
+        resetSave: () => setSave(() => structuredClone(DEFAULT_SAVE)),
+      }
+    : undefined;
+
   return (
     <GameStateContext.Provider
       value={{
@@ -359,6 +415,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
         abandonQuest,
         refreshQuestBoard,
         claimQuest,
+        dev,
       }}
     >
       {children}

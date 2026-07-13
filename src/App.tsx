@@ -3,6 +3,7 @@ import { GameStateProvider, useGameState } from "@/state/GameStateContext";
 import { AppShell } from "@/screens/AppShell";
 import { BattleScreen } from "@/screens/BattleScreen";
 import { ShopScreen } from "@/screens/ShopScreen";
+import { DevPanel } from "@/components/DevPanel";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { pickDungeonTrack, setMusicTrack } from "@/audio/music";
 import type { BattleMode } from "@/hooks/useBattleEngine";
@@ -60,6 +61,10 @@ function Shell() {
           onOpenShop={() => setView("shop")}
         />
       )}
+      {/* Local-only cheats. `import.meta.env.DEV` is a literal `false` in the
+          production build, so this branch (and DevPanel) is dropped from the
+          deployed bundle — it exists only while running `npm run dev`. */}
+      {import.meta.env.DEV && <DevPanel />}
     </>
   );
 }

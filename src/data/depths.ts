@@ -119,8 +119,9 @@ export interface RareSpawnQuest {
   spawnId: string;
   /** Spawn probability, rolled once per run of `floor`. */
   chance: number;
-  /** Player unit that must be in the fielded warband to earn the unlock. */
-  requires: string;
+  /** Player unit that must be in the fielded warband to earn the unlock.
+   *  An array means ANY ONE of the listed units satisfies the quest. */
+  requires: string | string[];
   /** Unit id whose PURCHASE this quest unlocks. */
   unlocks: string;
   /** Discounted gold price once unlocked (overrides UNLOCK_PRICES). */
@@ -144,6 +145,11 @@ export const RARE_SPAWN_QUESTS: RareSpawnQuest[] = [
     hint: "They say a knight who fells a rare ooze in The Depths may take on its unliving form.",
   },
 ];
+
+/** The unit ids that can satisfy a quest's `requires`, as a list. */
+export function questRequiredUnits(quest: RareSpawnQuest): string[] {
+  return Array.isArray(quest.requires) ? quest.requires : [quest.requires];
+}
 
 /** The rare-spawn quest that appears on `floor`, if any. */
 export function rareSpawnQuestForFloor(floor: number): RareSpawnQuest | undefined {

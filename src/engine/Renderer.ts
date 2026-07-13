@@ -12,6 +12,7 @@ import {
   FIELD_HEIGHT,
   FIELD_WIDTH,
   PLAYER_ZONE,
+  fieldTransform,
 } from "@/utils/constants";
 import { drawUnitSprite } from "@/assets/sprites";
 import { getUnitDef } from "@/data/units";
@@ -57,24 +58,29 @@ function getBackground(theme: ArenaTheme): HTMLCanvasElement {
   return bg;
 }
 
-function drawZones(ctx: Ctx, theme: ArenaTheme): void {
+/** Deployment bands + midline. Drawn in BUFFER space so they span the full
+ *  width (edge-to-edge), with world-Y mapped through the fit transform so they
+ *  still line up with the centered world layer. */
+function drawZones(
+  ctx: Ctx,
+  theme: ArenaTheme,
+  bufW: number,
+  scale: number,
+  offsetY: number
+): void {
+  const y = (worldY: number): number => offsetY + worldY * scale;
   ctx.save();
   ctx.fillStyle = theme.zoneTop;
-  ctx.fillRect(0, ENEMY_ZONE.top, FIELD_WIDTH, ENEMY_ZONE.bottom - ENEMY_ZONE.top);
+  ctx.fillRect(0, y(ENEMY_ZONE.top), bufW, (ENEMY_ZONE.bottom - ENEMY_ZONE.top) * scale);
   ctx.fillStyle = theme.zoneBottom;
-  ctx.fillRect(
-    0,
-    PLAYER_ZONE.top,
-    FIELD_WIDTH,
-    PLAYER_ZONE.bottom - PLAYER_ZONE.top
-  );
+  ctx.fillRect(0, y(PLAYER_ZONE.top), bufW, (PLAYER_ZONE.bottom - PLAYER_ZONE.top) * scale);
   // midline
   ctx.strokeStyle = theme.midline;
   ctx.lineWidth = 1;
   ctx.setLineDash([6, 6]);
   ctx.beginPath();
-  ctx.moveTo(0, FIELD_HEIGHT / 2);
-  ctx.lineTo(FIELD_WIDTH, FIELD_HEIGHT / 2);
+  ctx.moveTo(0, y(FIELD_HEIGHT / 2));
+  ctx.lineTo(bufW, y(FIELD_HEIGHT / 2));
   ctx.stroke();
   ctx.setLineDash([]);
   ctx.restore();
@@ -138,6 +144,22 @@ function drawHealthBar(ctx: Ctx, u: Unit): void {
     ctx.fillStyle = "rgba(0,0,0,0.6)";
     ctx.fillRect(x - 1, cy - 1, w + 2, ch + 2);
     ctx.fillStyle = "#fde047";
+    ctx.fillRect(x, cy, w * progress, ch);
+  }
+
+  // Ultimate charge bar (Outlaw's Killing Spree): a gold meter under the HP bar,
+  // filling as the ult charges (and refilling through its cooldown). It glows
+  // red-hot and full while a spree is active. ultChargeMax is 0 for every other
+  // unit, so this draws only for the Outlaw. (No overlap with the cast bar — the
+  // Outlaw never uses the engine's cast pipeline.)
+  if ((u.ultChargeMax ?? 0) > 0) {
+    const cy = y + h + 2;
+    const ch = 3;
+    const spreeing = (u.spreeTicks ?? 0) > 0;
+    const progress = spreeing ? 1 : Math.min(1, u.ultCharge / u.ultChargeMax);
+    ctx.fillStyle = "rgba(0,0,0,0.6)";
+    ctx.fillRect(x - 1, cy - 1, w + 2, ch + 2);
+    ctx.fillStyle = spreeing ? "#f87171" : "#fbbf24";
     ctx.fillRect(x, cy, w * progress, ch);
   }
 }
@@ -393,8 +415,23 @@ export function renderBattle(
   themeId: ArenaThemeId = "grassField"
 ): void {
   const theme = ARENA_THEMES[themeId];
-  ctx.drawImage(getBackground(theme), 0, 0);
-  drawZones(ctx, theme);
+  const bufW = ctx.canvas.width;
+  const bufH = ctx.canvas.height;
+  const { scale, offsetX, offsetY } = fieldTransform(bufW, bufH);
+
+  // --- Fill layer: background + zones span the WHOLE buffer, so the arena
+  // reaches the screen edges with no black letterbox bars. The buffer is sized
+  // to the display box's aspect (BattleScreen), and the background art is
+  // abstract, so stretching it to fill is imperceptible. ---
+  ctx.drawImage(getBackground(theme), 0, 0, FIELD_WIDTH, FIELD_HEIGHT, 0, 0, bufW, bufH);
+  drawZones(ctx, theme, bufW, scale, offsetY);
+
+  // --- World layer: everything positional lives in the fixed 480×720 world
+  // space, translated + uniformly scaled so the fight sits centered and
+  // undistorted; the margin either side is filled by the layer above. ---
+  ctx.save();
+  ctx.translate(offsetX, offsetY);
+  ctx.scale(scale, scale);
 
   // Ambient theme animation (embers, fireflies, glyphs) — drawn under the
   // units so combat readability is never compromised. Wall-clock time keeps
@@ -412,6 +449,8 @@ export function renderBattle(
   for (const v of snap.vfx) drawVfx(ctx, v);
   for (const p of snap.projectiles) drawProjectile(ctx, p);
   for (const ft of snap.floatingTexts) drawFloatingText(ctx, ft);
+
+  ctx.restore();
 }
 
 /** Draw a single unit portrait into a small canvas context (for card art).
