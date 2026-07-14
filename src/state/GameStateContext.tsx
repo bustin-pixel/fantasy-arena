@@ -39,7 +39,14 @@ import {
   tickQuestProgress,
 } from "@/meta/quests";
 import { questForUnlock, QUEST_LOCKED_UNITS, DUNGEON_IDS } from "@/data/dungeons";
-import { parseItemKey, type ItemKey } from "@/data/items";
+import {
+  ITEM_LINES,
+  ITEM_QUALITIES,
+  MAX_STARS,
+  makeItemKey,
+  parseItemKey,
+  type ItemKey,
+} from "@/data/items";
 import type { ItemSlot } from "@/types";
 import {
   foldChestContents,
@@ -63,6 +70,8 @@ export interface DevCheats {
   unlockAllDungeons: () => void;
   /** Mark every unit/monster defeated in the Compendium (full bestiary pages). */
   revealBestiary: () => void;
+  /** Fill the Bag with a stack of every item (each line at every quality+star). */
+  grantAllItems: () => void;
   /** Wipe back to a brand-new account (to retest the first-run flow). */
   resetSave: () => void;
 }
@@ -242,12 +251,10 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
           ...s.dungeons,
           [ctx.dungeonId]: { highestClearedFloor: Math.max(prev, ctx.floor) },
         };
-        // Milestone unlocks are a Depths-only ladder reward (the themed dungeons
-        // reward their legendary via the quest, not per-floor milestones).
-        if (ctx.dungeonId === "depths") {
-          const milestone = MILESTONE_UNLOCKS[ctx.floor];
-          if (milestone) unlocked.add(milestone);
-        }
+        // Per-dungeon gift: every dungeon hands the player a new unit on a
+        // first clear (MILESTONE_UNLOCKS is dungeonId → floor → unit id).
+        const gift = MILESTONE_UNLOCKS[ctx.dungeonId]?.[ctx.floor];
+        if (gift) unlocked.add(gift);
       }
       // Rare-spawn quest completion → the reward unit becomes purchasable.
       const questUnlocks = new Set(s.questUnlocks);
@@ -389,6 +396,24 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
               ])
             ),
           })),
+        grantAllItems: () =>
+          setSave((s) => {
+            // A stack of every (line, quality, star) triple. `max` keeps it
+            // idempotent (re-clicking never shrinks a stack you built by play)
+            // and can't break the references-<=-count invariant, since it only
+            // ever raises counts. 9 is plenty to equip across a deck + merge.
+            const COPIES = 9;
+            const items = { ...s.items };
+            for (const lineId of Object.keys(ITEM_LINES)) {
+              for (const quality of ITEM_QUALITIES) {
+                for (let star = 1; star <= MAX_STARS; star++) {
+                  const key = makeItemKey(lineId, quality, star);
+                  items[key] = Math.max(items[key] ?? 0, COPIES);
+                }
+              }
+            }
+            return { ...s, items };
+          }),
         resetSave: () => setSave(() => structuredClone(DEFAULT_SAVE)),
       }
     : undefined;

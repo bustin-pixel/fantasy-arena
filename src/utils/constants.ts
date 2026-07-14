@@ -51,10 +51,14 @@ export const MATCH_TIME_SEC = 120; // 2:00
 export const DEPTHS_MATCH_TIME_SEC = 300; // 5:00
 export const MAX_ACTIVE_UNITS_PER_SIDE = 2;
 /** The Depths (PvE): the player fields the whole warband at once; the horde
- *  cap sits above the proven ~8-unit/60fps-mobile ceiling — profiled OK in
- *  preview, drop back toward 10 if low-end mobile stutters. */
+ *  cap is the single biggest difficulty lever (4 player units vs. this many
+ *  concurrent enemies). Dropped 12 → 7 in the progression retune: the winrate
+ *  sweep showed a sustained ~2.5:1 swarm (cap 9-12) left regular mid-floors
+ *  unwinnable even for a max-level, epic-geared warband — the swarm size, not
+ *  player power, was the wall. 7 (a ~1.75:1 horde) keeps the outnumbered feel
+ *  while letting a leveled/geared 4-warband actually win. */
 export const DEPTHS_PLAYER_ACTIVE = 4;
-export const DEPTHS_ENEMY_ACTIVE = 12;
+export const DEPTHS_ENEMY_ACTIVE = 7;
 export const MAX_DECK = 4;
 export const DEPLOY_TIME_SEC = 20; // placement timer before units auto-deploy
 /** Mid-battle pause before EITHER side's next reinforcement deploys. One shared

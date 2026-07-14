@@ -364,6 +364,7 @@ export function BattleScreen({
                 rewards={rewards}
                 floor={floor}
                 mode={mode}
+                dungeonId={dungeonId}
                 // Grant-then-reveal: the save already holds the new XP; the
                 // panel animates the frozen pre-grant snapshot forward with
                 // the SAME addXp clamp, so the preview matches what persisted.

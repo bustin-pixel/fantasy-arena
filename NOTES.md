@@ -222,7 +222,10 @@ timeout-while-outnumbered = defeat. Headless winrate sweep (starter deck,
 100%/82%HP → floor 3 100%/63% → floor 4 77%/34% → floor 5 80% (starter) but
 37% (knight/warrior/healer/fire_mage) — deck choice brackets the boss coin
 flip. Bloater was buffed 380hp/16 → 800hp/28 as part of this. If you retune,
-re-run a sweep like that rather than eyeballing.
+re-run a sweep like that rather than eyeballing. The reusable harness now lives
+at `engine/__tests__/winrateSweep.test.ts` (SKIPPED by default; `SWEEP=1 npm
+test -- winrateSweep`) — it sweeps every dungeon×floor at a chosen level/gear
+tier and prints winrate tables. Prefer it over hand-run drivers.
 
 Sloughing Mass (2026-07-05): the Bloater then gained the Slime's split — a
 Bloatling (200hp/14dmg, `bloatling`, weaker Putrid Burst) sloughs off at each
@@ -252,6 +255,108 @@ the field each step so the gated fodder pool / rare / boss advance (a static dra
 stalls forever); the "boss-floor pacing" describe covers the gated pool +
 rare→boss telegraph order. ⚠ Banner display is timed in SIM TICKS, so at
 3× the on-screen flash is ~1/3 the wall-clock time (a screenshot-capture gotcha).
+
+### 4d. Progression retune (2026-07-13) — the whole chain is now winnable
+The `winrateSweep` harness revealed the post-Depths chain was tuned for a
+near-max warband: at "just-arrived" power every themed dungeon swept **0–6%**,
+and **every boss floor swept 0%** — a 4-unit deck cannot beat a sustained cap-12
+swarm below legendary gear. (The old Depths-only sweep never caught this.) The
+retune brings the chain to a smooth, monotonic-ish ramp that a leveled/geared
+warband clears, keeping the swarm feel and a real grind. Levers pulled (all
+sweep-tuned — re-run `SWEEP=1 npm test -- winrateSweep` before touching them):
+
+- **Enemy active cap `12 → 7`** (`constants.ts` `DEPTHS_ENEMY_ACTIVE`) — the
+  single biggest lever. 4-vs-12 was unwinnable at mid power regardless of level;
+  4-vs-7 keeps the horde feel and is beatable. (Summon-cap headroom rides it:
+  `flushSpawns` cap = `activeCaps + 3` = 10, so Bloater/Slime splits still fit.)
+- **Wave budget `25 + 3f → 20 + 2f`** (all dungeons' `budgetBase`/`budgetPerFloor`
+  in `dungeons.ts`) — shorter floors, so a 4-deck isn't grinding a sustained swarm
+  long enough to lose the attrition war on F2–F4.
+- **Floor scaling `0.08hp/0.05dmg → 0.06hp/0.04dmg`** (`depths.ts`
+  `DEPTHS_HP_PER_FLOOR`/`DMG`) — the per-floor multiplier compounds with the
+  elite-level bake on bosses; at 0.08 deep-floor boss HP was inflated so far that
+  mid-tier boss floors were 0% even at their intended gear.
+- **Boss-floor fodder share `0.7 → 0.45`** (`depths.ts` `BOSS_FLOOR_FODDER_SHARE`)
+  — the boss is the climax, not a fodder slog; the warband reaches it fresher with
+  time to burn its HP. (This re-introduces the "boss floor can be easier than the
+  floor before it" the old note warned about — accepted: the boss, not the horde,
+  is the point.)
+- **Bonefields roster thinned** (`skeleton_archer 2→3`, `bonecaller 4→5` cost) —
+  it was a pathological outlier (cheap ranged + raise-dead = a self-replenishing
+  kiting swarm, harder than the all-melee Wilds after it).
+- **Two Stage-B boss mechanics softened** as over-tuned initials: Dire Alpha howl
+  fear `1s → 0.5s` (a full fear chain-locked the player out of damaging it),
+  Elder Treant Regrowth `2.5%/s → 1.5%/s` (was an un-burstable wall; burning still
+  stops it entirely).
+
+Post-retune sweep (representative deck knight/fire_mage/berserker/healer, level
+descent-modeled `min(10, monsterLv+1+floor)`, gear per tier; 16 seeds/cell —
+winrates, not exact):
+
+| dungeon (gear) | F1 | F2 | F3 | F4 | F5 boss |
+|---|---|---|---|---|---|
+| depths (none) | 100 | 100 | 100 | 100 | 100 |
+| bonefields (none) | 94 | 69 | 63 | 56 | 94 |
+| wilds (none) | 100 | 100 | 75 | 31 | ~20* |
+| overgrowth (rare2) | 100 | 100 | 88 | 63 | ~20* |
+| sealed_vault (rare2) | 94 | 75 | 31 | 6 | 63 |
+| deep_forge (epic1) | 100 | 75 | 63 | 13 | 31 |
+| eclipse_spire (epic1) | 100 | 88 | 50 | 13 | ~10* |
+| fallen_cathedral (leg1) | 100 | 100 | 100 | 100 | 75 |
+| rogues_den (leg1) | 100 | 100 | 100 | 94 | 31 |
+
+Still-open tuning (left for the next sweep pass — the harness is the tool): a few
+boss floors (*wilds/overgrowth/eclipse_spire, Rogue's Den's Bandit King) are a
+notch too hard for their intended gear tier — they read as a "farm one more gear
+tier" gate rather than a coin-flip, which is a legit grind gate (replay chests +
+shop + quest board feed the gear), but ~40–50% would be nicer. Sealed Vault's
+F3–F4 dip is partly intended matchup (its horde is all `school:"magic"` — the
+Aegis Knight's soak is the answer, which a generic sweep deck lacks).
+
+### 4e. Economy + acquisition retune (2026-07-13)
+- **Replay gold scales with dungeon depth** (`economy.ts` `replayGoldFor` =
+  `20 + 4·monsterLevel`; Depths 24 → forks 60) — replaces the flat 30, so farming
+  the late chain stays worthwhile.
+- **Boss-replay chests** (`economy.ts` `BOSS_REPLAY_CHEST_CHANCE = 0.4`): a boss
+  *replay* (re-clearing a beaten boss) can drop a chest one tier below its
+  first-clear tier, signature-line roll intact — the "farm this boss for gear"
+  loop. Rolled on a derived stream `RNG(chestSeed ^ BOSS_REPLAY_CHEST_SALT)` so
+  first-clear seeds stay byte-stable (`rewards.ts`). Cathedral/Den first-clears
+  bumped to `arcane` so their replay chests are `gold`.
+- **Fork elites out-level the player**: `MONSTER_LEVEL_CAP = LEVEL_CAP + 2` (12) in
+  `dungeons.ts`; `monsterLevelFor` clamps to it, not the player cap — the fork
+  bosses/rares ride the +1 elite bump to **Lv 11**, a notch above a maxed warband.
+- **Starter is all-rare** (`STARTER_UNIT_IDS` knight/archer/warrior/mage) and
+  **every dungeon gifts a unit on a first clear** (`MILESTONE_UNLOCKS` is now
+  `dungeonId → floor → unitId`). INVARIANT (rewards.test): a unit a dungeon's
+  fusion quest REQUIRES is a starter or gifted at/before that dungeon's quest — you
+  always own the key before the lock. Save **v12** retro-grants gifts for cleared
+  floors (`persistence.migrateSave`).
+
+### 4f. Bespoke boss kits (2026-07-13) — engine-contract changes
+The 10 copy-paste boss/rare kits (`abomination`/`dire_alpha`/`elder_treant`/
+`rune_golem`/`forge_golem`/`bandit_king` bosses + `apex_beast`/`wildheart`/
+`ancient_automaton`/`eclipse_herald` rares) each got a purpose-built kit
+(`engine/kits/*.ts`, registered in `UnitKit.ts`). Three contract changes worth
+knowing:
+- **Traps carry a rider now.** `Trap` gained `rider?: ShotRider` + `sourceUid?`
+  (`types/index.ts`); the trigger in `CombatSystem` applies the rider via the
+  shared `applyItemRider` when present, else the default 7s stun. Absent field ⇒
+  the Hunter's stun trap is byte-identical. Lets the Forge Golem lay burn vents
+  with no defId branch.
+- **Two new flat Unit fields**: `bossPhase` (HP-threshold phases fired — Dire Alpha
+  howls, Rune Golem plate shatters, Bandit King smoke, Apex Beast one-shot Pounce
+  marker) and `bossStacks` (Apex Frenzy per-kill ramp). Init 0 in `createUnit`;
+  the ADR's opportunistic-flat-field convention.
+- **Seraph resurrection widened**: `fallenHero()` now skips only `SUMMONED_UNIT_IDS`
+  (was deckable-only), so the `fallen_seraph` boss revives its fallen MONSTER
+  wave-mates (its signature moment) while the player Seraph is unchanged in
+  practice. `bossRevamp.test.ts` covers all 10 kits + the trap rider + the rez.
+- **`onSpawn` gotcha**: `WaveController.spawnMonster` does NOT call `kit.onSpawn`
+  (only deploy / summon-flush / endless do). Dungeon boss/rare openers must arm
+  themselves elsewhere (Apex Beast's Pounce uses a `bossPhase` one-shot in
+  `onBeforeAttack`, not `onSpawn`). The Silencer's opening stealth is a
+  pre-existing casualty of this — unrelated to the revamp.
 
 ### 5. The Depths spawns bypass the deploy() path
 `WaveController` (the PvE horde director) pushes monsters into `state.units`
@@ -557,8 +662,10 @@ they perform better in long, messy fights than 1v1 numbers suggest. Re-audit
 2v2 after any balance change — it's closer to real play than 1v1.
 
 ### Arena pacing + AI decks (full-match audit, 2026-07)
-Measured with the (skipped) `balanceAudit.test.ts` harness — 300 auto-played
-matches per experiment; re-run it after any tuning:
+Measured historically with a 300-auto-played-match arena harness (that
+`balanceAudit.test.ts` file no longer exists; the live headless sweeper is
+`engine/__tests__/winrateSweep.test.ts`, PvE-focused but the same deploy-and-
+tick-to-terminal pattern — extend it if you need the arena numbers again):
 - **Reinforcement pacing is symmetric** via `REINFORCE_GRACE_SEC` (1.2s): both the
   player's mid-battle auto-deploy grace and the AI's redeploy cooldown. The old
   split (player 2.5s / AI 0.7s) let the AI snowball every player death 2-v-1 —

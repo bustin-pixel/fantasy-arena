@@ -54,6 +54,10 @@ export interface AbilityContext {
     value: string,
     kind: FloatingText["kind"]
   ) => void;
+  /** Bring a fallen unit back at a fraction of max HP (Seraph's Resurrection).
+   *  Backed by CombatSystem.reviveUnit — the same path as the Endless "Second
+   *  Chance" boon, so state/effect/target cleanup stays in one place. */
+  revive: (target: Unit, hpFrac: number) => void;
 }
 
 // (The PASSIVE_ABILITIES set + isActiveAbility check are retired: whether a unit

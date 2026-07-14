@@ -71,7 +71,18 @@ export type AbilityId =
   | "killing_spree"
   | "divine_light"
   | "sanctuary"
-  | "renewal";
+  | "resurrection"
+  // Bespoke dungeon boss / rare-catalyst abilities.
+  | "call_of_the_wild"
+  | "putrid_spew"
+  | "grasping_roots"
+  | "runic_plating"
+  | "magma_vents"
+  | "fan_of_knives"
+  | "apex_predator"
+  | "verdant_pulse"
+  | "sentry_protocol"
+  | "umbral_veil";
 
 export interface Vec2 {
   x: number;
@@ -253,6 +264,14 @@ export interface Unit {
   /** Affliction stacks ON this unit from a Mystic Archer (per-target). */
   lightStacks: number;
   darkStacks: number;
+  /** Bespoke-boss phase counter: how many HP-threshold transitions have fired
+   *  (Dire Alpha's howls at 66/33%, the Rune Golem's shattering plates at
+   *  75/50/25%, the Bandit King's smoke escapes at 60/30%). Like splitsSpawned,
+   *  but for phase gates rather than splits. 0 for every non-boss. */
+  bossPhase: number;
+  /** Bespoke-boss permanent stack counter — a running total that ramps a stat
+   *  (the Apex Beast's per-kill Frenzy). 0 for every non-boss. */
+  bossStacks: number;
   /** Arcane Mage: ticks until Blink (defensive teleport) is ready again. */
   blinkCooldown: number;
   /** Trickster: ticks until Shadow Step (reactive interrupt-blink) is ready. */
@@ -267,8 +286,8 @@ export interface Unit {
   renewCooldown: number;
   /** Seraph: ticks until Sanctuary (team-wide absorb bubble) is ready again. */
   sanctuaryCooldown: number;
-  /** Seraph: ticks until Renewal (team-wide HoT) is ready again. */
-  renewalCooldown: number;
+  /** Seraph: true once its once-per-battle Resurrection cast has been spent. */
+  resurrectionUsed: boolean;
   /** Druid: ticks of Bear Form's 80% damage reduction left (0 = expired). */
   bearGuardTimer: number;
   /** Hunter: ticks until it can re-summon its boar after the boar dies. */
@@ -527,12 +546,20 @@ export interface Vfx {
 
 export type MatchPhase = "deployment" | "battle" | "victory" | "defeat" | "draw";
 
-/** A Hunter's Scatter Trap sitting on the ground until an enemy steps on it. */
+/** A ground trap sitting until an enemy steps on it. The Hunter's Scatter Trap
+ *  (bare = stun) and boss hazards like the Forge Golem's Magma Vents (a burn
+ *  `rider`) both ride this one type — the trigger in CombatSystem stays generic. */
 export interface Trap {
   x: number;
   y: number;
   /** Owner's team; the trap catches units of the OTHER team. */
   team: Team;
+  /** On-step status instead of the default 7s stun (e.g. a burn/poison rider).
+   *  Absent = the Hunter's plain stun, byte-identical to the pre-rider build. */
+  rider?: ShotRider;
+  /** uid to credit the rider's DoT to (so a burn trap's ticks feed the boss's
+   *  kill count). Absent = "trap" sentinel (the Hunter never needs the credit). */
+  sourceUid?: string;
 }
 
 /** A transient boss-floor callout. On a boss floor the WaveController telegraphs

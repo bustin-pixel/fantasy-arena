@@ -3660,14 +3660,189 @@ function angelWing(
   ctx.restore();
 }
 
-// Seraph (defId "seraph") — the legendary raid healer. A pair of grand angel
-// wings behind the Cleric/Priest robed body (drawHealer): the wings are the
-// legendary signature; the rest keeps it in the holy-healer family.
-function drawSeraph(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {
-  const beat = (A.live ? Math.sin(A.t * 2.0) * 0.12 : 0) + 0.28;
-  angelWing(ctx, -1, beat, 1.28, A.glow);
-  angelWing(ctx, 1, beat, 1.28, A.glow);
-  drawHealer(ctx, body, dark, light, accent, A);
+// Seraph (defId "seraph") — the legendary raid healer as a "Stained-Glass
+// Saint": a cathedral come to life. An alabaster statue body veined with
+// pulsing gold kintsugi cracks (one across the cheek), wings of leaded
+// stained-glass panes that catch the light one after another, a carved stone
+// ring halo, and dust motes drifting in its own soft window-light. Levitates
+// with a slow bob. Chosen from the 4-variant mockup round (2026-07-13); the
+// losing variants are archived in docs/seraph-mockups.md.
+function drawSeraph(ctx: Ctx, _body: string, _dark: string, _light: string, accent: string, A: SpriteAnim) {
+  const t = A.t;
+  const bob = A.live ? Math.sin(t * 1.2) : 0;
+  const glow = A.glow;
+  ctx.save();
+  ctx.translate(0, bob - 1.5);
+
+  // soft cathedral-window backlight (no hard edges — reads as caught light)
+  ctx.save();
+  ctx.globalAlpha = 0.16 + glow * 0.08;
+  const lsg = ctx.createRadialGradient(0, -8, 3, 0, -8, 27);
+  lsg.addColorStop(0, "#fff3c9");
+  lsg.addColorStop(1, "rgba(255,243,201,0)");
+  ctx.fillStyle = lsg;
+  ctx.beginPath();
+  ctx.arc(0, -8, 27, 0, PI2);
+  ctx.fill();
+  ctx.restore();
+  // dust motes in the beam (motion only)
+  if (A.live) {
+    for (let i = 0; i < 5; i++) {
+      const seed = i * 2.7 + 1.1;
+      const life = (t * 0.18 + seed) % 1;
+      const x = Math.sin(seed * 7.3) * 9 + Math.sin((t + seed) * 0.9) * 2;
+      const y = 22 - life * 52;
+      ctx.globalAlpha = Math.sin(life * Math.PI) * 0.45;
+      ctx.fillStyle = "#fff3c9";
+      ctx.beginPath();
+      ctx.arc(x, y, 0.7, 0, PI2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // stained-glass wings: leaded panes, lit one after another
+  // [x1,y1, x2,y2, x3,y3, hue] — triangular panes fanning up-and-out
+  const panes: [number, number, number, number, number, number, string][] = [
+    [3, -4, 24, -22, 15, -6, "#e9b64f"], // gold
+    [3, -4, 15, -6, 20, 4, "#7fa8d9"], // azure
+    [3, -4, 24, -22, 12, -20, "#d98a9d"], // rose
+    [3, -4, 12, -20, 2, -16, "#9b87c9"], // violet
+    [3, -4, 20, 4, 12, 9, "#8fbf8a"], // green
+  ];
+  for (const dir of [-1, 1]) {
+    ctx.save();
+    ctx.scale(dir, 1);
+    ctx.translate(1, -3);
+    ctx.rotate((A.live ? Math.sin(t * 1.5) : 0) * 0.04 - 0.05); // stone-slow sway
+    for (let p = 0; p < panes.length; p++) {
+      const [x1, y1, x2, y2, x3, y3, hue] = panes[p];
+      // panes light up in sequence, offset per side — never dim below "lit
+      // glass" or the dim panes read as a black slab against dark arenas
+      const lit = 0.55 + 0.45 * Math.max(0, Math.sin(t * 1.6 - p * 0.85 + (dir < 0 ? 2.4 : 0)));
+      ctx.fillStyle = hue;
+      ctx.globalAlpha = 0.82 + lit * 0.18;
+      if (lit > 0.8) {
+        ctx.shadowColor = hue;
+        ctx.shadowBlur = 6;
+      } else ctx.shadowBlur = 0;
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.lineTo(x3, y3);
+      ctx.closePath();
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = 1;
+      // lead came outline
+      ctx.strokeStyle = "#2b2733";
+      ctx.lineWidth = 1.1;
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // alabaster statue robe (cool marble whites)
+  const marble = "#e8e6df";
+  const rg = ctx.createLinearGradient(0, -11, 0, 20);
+  rg.addColorStop(0, "#f4f2ec");
+  rg.addColorStop(0.55, marble);
+  rg.addColorStop(1, "#b9b6ac");
+  ctx.fillStyle = rg;
+  ctx.beginPath();
+  ctx.moveTo(0, -12);
+  ctx.quadraticCurveTo(10, -6, 12.5, 20);
+  ctx.lineTo(-12.5, 20);
+  ctx.quadraticCurveTo(-10, -6, 0, -12);
+  ctx.fill();
+  // carved drape folds
+  ctx.strokeStyle = "rgba(90,86,78,0.4)";
+  ctx.lineWidth = 0.8;
+  for (const fx of [-6, -1.5, 3.5]) {
+    ctx.beginPath();
+    ctx.moveTo(fx, -2);
+    ctx.quadraticCurveTo(fx + 1.5, 9, fx + 0.5, 19);
+    ctx.stroke();
+  }
+  // chipped hem (a statue's age)
+  ctx.fillStyle = "#b9b6ac";
+  ctx.beginPath();
+  ctx.moveTo(8, 20);
+  ctx.lineTo(10.5, 17.5);
+  ctx.lineTo(11.5, 20);
+  ctx.closePath();
+  ctx.fill();
+
+  // glowing kintsugi cracks across the body
+  ctx.save();
+  ctx.strokeStyle = accent;
+  ctx.shadowColor = accent;
+  ctx.lineWidth = 0.9;
+  ctx.lineCap = "round";
+  const cracks = [
+    [[-4, -9], [-2, -3], [-5, 3], [-3.5, 10]],
+    [[5, -5], [3, 1], [6, 7], [4.5, 14]],
+    [[-1, -12], [1, -8]],
+  ];
+  cracks.forEach((path, ci) => {
+    const pulse = 0.45 + 0.55 * Math.max(0, Math.sin(t * 1.9 + ci * 1.9));
+    ctx.globalAlpha = pulse;
+    ctx.shadowBlur = 3 + pulse * 5;
+    ctx.beginPath();
+    ctx.moveTo(path[0][0], path[0][1]);
+    for (let k = 1; k < path.length; k++) ctx.lineTo(path[k][0], path[k][1]);
+    ctx.stroke();
+  });
+  ctx.restore();
+
+  // serene marble head, kintsugi crack across one cheek
+  ctx.fillStyle = "#f4f2ec";
+  ctx.beginPath();
+  ctx.arc(0, -16, 5.8, 0, PI2);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(90,86,78,0.5)";
+  ctx.lineWidth = 0.7;
+  ctx.beginPath();
+  ctx.moveTo(-3, -15.2);
+  ctx.quadraticCurveTo(-2, -14.6, -1, -15.2);
+  ctx.moveTo(1, -15.2);
+  ctx.quadraticCurveTo(2, -14.6, 3, -15.2);
+  ctx.stroke();
+  ctx.save();
+  ctx.strokeStyle = accent;
+  ctx.shadowColor = accent;
+  const cp = 0.45 + 0.55 * Math.max(0, Math.sin(t * 1.9 + 4.1));
+  ctx.globalAlpha = cp;
+  ctx.shadowBlur = 2 + cp * 4;
+  ctx.lineWidth = 0.7;
+  ctx.beginPath();
+  ctx.moveTo(3.2, -19.5);
+  ctx.lineTo(2.2, -16.5);
+  ctx.lineTo(3.6, -13.8);
+  ctx.stroke();
+  ctx.restore();
+
+  // gothic ring halo: a carved stone ring with a small cross keystone
+  ctx.save();
+  ctx.strokeStyle = "#d9d5c9";
+  ctx.lineWidth = 1.7;
+  ctx.shadowColor = accent;
+  ctx.shadowBlur = 2 + glow * 4;
+  ctx.beginPath();
+  ctx.arc(0, -25.5, 5.2, 0, PI2);
+  ctx.stroke();
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = 1;
+  ctx.globalAlpha = 0.6 + glow * 0.4;
+  ctx.beginPath();
+  ctx.moveTo(0, -32.2);
+  ctx.lineTo(0, -29.4);
+  ctx.moveTo(-1.3, -31.1);
+  ctx.lineTo(1.3, -31.1);
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.restore();
 }
 
 function drawSummoner(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {

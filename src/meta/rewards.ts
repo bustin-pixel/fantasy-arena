@@ -27,6 +27,7 @@ import {
 } from "@/data/items";
 import { RNG } from "@/utils/rng";
 import {
+  BOSS_REPLAY_CHEST_CHANCE,
   CAPSTONE_DUNGEON_IDS,
   CHEST_GOLD_RANGE,
   CHEST_UNIT_CHANCE,
@@ -38,6 +39,7 @@ import {
   ITEM_DROP_CHANCE,
   ITEM_PITY_THRESHOLD,
   ITEM_QUALITY_WEIGHTS,
+  replayGoldFor,
   SHARD_CHEST_DRIP,
   SHARD_REWARDS,
   SIGNATURE_DROP_CHANCE,
@@ -186,11 +188,20 @@ const BOSS_CHEST_TIERS: Record<string, ChestTier> = {
   depths: "silver",
   deep_forge: "arcane",
   eclipse_spire: "dragon",
+  // The endgame fork bosses pay arcane first-clears — so their replay chests
+  // (one tier below) are gold, a worthwhile late-game farm.
+  fallen_cathedral: "arcane",
+  rogues_den: "arcane",
 };
 
 export function bossChestTierFor(dungeonId: string): ChestTier {
   return BOSS_CHEST_TIERS[dungeonId] ?? "gold";
 }
+
+/** XOR salt for the boss-replay-chest chance roll. Derives an INDEPENDENT stream
+ *  off chestSeed (distinct from the Lucky Coin's 0x5eed and rollChest's plain
+ *  chestSeed), so adding the replay chest never shifts a first-clear's contents. */
+const BOSS_REPLAY_CHEST_SALT = 0xb055;
 
 /** The full post-battle reward matrix. Callers pass chestSeed from
  *  generateSeed() at drop time so this stays pure. */
@@ -319,10 +330,23 @@ export function computeBattleRewards(input: {
     }
     const firstClear = floor > highestClearedFloor;
     if (!firstClear) {
+      // Boss-floor replays can drop a farm chest, one tier below the boss's
+      // first-clear tier, with its signature-line roll intact. Rolled on a
+      // SEPARATE derived stream off chestSeed (never touches rollChest's stream),
+      // so every first-clear seed stays byte-stable. Gold scales by dungeon depth.
+      let replayChest: ChestResult | null = null;
+      if (isBossFloorIn(dungeon, floor)) {
+        const rng = new RNG(chestSeed ^ BOSS_REPLAY_CHEST_SALT);
+        if (rng.next() < BOSS_REPLAY_CHEST_CHANCE) {
+          const base = TIER_ORDER.indexOf(bossChestTierFor(dungeonId));
+          replayChest = makeChest(TIER_ORDER[Math.max(0, base - 1)], dungeonId);
+        }
+      }
       return {
         ...none,
-        gold: boostGold(GOLD_REWARDS.depthsReplay),
+        gold: boostGold(replayGoldFor(dungeon.monsterLevel)),
         xp: winXp,
+        chest: replayChest,
         questUnlock,
       };
     }

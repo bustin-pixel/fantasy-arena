@@ -985,6 +985,7 @@ export function stepSimulation(state: SimState): void {
         }),
       spawnTrap: (t) => state.traps.push(t),
       spawnFloatingText: (u, v, k) => spawnFloatingText(state, u, v, k),
+      revive: (u, frac) => reviveUnit(state, u, frac),
     };
   };
 
@@ -1031,7 +1032,6 @@ export function stepSimulation(state: SimState): void {
     if (unit.rejuvCooldown > 0) unit.rejuvCooldown--;
     if (unit.renewCooldown > 0) unit.renewCooldown--;
     if (unit.sanctuaryCooldown > 0) unit.sanctuaryCooldown--;
-    if (unit.renewalCooldown > 0) unit.renewalCooldown--;
 
     // Equipment upkeep (Heartwood regen, Runeward barrier) — pre-gate like kit
     // onTick, so it runs even while stunned. No-op for unequipped units.
@@ -1193,6 +1193,7 @@ export function stepSimulation(state: SimState): void {
         }),
       spawnTrap: (t) => state.traps.push(t),
       spawnFloatingText: (u, v, k) => spawnFloatingText(state, u, v, k),
+      revive: (u, frac) => reviveUnit(state, u, frac),
     };
     const abilityKit = getKit(unit.defId);
 
@@ -1340,17 +1341,23 @@ export function stepSimulation(state: SimState): void {
       for (const u of state.units) {
         if (u.state === "dead" || u.team === trap.team) continue;
         if (dist(u.pos, trap) <= TRAP_RADIUS) {
-          applyEffect(
-            u,
-            makeEffect("stun", { source: "trap", durationSec: TRAP_STUN_SEC })
-          );
-          spawnVfx(state, {
-            kind: "slam",
-            pos: { x: trap.x, y: trap.y },
-            life: secToTicks(0.4),
-            maxLife: secToTicks(0.4),
-            color: "#9ca3af",
-          });
+          if (trap.rider) {
+            // A boss hazard (burn/poison vent) — funnel through the shared item
+            // rider path so the status + tinted impact vfx match everything else.
+            applyItemRider(state, u, trap.sourceUid ?? "trap", trap.rider);
+          } else {
+            applyEffect(
+              u,
+              makeEffect("stun", { source: "trap", durationSec: TRAP_STUN_SEC })
+            );
+            spawnVfx(state, {
+              kind: "slam",
+              pos: { x: trap.x, y: trap.y },
+              life: secToTicks(0.4),
+              maxLife: secToTicks(0.4),
+              color: "#9ca3af",
+            });
+          }
           state.traps.splice(i, 1);
           break; // trap consumed
         }

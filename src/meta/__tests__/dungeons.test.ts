@@ -10,6 +10,7 @@ import {
   ELITE_LEVEL_BONUS,
   getDungeon,
   isDungeonUnlocked,
+  MONSTER_LEVEL_CAP,
   monsterLevelFor,
 } from "@/data/dungeons";
 import { LEVEL_CAP } from "@/meta/leveling";
@@ -90,7 +91,7 @@ describe("monster-level ladder", () => {
     ]);
   });
 
-  it("every dungeon outlevels its own prerequisite; elites never exceed the player cap", () => {
+  it("every dungeon outlevels its own prerequisite; elites never exceed MONSTER_LEVEL_CAP", () => {
     // Post-fork the registry ORDER isn't strictly increasing (the two forks tie
     // at 10) — the real invariant is per-gate: harder than what unlocked you.
     for (const id of DUNGEON_IDS) {
@@ -98,7 +99,7 @@ describe("monster-level ladder", () => {
       if (d.gate) {
         expect(d.monsterLevel).toBeGreaterThan(getDungeon(d.gate.dungeonId).monsterLevel);
       }
-      expect(monsterLevelFor(d, "boss")).toBeLessThanOrEqual(LEVEL_CAP);
+      expect(monsterLevelFor(d, "boss")).toBeLessThanOrEqual(MONSTER_LEVEL_CAP);
     }
   });
 
@@ -109,12 +110,15 @@ describe("monster-level ladder", () => {
     expect(monsterLevelFor(d, "boss")).toBe(d.monsterLevel + ELITE_LEVEL_BONUS);
   });
 
-  it("cap-tier elites TIE the player cap instead of exceeding it (the fork dungeons)", () => {
+  it("the endgame fork elites out-level a maxed player (Lv 11), capped at MONSTER_LEVEL_CAP", () => {
     for (const id of ["fallen_cathedral", "rogues_den"]) {
       const d = getDungeon(id);
-      expect(d.monsterLevel).toBe(LEVEL_CAP);
-      expect(monsterLevelFor(d, "boss")).toBe(LEVEL_CAP);
-      expect(monsterLevelFor(d, "rare")).toBe(LEVEL_CAP);
+      expect(d.monsterLevel).toBe(LEVEL_CAP); // fodder at the player cap (10)
+      // Elites ride the +1 bump ABOVE the player cap — the endgame difficulty knob.
+      expect(monsterLevelFor(d, "boss")).toBe(LEVEL_CAP + ELITE_LEVEL_BONUS); // 11
+      expect(monsterLevelFor(d, "rare")).toBe(LEVEL_CAP + ELITE_LEVEL_BONUS); // 11
+      expect(monsterLevelFor(d, "boss")).toBeGreaterThan(LEVEL_CAP);
+      expect(monsterLevelFor(d, "boss")).toBeLessThanOrEqual(MONSTER_LEVEL_CAP);
     }
   });
 });

@@ -23,9 +23,12 @@ export interface DepthsTier {
 export const BOSS_FLOOR_INTERVAL = 5;
 
 /** Fraction of a boss floor's budget spent on fodder (the rest is the boss).
- *  Kept high — the winrate sweep showed halving the horde made boss floors
- *  EASIER than the floor before them. */
-export const BOSS_FLOOR_FODDER_SHARE = 0.7;
+ *  Dropped 0.7 → 0.45 in the progression retune: with the whole chain's fodder
+ *  now beatable (cap 9), a 70% pool arrived at the boss with a spent, depleted
+ *  warband and no time left to burn its HP — every boss floor swept 0%. Less
+ *  fodder means the warband reaches the boss healthier, so the boss itself
+ *  becomes the fight (targets ~50% at intended power). */
+export const BOSS_FLOOR_FODDER_SHARE = 0.45;
 
 /** Seconds between trickle-spawns while the field has room. */
 export const WAVE_SPAWN_INTERVAL_SEC = 0.5;
@@ -55,10 +58,13 @@ export const BOSS_BANNER_SEC = 2.7;
 // player-side counter-curve to this.
 // ---------------------------------------------------------------------------
 
-/** Extra monster HP per floor past 1 (linear, +8%/floor). */
-export const DEPTHS_HP_PER_FLOOR = 0.08;
-/** Extra monster damage per floor past 1 (linear, +5%/floor). */
-export const DEPTHS_DMG_PER_FLOOR = 0.05;
+/** Extra monster HP per floor past 1 (linear). Softened 0.08 → 0.06 in the
+ *  progression retune: the per-floor multiplier compounds with the elite-level
+ *  bake on bosses, inflating deep-floor boss HP so far that mid-tier boss floors
+ *  swept 0% at their intended (non-legendary) gear. */
+export const DEPTHS_HP_PER_FLOOR = 0.06;
+/** Extra monster damage per floor past 1 (linear). Softened 0.05 → 0.04 to match. */
+export const DEPTHS_DMG_PER_FLOOR = 0.04;
 
 /** Stat multipliers for monsters spawned on `floor` (bosses included). */
 export function floorStatMultipliers(floor: number): { hp: number; dmg: number } {

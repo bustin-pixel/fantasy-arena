@@ -375,6 +375,7 @@ describe("endless — once-per-battle passives re-arm each wave", () => {
       u.secondWindUsed = true;
       u.lastStandUsed = true;
       u.stealthTriggerUsed = true;
+      u.resurrectionUsed = true; // the Seraph's once-per-battle rez
       u.ambushReady = false;
     }
     assassin.effects = assassin.effects.filter((e) => e.type !== "stealth");
@@ -386,6 +387,7 @@ describe("endless — once-per-battle passives re-arm each wave", () => {
       expect(u.secondWindUsed).toBe(false);
       expect(u.lastStandUsed).toBe(false);
       expect(u.stealthTriggerUsed).toBe(false);
+      expect(u.resurrectionUsed).toBe(false);
     }
     // Ambush re-arms only on the assassin (flag + fresh opening stealth).
     expect(assassin.ambushReady).toBe(true);

@@ -126,8 +126,8 @@ export const ABILITIES: Record<AbilityId, AbilityDef> = {
     id: "divine_light",
     name: "Divine Light",
     description:
-      "A 1.5s prayer that pours 100 HP into the most-wounded ally in range (itself included) — a big emergency heal.",
-    cooldown: 6,
+      "A 1.5s prayer that pours 100 HP into EVERY teammate (itself included), then blankets them all in a renewing glow — 6 HP every 1s for 6s (36 more each).",
+    cooldown: 10,
     castTimeSec: 1.5,
   },
   sanctuary: {
@@ -137,12 +137,14 @@ export const ABILITIES: Record<AbilityId, AbilityDef> = {
       "Instant: bathes the whole team in a +55 absorb bubble (itself included), stacking on any existing shield, capped at 150 per ally.",
     cooldown: 11,
   },
-  renewal: {
-    id: "renewal",
-    name: "Renewal",
+  resurrection: {
+    id: "resurrection",
+    name: "Resurrection",
     description:
-      "Instant: blankets the whole team in a healing-over-time (itself included) — 6 HP every 1s for 6s (36 total each).",
-    cooldown: 9,
+      "A 1s prayer that brings a fallen hero back to life at half HP. Once per battle (summons don't count as heroes).",
+    // Once per battle: the kit gates it on a spent-flag, not this cooldown.
+    cooldown: 0,
+    castTimeSec: 1,
   },
   polymorph: {
     id: "polymorph",
@@ -266,5 +268,77 @@ export const ABILITIES: Record<AbilityId, AbilityDef> = {
       "Casts for ~2s, then arcs a bolt through up to 5 nearby enemies for heavy damage, briefly stunning each. Interrupted if stunned mid-cast.",
     cooldown: 8,
     castTimeSec: 2,
+  },
+
+  // ---- bespoke dungeon boss / rare-catalyst abilities ----------------------
+  call_of_the_wild: {
+    id: "call_of_the_wild",
+    name: "Call of the Wild",
+    description:
+      "Passive: at 66% and 33% HP it howls — two dire wolves lope in, the whole pack surges, and nearby enemies recoil in fear for 1s.",
+    cooldown: 0,
+  },
+  putrid_spew: {
+    id: "putrid_spew",
+    name: "Putrid Spew",
+    description:
+      "Belches a toxic cloud over the target's cluster: damage, a lingering poison, and a 40% slow.",
+    cooldown: 10,
+  },
+  grasping_roots: {
+    id: "grasping_roots",
+    name: "Grasping Roots",
+    description:
+      "Erupts roots around the target, damaging the cluster and pinning it in place with an 85% slow for 2.5s.",
+    cooldown: 11,
+  },
+  runic_plating: {
+    id: "runic_plating",
+    name: "Runic Plating",
+    description:
+      "Passive: starts at 60% damage reduction. Each time its HP crosses 75/50/25% a plate shatters — its reduction drops, a shockwave damages and stuns nearby foes, and it swings 15% faster.",
+    cooldown: 0,
+  },
+  magma_vents: {
+    id: "magma_vents",
+    name: "Magma Vents",
+    description:
+      "Opens burning vents beneath up to three of the player's units, setting each alight.",
+    cooldown: 10,
+  },
+  fan_of_knives: {
+    id: "fan_of_knives",
+    name: "Fan of Knives",
+    description:
+      "Flings five poisoned knives, split across the nearest enemies — a lone target eats all five.",
+    cooldown: 9,
+  },
+  apex_predator: {
+    id: "apex_predator",
+    name: "Apex Predator",
+    description:
+      "Passive: its opening pounce stuns the prey for 1s, and every kill it makes permanently ramps its attack speed (+12% each, up to +72%).",
+    cooldown: 0,
+  },
+  verdant_pulse: {
+    id: "verdant_pulse",
+    name: "Verdant Pulse",
+    description:
+      "Passive: every 6s it pulses life, healing the whole grove; its thorns bite back at melee attackers; and it buds two dryads when it falls.",
+    cooldown: 0,
+  },
+  sentry_protocol: {
+    id: "sentry_protocol",
+    name: "Sentry Protocol",
+    description:
+      "Passive: rebuilds a turret every 8s (up to two). While any turret stands, its wards cut incoming damage 40% — destroy them to expose the core.",
+    cooldown: 0,
+  },
+  umbral_veil: {
+    id: "umbral_veil",
+    name: "Umbral Veil",
+    description:
+      "Drapes a shroud over the target's cluster: a 2.5s silence and a 30% slow.",
+    cooldown: 12,
   },
 };

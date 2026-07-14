@@ -490,7 +490,10 @@ export function UnitDetail({
 
           {abilityIds.map((id) => {
             const ab = ABILITIES[id];
-            const kind = ab.cooldown > 0 ? "Active" : "Passive";
+            // Active = it does something on a timer: a cooldown OR a cast bar
+            // (the Seraph's once-per-battle Resurrection has no cooldown, only
+            // a 1s cast — still an active).
+            const kind = ab.cooldown > 0 || ab.castTimeSec ? "Active" : "Passive";
             return (
               <div className="detail-section" key={id}>
                 <div className="detail-skill-head">

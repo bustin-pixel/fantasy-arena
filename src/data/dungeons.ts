@@ -181,8 +181,8 @@ export const DUNGEONS: Record<string, Dungeon> = {
     tiers: DEPTHS_TIERS,
     bossFloorInterval: BOSS_FLOOR_INTERVAL,
     bossFloorFodderShare: BOSS_FLOOR_FODDER_SHARE,
-    budgetBase: 25,
-    budgetPerFloor: 3,
+    budgetBase: 20,
+    budgetPerFloor: 2,
     hpPerFloor: DEPTHS_HP_PER_FLOOR,
     dmgPerFloor: DEPTHS_DMG_PER_FLOOR,
     monsterLevel: 1,
@@ -198,14 +198,17 @@ export const DUNGEONS: Record<string, Dungeon> = {
     tiers: [
       {
         floors: [1, 5],
-        monsters: { skeleton: 1, skeleton_archer: 2, ghoul: 2, bonecaller: 4 },
+        // skeleton_archer + bonecaller thinned (2→3, 4→5) in the retune: their
+        // cheap ranged + raise-dead density made Bonefields a self-replenishing
+        // kiting swarm — a huge difficulty spike vs the all-melee Wilds after it.
+        monsters: { skeleton: 1, skeleton_archer: 3, ghoul: 2, bonecaller: 5 },
         boss: "abomination",
       },
     ],
     bossFloorInterval: 5, // boss on the last floor
     bossFloorFodderShare: BOSS_FLOOR_FODDER_SHARE,
-    budgetBase: 25,
-    budgetPerFloor: 3,
+    budgetBase: 20,
+    budgetPerFloor: 2,
     hpPerFloor: DEPTHS_HP_PER_FLOOR,
     dmgPerFloor: DEPTHS_DMG_PER_FLOOR,
     monsterLevel: 3,
@@ -228,8 +231,8 @@ export const DUNGEONS: Record<string, Dungeon> = {
     ],
     bossFloorInterval: 5,
     bossFloorFodderShare: BOSS_FLOOR_FODDER_SHARE,
-    budgetBase: 25,
-    budgetPerFloor: 3,
+    budgetBase: 20,
+    budgetPerFloor: 2,
     hpPerFloor: DEPTHS_HP_PER_FLOOR,
     dmgPerFloor: DEPTHS_DMG_PER_FLOOR,
     monsterLevel: 5,
@@ -252,8 +255,8 @@ export const DUNGEONS: Record<string, Dungeon> = {
     ],
     bossFloorInterval: 5,
     bossFloorFodderShare: BOSS_FLOOR_FODDER_SHARE,
-    budgetBase: 25,
-    budgetPerFloor: 3,
+    budgetBase: 20,
+    budgetPerFloor: 2,
     hpPerFloor: DEPTHS_HP_PER_FLOOR,
     dmgPerFloor: DEPTHS_DMG_PER_FLOOR,
     monsterLevel: 6,
@@ -276,8 +279,8 @@ export const DUNGEONS: Record<string, Dungeon> = {
     ],
     bossFloorInterval: 5,
     bossFloorFodderShare: BOSS_FLOOR_FODDER_SHARE,
-    budgetBase: 25,
-    budgetPerFloor: 3,
+    budgetBase: 20,
+    budgetPerFloor: 2,
     hpPerFloor: DEPTHS_HP_PER_FLOOR,
     dmgPerFloor: DEPTHS_DMG_PER_FLOOR,
     monsterLevel: 7,
@@ -300,8 +303,8 @@ export const DUNGEONS: Record<string, Dungeon> = {
     ],
     bossFloorInterval: 5,
     bossFloorFodderShare: BOSS_FLOOR_FODDER_SHARE,
-    budgetBase: 25,
-    budgetPerFloor: 3,
+    budgetBase: 20,
+    budgetPerFloor: 2,
     hpPerFloor: DEPTHS_HP_PER_FLOOR,
     dmgPerFloor: DEPTHS_DMG_PER_FLOOR,
     monsterLevel: 8,
@@ -324,8 +327,8 @@ export const DUNGEONS: Record<string, Dungeon> = {
     ],
     bossFloorInterval: 5,
     bossFloorFodderShare: BOSS_FLOOR_FODDER_SHARE,
-    budgetBase: 25,
-    budgetPerFloor: 3,
+    budgetBase: 20,
+    budgetPerFloor: 2,
     hpPerFloor: DEPTHS_HP_PER_FLOOR,
     dmgPerFloor: DEPTHS_DMG_PER_FLOOR,
     monsterLevel: 9,
@@ -348,8 +351,12 @@ export const DUNGEONS: Record<string, Dungeon> = {
     ],
     bossFloorInterval: 5,
     bossFloorFodderShare: BOSS_FLOOR_FODDER_SHARE,
-    budgetBase: 25,
-    budgetPerFloor: 3,
+    // Endgame fork — a true long-term project that expects a leveled,
+    // legendary-geared warband. monsterLevel stays 10 (no perpetual under-level
+    // warning for a capped player); its bosses/rares ride the +1 elite bump to
+    // Lv 11, above the player's Lv-10 cap (MONSTER_LEVEL_CAP). Dials sweep-tuned.
+    budgetBase: 20,
+    budgetPerFloor: 2,
     hpPerFloor: DEPTHS_HP_PER_FLOOR,
     dmgPerFloor: DEPTHS_DMG_PER_FLOOR,
     monsterLevel: 10,
@@ -372,8 +379,10 @@ export const DUNGEONS: Record<string, Dungeon> = {
     ],
     bossFloorInterval: 5,
     bossFloorFodderShare: BOSS_FLOOR_FODDER_SHARE,
-    budgetBase: 25,
-    budgetPerFloor: 3,
+    // Endgame fork (twin of the Cathedral). monsterLevel stays 10; bosses/rares
+    // ride the +1 elite bump to Lv 11. Dials sweep-tuned.
+    budgetBase: 20,
+    budgetPerFloor: 2,
     hpPerFloor: DEPTHS_HP_PER_FLOOR,
     dmgPerFloor: DEPTHS_DMG_PER_FLOOR,
     monsterLevel: 10,
@@ -395,9 +404,16 @@ export const DUNGEON_IDS: string[] = Object.keys(DUNGEONS);
 
 /** Bosses and telegraphed rare quest catalysts spawn this many levels above the
  *  dungeon's fodder (uniform rule: the Depths Bloater is Lv 2, the Eclipse
- *  Warden Lv 10), clamped to the player LEVEL_CAP — the fork dungeons run AT
- *  the cap, so their elites tie it rather than exceed the leveling curve. */
+ *  Warden Lv 10). Clamped to MONSTER_LEVEL_CAP (below), NOT the player's
+ *  LEVEL_CAP — so the endgame fork elites (monsterLevel 10 + 1) reach Lv 11, a
+ *  notch above a maxed warband, which is the point of the fork difficulty. */
 export const ELITE_LEVEL_BONUS = 1;
+
+/** Ceiling on a spawned monster's level. Sits ABOVE the player's LEVEL_CAP (10)
+ *  on purpose: the fork-dungeon elites are allowed to out-level a maxed warband
+ *  (Lv 11) as the endgame difficulty knob. Fodder never approaches it. Defined
+ *  relative to LEVEL_CAP so it tracks any future player-cap change. */
+export const MONSTER_LEVEL_CAP = LEVEL_CAP + 2;
 
 export type MonsterSpawnKind = "fodder" | "rare" | "boss";
 
@@ -407,7 +423,7 @@ export function monsterLevelFor(
   kind: MonsterSpawnKind
 ): number {
   return Math.min(
-    LEVEL_CAP,
+    MONSTER_LEVEL_CAP,
     dungeon.monsterLevel + (kind === "fodder" ? 0 : ELITE_LEVEL_BONUS)
   );
 }

@@ -436,12 +436,14 @@ export class EndlessController {
       if (lastBreath) u.cheatDeathReady = true;
       // Each wave is a fresh fight: re-arm the once-per-battle one-shots — the
       // death-cheats (Vanish / Second Wind / Last Stand), the Phasecloak item's
-      // one-time stealth, and the Ambush opener (flag is only ever set for
-      // ability "ambush"; re-arming includes its opening stealth, like onSpawn).
+      // one-time stealth, the Seraph's Resurrection, and the Ambush opener
+      // (flag is only ever set for ability "ambush"; re-arming includes its
+      // opening stealth, like onSpawn).
       u.vanishUsed = false;
       u.secondWindUsed = false;
       u.lastStandUsed = false;
       u.stealthTriggerUsed = false;
+      u.resurrectionUsed = false;
       if (u.ability === "ambush") {
         u.ambushReady = true;
         applyEffect(
