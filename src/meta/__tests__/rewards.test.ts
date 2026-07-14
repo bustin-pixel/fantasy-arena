@@ -28,7 +28,11 @@ import { ITEM_LINES, signatureLineFor } from "@/data/items";
 import { XP_REWARDS } from "@/meta/leveling";
 import { DECKABLE_UNIT_IDS, getUnitDef } from "@/data/units";
 import { RARITY_ORDER } from "@/data/rarities";
-import { questRequiredUnits, rareSpawnQuestForFloor } from "@/data/depths";
+import {
+  questRequiredUnits,
+  questUnlockIds,
+  rareSpawnQuestForFloor,
+} from "@/data/depths";
 import { DUNGEONS, QUEST_LOCKED_UNITS, getDungeon } from "@/data/dungeons";
 
 const NO_UNITS: string[] = [];
@@ -134,7 +138,7 @@ describe("computeBattleRewards — rare-spawn quest unlock", () => {
       highestClearedFloor: quest.floor, // replay branch — isolates the field
       deck: questRequiredUnits(quest), slain: [quest.spawnId],
     });
-    expect(r.questUnlock).toBe(quest.unlocks);
+    expect(r.questUnlocks).toEqual(questUnlockIds(quest));
   });
 
   it("counts even on a loss — clear it during the floor", () => {
@@ -142,7 +146,7 @@ describe("computeBattleRewards — rare-spawn quest unlock", () => {
       ...base, mode: "depths", floor: quest.floor, outcome: "defeat",
       deck: questRequiredUnits(quest), slain: [quest.spawnId],
     });
-    expect(r.questUnlock).toBe(quest.unlocks);
+    expect(r.questUnlocks).toEqual(questUnlockIds(quest));
   });
 
   it("no unlock without the required unit, without the kill, or on the wrong floor", () => {
@@ -158,24 +162,24 @@ describe("computeBattleRewards — rare-spawn quest unlock", () => {
       ...base, mode: "depths", floor: quest.floor + 1, outcome: "victory",
       deck: questRequiredUnits(quest), slain: [quest.spawnId],
     });
-    expect(noKnight.questUnlock).toBeUndefined();
-    expect(noKill.questUnlock).toBeUndefined();
-    expect(wrongFloor.questUnlock).toBeUndefined();
+    expect(noKnight.questUnlocks).toBeUndefined();
+    expect(noKill.questUnlocks).toBeUndefined();
+    expect(wrongFloor.questUnlocks).toBeUndefined();
   });
 
   it("doesn't re-announce once already unlocked or owned", () => {
     const already = computeBattleRewards({
       ...base, mode: "depths", floor: quest.floor, outcome: "victory",
       deck: questRequiredUnits(quest), slain: [quest.spawnId],
-      questUnlocks: [quest.unlocks],
+      questUnlocks: questUnlockIds(quest),
     });
     const owned = computeBattleRewards({
       ...base, mode: "depths", floor: quest.floor, outcome: "victory",
       deck: questRequiredUnits(quest), slain: [quest.spawnId],
-      unlockedUnits: [quest.unlocks],
+      unlockedUnits: questUnlockIds(quest),
     });
-    expect(already.questUnlock).toBeUndefined();
-    expect(owned.questUnlock).toBeUndefined();
+    expect(already.questUnlocks).toBeUndefined();
+    expect(owned.questUnlocks).toBeUndefined();
   });
 
   it("arena never triggers a quest unlock (Depths only)", () => {
@@ -183,7 +187,7 @@ describe("computeBattleRewards — rare-spawn quest unlock", () => {
       ...base, mode: "solo", floor: quest.floor, outcome: "victory",
       deck: questRequiredUnits(quest), slain: [quest.spawnId],
     });
-    expect(r.questUnlock).toBeUndefined();
+    expect(r.questUnlocks).toBeUndefined();
   });
 });
 
@@ -198,7 +202,7 @@ describe("computeBattleRewards — themed dungeon quest (The Bonefields)", () =>
       outcome: "victory", highestClearedFloor: quest.floor, // replay isolates the field
       deck: questRequiredUnits(quest), slain: [quest.spawnId],
     });
-    expect(r.questUnlock).toBe("necromancer");
+    expect(r.questUnlocks).toEqual(["necromancer"]);
   });
 
   it("a different dungeon's catalyst does NOT fire here (dungeon-scoped quests)", () => {
@@ -208,7 +212,7 @@ describe("computeBattleRewards — themed dungeon quest (The Bonefields)", () =>
       outcome: "victory", highestClearedFloor: quest.floor,
       deck: ["knight"], slain: ["slime"],
     });
-    expect(r.questUnlock).toBeUndefined();
+    expect(r.questUnlocks).toBeUndefined();
   });
 
   it("its boss floor drops a gold chest (a deep boss), not silver", () => {
@@ -233,13 +237,45 @@ describe("computeBattleRewards — any-of quest anchors (The Rogue's Den)", () =
 
   it("each stealth unit alone satisfies the quest", () => {
     for (const id of questRequiredUnits(quest)) {
-      expect(run([id]).questUnlock).toBe("outlaw");
+      expect(run([id]).questUnlocks).toEqual(["outlaw"]);
     }
     expect(questRequiredUnits(quest)).toEqual(["assassin", "rogue", "trickster"]);
   });
 
   it("a deck with no stealth unit earns nothing", () => {
-    expect(run(["knight", "mage"]).questUnlock).toBeUndefined();
+    expect(run(["knight", "mage"]).questUnlocks).toBeUndefined();
+  });
+});
+
+describe("computeBattleRewards — dual-payout quest (The Sealed Vault)", () => {
+  // Felling the Archmage with a Knight fielded unlocks BOTH the Aegis Knight
+  // and the Archmage himself; each drops out of the announcement independently
+  // once unlocked/owned.
+  const quest = getDungeon("sealed_vault").quest!;
+  const base = { unlockedUnits: NO_UNITS, highestClearedFloor: 0, chestSeed: 7 };
+  const run = (over: Partial<Parameters<typeof computeBattleRewards>[0]> = {}) =>
+    computeBattleRewards({
+      ...base, mode: "depths", dungeonId: "sealed_vault", floor: quest.floor,
+      outcome: "victory", highestClearedFloor: quest.floor,
+      deck: questRequiredUnits(quest), slain: [quest.spawnId],
+      ...over,
+    });
+
+  it("one kill pays out both unlocks", () => {
+    expect(questUnlockIds(quest)).toEqual(["aegis_knight", "archmage"]);
+    expect(run().questUnlocks).toEqual(["aegis_knight", "archmage"]);
+  });
+
+  it("an already-earned half drops out; a fully-earned quest announces nothing", () => {
+    expect(run({ questUnlocks: ["aegis_knight"] }).questUnlocks).toEqual([
+      "archmage",
+    ]);
+    expect(run({ unlockedUnits: ["archmage"] }).questUnlocks).toEqual([
+      "aegis_knight",
+    ]);
+    expect(
+      run({ questUnlocks: ["aegis_knight", "archmage"] }).questUnlocks
+    ).toBeUndefined();
   });
 });
 
@@ -472,11 +508,14 @@ describe("economy data sanity (guards designer typos)", () => {
       for (const id of questRequiredUnits(quest)) {
         expect(DECKABLE_UNIT_IDS).toContain(id);
       }
-      // The reward must be a deckable non-starter (you earn it, not start with it).
-      expect(DECKABLE_UNIT_IDS).toContain(quest.unlocks);
-      expect(STARTER_UNIT_IDS).not.toContain(quest.unlocks);
-      // And it must be quest-locked (excluded from chests / grandfathering).
-      expect(QUEST_LOCKED_UNITS.has(quest.unlocks)).toBe(true);
+      // Every reward must be a deckable non-starter (earned, not started with)
+      // and quest-locked (excluded from chests / grandfathering).
+      expect(questUnlockIds(quest).length).toBeGreaterThan(0);
+      for (const id of questUnlockIds(quest)) {
+        expect(DECKABLE_UNIT_IDS).toContain(id);
+        expect(STARTER_UNIT_IDS).not.toContain(id);
+        expect(QUEST_LOCKED_UNITS.has(id)).toBe(true);
+      }
     }
   });
 

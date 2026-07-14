@@ -150,7 +150,7 @@ export type SfxKey =
   | "fireBoom" | "frostShatter" | "zap" | "arcaneWarp" | "curse" | "heal"
   | "summon" | "roar" | "shieldGong" | "slimeSquish" | "boneRattle" | "death"
   | "deploy" | "trapSet" | "trapSnap" | "chestCreak" | "chestOpen" | "polymorph"
-  | "anvil" | "itemReveal" | "coinSpend"
+  | "anvil" | "itemReveal" | "coinSpend" | "quench" | "bellows"
   // UI/meta family (soundboard-auditioned 2026-07-11: Glasswork sine base with
   // the Woodwork triangle tap + equip pair)
   | "uiTap" | "uiOpen" | "uiClose" | "uiSelect" | "uiConfirm" | "uiDeny"
@@ -165,6 +165,8 @@ export type SfxKey =
   | "coinTick" | "unlockFanfare" | "questSting" | "chestShine" | "coinShower"
   // Grubbins' gibberish barks (Warm timbre)
   | "grubbinsGreet" | "grubbinsHappy" | "grubbinsSad" | "grubbinsNeutral"
+  // The smith's gibberish barks (same syllable engine, dropped to gravel)
+  | "smithGreet" | "smithHappy" | "smithGruff"
   // combat hit layer (Crunchy knock)
   | "hitSoft" | "hitBig";
 
@@ -177,22 +179,31 @@ const DRY_KEYS: Set<SfxKey> = new Set([
   "countTick", "countGo", "boonChime", "boonPick",
   "retireBank", "coinTick", "unlockFanfare", "questSting", "chestShine",
   "coinShower", "grubbinsGreet", "grubbinsHappy", "grubbinsSad",
-  "grubbinsNeutral",
+  "grubbinsNeutral", "smithGreet", "smithHappy", "smithGruff",
+  "quench", "bellows",
 ]);
 
-// --- Grubbins' voice: Animal-Crossing-style gibberish ----------------------
+// --- NPC voices: Animal-Crossing-style gibberish ----------------------------
 // One syllable = a triangle "glottal" blip + a bandpass formant puff; a bark
 // is 2–4 syllables walked along a pitch contour (mood). Warm timbre picked on
 // the 2026-07-11 soundboard. `durMul` scales the whole syllable rate — the
 // sad bark's 1.4 was auditioned as-is, so it stays even though it also lifts
-// the formant register.
+// the formant register. `base` is the speaker's register: Grubbins chirps at
+// 140 Hz; the smith rumbles at 95.
 const GRUB_BASE = 140;
+const SMITH_BASE = 95;
 function syllable(r: number, at: number, f: number): void {
   blip(r, at, f, f * 0.9, 0.08, "triangle", 0.13, 0.02);
   burst(r, at, 0.04, 0.025, "bandpass", f * 5, f * 4);
 }
-function mumble(r: number, contour: number[], step: number, durMul: number): void {
-  contour.forEach((c, i) => syllable(r * durMul, i * step, GRUB_BASE * c));
+function mumble(
+  r: number,
+  contour: number[],
+  step: number,
+  durMul: number,
+  base = GRUB_BASE
+): void {
+  contour.forEach((c, i) => syllable(r * durMul, i * step, base * c));
 }
 
 const SOUNDS: Record<SfxKey, (r: number) => void> = {
@@ -254,6 +265,10 @@ const SOUNDS: Record<SfxKey, (r: number) => void> = {
   // shop purchase: coins clinking into Grubbins' palm (quick metallic double
   // tap + a couple of stray pouch jingles). First UI/meta sound — kept gentle.
   coinSpend(r) { ring(r, 0, [2520, 3810], 0.1, 0.07); ring(r, 0.07, [2930, 4420], 0.12, 0.06); [0.16, 0.23].forEach((at, i) => ring(r, at, [3350 + i * 420], 0.08, 0.035)); burst(r, 0, 0.03, 0.08, "highpass", 5200, 8200); },
+  // forge quench: hot metal into the barrel — steam hiss + a low water bloop
+  quench(r) { burst(r, 0, 0.45, 0.12, "highpass", 5200, 1600); burst(r, 0.05, 0.3, 0.05, "bandpass", 900, 380); blip(r, 0.02, 190, 70, 0.18, "sine", 0.07); },
+  // forge bellows: one round air push (scene beat, never spammed)
+  bellows(r) { burst(r, 0, 0.35, 0.09, "lowpass", 900, 260); },
 
   // ----- UI/meta family (all dry; quiet by design — vol ≤ .08) -------------
   // warm wood tap (nav, chips, retire-arm, deploy-zone ack)
@@ -322,6 +337,11 @@ const SOUNDS: Record<SfxKey, (r: number) => void> = {
   grubbinsHappy(r) { mumble(r, [1.15, 1.35, 1.45, 1.2], 0.09, 0.9); },
   grubbinsSad(r) { mumble(r, [1.0, 0.78], 0.16, 1.4); },
   grubbinsNeutral(r) { mumble(r, [1.0, 1.06, 0.97], 0.11, 1); },
+
+  // ----- the smith's barks (BlacksmithScreen; slower, an octave-ish down) ---
+  smithGreet(r) { mumble(r, [1.0, 0.94, 1.08], 0.13, 1, SMITH_BASE); },
+  smithHappy(r) { mumble(r, [1.05, 1.22, 1.12], 0.11, 0.95, SMITH_BASE); },
+  smithGruff(r) { mumble(r, [1.0, 0.82], 0.15, 1.15, SMITH_BASE); },
 
   // ----- hit layer (quiet texture under the combat palette) — wet -----------
   hitSoft(r) { burst(r, 0, 0.035, 0.1, "bandpass", 900, 350); blip(r, 0, 300, 120, 0.04, "triangle", 0.05); },
@@ -404,6 +424,7 @@ const MIN_GAP_MS: Partial<Record<SfxKey, number>> = {
   coinTick: 40, unlockFanfare: 800, questSting: 800, chestShine: 300,
   coinShower: 500,
   grubbinsGreet: 300, grubbinsHappy: 300, grubbinsSad: 300, grubbinsNeutral: 300,
+  smithGreet: 300, smithHappy: 300, smithGruff: 300, quench: 250, bellows: 400,
   hitSoft: 140, hitBig: 260,
 };
 const DEFAULT_GAP_MS = 60;

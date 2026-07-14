@@ -72,6 +72,7 @@ export type AbilityId =
   | "divine_light"
   | "sanctuary"
   | "resurrection"
+  | "grand_grimoire"
   // Bespoke dungeon boss / rare-catalyst abilities.
   | "call_of_the_wild"
   | "putrid_spew"
@@ -122,7 +123,10 @@ export type TendencyId =
   | "executioner"
   | "bodyguard"
   | "spellwrath"
-  | "big_game";
+  | "big_game"
+  | "faithbane"
+  | "focus_fire"
+  | "lone_wolf";
 
 export interface UnitDef {
   id: string;
@@ -323,6 +327,10 @@ export interface Unit {
   castTicksMax: number;
   /** Electric Mage: target locked at the start of the cast (blast origin). */
   castTargetUid: string | null;
+  /** Mirror Image: ticks until the illusion dissolves. ABSENT for every real
+   *  unit (like the item fields), so existing sims stay byte-identical; stamped
+   *  by the Arch Mage's summon init and counted down by the illusion's kit. */
+  lifespanTicks?: number;
 
   // timers (in ticks)
   attackCooldown: number;

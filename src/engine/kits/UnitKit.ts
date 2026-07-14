@@ -25,6 +25,7 @@ import { aegisKnightKit } from "./aegisKnight";
 import { ancientAutomatonKit } from "./ancientAutomaton";
 import { apexBeastKit } from "./apexBeast";
 import { arcaneMageKit } from "./arcaneMage";
+import { archMageKit, mirrorImageKit } from "./archMage";
 import { archerKit } from "./archer";
 import { assassinKit } from "./assassin";
 import { banditKingKit } from "./banditKing";
@@ -182,7 +183,7 @@ export const UNIT_KITS: UnitKitRegistry = {
   apex_beast: apexBeastKit, // The Wilds catalyst: Pounce + Apex Frenzy (bespoke)
   arcane_mage: arcaneMageKit,
   archer: archerKit,
-  archmage: arcaneMageKit, // Sealed Vault catalyst: Arcane Barrage + Blink (reused)
+  archmage: archMageKit, // Sealed Vault catalyst + playable legendary: Grand Grimoire + Blink
   assassin: assassinKit,
   bandit_king: banditKingKit, // Rogue's Den boss: Fan of Knives + Smoke Bomb (bespoke)
   berserker: berserkerKit,
@@ -207,6 +208,7 @@ export const UNIT_KITS: UnitKitRegistry = {
   knight: knightKit,
   lich: necromancerKit, // Bonefields catalyst: raise + Curse + Terrify (reused)
   mage: mageKit,
+  mirror_image: mirrorImageKit, // the Archmage's illusion double (timed dissolve)
   mystic_archer: mysticArcherKit,
   necromancer: necromancerKit,
   ogre: ogreKit,

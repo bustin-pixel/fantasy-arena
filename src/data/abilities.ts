@@ -249,6 +249,14 @@ export const ABILITIES: Record<AbilityId, AbilityDef> = {
     cooldown: 6,
     castTimeSec: 0.6,
   },
+  grand_grimoire: {
+    id: "grand_grimoire",
+    name: "Grand Grimoire",
+    description:
+      "Each cast rips a random page from the grimoire: Fireball, Frost Blast, Chain Lightning, Arcane Barrage, Polymorph, Mirror Image (a fragile illusion double), or the jackpot — Twincast, which casts two of the others back to back.",
+    cooldown: 6,
+    castTimeSec: 0.8,
+  },
   blessing: {
     id: "blessing",
     name: "Blessing",

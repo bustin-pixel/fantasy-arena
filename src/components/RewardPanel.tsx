@@ -67,7 +67,7 @@ export function RewardPanel({ rewards, floor, mode, dungeonId = "depths", xpGain
   useEffect(() => {
     const timers: number[] = [];
     if (milestoneId) timers.push(window.setTimeout(() => playSfx("unlockFanfare"), 400));
-    if (rewards.questUnlock) timers.push(window.setTimeout(() => playSfx("questSting"), milestoneId ? 1100 : 400));
+    if (rewards.questUnlocks?.length) timers.push(window.setTimeout(() => playSfx("questSting"), milestoneId ? 1100 : 400));
     return () => timers.forEach(clearTimeout);
     // Mount-only ceremony: rewards are frozen for this panel's lifetime.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -120,10 +120,13 @@ export function RewardPanel({ rewards, floor, mode, dungeonId = "depths", xpGain
         </div>
       )}
 
-      {rewards.questUnlock && (
+      {rewards.questUnlocks && rewards.questUnlocks.length > 0 && (
         <div className="reward-milestone reward-quest">
-          <strong>{getUnitDef(rewards.questUnlock).name}</strong> discovered —
-          recruit it in your Collection!
+          <strong>
+            {rewards.questUnlocks.map((id) => getUnitDef(id).name).join(" & ")}
+          </strong>{" "}
+          discovered — recruit {rewards.questUnlocks.length > 1 ? "them" : "it"}{" "}
+          in your Collection!
         </div>
       )}
 

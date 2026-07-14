@@ -62,7 +62,8 @@ export type MusicTrackId =
   | "thievesCant"
   | "lanternAlley"
   | "kingsRansom"
-  | "shopTheme";
+  | "shopTheme"
+  | "blacksmithTheme";
 
 interface TrackDef {
   bpm: number;
@@ -838,6 +839,53 @@ const shopTheme: TrackDef = {
   },
 };
 
+/** The Blacksmith's forge — "hearth and hammer": a warm, sturdy work-tune,
+ *  slower and rounder than the shop's jaunty haggle and nothing like the Deep
+ *  Forge's dread. Walking sine bass, a breathing detuned-triangle hearth pad,
+ *  an amiable A-mixolydian triangle melody, and the smith keeping time — one
+ *  anvil backbeat on bars 2 and 4 (sparser than emberHalls' every-bar clank)
+ *  with one bellows swell per loop. Palette rules hold: no squares anywhere,
+ *  sines only down low, A-rooted for consonant crossfades. */
+const blacksmithTheme: TrackDef = {
+  bpm: 92,
+  steps: 64,
+  schedule(t0, out, st) {
+    // Walking bass: A — D — A — G (mixolydian turnaround), root/5th/6th walk.
+    const roots = [33, 38, 33, 31];
+    roots.forEach((root, b) => {
+      const walk = [
+        [0, root],
+        [4, root + 7],
+        [8, root + 9],
+        [12, root + 7],
+      ];
+      for (const [s, m] of walk)
+        tone(t0 + (b * 16 + s) * st, m, st * 3.4, "sine", 0.07, out);
+      // hearth pad: detuned triangle pair breathing over each bar
+      for (const dt of [-0.06, 0.06])
+        drone(t0 + b * 16 * st, root + 24 + dt, 16 * st, "triangle", 0.016, out);
+    });
+    // The work-song melody: question (bars 1–2), answer (bars 3–4), home on A.
+    const mel = [
+      [0, 69, 3], [4, 71, 1], [6, 72, 3], [10, 74, 2], [12, 72, 2], [14, 71, 1],
+      [16, 69, 3], [20, 67, 2], [24, 66, 4], [28, 64, 3],
+      [32, 69, 3], [36, 72, 2], [40, 74, 3], [44, 76, 2], [46, 74, 1],
+      [48, 72, 2], [52, 71, 2], [56, 69, 6],
+    ];
+    for (const [s, m, d] of mel) tone(t0 + s * st, m, d * st, "triangle", 0.055, out);
+    // The smith keeps time: anvil backbeats on bars 2 and 4 only.
+    anvil(t0 + (16 + 8) * st, 0.018, out);
+    anvil(t0 + (48 + 8) * st, 0.02, out);
+    anvil(t0 + (48 + 10.5) * st, 0.009, out); // the little double-tap
+    // Foot on the bar line, a soft heel mid-bar.
+    for (const s of [0, 16, 32, 48]) thump(t0 + s * st, 0.07, out, 95, 38);
+    for (const s of [8, 24, 40, 56]) thump(t0 + s * st, 0.035, out, 85, 40);
+    // One bellows swell per loop, and the faintest ember ticks.
+    noiseHit(t0 + 40 * st, st * 6, 0.016, out, "lowpass", 700, true);
+    for (const s of [6, 22, 38, 54]) noiseHit(t0 + s * st, 0.03, 0.008, out, "highpass", 6200);
+  },
+};
+
 /** Fallen Cathedral floor — a hollow hymn: organ-like detuned triangle chords
  *  moving at a funeral pace, a lone choir voice wandering above, one distant
  *  toll per loop. The nave is empty; the music remembers when it wasn't. */
@@ -1035,6 +1083,7 @@ const TRACKS: Record<MusicTrackId, TrackDef> = {
   lanternAlley,
   kingsRansom,
   shopTheme,
+  blacksmithTheme,
 };
 
 // ---------------------------------------------------------------------------

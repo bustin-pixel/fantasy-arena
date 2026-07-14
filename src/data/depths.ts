@@ -128,8 +128,10 @@ export interface RareSpawnQuest {
   /** Player unit that must be in the fielded warband to earn the unlock.
    *  An array means ANY ONE of the listed units satisfies the quest. */
   requires: string | string[];
-  /** Unit id whose PURCHASE this quest unlocks. */
-  unlocks: string;
+  /** Unit id(s) whose PURCHASE this quest unlocks. An array unlocks them ALL
+   *  from the one kill (the Sealed Vault pays out both the Aegis Knight and
+   *  the Archmage himself); each is bought separately at `price`. */
+  unlocks: string | string[];
   /** Discounted gold price once unlocked (overrides UNLOCK_PRICES). */
   price: number;
   /** Deliberately-vague rumor shown on the locked Collection card — a thread to
@@ -155,6 +157,12 @@ export const RARE_SPAWN_QUESTS: RareSpawnQuest[] = [
 /** The unit ids that can satisfy a quest's `requires`, as a list. */
 export function questRequiredUnits(quest: RareSpawnQuest): string[] {
   return Array.isArray(quest.requires) ? quest.requires : [quest.requires];
+}
+
+/** The unit ids a quest's completion unlocks, as a list (`unlocks` twin of
+ *  questRequiredUnits). */
+export function questUnlockIds(quest: RareSpawnQuest): string[] {
+  return Array.isArray(quest.unlocks) ? quest.unlocks : [quest.unlocks];
 }
 
 /** The rare-spawn quest that appears on `floor`, if any. */

@@ -19,6 +19,7 @@ import {
   DEPTHS_HP_PER_FLOOR,
   DEPTHS_TIERS,
   RARE_SPAWN_QUESTS,
+  questUnlockIds,
   type DepthsTier,
   type RareSpawnQuest,
 } from "./depths";
@@ -98,17 +99,18 @@ const WILDS_QUEST: RareSpawnQuest = {
   hint: "The wilds test the bow; whoever brings down the pack's apex is said to earn the beasts' loyalty.",
 };
 
-/** Knight + Archmage = Aegis Knight: shatter the rare Archmage in The Sealed
- *  Vault with a Knight fielded to unlock buying the Aegis Knight at a discount.
- *  (The vault's horde is all magic — the Aegis Knight's soak is the answer.) */
+/** Knight + Archmage = Aegis Knight AND the Archmage himself: fell the rare
+ *  Archmage in The Sealed Vault with a Knight fielded and BOTH become buyable —
+ *  the knight learns to turn magic aside, and the humbled Archmage offers his
+ *  grimoire to the victor. (Each is bought separately at the quest price.) */
 const SEALED_VAULT_QUEST: RareSpawnQuest = {
   floor: 5,
   spawnId: "archmage",
   chance: 0.15,
   requires: "knight",
-  unlocks: "aegis_knight",
+  unlocks: ["aegis_knight", "archmage"],
   price: 2500,
-  hint: "A knight who shatters a rogue archmage in the sealed vault may learn to turn magic aside.",
+  hint: "A knight who shatters a rogue archmage in the sealed vault may learn to turn magic aside — and a defeated master owes his victor a debt.",
 };
 
 /** Cleric + Wildheart = Druid: tend the wounded and fell the grove's ancient
@@ -498,10 +500,10 @@ export const ALL_QUESTS: RareSpawnQuest[] = Object.values(DUNGEONS)
  *  never granted by the grandfather clause, not buyable until the quest is
  *  done). Derived from every dungeon's quest. */
 export const QUEST_LOCKED_UNITS = new Set<string>(
-  ALL_QUESTS.map((q) => q.unlocks)
+  ALL_QUESTS.flatMap(questUnlockIds)
 );
 
 /** The rare-spawn quest that unlocks `unitId`'s purchase, if any. */
 export function questForUnlock(unitId: string): RareSpawnQuest | undefined {
-  return ALL_QUESTS.find((q) => q.unlocks === unitId);
+  return ALL_QUESTS.find((q) => questUnlockIds(q).includes(unitId));
 }

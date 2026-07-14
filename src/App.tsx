@@ -3,13 +3,16 @@ import { GameStateProvider, useGameState } from "@/state/GameStateContext";
 import { AppShell } from "@/screens/AppShell";
 import { BattleScreen } from "@/screens/BattleScreen";
 import { ShopScreen } from "@/screens/ShopScreen";
+import { BlacksmithScreen } from "@/screens/BlacksmithScreen";
 import { DevPanel } from "@/components/DevPanel";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { pickDungeonTrack, setMusicTrack } from "@/audio/music";
 import type { BattleMode } from "@/hooks/useBattleEngine";
 
 function Shell() {
-  const [view, setView] = useState<"shell" | "battle" | "shop">("shell");
+  const [view, setView] = useState<"shell" | "battle" | "shop" | "blacksmith">(
+    "shell"
+  );
   const [battleMode, setBattleMode] = useState<BattleMode>("solo");
   const [battleFloor, setBattleFloor] = useState(1);
   const [battleDungeonId, setBattleDungeonId] = useState("depths");
@@ -18,7 +21,8 @@ function Shell() {
   const [activeDeck, setActiveDeck] = useState<string[]>([]);
 
   // Soundtrack follows the view: hub theme in the shell; battles get the
-  // Arena groove or the dungeon's own floor/boss tracks; Grubbins gets his den.
+  // Arena groove or the dungeon's own floor/boss tracks; Grubbins gets his
+  // den; the smith gets his forge.
   useEffect(() => {
     if (view === "battle") {
       setMusicTrack(
@@ -32,6 +36,8 @@ function Shell() {
       );
     } else if (view === "shop") {
       setMusicTrack("shopTheme");
+    } else if (view === "blacksmith") {
+      setMusicTrack("blacksmithTheme");
     } else {
       setMusicTrack("emberfall");
     }
@@ -49,6 +55,8 @@ function Shell() {
         />
       ) : view === "shop" ? (
         <ShopScreen onExit={() => setView("shell")} />
+      ) : view === "blacksmith" ? (
+        <BlacksmithScreen onExit={() => setView("shell")} />
       ) : (
         <AppShell
           onBattle={(mode, floor = 1, dungeonId = "depths") => {
@@ -59,6 +67,7 @@ function Shell() {
             setView("battle");
           }}
           onOpenShop={() => setView("shop")}
+          onOpenBlacksmith={() => setView("blacksmith")}
         />
       )}
       {/* Local-only cheats. `import.meta.env.DEV` is a literal `false` in the

@@ -248,6 +248,31 @@ export const SHOP_PREMIUM_PACKS: readonly {
 ];
 
 // ---------------------------------------------------------------------------
+// Blacksmith (the Forge) — smith-service acquisition numbers. The salvage /
+// commission / forge-all folds live in meta/blacksmith.ts; these are the
+// tunables.
+// ---------------------------------------------------------------------------
+
+/** Gold returned for melting ONE free (unequipped) copy, [star−1] per quality.
+ *  Rules this table must keep (spec-enforced in meta/__tests__/blacksmith):
+ *  monotone in power order (a rare 3★ never melts for more than an epic 1★);
+ *  strictly below every acquisition price (shop, commission — no buy→salvage
+ *  loop); and melt value at most DOUBLES per merge rung so merge fees always
+ *  evaporate (no merge→salvage pump; the legendary rungs sit at gold-equality
+ *  only because their 30/50-shard fees burn). Gold ONLY — a shard yield would
+ *  turn salvage into a gold→shards pump on the premium currency. */
+export const SALVAGE_GOLD: Record<Rarity, [number, number, number]> = {
+  rare: [40, 80, 160],
+  epic: [200, 400, 800],
+  legendary: [1000, 2000, 4000],
+};
+
+/** Commission: forge a CHOSEN base-pool line at rare 1★, no RNG. Priced 2× the
+ *  shop's random rare — exact + unlimited vs cheap + random + daily-limited —
+ *  so Grubbins keeps his niche and this stays a late-game gold sink. */
+export const COMMISSION_PRICE = 500;
+
+// ---------------------------------------------------------------------------
 // Quest board (the bulletin board) — daily-notice acquisition numbers. The
 // board roll and progress/claim folds live in meta/quests.ts; these are the
 // tunables.

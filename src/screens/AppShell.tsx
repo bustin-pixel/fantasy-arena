@@ -6,7 +6,6 @@ import { DungeonWall } from "@/components/DungeonWall";
 import { DungeonVines } from "@/components/DungeonVines";
 import { DungeonGate } from "@/components/DungeonGate";
 import { SettingsPanel } from "@/components/SettingsPanel";
-import { BagSheet } from "@/components/BagSheet";
 import { QuestBoardSheet } from "@/components/QuestBoardSheet";
 import { GoldPill, ShardPill } from "@/components/CurrencyPills";
 import type { BattleMode } from "@/hooks/useBattleEngine";
@@ -18,6 +17,8 @@ interface Props {
   onBattle: (mode: BattleMode, floor?: number, dungeonId?: string) => void;
   /** Open Grubbins' shop — a full-screen App view, like Battle (not a sheet). */
   onOpenShop: () => void;
+  /** Open the Blacksmith's forge — the items home, a full-screen App view. */
+  onOpenBlacksmith: () => void;
 }
 
 // Page order: Collection (0) ← Home (1) → Compendium (2). Home is the landing.
@@ -32,14 +33,13 @@ const PAGES = ["Collection", "Home", "Compendium"] as const;
  * Battle is NOT a page here — it's a full-screen overlay owned by App, so the
  * pager never fights the finger mid-fight.
  */
-export function AppShell({ onBattle, onOpenShop }: Props) {
+export function AppShell({ onBattle, onOpenShop, onOpenBlacksmith }: Props) {
   const trackRef = useRef<HTMLDivElement>(null);
   const hallRef = useRef<HTMLDivElement>(null);
   // Pending "restore scroll-snap" timeout from the last drag (see endDrag).
   const snapTimer = useRef<number | null>(null);
   const [page, setPage] = useState(1); // land on Home (center)
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [bagOpen, setBagOpen] = useState(false);
   const [questsOpen, setQuestsOpen] = useState(false);
   // Live drag state in a ref so pointer handlers never trigger re-renders.
   const drag = useRef({
@@ -178,7 +178,7 @@ export function AppShell({ onBattle, onOpenShop }: Props) {
     <div className="app-shell">
       {/* Wallet + settings gear. Shown on the HOME page only (per the design) —
           faded out (not unmounted) elsewhere so a mid-swipe doesn't pop
-          elements in and out. (The Bag lives in a Home-screen FAB now.) */}
+          elements in and out. (Items live behind the Forge FAB on Home.) */}
       <div className={`top-right-cluster${page === 1 ? "" : " off-home"}`}>
         <ShardPill />
         <GoldPill />
@@ -192,7 +192,6 @@ export function AppShell({ onBattle, onOpenShop }: Props) {
         </button>
       </div>
       {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
-      {bagOpen && <BagSheet onClose={() => { playSfx("uiClose"); setBagOpen(false); }} />}
       {questsOpen && (
         <QuestBoardSheet onClose={() => { playSfx("uiClose"); setQuestsOpen(false); }} />
       )}
@@ -229,7 +228,7 @@ export function AppShell({ onBattle, onOpenShop }: Props) {
         <section className="pager-page" aria-label="Home">
           <HomeScreen
             onBattle={onBattle}
-            onOpenBag={() => { playSfx("uiOpen"); setBagOpen(true); }}
+            onOpenBlacksmith={onOpenBlacksmith}
             onOpenShop={onOpenShop}
             onOpenQuests={() => { playSfx("uiOpen"); setQuestsOpen(true); }}
           />

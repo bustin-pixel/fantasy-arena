@@ -14,7 +14,10 @@ import {
   isDungeonUnlocked,
   type Dungeon,
 } from "@/data/dungeons";
-import { DECKABLE_UNIT_IDS, getUnitDef } from "@/data/units";
+import { questUnlockIds } from "@/data/depths";
+import { DECKABLE_UNIT_IDS, UNIT_IDS, getUnitDef } from "@/data/units";
+import { TENDENCIES, type TendencyId } from "@/data/tendencies";
+import { ALL_BOON_IDS, BOONS, type BoonRarity } from "@/data/boons";
 import { rarityRank } from "@/data/rarities";
 import { ITEM_LINES, ITEM_SLOTS } from "@/data/items";
 import type { ItemSlot } from "@/types";
@@ -35,7 +38,11 @@ export interface ItemEntry {
   kind: "item";
   lineId: string;
 }
-export type PageEntry = MonsterEntry | ItemEntry;
+export interface BoonEntry {
+  kind: "boon";
+  boonId: string;
+}
+export type PageEntry = MonsterEntry | ItemEntry | BoonEntry;
 
 export interface BookPage {
   heading: string;
@@ -49,6 +56,12 @@ export interface BookPage {
   art?: string;
   /** Italic flavor line under the entries (lore page, rare-quest hint). */
   note?: string;
+  /** Small italic epithet line under the heading (a tendency's panel blurb). */
+  sub?: string;
+  /** Treatise pages (Book of Tendencies): bearer cards also count as revealed
+   *  when the player OWNS the unit — you know your own warband's instincts —
+   *  on top of the usual slain-in-battle bestiary reveal. */
+  knownReveal?: boolean;
   /** Boss showcase page: one big framed portrait instead of the card grid. */
   boss?: { defId: string };
   /** The rare-spawn page tags its entry with the legendary it unlocks. */
@@ -93,6 +106,8 @@ const SPINES: Record<string, { leather: string; accent: string; glyph: string }>
   fallen_cathedral: { leather: "#3d3244", accent: "#ffd76a", glyph: "⚜" },
   rogues_den: { leather: "#33261a", accent: "#e8b04b", glyph: "🗡" },
   heroes: { leather: "#243a5e", accent: "#f5b301", glyph: "⚔" },
+  tendencies: { leather: "#4a2e1f", accent: "#e09c5f", glyph: "◎" },
+  boons: { leather: "#31214d", accent: "#c9a2ff", glyph: "∞" },
   items: { leather: "#571f1f", accent: "#e8c06a", glyph: "◆" },
 };
 
@@ -165,7 +180,9 @@ function dungeonBook(dungeon: Dungeon, save: PlayerSave): BookDef {
         heading: "Rare Sighting",
         entries: [],
         boss: { defId: quest.spawnId },
-        rareTag: `Unlocks ${getUnitDef(quest.unlocks).name}`,
+        rareTag: `Unlocks ${questUnlockIds(quest)
+          .map((id) => getUnitDef(id).name)
+          .join(" & ")}`,
         note: quest.hint,
       }
     : { heading: "", entries: [] };
@@ -240,6 +257,105 @@ function heroesBook(save: PlayerSave): BookDef {
   };
 }
 
+/** All units bearing `id`, deckables first (rare → legendary), then monsters
+ *  (stable by defId). Summons ride with the deckables' sort tail — the wolf
+ *  and boar ARE the pack pages' whole point. */
+function bearersOf(id: TendencyId): string[] {
+  const bearers = UNIT_IDS.filter((u) => getUnitDef(u).tendency === id);
+  const deckable = (u: string) => (DECKABLE_UNIT_IDS.includes(u) ? 0 : 1);
+  return bearers.sort(
+    (a, b) =>
+      deckable(a) - deckable(b) ||
+      rarityRank(getUnitDef(a).rarity) - rarityRank(getUnitDef(b).rarity) ||
+      (a < b ? -1 : 1)
+  );
+}
+
+function tendenciesBook(): BookDef {
+  const pages: BookPage[] = [
+    { heading: "The Book of Tendencies", entries: [], title: true },
+    { heading: "", entries: [] },
+    {
+      heading: "The Book of Tendencies",
+      entries: [],
+      art: "tendencies",
+      note:
+        "Every creature fights by instinct — the tendency that chooses its prey. Learn them, and the field stops being chaos: screen your healer from the faithbane, feed the brawler a shield. One law binds them all: a bellowed taunt overrides every instinct, without exception.",
+    },
+  ];
+  // One treatise entry per tendency, in registry order (Brawler — the default —
+  // opens the chapter). Bearer cards spill onto continuation pages if a
+  // tendency ever collects more than a grid's worth.
+  for (const [id, t] of Object.entries(TENDENCIES) as [
+    TendencyId,
+    (typeof TENDENCIES)[TendencyId],
+  ][]) {
+    const chunks = chunk(
+      bearersOf(id).map((defId) => ({ kind: "monster", defId }) as PageEntry),
+      PER_PAGE
+    );
+    if (chunks.length === 0) chunks.push([]);
+    pages.push(
+      ...chunks.map((entries, i) => ({
+        heading: t.name + (i > 0 ? (ROMAN[i] ?? ` ${i + 1}`) : ""),
+        sub: t.blurb,
+        entries,
+        knownReveal: true,
+        // The full treatise text rides the last (usually only) page.
+        note: i === chunks.length - 1 ? t.detail : undefined,
+      }))
+    );
+  }
+  return {
+    id: "tendencies",
+    title: "The Book of Tendencies",
+    ...SPINES.tendencies,
+    locked: false,
+    spreads: toSpreads(pages),
+    kind: "bestiary",
+  };
+}
+
+const BOON_CHAPTER: Record<BoonRarity, string> = {
+  common: "Common Boons",
+  rare: "Rare Boons",
+  epic: "Epic Boons",
+};
+
+/** The Book of Boons — the full Endless-mode boon catalog, chaptered by
+ *  rarity. Pure rules reference like the tendency treatise: never locked, no
+ *  reveal tiers, no progress plaque. Rows render in BookOverlay's BoonRow. */
+function boonsBook(): BookDef {
+  const pages: BookPage[] = [
+    { heading: "The Book of Boons", entries: [], title: true },
+    { heading: "", entries: [] },
+    {
+      heading: "The Book of Boons",
+      entries: [],
+      art: "boons",
+      note:
+        "Every wave survived in the Endless deep, the horde pauses and three boons are offered — take one, and it blesses the whole warband for the rest of the run. Boons stack, and the deeper you descend the rarer the offers. Marked boons come only once; a fallen ally calls forth a Second Chance.",
+    },
+  ];
+  for (const rarity of ["common", "rare", "epic"] as BoonRarity[]) {
+    const ids = ALL_BOON_IDS.filter((id) => BOONS[id].rarity === rarity);
+    pages.push(
+      ...headed(
+        BOON_CHAPTER[rarity],
+        chunk(ids.map((boonId) => ({ kind: "boon", boonId }) as PageEntry), PER_PAGE)
+      )
+    );
+  }
+  return {
+    id: "boons",
+    title: "The Book of Boons",
+    ...SPINES.boons,
+    locked: false,
+    spreads: toSpreads(pages),
+    kind: "bestiary",
+  };
+}
+
 const SLOT_LABEL: Record<ItemSlot, string> = {
   weapon: "Weapons",
   armor: "Armor",
@@ -292,11 +408,14 @@ function itemsBook(save: PlayerSave): BookDef {
 // ---------------------------------------------------------------------------
 
 /** Every book on the shelf, in shelf order: the nine dungeons down the gate
- *  chain, then the Heroes tome and the item catalog. */
+ *  chain, then the Heroes tome, the two rules treatises (tendencies, boons),
+ *  and the item catalog. */
 export function buildBooks(save: PlayerSave): BookDef[] {
   return [
     ...Object.values(DUNGEONS).map((d) => dungeonBook(d, save)),
     heroesBook(save),
+    tendenciesBook(),
+    boonsBook(),
     itemsBook(save),
   ];
 }

@@ -81,9 +81,45 @@ function tendencyComparator(
     case "big_game":
       // The biggest beast on the field.
       return (a, b) => b.maxHp - a.maxHp || byUid(a, b);
+    case "faithbane": {
+      // Healers die first. Always. (Sharper than the Backline Stalker, which
+      // rates ranged and support equally — this one walks past the archer.)
+      const healer = (u: Unit) =>
+        getKit(u.defId)?.roleClass === "support" ? 1 : 0;
+      return (a, b) => healer(b) - healer(a) || a.hp - b.hp || byUid(a, b);
+    }
+    case "focus_fire": {
+      // Pile onto whatever the most of my living allies already fight.
+      const mobbed = allyTargetCounts(unit, unitsByUid);
+      const count = (u: Unit) => mobbed.get(u.uid) ?? 0;
+      return (a, b) => count(b) - count(a) || a.hp - b.hp || byUid(a, b);
+    }
+    case "lone_wolf": {
+      // Seek the foe nobody else is fighting (0 allies on it beats any mob).
+      const mobbed = allyTargetCounts(unit, unitsByUid);
+      const unclaimed = (u: Unit) => ((mobbed.get(u.uid) ?? 0) === 0 ? 1 : 0);
+      return (a, b) =>
+        unclaimed(b) - unclaimed(a) || a.hp - b.hp || byUid(a, b);
+    }
     default:
       return null; // Brawler — today's exact behavior.
   }
+}
+
+/** How many of `unit`'s living allies (itself excluded) currently target each
+ *  enemy, keyed by enemy uid. Built once per acquire for the pack tendencies
+ *  (Focus Fire / Lone Wolf) so the comparator stays O(1) per comparison. */
+function allyTargetCounts(
+  unit: Unit,
+  unitsByUid: Map<string, Unit>
+): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const ally of unitsByUid.values()) {
+    if (ally.uid === unit.uid || ally.team !== unit.team) continue;
+    if (!alive(ally) || !ally.targetUid) continue;
+    counts.set(ally.targetUid, (counts.get(ally.targetUid) ?? 0) + 1);
+  }
+  return counts;
 }
 
 export function acquireTarget(

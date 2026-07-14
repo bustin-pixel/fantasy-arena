@@ -8,6 +8,7 @@ import { ProfileSheet } from "@/components/ProfileSheet";
 import { getDungeon } from "@/data/dungeons";
 import { endlessBestWave, highestClearedFloorOf } from "@/state/persistence";
 import { dayIndexLocal } from "@/meta/shop";
+import { forgeableStackCount } from "@/meta/blacksmith";
 import type { BattleMode } from "@/hooks/useBattleEngine";
 import { playSfx } from "@/audio/sfx";
 
@@ -17,11 +18,11 @@ const ENDLESS_GATE_FLOOR = 5;
 
 interface Props {
   onBattle: (mode: BattleMode, floor?: number, dungeonId?: string) => void;
-  /** Open the equipment Bag (rendered by AppShell so it overlays everything). */
-  onOpenBag: () => void;
+  /** Open the Blacksmith's forge — the items home (a full-screen App view). */
+  onOpenBlacksmith: () => void;
   /** Open Grubbins' shop (a full-screen App view). */
   onOpenShop: () => void;
-  /** Open the quest bulletin board (rendered by AppShell, like the Bag). */
+  /** Open the quest bulletin board (rendered by AppShell as an overlay). */
   onOpenQuests: () => void;
 }
 
@@ -30,10 +31,16 @@ interface Props {
  * (mode "solo"); the Dungeons card opens the dungeon-select map (The Depths +
  * the themed legendary dungeons), then a floor picker for the chosen dungeon.
  */
-export function HomeScreen({ onBattle, onOpenBag, onOpenShop, onOpenQuests }: Props) {
+export function HomeScreen({
+  onBattle,
+  onOpenBlacksmith,
+  onOpenShop,
+  onOpenQuests,
+}: Props) {
   const { save } = useGameState();
-  // Total items owned (across all stacks) for the Bag button's count badge.
-  const bagCount = Object.values(save.items).reduce((n, c) => n + c, 0);
+  // Forge pip: stacks with an affordable merge RIGHT NOW — self-clears as
+  // merges complete or stop being affordable (unlike a raw item count).
+  const forgeable = forgeableStackCount(save);
   // Shop pip: today's shelf hasn't been seen yet (opening the shop rolls
   // save.shop.day forward via visitShop, which clears this).
   const newStock = save.shop.day !== dayIndexLocal();
@@ -120,18 +127,19 @@ export function HomeScreen({ onBattle, onOpenBag, onOpenShop, onOpenQuests }: Pr
         <p className="home-hint">← Swipe to Collection to build your warband</p>
       )}
 
-      {/* Floating Bag button — bottom-right, above the Compendium tab. */}
+      {/* Floating Forge button — bottom-right, above the Compendium tab. The
+          badge counts stacks the smith can merge right now. */}
       <button
         type="button"
-        className="home-bag-fab"
-        aria-label="Open Bag"
-        onClick={onOpenBag}
+        className="home-forge-fab"
+        aria-label="Open the Forge"
+        onClick={() => { playSfx("uiOpen"); onOpenBlacksmith(); }}
       >
-        <span className="home-bag-emoji" aria-hidden>
-          🎒
+        <span className="home-forge-emoji" aria-hidden>
+          ⚒️
         </span>
-        <span className="home-bag-text">Bag</span>
-        {bagCount > 0 && <span className="home-bag-count">{bagCount}</span>}
+        <span className="home-forge-text">Forge</span>
+        {forgeable > 0 && <span className="home-forge-count">{forgeable}</span>}
       </button>
 
       {/* Floating Shop button — bottom-left, the Bag's mirror twin. */}

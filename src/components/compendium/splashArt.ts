@@ -689,6 +689,115 @@ function roguesDen(g: Ctx, w: number, h: number, rnd: () => number): void {
   }
 }
 
+/** The Book of Tendencies — a hunter's sigil burning over eyes in the dark:
+ *  every instinct is a pair of eyes choosing its prey. */
+function tendencies(g: Ctx, w: number, h: number, rnd: () => number): void {
+  sky(g, w, h, "#33200f", "#0b0502");
+  // the sigil: a burning copper mark (the ◎ of the spine) hung mid-air
+  const cx = w * 0.5;
+  const cy = h * 0.38;
+  glow(g, cx, cy, w * 0.34, "rgba(255,170,80,.45)");
+  g.strokeStyle = "#e8a45c";
+  g.lineWidth = 2.2;
+  for (const r of [0.055, 0.1, 0.15]) {
+    g.beginPath();
+    g.arc(cx, cy, w * r, 0, 7);
+    g.stroke();
+  }
+  g.fillStyle = "#ffd9a0";
+  g.beginPath();
+  g.arc(cx, cy, w * 0.018, 0, 7);
+  g.fill();
+  // four crosshair ticks piercing the outer ring
+  g.lineWidth = 2.6;
+  for (let i = 0; i < 4; i++) {
+    const a = (i * Math.PI) / 2 + Math.PI / 4;
+    g.beginPath();
+    g.moveTo(cx + Math.cos(a) * w * 0.125, cy + Math.sin(a) * w * 0.125);
+    g.lineTo(cx + Math.cos(a) * w * 0.185, cy + Math.sin(a) * w * 0.185);
+    g.stroke();
+  }
+  // low scrub ridge swallowing the bottom of the field
+  g.fillStyle = "#0a0503";
+  g.beginPath();
+  g.moveTo(0, h * 0.72);
+  for (let i = 0; i <= 8; i++) {
+    g.lineTo((i / 8) * w, h * (0.68 + rnd() * 0.08));
+  }
+  g.lineTo(w, h);
+  g.lineTo(0, h);
+  g.closePath();
+  g.fill();
+  // pairs of eyes watching from the dark, each pair fixed on the sigil
+  const eyes: Array<[number, number, number]> = [
+    [0.16, 0.8, 1],
+    [0.78, 0.76, 1.1],
+    [0.38, 0.88, 0.85],
+    [0.9, 0.9, 0.8],
+    [0.6, 0.84, 0.95],
+  ];
+  for (const [x, y, s] of eyes) {
+    glow(g, w * x + 3, h * y, 14 * s, "rgba(255,180,90,.35)");
+    g.fillStyle = "#ffc86a";
+    g.fillRect(w * x, h * y, 2.6 * s, 2.6 * s);
+    g.fillRect(w * x + 6 * s, h * y, 2.6 * s, 2.6 * s);
+  }
+}
+
+/** The Book of Boons — three blessings hanging radiant over the endless
+ *  horde: steel, sapphire, and amethyst, each a choice. */
+function boons(g: Ctx, w: number, h: number, rnd: () => number): void {
+  sky(g, w, h, "#241a3d", "#0a0614");
+  // the endless horde: ridge upon ridge of massed silhouettes fading back
+  for (let ridge = 3; ridge >= 0; ridge--) {
+    const y = h * (0.62 + ridge * 0.11);
+    const shade = 10 + ridge * 8;
+    g.fillStyle = `rgb(${shade},${shade - 3},${shade + 8})`;
+    g.beginPath();
+    g.moveTo(0, h);
+    for (let i = 0; i <= 14; i++) {
+      const x = (i / 14) * w;
+      g.lineTo(x, y - rnd() * h * 0.05 - (i % 2) * h * 0.02);
+    }
+    g.lineTo(w, h);
+    g.closePath();
+    g.fill();
+  }
+  // scattered horde eyes, dimming with depth
+  for (let i = 0; i < 12; i++) {
+    const y = h * (0.66 + rnd() * 0.3);
+    g.fillStyle = `rgba(255,120,90,${0.5 - (y / h - 0.66) * 1.1})`;
+    g.fillRect(rnd() * w, y, 1.8, 1.8);
+  }
+  // the three offered boons: steel / sapphire / amethyst diamonds
+  const gems: Array<[number, number, string, number]> = [
+    [0.24, 0.36, "#8a9ba8", 0.05],
+    [0.5, 0.28, "#3b82f6", 0.062],
+    [0.76, 0.36, "#a855f7", 0.055],
+  ];
+  for (const [x, y, color, r] of gems) {
+    const cx = w * x;
+    const cy = h * y;
+    const rr = w * r;
+    glow(g, cx, cy, rr * 4.2, color + "66");
+    g.fillStyle = color;
+    g.beginPath();
+    g.moveTo(cx, cy - rr * 1.4);
+    g.lineTo(cx + rr, cy);
+    g.lineTo(cx, cy + rr * 1.4);
+    g.lineTo(cx - rr, cy);
+    g.closePath();
+    g.fill();
+    g.fillStyle = "rgba(255,255,255,.55)";
+    g.beginPath();
+    g.moveTo(cx, cy - rr * 1.05);
+    g.lineTo(cx + rr * 0.4, cy - rr * 0.25);
+    g.lineTo(cx, cy);
+    g.closePath();
+    g.fill();
+  }
+}
+
 // --- the gallery -------------------------------------------------------------
 
 const SCENES: Record<string, (g: Ctx, w: number, h: number, rnd: () => number) => void> = {
@@ -702,6 +811,8 @@ const SCENES: Record<string, (g: Ctx, w: number, h: number, rnd: () => number) =
   fallen_cathedral: fallenCathedral,
   rogues_den: roguesDen,
   heroes,
+  tendencies,
+  boons,
   items,
 };
 
@@ -709,7 +820,12 @@ const SCENES: Record<string, (g: Ctx, w: number, h: number, rnd: () => number) =
  *  painting (a window centered on this focal x) instead of squeezing the whole
  *  scene into the portrait box. The dungeon books keep the squeeze — their
  *  scenes (spire, trunk, vault door) read fine tall. */
-const COVER_FOCAL: Record<string, number> = { heroes: 0.53, items: 0.5 };
+const COVER_FOCAL: Record<string, number> = {
+  heroes: 0.53,
+  items: 0.5,
+  tendencies: 0.5,
+  boons: 0.5,
+};
 
 /** Paint `bookId`'s splash vignette onto a w×h context (unknown ids get the
  *  armory still-life rather than a blank plate). Pass `cover: true` when

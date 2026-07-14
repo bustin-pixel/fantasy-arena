@@ -26,6 +26,12 @@ import { MILESTONE_UNLOCKS, UNLOCK_PRICES } from "@/meta/economy";
 import { addXp } from "@/meta/leveling";
 import { canEquip, combineFold } from "@/meta/inventory";
 import {
+  commissionFold,
+  commissionManyFold,
+  forgeAllFold,
+  salvageFold,
+} from "@/meta/blacksmith";
+import {
   applyShopPurchase,
   applyShopReroll,
   normalizeShopDay,
@@ -114,9 +120,21 @@ interface GameStateValue {
   /** Clear one of a unit's item slots. */
   unequipItem: (defId: string, slot: ItemSlot) => void;
   /** Merge two copies of `key` into the next star/quality, paying the
-   *  gold/shard fee. No-op when blocked (copies/fee/cap) — the Bag disables
+   *  gold/shard fee. No-op when blocked (copies/fee/cap) — the Forge disables
    *  the button with the reason, this is belt-and-braces. */
   combineItems: (key: ItemKey) => void;
+  /** Melt one FREE (unequipped) copy of `key` into gold. No-op when blocked
+   *  (invalid/none/equipped) — meta/blacksmith.salvageFold. */
+  salvageItem: (key: ItemKey) => void;
+  /** Pay gold to forge a chosen BASE-pool line at rare 1★ (no RNG; signature
+   *  lines refused). No-op when blocked — meta/blacksmith.commissionFold. */
+  commissionItem: (lineId: string) => void;
+  /** Bulk-commission `qty` copies of a base line at once (qty clamped to what
+   *  gold affords, atomic) — meta/blacksmith.commissionManyFold. */
+  commissionItems: (lineId: string, qty: number) => void;
+  /** Chain every GOLD-only merge to fixpoint (shards never auto-spent). The
+   *  Forge previews via planForgeAll first — meta/blacksmith.forgeAllFold. */
+  forgeAll: () => void;
   /** Roll the shop's day forward (clears the Home FAB's "new stock" dot).
    *  Callers pass dayIndexLocal() — the impure edge stays outside the fold. */
   visitShop: (todayIdx: number) => void;
@@ -256,9 +274,10 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
         const gift = MILESTONE_UNLOCKS[ctx.dungeonId]?.[ctx.floor];
         if (gift) unlocked.add(gift);
       }
-      // Rare-spawn quest completion → the reward unit becomes purchasable.
+      // Rare-spawn quest completion → the reward unit(s) become purchasable
+      // (the Sealed Vault quest pays out two from the one kill).
       const questUnlocks = new Set(s.questUnlocks);
-      if (rewards.questUnlock) questUnlocks.add(rewards.questUnlock);
+      for (const id of rewards.questUnlocks ?? []) questUnlocks.add(id);
       return {
         ...s,
         gold,
@@ -333,6 +352,15 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
         soulShards: folded.soulShards,
       };
     });
+
+  // ---- blacksmith — folds live in meta/blacksmith (pure, StrictMode-safe,
+  // no RNG anywhere); these wrappers only bind them to setSave. -------------
+  const salvageItem = (key: ItemKey) => setSave((s) => salvageFold(s, key));
+  const commissionItem = (lineId: string) =>
+    setSave((s) => commissionFold(s, lineId));
+  const commissionItems = (lineId: string, qty: number) =>
+    setSave((s) => commissionManyFold(s, lineId, qty));
+  const forgeAll = () => setSave((s) => forgeAllFold(s));
 
   // ---- shop — the folds live in meta/shop (pure, StrictMode-safe); these
   // wrappers only bind them to setSave. ------------------------------------
@@ -432,6 +460,10 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
         equipItem,
         unequipItem,
         combineItems,
+        salvageItem,
+        commissionItem,
+        commissionItems,
+        forgeAll,
         visitShop,
         purchaseShopItem,
         rerollShop,

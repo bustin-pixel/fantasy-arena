@@ -587,13 +587,51 @@ shelf that is re-rolled from its inputs everywhere it's needed:
 Specs: `meta/__tests__/shop.test.ts`; v10 migration cases in
 `state/__tests__/persistence.test.ts`.
 
-**The shop's set piece is PixiJS (the only WebGL surface in the app).**
-`components/GrubbinsScene.tsx` ("Gilded Baron", 2026-07-10) owns the repo's
-only `pixi.js`/`pixi-filters` imports — battle canvas is still plain 2D.
-Its gotchas live in the component header: `Application.init()` is async (the
+**The NPC set pieces are PixiJS (the app's only WebGL surfaces).**
+`components/GrubbinsScene.tsx` ("Gilded Baron", 2026-07-10) and
+`components/BlacksmithScene.tsx` (the Forge) own the repo's only
+`pixi.js`/`pixi-filters` imports — battle canvas is still plain 2D. Shared
+gotchas live in both component headers: `Application.init()` is async (the
 `disposed` guard covers unmount/StrictMode races), and the canvas-generated
-textures are module-scope + shared across mounts, so `app.destroy` must NOT
-pass `texture: true`.
+textures (`texCache`, and the smith's `iconTexCache`) are module-scope +
+shared across mounts, so `app.destroy` must NOT pass `texture: true`.
+
+### 11. The Blacksmith is stateless meta
+
+The Forge (BlacksmithScreen + `meta/blacksmith.ts`) replaced the Bag as the
+items home and added Salvage / Commission / Forge All. Its whole design is
+that it adds NO save state:
+
+- **Every fold operates on existing fields only** (`gold`, `soulShards`,
+  `items`, `loadouts`) — no BlacksmithState, no version bump, nothing for
+  `migrateSave` to do. If a future smith feature wants daily deals, limits,
+  or smith XP, THAT is the moment a schema migration arrives; don't add one
+  casually.
+- **Salvage yields gold ONLY, never shards** (a shard yield would be a
+  gold→shards pump on the premium currency), and only a FREE copy melts
+  (`availableCount ≥ 1` — the smith never strips worn gear). The `SALVAGE_GOLD`
+  table's rules are executable spec in `meta/__tests__/blacksmith.test.ts`:
+  monotone in power order, strictly below every acquisition price, and
+  `salvage(next) ≤ 2·salvage(cur) + goldFee(cur)` on every merge rung (gold-
+  equality tolerated only where shards burn) so merge fees always evaporate.
+- **Forge All is gold-only by design** — any rung whose fee has `shards > 0`
+  (epic 3★→legendary, legendary star-ups) is skipped, so the player's premium
+  currency is never auto-spent; legendary work stays a manual act. It walks
+  keys in CANONICAL order (quality ↑ → star ↑ → line declaration order, never
+  `Object.keys` insertion order) to fixpoint, and `planForgeAll`/`forgeAllFold`
+  share one private walk so the preview always equals the commit.
+- **Commission is RNG-free** (chosen line, flat `COMMISSION_PRICE`, rare 1★,
+  base pool only — dungeon-signature lines refused like the shop's pool), so
+  there's no roll-before-fold dance.
+- **Commit-first-then-theater still holds**: the fold lands, then the
+  `BlacksmithScene` act plays and one scheduled timeout fires the reveal cues
+  at the scene's exported beats (`CRAFT_REVEAL_MS` etc.). The SCENE owns
+  frame-synced anvil/quench clangs; the SCREEN owns transactional cues.
+- The Home FAB pip is `forgeableStackCount` — stacks with an OK merge right
+  now (any currency), so it self-clears; it deliberately counts shard-fee
+  merges that Forge All would skip.
+
+Specs: `meta/__tests__/blacksmith.test.ts`.
 
 ---
 
