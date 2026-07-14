@@ -20,19 +20,27 @@
 
 import type { Projectile, Unit } from "@/types";
 import type { AbilityContext } from "../AbilitySystem";
+import { abominationKit } from "./abomination";
 import { aegisKnightKit } from "./aegisKnight";
+import { ancientAutomatonKit } from "./ancientAutomaton";
+import { apexBeastKit } from "./apexBeast";
 import { arcaneMageKit } from "./arcaneMage";
 import { archerKit } from "./archer";
 import { assassinKit } from "./assassin";
+import { banditKingKit } from "./banditKing";
 import { berserkerKit } from "./berserker";
 import { bloaterKit, bloatlingKit } from "./bloater";
 import { boarKit } from "./boar";
 import { bonecallerKit } from "./bonecaller";
 import { clericKit } from "./cleric";
+import { direAlphaKit } from "./direAlpha";
 import { druidKit } from "./druid";
+import { eclipseHeraldKit } from "./eclipseHerald";
+import { elderTreantKit } from "./elderTreant";
 import { electricMageKit } from "./electricMage";
 import { engineerKit } from "./engineer";
 import { fireMageKit } from "./fireMage";
+import { forgeGolemKit } from "./forgeGolem";
 import { holyKnightKit } from "./holyKnight";
 import { hunterKit } from "./hunter";
 import { iceMageKit } from "./iceMage";
@@ -52,6 +60,7 @@ import { slimeKit, slimeCloneKit } from "./slime";
 import { slimeKnightKit, slimeBlobKit } from "./slimeKnight";
 import { tricksterKit } from "./trickster";
 import { warriorKit } from "./warrior";
+import { wildheartKit } from "./wildheart";
 import { zombieShamblerKit } from "./zombieShambler";
 
 /** The context every kit hook receives (the engine's AbilityContext). For the
@@ -167,30 +176,30 @@ export type UnitKitRegistry = Record<string /* defId */, UnitKit>;
  *  units getKit returns undefined and the engine falls back to the old hardcoded
  *  path, so behavior — and digest() — is unchanged until a unit's kit is born. */
 export const UNIT_KITS: UnitKitRegistry = {
-  abomination: ogreKit, // Bonefields boss: Second Wind + Crushing Slam (reused)
+  abomination: abominationKit, // Bonefields boss: Putrid Spew + Rot Aura (bespoke)
   aegis_knight: aegisKnightKit,
-  ancient_automaton: runeGolemKit, // Deep Forge catalyst: Warded Plating (halves damage)
-  apex_beast: ogreKit, // The Wilds catalyst: a great bear — Second Wind + Slam (reused)
+  ancient_automaton: ancientAutomatonKit, // Deep Forge catalyst: Sentry Protocol + Fortress Core (bespoke)
+  apex_beast: apexBeastKit, // The Wilds catalyst: Pounce + Apex Frenzy (bespoke)
   arcane_mage: arcaneMageKit,
   archer: archerKit,
   archmage: arcaneMageKit, // Sealed Vault catalyst: Arcane Barrage + Blink (reused)
   assassin: assassinKit,
-  bandit_king: berserkerKit, // Rogue's Den boss: Bloodrage + Cleave + Last Stand (reused)
+  bandit_king: banditKingKit, // Rogue's Den boss: Fan of Knives + Smoke Bomb (bespoke)
   berserker: berserkerKit,
   bloater: bloaterKit,
   bloatling: bloatlingKit,
   boar: boarKit,
   bonecaller: bonecallerKit, // Bonefields: Raise Dead (skeletons)
-  dire_alpha: berserkerKit, // The Wilds boss: Bloodrage + Cleave + Last Stand (reused)
+  dire_alpha: direAlphaKit, // The Wilds boss: Call of the Wild + Savage Bite (bespoke)
   dryad: clericKit, // The Overgrowth: Mend (grove healer, reused)
-  eclipse_herald: arcaneMageKit, // Eclipse Spire catalyst: Arcane Barrage + Blink (reused)
+  eclipse_herald: eclipseHeraldKit, // Eclipse Spire catalyst: Umbral Veil + Duality (bespoke)
   eclipse_warden: mysticArcherKit, // Eclipse Spire boss: Light/Dark + Momentum (reused)
-  elder_treant: ogreKit, // The Overgrowth boss: Crushing Slam + Regrowth (reused)
+  elder_treant: elderTreantKit, // The Overgrowth boss: Grasping Roots + Regrowth (bespoke)
   electric_mage: electricMageKit,
   engineer: engineerKit,
   fallen_seraph: seraphKit, // Fallen Cathedral boss: Sanctuary + Divine Light (reused)
   fire_mage: fireMageKit,
-  forge_golem: ogreKit, // Deep Forge boss: Crushing Slam + Reforge (reused)
+  forge_golem: forgeGolemKit, // Deep Forge boss: Magma Vents + Overheat (bespoke)
   healer: clericKit,
   holy_knight: holyKnightKit,
   hunter: hunterKit,
@@ -207,7 +216,7 @@ export const UNIT_KITS: UnitKitRegistry = {
   priest: priestKit,
   ranger: rangerKit,
   rogue: rogueKit,
-  rune_golem: runeGolemKit, // Sealed Vault boss: Warded Hide (halves all damage)
+  rune_golem: runeGolemKit, // Sealed Vault boss: Runic Plating phase fight (bespoke)
   seraph: seraphKit,
   silencer: outlawKit, // Rogue's Den catalyst: dodge + stealth + Killing Spree (reused)
   slime: slimeKit,
@@ -217,7 +226,7 @@ export const UNIT_KITS: UnitKitRegistry = {
   summoner: druidKit,
   trickster: tricksterKit,
   warrior: warriorKit,
-  wildheart: berserkerKit, // The Overgrowth catalyst: Wild Fury + Thrash + Ever-Green (reused)
+  wildheart: wildheartKit, // The Overgrowth catalyst: Verdant Pulse + Thorned Hide + Final Bloom (bespoke)
   zombie_shambler: zombieShamblerKit,
 };
 

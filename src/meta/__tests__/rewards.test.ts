@@ -17,6 +17,7 @@ import {
   freshMilestonesCrossed,
   GOLD_REWARDS,
   MILESTONE_UNLOCKS,
+  replayGoldFor,
   SHARD_CHEST_DRIP,
   SHARD_REWARDS,
   STARTER_UNIT_IDS,
@@ -27,11 +28,7 @@ import { ITEM_LINES, signatureLineFor } from "@/data/items";
 import { XP_REWARDS } from "@/meta/leveling";
 import { DECKABLE_UNIT_IDS, getUnitDef } from "@/data/units";
 import { RARITY_ORDER } from "@/data/rarities";
-import {
-  DEPTHS_TIERS,
-  questRequiredUnits,
-  rareSpawnQuestForFloor,
-} from "@/data/depths";
+import { questRequiredUnits, rareSpawnQuestForFloor } from "@/data/depths";
 import { DUNGEONS, QUEST_LOCKED_UNITS, getDungeon } from "@/data/dungeons";
 
 const NO_UNITS: string[] = [];
@@ -308,12 +305,36 @@ describe("computeBattleRewards — the reward matrix", () => {
       highestClearedFloor: 4,
     });
     expect(r).toEqual({
-      gold: GOLD_REWARDS.depthsReplay,
+      gold: replayGoldFor(getDungeon("depths").monsterLevel), // scales by depth
       xp: XP_REWARDS.dungeonWinBase + XP_REWARDS.dungeonWinPerFloor * 2,
-      chest: null,
+      chest: null, // floor 2 isn't a boss floor → no replay chest
       shards: 0,
       firstClear: false,
     });
+  });
+
+  it("boss-floor replays can drop a farm chest, one tier below the first-clear tier", () => {
+    // Scan seeds for a replay roll that drops a chest (~40% each). Deep Forge's
+    // boss first-clear is arcane → its replay chest is gold (one tier below).
+    let chest: ReturnType<typeof computeBattleRewards>["chest"] = null;
+    for (let seed = 1; seed <= 200 && !chest; seed++) {
+      chest = computeBattleRewards({
+        ...base, mode: "depths", dungeonId: "deep_forge", floor: 5,
+        outcome: "victory", highestClearedFloor: 5, chestSeed: seed,
+      }).chest;
+    }
+    expect(chest).not.toBeNull();
+    expect(chest!.tier).toBe("gold");
+  });
+
+  it("non-boss replays never drop a chest", () => {
+    for (let seed = 1; seed <= 50; seed++) {
+      const r = computeBattleRewards({
+        ...base, mode: "depths", dungeonId: "deep_forge", floor: 3,
+        outcome: "victory", highestClearedFloor: 5, chestSeed: seed,
+      });
+      expect(r.chest).toBeNull();
+    }
   });
 
   it("depths defeat and draw both pay the consolation + fractional XP, no chest", () => {
@@ -388,12 +409,48 @@ describe("computeBattleRewards — the reward matrix", () => {
 });
 
 describe("economy data sanity (guards designer typos)", () => {
-  it("milestone floors have tier data and grant non-starter deckable units", () => {
-    const maxFloorWithData = DEPTHS_TIERS[DEPTHS_TIERS.length - 1].floors[1];
-    for (const [floorStr, unitId] of Object.entries(MILESTONE_UNLOCKS)) {
-      expect(Number(floorStr)).toBeLessThanOrEqual(maxFloorWithData);
-      expect(DECKABLE_UNIT_IDS).toContain(unitId);
-      expect(STARTER_UNIT_IDS).not.toContain(unitId);
+  it("every dungeon gift grants a non-starter, non-quest-locked deckable unit on a real floor", () => {
+    for (const [dungeonId, byFloor] of Object.entries(MILESTONE_UNLOCKS)) {
+      const dungeon = getDungeon(dungeonId); // throws on an unknown dungeon id
+      for (const [floorStr, unitId] of Object.entries(byFloor)) {
+        const floor = Number(floorStr);
+        expect(floor).toBeGreaterThanOrEqual(1);
+        expect(floor).toBeLessThanOrEqual(dungeon.floors);
+        expect(DECKABLE_UNIT_IDS).toContain(unitId);
+        expect(STARTER_UNIT_IDS).not.toContain(unitId); // gifts aren't already-owned
+        expect(QUEST_LOCKED_UNITS.has(unitId)).toBe(false); // legendaries stay quest-locked
+      }
+    }
+  });
+
+  it("every quest's required unit is a starter or gifted before that dungeon's quest", () => {
+    // Units the player is guaranteed to own by the time they can attempt a
+    // dungeon's fusion quest: the starters, this dungeon's gifts BELOW the quest
+    // floor, and every gift from the gate-ancestors (fully cleared to progress
+    // — you can't reach a gate floor without clearing the earlier floors).
+    const ownableBefore = (
+      dungeon: ReturnType<typeof getDungeon>
+    ): Set<string> => {
+      const owned = new Set<string>(STARTER_UNIT_IDS);
+      const qFloor = dungeon.quest?.floor ?? dungeon.floors;
+      for (const [fStr, u] of Object.entries(MILESTONE_UNLOCKS[dungeon.id] ?? {})) {
+        if (Number(fStr) < qFloor) owned.add(u);
+      }
+      let cur = dungeon;
+      const seen = new Set<string>();
+      while (cur.gate && !seen.has(cur.gate.dungeonId)) {
+        seen.add(cur.gate.dungeonId);
+        const anc = getDungeon(cur.gate.dungeonId);
+        for (const u of Object.values(MILESTONE_UNLOCKS[anc.id] ?? {})) owned.add(u);
+        cur = anc;
+      }
+      return owned;
+    };
+    for (const dungeon of Object.values(DUNGEONS)) {
+      if (!dungeon.quest) continue;
+      const ownable = ownableBefore(dungeon);
+      const reqs = questRequiredUnits(dungeon.quest); // any-of
+      expect(reqs.some((id) => ownable.has(id))).toBe(true);
     }
   });
 

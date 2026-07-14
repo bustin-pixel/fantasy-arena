@@ -419,12 +419,27 @@ export function renderBattle(
   const bufH = ctx.canvas.height;
   const { scale, offsetX, offsetY } = fieldTransform(bufW, bufH);
 
-  // --- Fill layer: background + zones span the WHOLE buffer, so the arena
-  // reaches the screen edges with no black letterbox bars. The buffer is sized
-  // to the display box's aspect (BattleScreen), and the background art is
-  // abstract, so stretching it to fill is imperceptible. ---
+  // --- Fill layer: background + ambient accents + zones span the WHOLE buffer,
+  // so the arena reaches the screen edges with no black letterbox bars. The
+  // buffer is sized to the display box's aspect (BattleScreen), and the
+  // background art is abstract, so stretching it to fill is imperceptible. ---
   ctx.drawImage(getBackground(theme), 0, 0, FIELD_WIDTH, FIELD_HEIGHT, 0, 0, bufW, bufH);
   drawZones(ctx, theme, bufW, scale, offsetY);
+
+  // Ambient theme animation (candle/torch flames, embers, fireflies, glyphs).
+  // These belong to the BACKDROP — each animated flame sits on a static base
+  // that `build()` paints into the background (see arenaThemes: "flames animate
+  // in accents"), and side-wall sconces sit at the very edges. So accents must
+  // share the background's STRETCH-to-fill transform, NOT the world transform —
+  // otherwise the flame drifts off its candle when the arena widens. Kept in
+  // the original order (over the zone tints, under the units) so the blend is
+  // byte-identical to before once the buffer is 480×720.
+  if (getSettings().ambientFx) {
+    ctx.save();
+    ctx.scale(bufW / FIELD_WIDTH, bufH / FIELD_HEIGHT);
+    theme.accents?.(ctx, performance.now() / 1000);
+    ctx.restore();
+  }
 
   // --- World layer: everything positional lives in the fixed 480×720 world
   // space, translated + uniformly scaled so the fight sits centered and
@@ -432,12 +447,6 @@ export function renderBattle(
   ctx.save();
   ctx.translate(offsetX, offsetY);
   ctx.scale(scale, scale);
-
-  // Ambient theme animation (embers, fireflies, glyphs) — drawn under the
-  // units so combat readability is never compromised. Wall-clock time keeps
-  // it presentation-only, like the lightning jitter below. Skippable in
-  // settings as a courtesy to older phones (it redraws every frame).
-  if (getSettings().ambientFx) theme.accents?.(ctx, performance.now() / 1000);
 
   // Ground-level markers under the units.
   for (const t of snap.traps) drawTrap(ctx, t);

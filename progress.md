@@ -55,6 +55,22 @@ first-clear, 30 replay, 15 loss).
   campaign works (personal-best waves on Home).
 
 ### Progression & economy — SLICE 1 SHIPPED; remaining slices below
+
+> **Progression revamp — BUILT 2026-07-13, UNSHIPPED** (`feat/progression-revamp`).
+> A `winrateSweep` harness (`engine/__tests__`, SKIPPED by default; `SWEEP=1 npm
+> test -- winrateSweep`) exposed that the whole post-Depths chain was tuned for a
+> near-max warband — themed dungeons swept 0–6% and **every boss floor 0%** at
+> intended power (the old sweep was Depths-only). Retuned to a smooth, winnable
+> ramp: enemy cap 12→7, wave budget 25+3f→20+2f, floor scaling 0.08/0.05→0.06/0.04,
+> boss-floor fodder share 0.7→0.45, Bonefields roster thinned. **10 copy-paste
+> boss/rare kits replaced with bespoke themed ones** (Putrid Spew, Runic Plating
+> phase fight, Magma Vents, Fan of Knives, Sentry Protocol, Duality, …) + Seraph
+> now revives fallen monsters. **All-rare starter** (knight/archer/warrior/mage) +
+> **every dungeon gifts a unit on first clear** (`MILESTONE_UNLOCKS` is per-dungeon,
+> save v12 retro-grants). **Replay gold scales with depth** + **boss-replay chests**
+> (farm-for-gear loop). Fork elites reach Lv 11 (`MONSTER_LEVEL_CAP`). Full detail:
+> NOTES §4d–4f. Still-open fine-tuning (a few boss floors a notch hard) noted there.
+
 The loop is live: battle → **gold + chest** → unlock units → stronger warband →
 deeper floors. All meta-layer — the sim never learns about rewards; chest contents
 roll from a **drop-time seed stored on the result** (deterministic,

@@ -41,7 +41,7 @@ function v2Save(): Partial<PlayerSave> {
 describe("migrateSave", () => {
   it("null (new player) → defaults: starter units, 0 gold, floor 0", () => {
     const save = migrateSave(null);
-    expect(save.version).toBe(11);
+    expect(save.version).toBe(12);
     expect(save.shop).toEqual({ day: -1, rerolls: 0, bought: [] });
     expect(save.quests).toEqual({
       day: -1,
@@ -160,6 +160,21 @@ describe("migrateSave", () => {
     for (const id of STARTER_UNIT_IDS) {
       expect(save.unlockedUnits).toContain(id);
     }
+  });
+
+  it("v12: retro-grants per-dungeon gifts for floors already cleared", () => {
+    const save = migrateSave({
+      version: 11,
+      dungeons: {
+        depths: { highestClearedFloor: 3 }, // gifts at F2 (healer) + F3 (fire_mage)
+        bonefields: { highestClearedFloor: 5 }, // gift at F5 (holy_knight)
+      },
+    });
+    expect(save.unlockedUnits).toContain("healer"); // depths F2 — cleared
+    expect(save.unlockedUnits).toContain("fire_mage"); // depths F3 — cleared
+    expect(save.unlockedUnits).not.toContain("berserker"); // depths F5 — not yet
+    expect(save.unlockedUnits).toContain("holy_knight"); // bonefields F5 — cleared
+    expect(save.unlockedUnits).not.toContain("ogre"); // wilds — never played
   });
 
   it("drops unknown/non-deckable ids and clamps negative gold", () => {

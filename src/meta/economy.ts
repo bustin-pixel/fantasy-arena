@@ -7,13 +7,16 @@
 
 import type { Rarity } from "@/types";
 
-/** Units a brand-new save starts with. Grandfathered saves (version < 3)
- *  instead unlock everything that existed at migration time. */
+/** Units a brand-new save starts with — four rares, the reference power level,
+ *  with room to grow into the epics/legendaries earned along the chain. The old
+ *  epics (ogre, fire_mage) are now per-dungeon gifts (MILESTONE_UNLOCKS) instead
+ *  of freebies. Grandfathered saves (version < 3) unlock everything that existed
+ *  at migration time; every existing save also gets these four retro-granted. */
 export const STARTER_UNIT_IDS = [
-  "ogre",
-  "archer",
   "knight",
-  "fire_mage",
+  "archer",
+  "warrior",
+  "mage",
 ] as const;
 
 /** Gold price to unlock a locked unit from the Collection. */
@@ -38,11 +41,26 @@ export const DUPLICATE_GOLD: Record<Rarity, number> = {
 export const GOLD_REWARDS = {
   depthsFirstClearBase: 50,
   depthsFirstClearPerFloor: 15,
-  depthsReplay: 30,
+  // Replay gold now scales with a dungeon's monsterLevel (replayGoldFor): deeper
+  // dungeons pay more per farm run, so grinding the late chain stays worthwhile.
+  depthsReplayBase: 20,
+  depthsReplayPerLevel: 4, // Depths(Lv1)=24 → fork(Lv10)=60
   depthsLoss: 15,
   arenaWin: 40,
   arenaLoss: 10,
 } as const;
+
+/** Replay (non-first-clear) dungeon gold, scaled by the dungeon's monsterLevel. */
+export function replayGoldFor(monsterLevel: number): number {
+  return (
+    GOLD_REWARDS.depthsReplayBase + GOLD_REWARDS.depthsReplayPerLevel * monsterLevel
+  );
+}
+
+/** Chance a BOSS-floor replay (re-clearing a boss you've already beaten) drops a
+ *  chest — the "farm this boss for gear" loop. The tier is one below the boss's
+ *  first-clear tier (bossChestTierFor, meta/rewards). First clears are unchanged. */
+export const BOSS_REPLAY_CHEST_CHANCE = 0.4;
 
 /** Endless survival payout: a flat base plus per-wave-survived gold, granted
  *  regardless of the (always-eventual) wipe. Comparable gold/min to Depths. */
@@ -92,14 +110,28 @@ export const CHEST_GOLD_RANGE: Record<ChestTier, [number, number]> = {
   dragon: [700, 1100],
 };
 
-/** Designer-controlled free unlocks: floor → unit id, granted on that floor's
- *  FIRST clear. Ids, not display names ("healer" shows as Cleric). Keep every
- *  value deckable and outside STARTER_UNIT_IDS (spec-enforced). */
-export const MILESTONE_UNLOCKS: Record<number, string> = {
-  2: "warrior", // rare bruiser — first taste of progression
-  3: "mage", // rare crowd control
-  4: "healer", // rare support — teaches sustain before the boss
-  5: "berserker", // epic — reward for downing the Bloater
+/** Designer-controlled free unlocks: dungeonId → floor → unit id, granted on
+ *  that floor's FIRST clear. Every dungeon hands the player a new toy as they
+ *  clear it (not just the Depths anymore), pacing acquisition across the whole
+ *  chain. Ids, not display names ("healer" shows as Cleric). Keep every value
+ *  deckable and outside STARTER_UNIT_IDS + QUEST_LOCKED_UNITS.
+ *  INVARIANT (spec-enforced in rewards.test): a unit that a dungeon's fusion
+ *  quest REQUIRES is a starter or gifted at/before that dungeon's quest floor —
+ *  so you always own the key before the lock. */
+export const MILESTONE_UNLOCKS: Record<string, Record<number, string>> = {
+  depths: {
+    2: "healer", // Cleric — sustain; the Overgrowth quest needs it
+    3: "fire_mage", // burn — the Bonefields quest needs it
+    5: "berserker", // epic capstone for downing the Bloater
+  },
+  bonefields: { 5: "holy_knight" }, // light vs undead
+  wilds: { 5: "ogre" }, // the Deep Forge quest needs it (arrives a few dungeons early)
+  overgrowth: { 5: "ranger" }, // woodland archer
+  sealed_vault: { 5: "arcane_mage" }, // the vault of arcana
+  deep_forge: { 5: "electric_mage" }, // lightning + machinery
+  eclipse_spire: { 5: "trickster" }, // satisfies the Den's any-of quest
+  fallen_cathedral: { 2: "priest" }, // the Cathedral's own F5 quest needs it
+  rogues_den: { 2: "rogue" }, // the Den's own F5 quest needs it
 };
 
 // ---------------------------------------------------------------------------

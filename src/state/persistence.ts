@@ -8,7 +8,7 @@
 
 import type { ItemLoadouts } from "@/types";
 import { DECKABLE_UNIT_IDS, UNITS } from "@/data/units";
-import { STARTER_UNIT_IDS } from "@/meta/economy";
+import { MILESTONE_UNLOCKS, STARTER_UNIT_IDS } from "@/meta/economy";
 import { TOTAL_XP_CAP } from "@/meta/leveling";
 import { sanitizeItems, sanitizeLoadouts } from "@/meta/inventory";
 import { sanitizeShop, type ShopState } from "@/meta/shop";
@@ -116,10 +116,10 @@ export interface PlayerSave {
 const KEY = "fantasy-arena/save/v1";
 
 export const DEFAULT_SAVE: PlayerSave = {
-  version: 11,
+  version: 12,
   username: "Champion",
   avatarId: DEFAULT_AVATAR_ID,
-  deck: ["ogre", "archer", "knight", "fire_mage"],
+  deck: [...STARTER_UNIT_IDS],
   wins: 0,
   losses: 0,
   bestiary: {},
@@ -228,6 +228,16 @@ export function migrateSave(parsed: Partial<PlayerSave> | null): PlayerSave {
       )
     );
     for (const id of STARTER_UNIT_IDS) owned.add(id);
+    // v12: retro-grant per-dungeon gifts the player has already earned — any
+    // gift whose floor is at/below that dungeon's cleared high-water mark.
+    // Idempotent + monotonic (only ever adds), so it's safe on every load and
+    // covers saves made before a dungeon's gift existed.
+    for (const [dungeonId, byFloor] of Object.entries(MILESTONE_UNLOCKS)) {
+      const cleared = merged.dungeons[dungeonId]?.highestClearedFloor ?? 0;
+      for (const [floorStr, unitId] of Object.entries(byFloor)) {
+        if (Number(floorStr) <= cleared) owned.add(unitId);
+      }
+    }
     merged.unlockedUnits = [...owned];
   }
 

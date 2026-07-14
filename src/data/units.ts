@@ -623,8 +623,8 @@ export const UNITS: Record<string, UnitDef> = {
     attackSpeed: 1.6,
     moveSpeed: 56, // hangs back
     range: FIELD_WIDTH * 0.3, // medium, like the Priest
-    ability: "divine_light", // the big 1.5s cast heal (cast pipeline)
-    abilities: ["sanctuary", "renewal"], // two instant team-wide supports
+    ability: "divine_light", // 1.5s cast: team-wide 100 heal + renewing HoT
+    abilities: ["sanctuary", "resurrection"], // team bubble + once-per-battle rez
     school: "magic", // radiant / holy
     color: "#f4ecd6", // pale ivory
     accent: "#ffd76a", // radiant gold
@@ -765,7 +765,7 @@ export const UNITS: Record<string, UnitDef> = {
   // Gated behind Depths floor 5; its boss floor hosts the rare Lich fusion quest
   // (Fire Mage + Lich → Necromancer). Sprites recolor the skeleton / zombie /
   // brute bodies (the reskin pattern); the Lich reuses the Necromancer kit and
-  // the Abomination reuses the Ogre kit — no new engine branches, no new abilities.
+  // the Abomination has its own kit (Putrid Spew + Rot Aura).
   // -------------------------------------------------------------------------
   skeleton_archer: {
     id: "skeleton_archer",
@@ -821,7 +821,7 @@ export const UNITS: Record<string, UnitDef> = {
     ],
   },
   // Abomination — the Bonefields boss. A hulking stitched-together corpse: huge
-  // HP, a crushing slam, and one refusal to die (reuses the Ogre kit).
+  // HP, a poison-belching Putrid Spew, and a festering Rot Aura (kits/abomination).
   abomination: {
     id: "abomination",
     name: "Abomination",
@@ -833,25 +833,20 @@ export const UNITS: Record<string, UnitDef> = {
     attackSpeed: 2.2,
     moveSpeed: 30, // lumbering
     range: MELEE,
-    ability: "crushing_slam",
-    wardedAgainst: ["polymorph"], // bosses don't fit in a sheep
+    ability: "putrid_spew",
+    wardedAgainst: ["polymorph", "fear"], // a mindless horror — can't be scared or sheeped
     tags: ["undead"],
     color: "#6f7a58", // grey-green stitched flesh
     accent: "#b7c48a",
     traits: [
       {
-        name: "Crushing Slam",
+        name: "Rot Aura",
         description:
-          "Periodically caves in its target for heavy damage and a stun.",
+          "The reek around it festers — anything in melee reach is poisoned every 2s.",
       },
       {
-        name: "Refuses to Die",
-        description:
-          "Once per battle, a blow that would fell it instead heaves it back to full health.",
-      },
-      {
-        name: "Too Big to Baa",
-        description: "Far too massive to polymorph — no sheep holds this much.",
+        name: "Mindless",
+        description: "Too mindless to fear and too massive to polymorph.",
       },
     ],
   },
@@ -894,7 +889,7 @@ export const UNITS: Record<string, UnitDef> = {
   // The Wilds — feral beast tier (the Hunter's dungeon; see data/dungeons).
   // Gated behind Depths floor 5; its boss floor hosts the rare Apex Beast fusion
   // quest (Archer + Apex Beast → Hunter). Sprites reuse the wolf / boar / bear
-  // draws; the boss reuses the Berserker kit and the Apex Beast the Ogre kit.
+  // draws; the boss and the Apex Beast each have their own kit (direAlpha / apexBeast).
   // -------------------------------------------------------------------------
   dire_wolf: {
     id: "dire_wolf",
@@ -938,8 +933,8 @@ export const UNITS: Record<string, UnitDef> = {
     color: "#7a5a34", // brown bear
     accent: "#e8d3ad",
   },
-  // Dire Alpha — the Wilds boss. A pack leader that turns berserk as it's
-  // wounded and cleaves the whole line (reuses the Berserker kit).
+  // Dire Alpha — the Wilds boss. A pack leader that howls in wolves and fears
+  // the line as it's wounded, and bleeds its prey (kits/direAlpha).
   dire_alpha: {
     id: "dire_alpha",
     name: "Dire Alpha",
@@ -951,30 +946,21 @@ export const UNITS: Record<string, UnitDef> = {
     attackSpeed: 1.3,
     moveSpeed: 78, // fast for its size
     range: MELEE,
-    ability: "bloodrage",
+    ability: "call_of_the_wild",
     wardedAgainst: ["polymorph"], // bosses don't fit in a sheep
     color: "#3f4550", // near-black dire pelt
     accent: "#ef4444", // blood-red eyes
     traits: [
       {
-        name: "Bloodrage",
+        name: "Savage Bite",
         description:
-          "The more wounded it is, the harder and faster it strikes.",
-      },
-      {
-        name: "Cleave",
-        description: "Each swing also mauls every other enemy in reach.",
-      },
-      {
-        name: "Last Stand",
-        description:
-          "Once per battle, a killing blow leaves it at 1 HP and unkillable for 5s.",
+          "Every third strike tears a bleeding wound that festers over time.",
       },
     ],
   },
   // Apex Beast — the rare Wilds catalyst (the fusion quest's spawn). A colossal
-  // bear that slams and refuses to fall (reuses the Ogre kit). Fell it with an
-  // Archer fielded to earn the Hunter.
+  // bear that opens with a stunning Pounce and frenzies faster per kill
+  // (kits/apexBeast). Fell it with an Archer fielded to earn the Hunter.
   apex_beast: {
     id: "apex_beast",
     name: "Apex Beast",
@@ -985,29 +971,18 @@ export const UNITS: Record<string, UnitDef> = {
     attackSpeed: 1.7,
     moveSpeed: 66,
     range: MELEE,
-    ability: "crushing_slam",
+    ability: "apex_predator",
     wardedAgainst: ["polymorph"],
     color: "#6b4a2a", // great brown bear
     accent: "#f5e0b8",
-    traits: [
-      {
-        name: "Crushing Slam",
-        description: "Periodically caves in its prey for heavy damage and a stun.",
-      },
-      {
-        name: "Apex",
-        description:
-          "Once per battle, a blow that would fell it instead heaves it back to full.",
-      },
-    ],
   },
   // -------------------------------------------------------------------------
   // The Sealed Vault — arcane tier (the Aegis Knight's dungeon; see data/dungeons).
   // Gated behind Depths floor 5; its whole horde is `school: "magic"`, so the
   // Aegis Knight's magic soak is the answer. Boss floor hosts the rare Archmage
   // fusion quest (Knight + Archmage → Aegis Knight). Casters reuse the mage
-  // draws; the Archmage reuses the Arcane Mage kit; the Rune Golem gets a small
-  // damage-reduction kit; the Wisp gets a new orb sprite.
+  // draws; the Archmage reuses the Arcane Mage kit; the Rune Golem has its own
+  // Runic Plating phase-fight kit; the Wisp gets a new orb sprite.
   // -------------------------------------------------------------------------
   arcane_wisp: {
     id: "arcane_wisp",
@@ -1054,8 +1029,10 @@ export const UNITS: Record<string, UnitDef> = {
     color: "#3b2a52", // dark robe
     accent: "#a78bfa",
   },
-  // Rune Golem — the Sealed Vault boss. A warded construct that halves ALL
-  // incoming damage (its own damage-reduction kit) — a slow, grinding wall.
+  // Rune Golem — the Sealed Vault boss. A warded construct whose Runic Plating
+  // starts at 60% damage reduction and sheds a plate (with a stunning Shatter
+  // Pulse) each time its HP crosses 75/50/25% — a wall that turns threat
+  // (kits/runeGolem).
   rune_golem: {
     id: "rune_golem",
     name: "Rune Golem",
@@ -1067,16 +1044,11 @@ export const UNITS: Record<string, UnitDef> = {
     attackSpeed: 1.8,
     moveSpeed: 34, // lumbering
     range: MELEE,
-    ability: "lifesteal", // no active — damage reduction is the mechanic (kit)
+    ability: "runic_plating", // phase fight — the DR + shatter live in the kit
     wardedAgainst: ["polymorph"], // bosses don't fit in a sheep
     color: "#4a5568", // rune-carved stone
     accent: "#38bdf8", // glowing glyphs
     traits: [
-      {
-        name: "Warded Hide",
-        description:
-          "Ancient runes halve every hit it takes — physical or magical alike.",
-      },
       {
         name: "Too Big to Baa",
         description: "Far too massive to polymorph — no sheep holds this much.",
@@ -1117,8 +1089,8 @@ export const UNITS: Record<string, UnitDef> = {
   // The Overgrowth — nature tier (the Druid's dungeon; see data/dungeons).
   // Gated behind Depths floor 5; boss floor hosts the rare Wildheart fusion quest
   // (Cleric + Wildheart → Druid). Dryads reuse the Cleric kit (Mend); the Elder
-  // Treant reuses the Ogre kit and the Wildheart the Berserker kit; new plant
-  // sprites (drawTreant / drawSporePod) + a mossy-boar reskin.
+  // Treant and the Wildheart each have their own kit (elderTreant / wildheart);
+  // new plant sprites (drawTreant / drawSporePod) + a mossy-boar reskin.
   // -------------------------------------------------------------------------
   thornbeast: {
     id: "thornbeast",
@@ -1174,8 +1146,9 @@ export const UNITS: Record<string, UnitDef> = {
       },
     ],
   },
-  // Elder Treant — the Overgrowth boss. An ancient walking tree: colossal HP, a
-  // crushing slam, and one regrowth from the brink (reuses the Ogre kit).
+  // Elder Treant — the Overgrowth boss. An ancient walking tree: colossal HP,
+  // Grasping Roots that snare the line, and a burning-stops-it Regrowth
+  // (kits/elderTreant).
   elder_treant: {
     id: "elder_treant",
     name: "Elder Treant",
@@ -1187,19 +1160,15 @@ export const UNITS: Record<string, UnitDef> = {
     attackSpeed: 2.0,
     moveSpeed: 28, // ponderous
     range: MELEE,
-    ability: "crushing_slam",
+    ability: "grasping_roots",
     wardedAgainst: ["polymorph"], // bosses don't fit in a sheep
     color: "#5b4327", // bark brown
     accent: "#4d7c0f", // canopy green
     traits: [
       {
-        name: "Crushing Slam",
-        description: "Periodically brings a massive limb down for heavy damage and a stun.",
-      },
-      {
         name: "Regrowth",
         description:
-          "Once per battle, a blow that would fell it instead surges it back to full.",
+          "Below 60% HP it knits itself back together — unless it is burning, which sears the wound shut and stops the regrowth cold.",
       },
       {
         name: "Too Big to Baa",
@@ -1208,8 +1177,8 @@ export const UNITS: Record<string, UnitDef> = {
     ],
   },
   // Wildheart — the rare Overgrowth catalyst (the fusion quest's spawn). The
-  // grove's beating heart, a treant-spirit that rages harder as it's wounded and
-  // cleaves the line (reuses the Berserker kit). Fell it with a Cleric fielded to
+  // grove's beating heart, a treant-spirit that pulses healing, thorns melee
+  // attackers, and buds dryads when it dies (kits/wildheart). Fell it with a Cleric fielded to
   // earn the Druid.
   wildheart: {
     id: "wildheart",
@@ -1221,23 +1190,19 @@ export const UNITS: Record<string, UnitDef> = {
     attackSpeed: 1.7,
     moveSpeed: 40,
     range: MELEE,
-    ability: "bloodrage",
+    ability: "verdant_pulse",
     wardedAgainst: ["polymorph"],
     color: "#6b5327", // radiant heartwood
     accent: "#facc15", // golden sap-glow
     traits: [
       {
-        name: "Wild Fury",
-        description: "The more wounded it is, the harder and faster it lashes out.",
-      },
-      {
-        name: "Thrash",
-        description: "Each swing also rends every other enemy in reach.",
-      },
-      {
-        name: "Ever-Green",
+        name: "Thorned Hide",
         description:
-          "Once per battle, a killing blow leaves it at 1 HP and unkillable for 5s.",
+          "Anything that strikes it from melee reach is torn by thorns in return.",
+      },
+      {
+        name: "Final Bloom",
+        description: "When it falls, two dryads bud from the corpse.",
       },
     ],
   },
@@ -1246,8 +1211,8 @@ export const UNITS: Record<string, UnitDef> = {
   // see data/dungeons). Gated behind Depths floor 5; boss floor hosts the rare
   // Eclipse Herald fusion quest (Mage + Herald → Mystic Archer). All school
   // magic. Sprites reuse the wisp / assassin / mage / mystic-archer draws (light
-  // & dark tints); the Warden reuses the Mystic Archer kit and the Herald the
-  // Arcane Mage kit — no new sprites or kits.
+  // & dark tints); the Warden reuses the Mystic Archer kit and the Herald has
+  // its own Duality kit (kits/eclipseHerald) — no new sprites.
   // -------------------------------------------------------------------------
   light_wisp: {
     id: "light_wisp",
@@ -1338,19 +1303,16 @@ export const UNITS: Record<string, UnitDef> = {
     attackSpeed: 2.0,
     moveSpeed: 52,
     range: FIELD_WIDTH * 0.34,
-    ability: "arcane_barrage",
+    ability: "umbral_veil",
     school: "magic",
     wardedAgainst: ["polymorph"],
     color: "#0ea5e9", // dawn-blue
     accent: "#fde68a",
     traits: [
       {
-        name: "Arcane Barrage",
-        description: "Looses a volley of three homing missiles of light.",
-      },
-      {
-        name: "Blink",
-        description: "Steps through shadow the instant a melee attacker closes in.",
+        name: "Duality",
+        description:
+          "Every 6s it turns from Radiant (mending itself) to Umbral (+30% attack damage) and back.",
       },
     ],
   },
@@ -1358,8 +1320,8 @@ export const UNITS: Record<string, UnitDef> = {
   // The Deep Forge — construct tier (the Engineer's dungeon; see data/dungeons).
   // Gated behind Depths floor 5; boss floor hosts the rare Ancient Automaton
   // fusion quest (Ogre + Automaton → Engineer). Sprites reuse the turret / rat /
-  // knight / brute draws (metal tints); the Forge Golem reuses the Ogre kit and
-  // the Ancient Automaton the Rune Golem kit — no new sprites or kits.
+  // knight / brute draws (metal tints); the Forge Golem and the Ancient Automaton
+  // each have their own kit (forgeGolem / ancientAutomaton) — no new sprites.
   // -------------------------------------------------------------------------
   clockwork_spider: {
     id: "clockwork_spider",
@@ -1403,8 +1365,9 @@ export const UNITS: Record<string, UnitDef> = {
     color: "#52525b", // dark steel
     accent: "#a1a1aa",
   },
-  // Forge Golem — the Deep Forge boss. A colossal molten construct: huge HP, a
-  // crushing slam, and one reforge from the brink (reuses the Ogre kit).
+  // Forge Golem — the Deep Forge boss. A colossal molten construct: huge HP,
+  // burning Magma Vents underfoot, and an Overheat that ignites its swings
+  // below half HP (kits/forgeGolem).
   forge_golem: {
     id: "forge_golem",
     name: "Forge Golem",
@@ -1416,19 +1379,15 @@ export const UNITS: Record<string, UnitDef> = {
     attackSpeed: 2.0,
     moveSpeed: 30, // lumbering
     range: MELEE,
-    ability: "crushing_slam",
+    ability: "magma_vents",
     wardedAgainst: ["polymorph"], // bosses don't fit in a sheep
     color: "#7c2d12", // fire-blackened iron
     accent: "#f97316", // molten glow
     traits: [
       {
-        name: "Crushing Slam",
-        description: "Periodically brings a molten fist down for heavy damage and a stun.",
-      },
-      {
-        name: "Reforge",
+        name: "Overheat",
         description:
-          "Once per battle, a blow that would break it instead reforges it to full.",
+          "Below 50% HP its core runs away with it: +40% attack speed, and its swings set the target alight.",
       },
       {
         name: "Too Big to Baa",
@@ -1437,8 +1396,9 @@ export const UNITS: Record<string, UnitDef> = {
     ],
   },
   // Ancient Automaton — the rare Deep Forge catalyst (the fusion quest's spawn).
-  // A relic construct sheathed in warded plating that halves every hit (reuses
-  // the Rune Golem kit). Wreck it with an Ogre fielded to earn the Engineer.
+  // A relic construct that redeploys turrets and hides behind a Fortress Core —
+  // 40% damage reduction only while a turret still stands (kits/ancientAutomaton).
+  // Wreck it with an Ogre fielded to earn the Engineer.
   ancient_automaton: {
     id: "ancient_automaton",
     name: "Ancient Automaton",
@@ -1449,14 +1409,15 @@ export const UNITS: Record<string, UnitDef> = {
     attackSpeed: 1.8,
     moveSpeed: 40,
     range: MELEE,
-    ability: "lifesteal", // no active — warded plating is the mechanic (kit)
+    ability: "sentry_protocol",
     wardedAgainst: ["polymorph"],
     color: "#78350f", // ancient bronze
     accent: "#fde68a", // gold filigree
     traits: [
       {
-        name: "Warded Plating",
-        description: "Age-old wards halve every hit it takes — physical or magical alike.",
+        name: "Fortress Core",
+        description:
+          "While any of its turrets still stands, its wards cut incoming damage 40% — destroy them to expose the core.",
       },
       {
         name: "Relic",
@@ -1530,7 +1491,9 @@ export const UNITS: Record<string, UnitDef> = {
     moveSpeed: 50,
     range: FIELD_WIDTH * 0.3,
     ability: "divine_light",
-    abilities: ["sanctuary", "renewal"],
+    // No "resurrection" here: the kit's rez only targets fallen deckable
+    // HEROES, and the boss's wave-mates are monsters — it can never fire.
+    abilities: ["sanctuary"],
     school: "magic",
     wardedAgainst: ["polymorph"], // bosses don't fit in a sheep
     color: "#3f3348", // ash-stained ivory gone dusk
@@ -1584,7 +1547,7 @@ export const UNITS: Record<string, UnitDef> = {
   // data/dungeons). Gated behind Eclipse Spire floor 5; boss floor hosts the
   // rare Silencer fusion quest (any stealth unit + Silencer → Outlaw). The
   // Silencer reuses the Outlaw kit (a taste of dodge + Killing Spree before you
-  // own it) and the Bandit King the Berserker kit.
+  // own it); the Bandit King has its own kit (Fan of Knives + Smoke Bomb).
   // -------------------------------------------------------------------------
   cutpurse: {
     id: "cutpurse",
@@ -1639,9 +1602,9 @@ export const UNITS: Record<string, UnitDef> = {
     color: "#5b4632", // scarred hide vest
     accent: "#c98a3d", // brass knuckles
   },
-  // The Bandit King — the Den boss. A roaring crowned brute whose rage only
-  // builds: cleaving sabers, ramping bloodrage, and one spiteful refusal to die
-  // (reuses the Berserker kit).
+  // The Bandit King — the Den boss. A crowned cutthroat who fights dirty: a
+  // poisoned Fan of Knives and a Smoke Bomb that cloaks him and stabs your
+  // weakest as he's chipped down (kits/banditKing).
   bandit_king: {
     id: "bandit_king",
     name: "The Bandit King",
@@ -1653,21 +1616,16 @@ export const UNITS: Record<string, UnitDef> = {
     attackSpeed: 1.4,
     moveSpeed: 62,
     range: MELEE,
-    ability: "bloodrage",
+    ability: "fan_of_knives",
     tendency: "executioner",
     wardedAgainst: ["polymorph"], // bosses don't fit in a sheep
     color: "#4a2c3a", // wine-stained leathers
     accent: "#e8b04b", // stolen crown gold
     traits: [
       {
-        name: "Twin Sabers",
+        name: "Smoke Bomb",
         description:
-          "Each swing cleaves every enemy in reach — the King doesn't pick favorites.",
-      },
-      {
-        name: "King's Ransom",
-        description:
-          "Once per battle, a killing blow leaves him at 1 HP and unkillable — long enough to rage back.",
+          "At 60% and 30% HP he vanishes in smoke for 1.2s — breaking your target lock — and buries a parting knife in the nearest foe.",
       },
     ],
   },

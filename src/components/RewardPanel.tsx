@@ -36,6 +36,8 @@ interface Props {
   /** Depths floor the battle was fought on (drives the milestone callout). */
   floor: number;
   mode: string;
+  /** Which dungeon — the gift callout is per-dungeon (defaults to the Depths). */
+  dungeonId?: string;
   /** Per-deck-unit XP gains for the bar ceremony (omit to hide the section). */
   xpGains?: XpGain[];
 }
@@ -51,12 +53,14 @@ export const CHEST_LABEL: Record<ChestTier, string> = {
 /** closed → (tap) → opening (sprite animates) → open (contents revealed). */
 type ChestPhase = "closed" | "opening" | "open";
 
-export function RewardPanel({ rewards, floor, mode, xpGains }: Props) {
+export function RewardPanel({ rewards, floor, mode, dungeonId = "depths", xpGains }: Props) {
   const [chestPhase, setChestPhase] = useState<ChestPhase>("closed");
   const shownGold = useCountUp(rewards.gold, true);
 
   const milestoneId =
-    mode === "depths" && rewards.firstClear ? MILESTONE_UNLOCKS[floor] : undefined;
+    mode === "depths" && rewards.firstClear
+      ? MILESTONE_UNLOCKS[dungeonId]?.[floor]
+      : undefined;
 
   // Milestone/quest stings, staggered off the victory stinger (and each other)
   // so the panel's arrival isn't a pile-up.

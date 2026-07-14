@@ -862,7 +862,7 @@ export function resolveLoadoutMods(
 }
 
 // ---------------------------------------------------------------------------
-// Descriptions — one generic formatter for all 25 lines, so panel text always
+// Descriptions — one generic formatter for every item line, so panel text always
 // matches the resolved numbers (no hand-written strings to drift).
 // ---------------------------------------------------------------------------
 

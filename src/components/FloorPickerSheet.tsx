@@ -8,7 +8,7 @@
 
 import { useEffect, useState } from "react";
 import { isBossFloorIn, monsterLevelFor, type Dungeon } from "@/data/dungeons";
-import { GOLD_REWARDS } from "@/meta/economy";
+import { GOLD_REWARDS, replayGoldFor } from "@/meta/economy";
 import { bossChestTierFor } from "@/meta/rewards";
 import { playSfx } from "@/audio/sfx";
 
@@ -59,6 +59,16 @@ export function FloorPickerSheet({
           ✕
         </button>
         <h3 className="floor-sheet-title">{dungeon.name}</h3>
+        <p
+          style={{
+            margin: "-6px 0 10px",
+            fontSize: "0.72rem",
+            opacity: 0.72,
+            textAlign: "center",
+          }}
+        >
+          Recommended warband: Lv {Math.min(10, dungeon.monsterLevel + 1)}+
+        </p>
 
         <ul className="floor-list">
           {floors.map((floor) => {
@@ -84,7 +94,7 @@ export function FloorPickerSheet({
                   </span>
                   <span className="floor-reward">
                     {cleared
-                      ? `✓ Replay · ${GOLD_REWARDS.depthsReplay}g`
+                      ? `✓ Replay · ${replayGoldFor(dungeon.monsterLevel)}g`
                       : `${firstClearGold}g + ${boss ? bossChest : "wooden"} chest`}
                   </span>
                 </button>

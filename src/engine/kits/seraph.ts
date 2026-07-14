@@ -1,74 +1,80 @@
 // Seraph (defId "seraph") — the legendary capstone healer: a squishy backline
-// raid-medic with three layered supports.
-//   Divine Light — a 1.5s cast (6s cooldown) that pours 100 HP into the
-//                  most-wounded ally in range (itself included). Lands on cast
-//                  COMPLETION; the Seraph only BEGINS the wind-up when someone
-//                  actually needs it, so it never freezes channelling a 100-heal
-//                  onto a full-HP team. (The engine owns the cast bar; the kit
-//                  supplies wantsToCast — the begin gate — and fireAbility.)
+// raid-medic that juggles TWO casts on ONE cast bar (the Necromancer pattern:
+// it OWNS its cast pipeline in onActTick and returns true so the engine's
+// standard cast chain is bypassed).
+//   Resurrection — a 1s cast, ONCE per battle: brings the most valuable fallen
+//                  allied HERO back at 50% max HP (the game's back-from-the-dead
+//                  convention — Second Chance boon, Slime Knight rebirth).
+//                  "Hero" = a deckable unit: summons (wolves, skeletons,
+//                  turrets) and dungeon monsters don't count. The Slime Knight
+//                  is excluded — its rebirth SPAWNS a new knight and leaves the
+//                  corpse behind, so rezzing that corpse would duplicate it.
+//                  Spent when the cast BEGINS (Necro convention), so a stun
+//                  interrupt burns it — killing the Seraph mid-prayer is real
+//                  counterplay. Discriminated on completion by castTargetUid
+//                  (set = Resurrection, null = Divine Light).
+//   Divine Light — a 1.5s cast (10s cooldown) that pours 100 HP into EVERY
+//                  living teammate (self included) and then blankets them all
+//                  in the renewing glow (6 HP/s for 6s = 36 more each — the old
+//                  standalone Renewal, now folded into this one prayer). Only
+//                  begins when someone on the team is actually hurt.
 //   Sanctuary    — instant (11s cooldown): a +55 absorb bubble on EVERY living
 //                  ally (self included), stacking on any existing shield and
 //                  capped at 150/ally (the Holy Knight's Blessing rule). Reuses
-//                  the shieldHp pool.
-//   Renewal      — instant (9s cooldown): a team-wide heal-over-time on every
-//                  living ally (self included) — 6 HP/s for 6s (36 total each).
-//                  Reuses the shared `regen` status effect (as Renew does). Only
-//                  fires when someone on the team is actually hurt.
-// Both instants run in the post-idle act slot (onActTick): instant, never touch
-// the cast bar, won't fire mid-Divine-Light, and a silence/stun blocks them.
+//                  the shieldHp pool. Never fires mid-cast; stun/silence block it.
 // Its niche vs the Priest/Cleric: those heal ONE ally; the Seraph blankets the
-// WHOLE deployed side. Squishy with a token attack, so "kill the healer" is the
-// counterplay.
+// WHOLE deployed side — and once a battle it undoes a kill. Squishy with a token
+// attack, so "kill the healer" is the counterplay.
 import type { Unit } from "@/types";
 import type { KitCtx, UnitKit } from "./UnitKit";
-import { getUnitDef } from "@/data/units";
-import { abilityCooldownTicks } from "../AbilitySystem";
+import { SUMMONED_UNIT_IDS, getUnitDef } from "@/data/units";
+import { abilityCastTimeTicks, abilityCooldownTicks } from "../AbilitySystem";
 import { applyEffect, isSilenced, isStunned, makeEffect } from "../StatusEffectSystem";
 import { secToTicks } from "@/utils/constants";
-import { dist } from "@/utils/math";
 
 const DIVINE_LIGHT_AMOUNT = 100;
 
 const SANCTUARY_SHIELD = 55;
 const SANCTUARY_CAP = 150; // per-ally absorb ceiling (matches the Holy Knight)
 
-// Renewal: 6 HP every 1s for 6s (36 total) on the whole team.
-const RENEWAL_HEAL_PER_TICK = 6;
-const RENEWAL_TICK_SEC = 1;
-const RENEWAL_DURATION_SEC = 6;
+// The renewing glow Divine Light leaves behind: 6 HP every 1s for 6s (36 total).
+const RENEWING_HEAL_PER_TICK = 6;
+const RENEWING_TICK_SEC = 1;
+const RENEWING_DURATION_SEC = 6;
 
-// The most-wounded ally within heal range (including self), or null if no one
-// needs healing. Drives Divine Light's begin-cast gate and its completion pick
-// (re-evaluated, since the pick may shift mid-cast). Most-wounded by missing HP,
-// uid tiebreak for determinism.
-function woundedTarget(ctx: KitCtx): Unit | null {
-  const { unit, allies } = ctx;
-  const candidates = [unit, ...allies].filter(
-    (u) => u.state !== "dead" && u.hp < u.maxHp
-  );
-  if (candidates.length === 0) return null;
+const RESURRECT_HP_FRAC = 0.5; // revived hero returns at half HP
 
-  const healRange = unit.range + unit.radius;
-  const inRange = candidates.filter((u) => dist(unit.pos, u.pos) <= healRange);
-  const pool = inRange.length > 0 ? inRange : [unit];
-
-  let best = pool[0];
-  let bestMissing = best.maxHp - best.hp;
-  for (const u of pool) {
-    const missing = u.maxHp - u.hp;
-    if (missing > bestMissing || (missing === bestMissing && u.uid < best.uid)) {
-      best = u;
-      bestMissing = missing;
-    }
-  }
-  return bestMissing > 0 ? best : null;
-}
-
-// Every living ally on the Seraph's side, self included — the "whole team" the
-// two instant supports blanket. No range gate: only 1–2 allies are ever on the
-// field, so "entire team" is the intended reach.
+// Every living ally on the Seraph's side, self included — the "whole team" its
+// supports blanket. No range gate: only 1–2 allies are ever on the field, so
+// "entire team" is the intended reach.
 function team(ctx: KitCtx): Unit[] {
   return [ctx.unit, ...ctx.allies].filter((u) => u.state !== "dead");
+}
+
+// The most valuable fallen ally, or null. Excludes SUMMONS (wolves, skeletons,
+// turrets, bloatlings) — a rez should bring back a real body, not a disposable
+// pet. This is intentionally team-relative rather than deckable-only: the player
+// Seraph rezzes a fallen hero, and via the Seraphiel boss (same kit) the same
+// rule rezzes a fallen MONSTER wave-mate — the boss's signature "the choir will
+// not stay dead" moment (before, monsters weren't deckable so its rez never
+// fired). Slime Knight excluded: its corpse persists after its own blob-rebirth
+// spawns a NEW knight, so a rez would duplicate it. Highest maxHp first, uid
+// tiebreak — deterministic.
+function fallenHero(ctx: KitCtx): Unit | null {
+  let best: Unit | null = null;
+  for (const u of ctx.unitsByUid.values()) {
+    if (u.team !== ctx.unit.team || u.state !== "dead") continue;
+    if (SUMMONED_UNIT_IDS.has(u.defId)) continue;
+    if (u.defId === "slime_knight") continue;
+    if (
+      !best ||
+      u.maxHp > best.maxHp ||
+      (u.maxHp === best.maxHp && u.uid < best.uid)
+    ) {
+      best = u;
+    }
+  }
+  return best;
 }
 
 function healVfx(ctx: KitCtx, target: Unit): void {
@@ -81,56 +87,100 @@ function healVfx(ctx: KitCtx, target: Unit): void {
   });
 }
 
+// Replicates CombatSystem.transitionTo(unit, "casting") — the dead-guard matters
+// (a Seraph killed earlier this tick can still reach onActTick, and its state
+// must stay "dead").
+function lockCasting(unit: Unit): void {
+  if (unit.state !== "dead") unit.state = "casting";
+}
+
+// The dual-cast pipeline (Necromancer pattern). Mutates the shared cast-bar
+// fields; the seam reads castTicks > 0 to decide whether the unit is locked
+// this tick. Resurrection outranks Divine Light — a dead hero is more urgent
+// than topping up the living.
+function seraphCast(unit: Unit, ctx: KitCtx): void {
+  if (unit.castTicks > 0) {
+    unit.castTicks--;
+    if (unit.castTicks <= 0) {
+      // Cast complete: Resurrection (a corpse is targeted) or Divine Light.
+      if (unit.castTargetUid) {
+        const corpse = ctx.unitsByUid.get(unit.castTargetUid);
+        if (corpse && corpse.state === "dead") {
+          ctx.revive(corpse, RESURRECT_HP_FRAC);
+          healVfx(ctx, corpse);
+        }
+      } else {
+        // Divine Light: 100 HP into every living teammate, then the renewing
+        // glow on each (re-evaluated at completion — the team may have changed).
+        for (const ally of team(ctx)) {
+          ctx.heal(ally, DIVINE_LIGHT_AMOUNT);
+          applyEffect(
+            ally,
+            makeEffect("regen", {
+              source: unit.uid,
+              healPerTick: RENEWING_HEAL_PER_TICK,
+              tickIntervalSec: RENEWING_TICK_SEC,
+              durationSec: RENEWING_DURATION_SEC,
+            })
+          );
+          healVfx(ctx, ally);
+        }
+      }
+      unit.castTicksMax = 0;
+      unit.castTargetUid = null;
+    } else {
+      lockCasting(unit);
+    }
+    return;
+  }
+
+  if (isStunned(unit) || isSilenced(unit)) return;
+
+  // Resurrection — once per battle, spent at cast BEGIN (an interrupt burns it).
+  if (!unit.resurrectionUsed) {
+    const corpse = fallenHero(ctx);
+    if (corpse) {
+      unit.castTicks = abilityCastTimeTicks("resurrection");
+      unit.castTicksMax = unit.castTicks;
+      unit.castTargetUid = corpse.uid;
+      unit.resurrectionUsed = true;
+      lockCasting(unit);
+      return;
+    }
+  }
+
+  // Divine Light — only wind up when someone on the team is actually hurt.
+  if (unit.abilityCooldown <= 0 && team(ctx).some((u) => u.hp < u.maxHp)) {
+    unit.castTicks = abilityCastTimeTicks("divine_light");
+    unit.castTicksMax = unit.castTicks;
+    unit.castTargetUid = null; // team-wide → Divine Light on completion
+    unit.abilityCooldown = abilityCooldownTicks("divine_light");
+    lockCasting(unit);
+    return;
+  }
+}
+
 export const seraphKit: UnitKit = {
   roleClass: "support",
 
-  // Divine Light — only commit the 1.5s wind-up when there's a wounded ally.
-  wantsToCast(ctx) {
-    return woundedTarget(ctx) != null;
-  },
-
-  // Fired on cast completion: pour 100 HP into the (re-evaluated) most-wounded ally.
-  fireAbility(ctx) {
-    const best = woundedTarget(ctx);
-    if (!best) return false;
-    ctx.heal(best, DIVINE_LIGHT_AMOUNT);
-    healVfx(ctx, best);
-    return true;
-  },
-
-  // Sanctuary + Renewal — instants on their own cooldowns. Neither fires mid-
-  // Divine-Light (castTicks), and a silence/stun blocks both. Returns void so the
-  // standard cast/attack chain (Divine Light, the basic swing) still runs.
+  // Owns the whole cast pipeline (Resurrection + Divine Light on one bar) and
+  // runs the Sanctuary instant, then returns true so the engine bypasses its
+  // standard cast-handling chain (the seam derives "locked" from castTicks > 0).
   onActTick(unit, ctx) {
-    if (unit.castTicks > 0 || isStunned(unit) || isSilenced(unit)) return;
-
-    // Sanctuary — proactive team-wide bubble; top up whenever it's ready.
-    if (unit.sanctuaryCooldown <= 0) {
-      for (const ally of team(ctx)) {
-        ally.shieldHp = Math.min(SANCTUARY_CAP, ally.shieldHp + SANCTUARY_SHIELD);
-        ally.shieldHpMax = Math.max(ally.shieldHpMax, ally.shieldHp);
-        healVfx(ctx, ally);
+    // Sanctuary — proactive team-wide bubble; top up whenever it's ready. Never
+    // mid-cast (matches the old behavior), and a silence/stun blocks it.
+    if (unit.castTicks <= 0 && !isStunned(unit) && !isSilenced(unit)) {
+      if (unit.sanctuaryCooldown <= 0) {
+        for (const ally of team(ctx)) {
+          ally.shieldHp = Math.min(SANCTUARY_CAP, ally.shieldHp + SANCTUARY_SHIELD);
+          ally.shieldHpMax = Math.max(ally.shieldHpMax, ally.shieldHp);
+          healVfx(ctx, ally);
+        }
+        unit.sanctuaryCooldown = abilityCooldownTicks("sanctuary");
       }
-      unit.sanctuaryCooldown = abilityCooldownTicks("sanctuary");
     }
 
-    // Renewal — team-wide HoT, but only when someone on the team is hurt (the
-    // reach is rangeless, so the gate looks at the whole team, not heal range).
-    const teammates = team(ctx);
-    if (unit.renewalCooldown <= 0 && teammates.some((u) => u.hp < u.maxHp)) {
-      for (const ally of teammates) {
-        applyEffect(
-          ally,
-          makeEffect("regen", {
-            source: unit.uid,
-            healPerTick: RENEWAL_HEAL_PER_TICK,
-            tickIntervalSec: RENEWAL_TICK_SEC,
-            durationSec: RENEWAL_DURATION_SEC,
-          })
-        );
-        healVfx(ctx, ally);
-      }
-      unit.renewalCooldown = abilityCooldownTicks("renewal");
-    }
+    seraphCast(unit, ctx);
+    return true;
   },
 };

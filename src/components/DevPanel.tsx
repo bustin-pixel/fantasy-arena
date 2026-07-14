@@ -66,6 +66,7 @@ export function DevPanel() {
           </div>
           <div style={{ opacity: 0.8 }}>
             {save.gold}g · {save.soulShards}◆ · {save.unlockedUnits.length} units
+            · {Object.keys(save.items).length} items
           </div>
           <button style={btn} onClick={dev.unlockAllUnits}>
             Unlock all units
@@ -81,6 +82,9 @@ export function DevPanel() {
           </button>
           <button style={btn} onClick={dev.revealBestiary}>
             Reveal full bestiary
+          </button>
+          <button style={btn} onClick={dev.grantAllItems}>
+            Grant all items
           </button>
           <button
             style={{ ...btn, borderColor: "#b91c1c", background: "#451a1a" }}
