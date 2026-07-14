@@ -987,7 +987,7 @@ export function describeItemMods(mods: ItemMods): string[] {
   return out;
 }
 
-/** Lucky Coin is meta-only; the Bag describes it via this helper. */
+/** Lucky Coin is meta-only; the panels describe it via this helper. */
 export function describeLuckyCoin(quality: ItemQuality, star: number): string[] {
   const q = ITEM_QUALITIES.indexOf(quality);
   const out = [`+${LUCKY_GOLD_PCT[q][star - 1]}% gold from battles`];
@@ -996,6 +996,15 @@ export function describeLuckyCoin(quality: ItemQuality, star: number): string[] 
       `${p100(LUCKY_UPGRADE_CHANCE[star - 1])}% chance to upgrade the reward chest a tier`
     );
   return out;
+}
+
+/** Effect lines for an item KEY — the one panel-text entry point (Shop /
+ *  Forge / unit detail), so the Lucky Coin special case lives in one place. */
+export function describeItemKey(key: ItemKey): string[] {
+  const p = parseItemKey(key);
+  if (!p) return [];
+  if (p.lineId === "lucky_coin") return describeLuckyCoin(p.quality, p.star);
+  return describeItemMods(resolveItemMods(key));
 }
 
 // ---------------------------------------------------------------------------

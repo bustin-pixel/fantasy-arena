@@ -42,7 +42,7 @@ export function ItemIcon({ itemKey, size = 56, hideStars }: Props) {
   );
 }
 
-/** Exposed for non-React canvases (the combine ceremony's flash frames). */
+/** Exposed for non-React canvases (the smith scene's on-anvil item textures). */
 export function drawItemIcon(
   ctx: CanvasRenderingContext2D,
   itemKey: string,

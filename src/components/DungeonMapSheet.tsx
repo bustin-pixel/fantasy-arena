@@ -10,6 +10,7 @@
 
 import { useEffect } from "react";
 import { DUNGEONS, getDungeon, isDungeonUnlocked } from "@/data/dungeons";
+import { questUnlockIds } from "@/data/depths";
 import { getUnitDef } from "@/data/units";
 import { RARITIES } from "@/data/rarities";
 import { averageDeckLevel, levelFromXp } from "@/meta/leveling";
@@ -72,17 +73,20 @@ export function DungeonMapSheet({ save, onPick, onClose }: Props) {
             );
             const cleared = highestClearedFloorOf(save, d.id);
             const underleveled = warbandLv < d.monsterLevel;
-            const reward = d.quest ? getUnitDef(d.quest.unlocks) : null;
-            const owned = reward
-              ? save.unlockedUnits.includes(reward.id)
-              : false;
-            // Status line: gate hint when locked; the legendary it unlocks when
-            // themed; plain progress for The Depths.
+            const rewardIds = d.quest ? questUnlockIds(d.quest) : [];
+            const rewardNames = rewardIds
+              .map((id) => getUnitDef(id).name)
+              .join(" & ");
+            const owned =
+              rewardIds.length > 0 &&
+              rewardIds.every((id) => save.unlockedUnits.includes(id));
+            // Status line: gate hint when locked; the legendaries it unlocks
+            // when themed; plain progress for The Depths.
             // (`locked` implies `gate` exists — gateless dungeons never lock.)
             const status = locked
               ? `Clear ${getDungeon(d.gate!.dungeonId).name} floor ${d.gate!.floor} to unlock`
-              : reward
-                ? `Unlocks ${reward.name}${owned ? " ✓" : ""}`
+              : rewardIds.length > 0
+                ? `Unlocks ${rewardNames}${owned ? " ✓" : ""}`
                 : cleared > 0
                   ? `Deepest cleared — floor ${cleared}`
                   : "The endless descent";
@@ -121,8 +125,11 @@ export function DungeonMapSheet({ save, onPick, onClose }: Props) {
                   <span
                     className="floor-reward"
                     style={
-                      reward && !locked
-                        ? { color: RARITIES[reward.rarity].color }
+                      rewardIds.length > 0 && !locked
+                        ? {
+                            color:
+                              RARITIES[getUnitDef(rewardIds[0]).rarity].color,
+                          }
                         : undefined
                     }
                   >

@@ -18,7 +18,7 @@ import { playSfx } from "@/audio/sfx";
 
 /** Spine heights (px) walked in shelf order — an uneven row reads as a real
  *  shelf, not a bar chart. */
-const SPINE_HEIGHTS = [128, 116, 134, 110, 124, 120, 132, 126, 114, 138, 118];
+const SPINE_HEIGHTS = [128, 116, 134, 110, 124, 120, 132, 126, 114, 138, 122, 130, 118];
 /** Books per shelf row. */
 const ROW_SPLIT = 6;
 

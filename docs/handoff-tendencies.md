@@ -169,3 +169,26 @@ the lever is roster assignment (fewer stalkers), not new targeting exceptions.
 Ships as its own PR per `WORKFLOW.md` (verify → batch → **user approves the merge**;
 each merge is a Netlify deploy). Keep it isolated so the one digest change is
 auditable alone.
+
+## Addendum — wave 2 (2026-07-14)
+
+Three more tendencies, built to the same rules (steps 2 & 4 only, uid tie-break,
+taunt absolute; specs in `targeting.test.ts`):
+
+| Tendency | Blurb | Rule |
+|---|---|---|
+| **Faithbane** | "Healers die first. Always." | Prefer `roleClass === "support"`, then lowest HP. Sharper than Backline Stalker (which rates ranged and support equally). |
+| **Focus Fire** | "Piles onto whatever its allies are already fighting." | Prefer the enemy targeted by the most living allies (per-acquire ally-target-count map), then lowest HP. |
+| **Lone Wolf** | "Seeks the foe nobody else is fighting." | Prefer enemies zero allies target, then lowest HP. |
+
+Roster: `necromancer` → faithbane; `wolf`/`boar` (summons inherit via defId) →
+focus_fire; `outlaw` backline_stalker → **lone_wolf** (replaced). And the first
+**monster tendencies** (superseding "all monsters Brawler, for now" above):
+`silencer` backline_stalker → faithbane, `heretic_zealot` → faithbane,
+`dire_wolf`/`razorback` → focus_fire, `gargoyle` → lone_wolf.
+
+Paired 24-seed sweep (same seeds before/after, `SWEEP=1` winrateSweep): wilds
+±4% noise (F5 boss 0% is pre-existing); rogues_den byte-identical (the
+Silencer's old preference already picked the Cleric); fallen_cathedral F5
+67% → 54% at Lv10 — faithbane zealots diving the sweep warband's Cleric —
+which lands inside the 40–60% fork-boss band.

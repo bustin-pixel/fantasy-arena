@@ -9,7 +9,7 @@
 import type { BattleMode } from "@/hooks/useBattleEngine"; // type-only: erased at runtime
 import type { ItemLoadouts } from "@/types";
 import { DECKABLE_UNIT_IDS, getUnitDef } from "@/data/units";
-import { questRequiredUnits } from "@/data/depths";
+import { questRequiredUnits, questUnlockIds } from "@/data/depths";
 import { RARITIES } from "@/data/rarities";
 import {
   getDungeon,
@@ -81,10 +81,11 @@ export interface BattleRewards {
   /** Depths only: this victory beat the player's high-water floor. Drives
    *  the progress bump and the milestone unlock. */
   firstClear: boolean;
-  /** A rare-spawn quest was completed this battle: the id of the unit whose
-   *  PURCHASE is now unlocked (discounted). Present only the first time it's
-   *  earned — left undefined otherwise so exact reward comparisons stay stable. */
-  questUnlock?: string;
+  /** A rare-spawn quest was completed this battle: the unit id(s) whose
+   *  PURCHASE is now unlocked (discounted) — the Sealed Vault pays out two.
+   *  Present (non-empty) only the first time each is earned — left undefined
+   *  otherwise so exact reward comparisons stay stable. */
+  questUnlocks?: string[];
 }
 
 /** Roll a chest's contents. Pure: same (seed, tier, unlockedUnits, opts) →
@@ -307,14 +308,19 @@ export function computeBattleRewards(input: {
     // required unit unlocks the reward's PURCHASE. Counts on a loss too — "clear
     // it during the floor". Announced once: skip if already unlocked or owned.
     const quest = questForFloorIn(dungeon, floor);
-    const questUnlock =
-      quest &&
+    const questDone =
+      quest != null &&
       slain.includes(quest.spawnId) &&
-      questRequiredUnits(quest).some((id) => deck.includes(id)) &&
-      !questUnlocks.includes(quest.unlocks) &&
-      !unlockedUnits.includes(quest.unlocks)
-        ? quest.unlocks
-        : undefined;
+      questRequiredUnits(quest).some((id) => deck.includes(id));
+    // One kill can pay out several unlocks (the Sealed Vault); each id is
+    // announced only the first time — already-unlocked/owned ones drop out.
+    const newQuestUnlocks = questDone
+      ? questUnlockIds(quest).filter(
+          (id) => !questUnlocks.includes(id) && !unlockedUnits.includes(id)
+        )
+      : [];
+    const questUnlock =
+      newQuestUnlocks.length > 0 ? newQuestUnlocks : undefined;
 
     // XP scales with the floor fought, win or lose — replays pay full (unlike
     // gold) so fighting at your edge is always the best XP.
@@ -325,7 +331,7 @@ export function computeBattleRewards(input: {
         ...none,
         gold: boostGold(GOLD_REWARDS.depthsLoss),
         xp: Math.round(XP_REWARDS.lossFrac * winXp),
-        questUnlock,
+        questUnlocks: questUnlock,
       };
     }
     const firstClear = floor > highestClearedFloor;
@@ -347,7 +353,7 @@ export function computeBattleRewards(input: {
         gold: boostGold(replayGoldFor(dungeon.monsterLevel)),
         xp: winXp,
         chest: replayChest,
-        questUnlock,
+        questUnlocks: questUnlock,
       };
     }
     // Boss floors drop a chest, graded by the dungeon's place in the chain
@@ -371,7 +377,7 @@ export function computeBattleRewards(input: {
       chest: makeChest(tier, isBoss ? dungeonId : undefined),
       shards,
       firstClear: true,
-      questUnlock,
+      questUnlocks: questUnlock,
     };
   }
 

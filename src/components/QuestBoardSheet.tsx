@@ -1,5 +1,5 @@
 // ============================================================================
-// QuestBoardSheet — the bulletin board. An overlay sheet (the BagSheet
+// QuestBoardSheet — the bulletin board. An overlay sheet (the DungeonMapSheet
 // pattern: .detail-overlay backdrop, Escape close, body scroll freeze —
 // automatically exempt from the pager swipe).
 //

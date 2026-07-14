@@ -41,7 +41,7 @@ function v2Save(): Partial<PlayerSave> {
 describe("migrateSave", () => {
   it("null (new player) → defaults: starter units, 0 gold, floor 0", () => {
     const save = migrateSave(null);
-    expect(save.version).toBe(12);
+    expect(save.version).toBe(13);
     expect(save.shop).toEqual({ day: -1, rerolls: 0, bought: [] });
     expect(save.quests).toEqual({
       day: -1,
@@ -86,6 +86,22 @@ describe("migrateSave", () => {
       questUnlocks: [questUnit, "ogre", "not_a_unit"],
     });
     expect(save.questUnlocks).toEqual([questUnit]);
+  });
+
+  it("v13: a completed Sealed Vault quest retroactively unlocks the Archmage", () => {
+    // Aegis Knight buyable (quest done, not yet bought) → Archmage buyable too.
+    const buyable = migrateSave({ version: 12, questUnlocks: ["aegis_knight"] });
+    expect(buyable.questUnlocks).toContain("archmage");
+    // Aegis Knight already OWNED (quest done and bought) → same grandfather.
+    const owned = migrateSave({
+      version: 12,
+      unlockedUnits: ["aegis_knight"],
+    });
+    expect(owned.questUnlocks).toContain("archmage");
+    // Untouched quest → no free Archmage; and the grant is idempotent.
+    expect(migrateSave({ version: 12 }).questUnlocks).not.toContain("archmage");
+    const again = migrateSave(buyable);
+    expect(again.questUnlocks.filter((id) => id === "archmage").length).toBe(1);
   });
 
   it("keeps a grandfathered deck untouched (sanitize is a no-op)", () => {

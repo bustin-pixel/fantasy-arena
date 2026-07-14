@@ -468,6 +468,13 @@ export function drawUnitSprite(
       ctx.scale(1.1, 1.1); // a grand caster
       drawArchmage(ctx, body, dark, light, accent, A);
       break;
+    case "mirror_image":
+      // The Archmage's illusion double: same sprite, slightly smaller and
+      // translucent so the real one always reads at a glance.
+      ctx.scale(0.95, 0.95);
+      ctx.globalAlpha *= 0.65;
+      drawArchmage(ctx, body, dark, light, accent, A);
+      break;
     case "rune_golem":
       ctx.scale(1.2, 1.2); // a hulking construct
       drawRuneGolem(ctx, body, dark, light, accent, A);
@@ -7064,12 +7071,20 @@ function drawRuneGolem(ctx: Ctx, body: string, dark: string, light: string, acce
   ctx.restore();
 }
 
-// Archmage — the rare Sealed Vault catalyst: a grand master caster haloed in
-// orbiting rune-glyphs (catalyst signature), tall starred hat, glowing staff
-// orb and a floating spellbook.
+// Archmage — the Sealed Vault catalyst AND playable legendary ("Woven Gold +
+// Grimoire" mockup, 2026-07-13): a grand master caster haloed in orbiting
+// rune-glyphs, breathing hover, shimmer beads running down the robe's gold
+// seams, a fluttering open grimoire that sheds the four spell elements
+// (flame / snowflake / bolt / rune), and a twinkling starred hat worn ON the
+// head (head first, brim over the forehead, eyes on top — the old order drew
+// the face over the brim). Mirror Image reuses this draw.
+const GRIMOIRE_MOTE_COLORS = ["#fb923c", "#7dd3fc", "#fde047", "#c084fc"]; // fire, frost, bolt, arcane
 function drawArchmage(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {
   const gold = accent;
   const t = A.t;
+  const breathe = A.live ? Math.sin(t * 1.4) * 0.8 : 0;
+  ctx.save();
+  ctx.translate(0, breathe);
   // orbiting arcane rune-glyphs aura (catalyst signature)
   ctx.save();
   ctx.strokeStyle = gold;
@@ -7104,9 +7119,10 @@ function drawArchmage(ctx: Ctx, body: string, dark: string, light: string, accen
   for (const [hx, hy] of hem) ctx.lineTo(hx, hy);
   ctx.closePath();
   ctx.fill();
+  // gold seams, pulsing between faint and bright
   ctx.strokeStyle = gold;
   ctx.lineWidth = 1.2;
-  ctx.globalAlpha = 0.8;
+  ctx.globalAlpha = 0.45 + 0.5 * (0.5 + 0.5 * Math.sin(t * 2.6));
   ctx.beginPath();
   ctx.moveTo(0, -8);
   ctx.lineTo(-7, 18);
@@ -7114,6 +7130,19 @@ function drawArchmage(ctx: Ctx, body: string, dark: string, light: string, accen
   ctx.lineTo(7, 18);
   ctx.stroke();
   ctx.globalAlpha = 1;
+  // shimmer bead running down each seam
+  ctx.save();
+  ctx.fillStyle = gold;
+  ctx.shadowColor = gold;
+  ctx.shadowBlur = 5;
+  for (const dir of [-1, 1]) {
+    const ph = (t * 0.7 + (dir + 1) * 0.25) % 1;
+    ctx.globalAlpha = 0.9 * Math.sin(ph * Math.PI);
+    ctx.beginPath();
+    ctx.arc(dir * 7 * ph, -8 + 26 * ph, 1, 0, PI2);
+    ctx.fill();
+  }
+  ctx.restore();
   // arms
   ctx.strokeStyle = body;
   ctx.lineWidth = 4;
@@ -7145,7 +7174,7 @@ function drawArchmage(ctx: Ctx, body: string, dark: string, light: string, accen
   ctx.arc(11, -17, 1.4, 0, PI2);
   ctx.fill();
   ctx.restore();
-  // floating open spellbook at the off hand
+  // floating open spellbook at the off hand, a page mid-turn over the spine
   ctx.save();
   ctx.translate(-13, 4 + (A.live ? Math.sin(t * 2) : 0));
   ctx.fillStyle = "#6b1f2a";
@@ -7177,49 +7206,74 @@ function drawArchmage(ctx: Ctx, body: string, dark: string, light: string, accen
   ctx.lineTo(3.4, 1.4);
   ctx.closePath();
   ctx.fill();
-  ctx.restore();
-  // tall starred hat
-  ctx.fillStyle = dark;
+  const flutter = (t * 1.6) % 1;
+  ctx.strokeStyle = "#efe6cf";
+  ctx.globalAlpha = 0.9;
+  ctx.lineWidth = 0.9;
   ctx.beginPath();
-  ctx.moveTo(-7, -8);
-  ctx.lineTo(0, -26);
-  ctx.lineTo(7, -8);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = withShade(body, -20);
-  ctx.beginPath();
-  ctx.ellipse(0, -8, 8, 2.4, 0, 0, PI2);
-  ctx.fill();
-  ctx.save();
-  ctx.fillStyle = gold;
-  ctx.shadowColor = gold;
-  ctx.shadowBlur = 4;
-  ctx.beginPath();
-  ctx.arc(2, -16, 1.4, 0, PI2);
-  ctx.fill();
-  ctx.restore();
-  ctx.strokeStyle = gold;
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(-6, -9.5);
-  ctx.lineTo(6, -9.5);
+  ctx.moveTo(0, 2.2);
+  ctx.quadraticCurveTo(3.2 - flutter * 6.4, -4.5, 0, -1.4);
   ctx.stroke();
-  // face shadowed under the brim + glowing eyes
+  ctx.restore();
+  // the four spell elements drifting up out of the open book — one mote per
+  // school (fire flame, frost flake, lightning bolt, arcane rune), each on its
+  // own phase, swaying as it climbs and fading out
+  ctx.save();
+  for (let k = 0; k < 4; k++) {
+    const ph = (t * 0.55 + k * 0.25) % 1;
+    const mx = -13 + Math.sin((t + k * 7) * 2.2) * 2.5;
+    const my = 2 - ph * 22;
+    ctx.globalAlpha = 0.8 * (1 - ph);
+    ctx.save();
+    ctx.translate(mx, my);
+    if (k % 2 === 0) ctx.rotate(Math.sin((t + k) * 1.5) * 0.4); // gentle tumble
+    const mc = GRIMOIRE_MOTE_COLORS[k];
+    ctx.strokeStyle = mc;
+    ctx.fillStyle = mc;
+    ctx.shadowColor = mc;
+    ctx.shadowBlur = 4;
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    if (k === 0) {
+      // flame
+      ctx.moveTo(0, -2.1);
+      ctx.quadraticCurveTo(1.7, -0.2, 0.9, 1.1);
+      ctx.quadraticCurveTo(0.4, 1.8, 0, 1.3);
+      ctx.quadraticCurveTo(-0.4, 1.8, -0.9, 1.1);
+      ctx.quadraticCurveTo(-1.7, -0.2, 0, -2.1);
+      ctx.fill();
+    } else if (k === 1) {
+      // snowflake
+      for (let s = 0; s < 3; s++) {
+        const a = (s * Math.PI) / 3;
+        ctx.moveTo(Math.cos(a) * 1.8, Math.sin(a) * 1.8);
+        ctx.lineTo(-Math.cos(a) * 1.8, -Math.sin(a) * 1.8);
+      }
+      ctx.stroke();
+    } else if (k === 2) {
+      // lightning bolt
+      ctx.moveTo(-0.6, -1.9);
+      ctx.lineTo(0.5, -0.3);
+      ctx.lineTo(-0.4, 0.1);
+      ctx.lineTo(0.7, 1.9);
+      ctx.stroke();
+    } else {
+      // arcane rune
+      ctx.arc(0, 0, 1.6, 0, PI2);
+      ctx.moveTo(-1.6, 0);
+      ctx.lineTo(1.6, 0);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+  ctx.restore();
+  // face + beard FIRST so the hat sits on the head, not behind it
   ctx.fillStyle = light;
   ctx.beginPath();
   ctx.arc(0, -5, 3.6, 0, PI2);
   ctx.fill();
   ctx.fillStyle = "#0d1633";
   ctx.fillRect(-2.2, -6, 4.4, 2.4);
-  ctx.save();
-  ctx.fillStyle = gold;
-  ctx.shadowColor = gold;
-  ctx.shadowBlur = 3 + A.glow * 3;
-  ctx.beginPath();
-  ctx.arc(-1.3, -5, 0.8, 0, PI2);
-  ctx.arc(1.3, -5, 0.8, 0, PI2);
-  ctx.fill();
-  ctx.restore();
   // long beard
   ctx.fillStyle = "#e8eaf0";
   ctx.beginPath();
@@ -7230,6 +7284,60 @@ function drawArchmage(ctx: Ctx, body: string, dark: string, light: string, accen
   ctx.lineTo(-1, 4);
   ctx.closePath();
   ctx.fill();
+  // tall starred hat — cone, then brim ACROSS the forehead
+  const twinkle = 0.5 + 0.5 * Math.sin(t * 5);
+  ctx.fillStyle = dark;
+  ctx.beginPath();
+  ctx.moveTo(-7, -7.5);
+  ctx.lineTo(0, -26);
+  ctx.lineTo(7, -7.5);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = withShade(body, -20);
+  ctx.beginPath();
+  ctx.ellipse(0, -7.5, 8, 2.4, 0, 0, PI2);
+  ctx.fill();
+  ctx.save();
+  ctx.fillStyle = gold;
+  ctx.shadowColor = gold;
+  ctx.shadowBlur = 4 + twinkle * 5;
+  ctx.beginPath();
+  ctx.arc(2, -16, 1.4 + twinkle * 0.5, 0, PI2);
+  ctx.fill();
+  ctx.restore();
+  ctx.strokeStyle = gold;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-5.6, -10);
+  ctx.lineTo(5.6, -10);
+  ctx.stroke();
+  // stray sparkles around the hat tip
+  ctx.save();
+  ctx.strokeStyle = gold;
+  ctx.globalAlpha = 0.6 + 0.4 * twinkle;
+  ctx.lineWidth = 0.8;
+  for (let k = 0; k < 2; k++) {
+    const a = t * 2 + k * Math.PI;
+    const sx = Math.cos(a) * 5, sy = -24 + Math.sin(a) * 3;
+    ctx.beginPath();
+    ctx.moveTo(sx - 1.4, sy);
+    ctx.lineTo(sx + 1.4, sy);
+    ctx.moveTo(sx, sy - 1.4);
+    ctx.lineTo(sx, sy + 1.4);
+    ctx.stroke();
+  }
+  ctx.restore();
+  // glowing eyes on top so the brim never swallows them
+  ctx.save();
+  ctx.fillStyle = gold;
+  ctx.shadowColor = gold;
+  ctx.shadowBlur = 3 + A.glow * 3;
+  ctx.beginPath();
+  ctx.arc(-1.3, -4.6, 0.8, 0, PI2);
+  ctx.arc(1.3, -4.6, 0.8, 0, PI2);
+  ctx.fill();
+  ctx.restore();
+  ctx.restore();
 }
 
 // ---- The Overgrowth (blighted grove) --------------------------------------

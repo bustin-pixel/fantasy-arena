@@ -14,14 +14,7 @@ import { useGameState } from "@/state/GameStateContext";
 import { GrubbinsScene, SCENE_ASPECT } from "@/components/GrubbinsScene";
 import { GoldPill, ShardPill } from "@/components/CurrencyPills";
 import { ItemIcon } from "@/components/ItemIcon";
-import {
-  describeItemMods,
-  describeLuckyCoin,
-  ITEM_LINES,
-  makeItemKey,
-  parseItemKey,
-  resolveItemMods,
-} from "@/data/items";
+import { describeItemKey, ITEM_LINES, makeItemKey } from "@/data/items";
 import { RARITIES } from "@/data/rarities";
 import { getUnitDef } from "@/data/units";
 import {
@@ -83,14 +76,6 @@ const BARK_VOICE: Record<BarkKind, SfxKey> = {
   mint: "grubbinsHappy",
   reroll: "grubbinsHappy",
 };
-
-/** Effect lines for an item key (Lucky Coin is meta-only, described specially). */
-function effectLines(key: string): string[] {
-  const p = parseItemKey(key);
-  if (!p) return [];
-  if (p.lineId === "lucky_coin") return describeLuckyCoin(p.quality, p.star);
-  return describeItemMods(resolveItemMods(key));
-}
 
 export function ShopScreen({ onExit }: Props) {
   const { save, visitShop, purchaseShopItem, rerollShop } = useGameState();
@@ -361,7 +346,7 @@ export function ShopScreen({ onExit }: Props) {
                   </div>
                   <p className="shop-detail-desc">{line.desc}</p>
                   <ul className="shop-detail-effects">
-                    {effectLines(key).map((l) => (
+                    {describeItemKey(key).map((l) => (
                       <li key={l}>{l}</li>
                     ))}
                   </ul>

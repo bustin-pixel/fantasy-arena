@@ -1,4 +1,4 @@
-﻿/* ==========================================================================
+/* ==========================================================================
    Fantasy Arena — high-fantasy theme
    Palette: forest green, dark brown, gold, stone gray.
    ========================================================================== */
@@ -763,7 +763,7 @@ body {
   margin-top: 8px;
 }
 /* Cards + Bag are sized so the three-card stack clears the floating Bag FAB on a
-   short phone (see .home-bag-fab) — don't scale these back up without rechecking. */
+   short phone (see .home-forge-fab) — don't scale these back up without rechecking. */
 .mode-card {
   display: flex;
   flex-direction: column;
@@ -2440,7 +2440,7 @@ body.modal-open .pager-nav {
 }
 
 /* ============================================================================
-   Items — Bag sheet, equipment slots, combine ceremony, shard pill
+   Items — Forge/Shop FABs, equipment slots, shard pill
    ========================================================================== */
 
 /* The top-right cluster lives on the HOME page only: faded (not unmounted)
@@ -2452,11 +2452,11 @@ body.modal-open .pager-nav {
   opacity: 0;
   pointer-events: none;
 }
-/* Floating Bag (bottom-right) + Shop (bottom-left) buttons on the Home screen,
-   above the pager nav and flanking the mode cards. Anchored to the full-height
-   Home column (see `.home { min-height: 100% }`). Both share the mode-card
-   clearance budget on short phones — resize together, and recheck. */
-.home-bag-fab,
+/* Floating Forge (bottom-right) + Shop (bottom-left) buttons on the Home
+   screen, above the pager nav and flanking the mode cards. Anchored to the
+   full-height Home column (see `.home { min-height: 100% }`). Both share the
+   mode-card clearance budget on short phones — resize together, and recheck. */
+.home-forge-fab,
 .home-shop-fab {
   position: absolute;
   bottom: calc(16px + env(safe-area-inset-bottom));
@@ -2477,23 +2477,23 @@ body.modal-open .pager-nav {
     0 0 20px rgba(245, 179, 1, 0.2), 0 6px 16px rgba(0, 0, 0, 0.5);
   transition: transform 0.08s ease, filter 0.15s ease;
 }
-.home-bag-fab {
+.home-forge-fab {
   right: 16px;
 }
 .home-shop-fab {
   left: 16px;
 }
-.home-bag-fab:active,
+.home-forge-fab:active,
 .home-shop-fab:active {
   transform: translateY(1px) scale(0.98);
 }
-.home-bag-emoji,
+.home-forge-emoji,
 .home-shop-emoji {
   font-size: 1.4rem;
   line-height: 1;
   filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.55));
 }
-.home-bag-text,
+.home-forge-text,
 .home-shop-text {
   font-family: var(--font-display);
   font-size: 0.58rem;
@@ -2524,7 +2524,8 @@ body.modal-open .pager-nav {
     transform: scale(1.18);
   }
 }
-.home-bag-count {
+/* "Forgeable now" badge — stacks with an affordable merge this instant. */
+.home-forge-count {
   position: absolute;
   top: -7px;
   right: -7px;
@@ -2907,180 +2908,6 @@ body.modal-open .pager-nav {
   text-transform: uppercase;
 }
 
-/* ---- Bag sheet ----------------------------------------------------------- */
-.bag-sheet {
-  max-width: 460px;
-  width: min(94vw, 460px);
-  max-height: 86vh;
-  display: flex;
-  flex-direction: column;
-}
-.bag-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 44px 8px 16px;
-}
-.bag-title {
-  font-size: 1.05rem;
-  font-weight: 800;
-  letter-spacing: 0.03em;
-}
-.bag-wallet {
-  display: flex;
-  gap: 12px;
-  font-size: 0.85rem;
-  font-weight: 700;
-}
-.bag-gold {
-  color: var(--gold);
-}
-.bag-shards {
-  color: #c084fc;
-}
-.bag-body {
-  overflow-y: auto;
-  padding: 0 14px 16px;
-}
-.bag-empty {
-  opacity: 0.75;
-  font-size: 0.88rem;
-  line-height: 1.5;
-  padding: 18px 6px;
-}
-.bag-section-title {
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  opacity: 0.7;
-  margin: 14px 2px 6px;
-}
-.bag-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(62px, 1fr));
-  gap: 8px;
-}
-.bag-cell {
-  position: relative;
-  padding: 3px;
-  border-radius: 12px;
-  border: 2px solid transparent;
-  background: none;
-  cursor: pointer;
-  line-height: 0;
-}
-.bag-cell.selected {
-  border-color: #ece3cf;
-  background: rgba(236, 227, 207, 0.06);
-}
-.bag-count {
-  position: absolute;
-  right: 2px;
-  top: 2px;
-  font-size: 0.68rem;
-  font-weight: 800;
-  color: #ece3cf;
-  background: rgba(10, 8, 5, 0.85);
-  border-radius: 8px;
-  padding: 1px 5px;
-  line-height: 1.3;
-}
-.bag-equipped {
-  position: absolute;
-  left: 2px;
-  top: 2px;
-  font-size: 0.62rem;
-  font-weight: 800;
-  color: #86efac;
-  background: rgba(10, 8, 5, 0.85);
-  border: 1px solid rgba(134, 239, 172, 0.5);
-  border-radius: 8px;
-  padding: 1px 4px;
-  line-height: 1.3;
-}
-.bag-detail {
-  margin-top: 14px;
-  border: 1px solid;
-  border-radius: 12px;
-  padding: 12px;
-  background: rgba(10, 8, 5, 0.45);
-}
-.bag-detail-head {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-.bag-detail-title {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-.bag-detail-name {
-  font-weight: 800;
-  font-size: 0.98rem;
-}
-.bag-detail-tier {
-  font-size: 0.78rem;
-  color: var(--gold);
-}
-.bag-detail-sig {
-  color: #c084fc;
-  font-style: italic;
-}
-.bag-detail-counts {
-  font-size: 0.74rem;
-  opacity: 0.75;
-}
-.bag-detail-desc {
-  font-size: 0.8rem;
-  font-style: italic;
-  opacity: 0.7;
-  margin: 8px 0 6px;
-  line-height: 1.4;
-}
-.bag-detail-effects {
-  margin: 0;
-  padding-left: 18px;
-  font-size: 0.82rem;
-  line-height: 1.45;
-}
-.bag-detail-effects.next {
-  opacity: 0.8;
-}
-.bag-next {
-  margin-top: 10px;
-  border-top: 1px dashed rgba(236, 227, 207, 0.2);
-  padding-top: 8px;
-}
-.bag-next-head {
-  font-size: 0.74rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: #86efac;
-  margin-bottom: 4px;
-}
-.bag-combine-row {
-  margin-top: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.bag-combine {
-  width: 100%;
-}
-.bag-warning {
-  font-size: 0.76rem;
-  color: #fcd34d;
-  line-height: 1.4;
-}
-.bag-maxed {
-  margin-top: 10px;
-  font-size: 0.8rem;
-  color: var(--gold);
-  font-weight: 700;
-}
-
 /* ---- Equipment (UnitDetail) ------------------------------------------------
    The three item slots sit ON the portrait alcove: weapon top-left, armor
    bottom-left, trinket bottom-right. Tapping one opens the picker below. */
@@ -3182,119 +3009,6 @@ body.modal-open .pager-nav {
   font-size: 0.78rem;
   line-height: 1.45;
   opacity: 0.9;
-}
-
-/* ---- Combine ceremony ------------------------------------------------------ */
-.combine-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 90;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(5, 4, 2, 0.82);
-  animation: fade 0.2s ease;
-}
-.combine-stage {
-  position: relative;
-  width: 260px;
-  height: 220px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.combine-fuel {
-  position: absolute;
-  top: 62px;
-  transition: transform 0.55s cubic-bezier(0.5, -0.3, 0.8, 1);
-}
-.combine-fuel.left {
-  transform: translateX(-80px);
-}
-.combine-fuel.right {
-  transform: translateX(80px);
-}
-.combine-stage.flash .combine-fuel.left,
-.combine-stage.flash .combine-fuel.right {
-  transform: translateX(0);
-}
-/* Arm the slide one frame in: start apart, animate together. */
-.combine-stage.slide .combine-fuel.left {
-  animation: combine-slide-l 0.55s cubic-bezier(0.5, -0.3, 0.8, 1) forwards;
-}
-.combine-stage.slide .combine-fuel.right {
-  animation: combine-slide-r 0.55s cubic-bezier(0.5, -0.3, 0.8, 1) forwards;
-}
-@keyframes combine-slide-l {
-  from { transform: translateX(-80px); }
-  to { transform: translateX(-2px); }
-}
-@keyframes combine-slide-r {
-  from { transform: translateX(80px); }
-  to { transform: translateX(2px); }
-}
-.combine-flash {
-  position: absolute;
-  top: 54px;
-  width: 88px;
-  height: 88px;
-  border-radius: 50%;
-  background: radial-gradient(circle, #fff8e1 0%, rgba(255, 248, 225, 0.45) 45%, transparent 70%);
-  animation: combine-flash 0.24s ease-out forwards;
-}
-@keyframes combine-flash {
-  from { transform: scale(0.3); opacity: 1; }
-  to { transform: scale(2.4); opacity: 0; }
-}
-.combine-result {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  animation: combine-pop 0.35s cubic-bezier(0.2, 1.6, 0.4, 1);
-  position: relative;
-}
-@keyframes combine-pop {
-  from { transform: scale(0.4); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
-}
-.combine-burst {
-  position: absolute;
-  top: 40px;
-  left: 50%;
-  width: 0;
-  height: 0;
-  pointer-events: none;
-}
-.combine-burst span {
-  position: absolute;
-  left: -1.5px;
-  top: -1.5px;
-  width: 3px;
-  height: 34px;
-  background: linear-gradient(180deg, currentColor, transparent);
-  transform-origin: 50% 0;
-  animation: combine-ray 0.6s ease-out forwards;
-}
-/* Opacity-only, so each ray keeps its inline rotate() transform. */
-@keyframes combine-ray {
-  0% { opacity: 0.9; }
-  100% { opacity: 0; }
-}
-.combine-result-name {
-  font-weight: 800;
-  font-size: 1rem;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
-}
-.combine-result-tier {
-  font-size: 0.9rem;
-  font-weight: 800;
-  color: #f5b301;
-  letter-spacing: 0.12em;
-}
-.combine-stage.quality-up .combine-result-tier {
-  font-size: 1.05rem;
-  animation: combine-pop 0.45s cubic-bezier(0.2, 1.6, 0.4, 1);
 }
 
 /* ---- Library Compendium — the Grand Athenaeum ----------------------------
@@ -3569,6 +3283,55 @@ body.modal-open .pager-nav {
   border-bottom: 1px solid rgba(90, 61, 28, 0.35);
   padding-bottom: 4px;
   letter-spacing: 0.6px;
+}
+/* Tendency treatise: the epithet blurb tucked under the chapter heading. */
+.book-page-sub {
+  margin: -4px 4px 8px;
+  font-size: 0.66rem;
+  font-style: italic;
+  color: #8a5a28;
+  text-align: center;
+}
+/* Book of Boons: full-width treatise rows, rarity-inked down the left edge. */
+.book-boons {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  overflow: hidden;
+}
+.book-boon {
+  border-left: 3px solid #8a9ba8;
+  padding: 2px 4px 3px 8px;
+  background: rgba(90, 61, 28, 0.06);
+  border-radius: 0 4px 4px 0;
+}
+.book-boon-name {
+  display: block;
+  font-family: var(--font-display);
+  font-variant: small-caps;
+  font-size: 0.74rem;
+  color: #4a3114;
+  letter-spacing: 0.4px;
+}
+.book-boon-rarity {
+  margin-left: 6px;
+  font-size: 0.56rem;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+.book-boon-tag {
+  margin-left: 6px;
+  font-size: 0.54rem;
+  font-style: italic;
+  font-variant: normal;
+  letter-spacing: 0.2px;
+  color: #8a5a28;
+}
+.book-boon-desc {
+  display: block;
+  font-size: 0.62rem;
+  line-height: 1.35;
+  color: #6a4a1c;
 }
 /* Opening title page: just the book's name, centered on plain parchment
    (the painted cover already carries the art — this leaf must not repeat it). */
@@ -3935,7 +3698,7 @@ body.modal-open .pager-nav {
   animation: shop-dot-pulse 1.6s ease-in-out infinite;
 }
 
-/* The bulletin-board sheet (BagSheet sizing). */
+/* The bulletin-board sheet (the standard overlay-sheet sizing). */
 .quest-board {
   max-width: 460px;
   width: min(94vw, 460px);
@@ -4168,4 +3931,440 @@ body.modal-open .pager-nav {
   font-size: 0.9rem;
   font-weight: 800;
   color: var(--gold);
+}
+
+/* ---- The Forge (BlacksmithScreen) -------------------------------------------
+   The ShopScreen pattern: smith set piece up top (BlacksmithScene canvas),
+   inventory + services below. Replaces the BagSheet as the items home. */
+.smith-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  overflow-y: auto;
+  background: #0c0a0e;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.smith-scene-wrap {
+  position: relative;
+  width: 100%;
+  max-width: 520px;
+  background: #0b0810;
+  border-bottom: 2px solid #4a3a2c;
+  display: flex;
+  justify-content: center;
+  line-height: 0;
+}
+.smith-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 10px;
+  z-index: 2;
+  /* the scene wrap sets line-height:0 (kills the canvas gap); reset it here so
+     the wallet pills + back button read like the shop/home, not squashed. */
+  line-height: normal;
+}
+.smith-pills {
+  display: flex;
+  gap: 6px;
+}
+.smith-back {
+  border: 2px solid #4a3a2c;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #2a211c, #17110c);
+  color: var(--parchment);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.85rem;
+  padding: 6px 12px;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.45);
+}
+.smith-back:active {
+  transform: translateY(1px);
+}
+.smith-title {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 14px;
+  margin: 0;
+  text-align: center;
+  line-height: 1.15; /* reset the wrap's line-height:0 so glyphs don't dip past the edge */
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  color: var(--gold);
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.9), 0 0 18px rgba(255, 140, 50, 0.3);
+  pointer-events: none;
+  z-index: 2;
+}
+.smith-body {
+  width: 100%;
+  max-width: 520px;
+  padding: 10px 12px calc(12px + env(safe-area-inset-bottom));
+}
+.smith-actions {
+  display: flex;
+  gap: 8px;
+}
+.smith-service {
+  flex: 1;
+  border: 1.5px solid #4a3a2c;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #2a211c, #17110c);
+  color: var(--parchment);
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 8px 6px;
+  cursor: pointer;
+}
+.smith-service:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.smith-empty {
+  opacity: 0.75;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  padding: 18px 6px;
+}
+.smith-section-title {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.7;
+  margin: 14px 2px 6px;
+}
+.smith-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(62px, 1fr));
+  gap: 8px;
+}
+.smith-cell {
+  position: relative;
+  padding: 3px;
+  border-radius: 12px;
+  border: 2px solid transparent;
+  background: none;
+  cursor: pointer;
+  line-height: 0;
+}
+.smith-cell.just-forged {
+  animation: shop-pop 0.45s ease-out;
+  border-color: rgba(255, 180, 90, 0.6);
+}
+.smith-count {
+  position: absolute;
+  right: 2px;
+  top: 2px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #ece3cf;
+  background: rgba(10, 8, 5, 0.85);
+  border-radius: 8px;
+  padding: 1px 5px;
+  line-height: 1.3;
+}
+.smith-equipped {
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: #86efac;
+  background: rgba(10, 8, 5, 0.85);
+  border: 1px solid rgba(134, 239, 172, 0.5);
+  border-radius: 8px;
+  padding: 1px 4px;
+  line-height: 1.3;
+}
+
+/* Floating panels: item detail, commission picker, forge-all confirm. */
+.smith-detail-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 44;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(8, 6, 4, 0.55);
+  animation: fade 0.18s ease;
+}
+.smith-detail {
+  width: 100%;
+  max-width: 380px;
+  max-height: 84vh;
+  overflow-y: auto;
+  padding: 14px 16px;
+  border: 2px solid #4a3a2c;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #29211c, #150f0b);
+  box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.6);
+  text-align: left;
+}
+.smith-panel-title {
+  margin: 0 0 4px;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  color: var(--gold);
+}
+.smith-panel-note {
+  margin: 0 0 10px;
+  font-size: 0.74rem;
+  color: #9b8d75;
+  line-height: 1.4;
+}
+.smith-detail-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.smith-detail-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.smith-detail-name {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.smith-detail-tier {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: capitalize;
+  color: var(--stone);
+}
+.smith-detail-sig {
+  color: #c084fc;
+  font-style: italic;
+}
+.smith-detail-counts {
+  font-size: 0.72rem;
+  color: var(--stone-dark);
+}
+.smith-detail-desc {
+  margin: 10px 0 6px;
+  font-size: 0.82rem;
+  font-style: italic;
+  color: var(--stone);
+  line-height: 1.35;
+}
+.smith-detail-effects {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 0.84rem;
+  color: #86efac;
+  line-height: 1.5;
+}
+.smith-detail-effects.next {
+  opacity: 0.85;
+}
+.smith-next {
+  margin-top: 10px;
+  border-top: 1px dashed rgba(236, 227, 207, 0.2);
+  padding-top: 8px;
+}
+.smith-next-head {
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #86efac;
+  margin-bottom: 4px;
+}
+.smith-maxed {
+  margin-top: 10px;
+  font-size: 0.8rem;
+  color: var(--gold);
+  font-weight: 700;
+}
+.smith-detail-buttons {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.smith-forge-btn,
+.smith-salvage-btn {
+  width: 100%;
+  padding: 9px 12px;
+  font-size: 0.85rem;
+}
+.smith-forge-btn:disabled,
+.smith-salvage-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.smith-close {
+  align-self: flex-end;
+  padding: 8px 14px;
+  font-size: 0.85rem;
+}
+.smith-warning {
+  font-size: 0.76rem;
+  color: #fcd34d;
+  line-height: 1.4;
+}
+.smith-detail-actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+.smith-detail-actions .cant {
+  filter: saturate(0.4) brightness(0.8);
+}
+.smith-detail-actions .btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* Commission picker */
+.smith-commission {
+  max-width: 420px;
+}
+.smith-com-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 6px;
+}
+.smith-com-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 2px 4px;
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background: rgba(10, 8, 5, 0.35);
+  color: var(--parchment);
+  cursor: pointer;
+}
+.smith-com-card.selected {
+  border-color: #ece3cf;
+  background: rgba(236, 227, 207, 0.08);
+}
+.smith-com-name {
+  font-size: 0.58rem;
+  font-weight: 700;
+  text-align: center;
+  line-height: 1.15;
+}
+.smith-com-desc {
+  margin: 10px 0 0;
+  font-size: 0.74rem;
+  color: #b9ab90;
+  line-height: 1.4;
+  /* FIXED at three lines (flavour + up to two stat lines) with overflow hidden,
+     so selecting a pattern can never resize the panel — the empty state and
+     every item fill the exact same box. */
+  height: 4.2em;
+  overflow: hidden;
+}
+.smith-com-flavor {
+  display: block; /* flavour: always exactly one line */
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.smith-com-stats {
+  display: -webkit-box; /* stats: clamp to two lines, never more */
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+.smith-com-desc-empty {
+  font-style: italic;
+  opacity: 0.7;
+}
+/* Commission actions: big Close on the left; on the right the quantity stepper
+   with the Commission button beneath it. */
+.smith-com-actions {
+  justify-content: space-between;
+  align-items: stretch;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.smith-com-close {
+  align-self: flex-end; /* sit at the bottom, level with the Commission button */
+  padding: 12px 24px; /* same vertical height as .smith-com-commit */
+  font-size: 0.9rem;
+}
+.smith-com-buy {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+  flex: 1;
+  min-width: 190px;
+  max-width: 280px;
+}
+.smith-com-qty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 5px 8px;
+  border: 1px solid #4a3a2c;
+  border-radius: 999px;
+  background: rgba(10, 8, 5, 0.5);
+}
+.smith-qty-btn {
+  width: 38px;
+  height: 38px;
+  border: 1px solid #57432c;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #2c2118, #191209);
+  color: var(--parchment);
+  font-size: 1.45rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+.smith-qty-btn:active {
+  transform: translateY(1px);
+}
+.smith-qty-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.smith-qty-n {
+  min-width: 40px;
+  text-align: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--gold);
+}
+.smith-qty-max {
+  border: 1px solid #57432c;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #2c2118, #191209);
+  color: var(--parchment);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.85rem;
+  padding: 9px 14px;
+  cursor: pointer;
+}
+.smith-qty-max:active {
+  transform: translateY(1px);
+}
+.smith-qty-max:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.smith-com-commit {
+  width: 100%;
+  padding: 12px;
 }

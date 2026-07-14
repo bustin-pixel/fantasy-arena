@@ -1,7 +1,7 @@
 // ============================================================================
 // BookOverlay — the library's open-book ceremony. A tapped spine becomes a
-// tome that scales up and swings its cover open (CSS 3D, CombineCeremony's
-// timeout-phase pattern), revealing two-page spreads. Page turns animate a
+// tome that scales up and swings its cover open (CSS 3D, phased by chained
+// timeouts), revealing two-page spreads. Page turns animate a
 // real flipping leaf (front face = the outgoing right page, back face = the
 // incoming left page) over the static pages beneath. Monster pages reuse the
 // bestiary's 3-tier reveal; the boss showcase closes every dungeon book; the
@@ -13,6 +13,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { getUnitDef } from "@/data/units";
 import { RARITIES } from "@/data/rarities";
 import { ITEM_LINES, makeItemKey } from "@/data/items";
+import { BOONS } from "@/data/boons";
+import { rarityColor } from "@/components/BoonPickOverlay";
 import { renderPortrait } from "@/engine/Renderer";
 import { ItemIcon } from "@/components/ItemIcon";
 import { playSfx } from "@/audio/sfx";
@@ -170,6 +172,29 @@ function ItemCard({
   );
 }
 
+/** One Endless boon as a treatise row (Book of Boons): rarity-inked name, the
+ *  full card text, and the offer quirks (unique / needs-a-fallen-ally) spelled
+ *  out. Plain rules reference — nothing to tap, nothing to unlock. */
+function BoonRow({ boonId }: { boonId: string }) {
+  const boon = BOONS[boonId];
+  const color = rarityColor(boon.rarity);
+  return (
+    <div className="book-boon" style={{ borderLeftColor: color }}>
+      <span className="book-boon-name">
+        {boon.name}
+        <span className="book-boon-rarity" style={{ color }}>
+          {boon.rarity}
+        </span>
+        {boon.unique && <span className="book-boon-tag">once per run</span>}
+        {boon.offerIf === "allyDead" && (
+          <span className="book-boon-tag">offered when an ally has fallen</span>
+        )}
+      </span>
+      <span className="book-boon-desc">{boon.description}</span>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Pages
 // ---------------------------------------------------------------------------
@@ -226,32 +251,48 @@ function PageView({
   return (
     <div className="book-pagebody">
       {page.heading && <h4 className="book-page-heading">{page.heading}</h4>}
+      {page.sub && <p className="book-page-sub">{page.sub}</p>}
       {page.art && (
         <div className="book-splash-plate">
           <SplashArt bookId={page.art} className="book-splash-canvas" cover />
         </div>
       )}
-      {page.entries.length > 0 && (
-        <div className="book-cards">
-          {page.entries.map((e) =>
-            e.kind === "monster" ? (
-              <MonsterCard
-                key={e.defId}
-                defId={e.defId}
-                tier={tierOf(save.bestiary[e.defId])}
-                onOpen={onOpenUnit}
-              />
-            ) : (
-              <ItemCard
-                key={e.lineId}
-                lineId={e.lineId}
-                owned={ownsLine(save, e.lineId)}
-                onPick={onPickItem}
-              />
-            )
-          )}
-        </div>
-      )}
+      {page.entries.length > 0 &&
+        // Boon pages are full-width treatise rows, not the 2×2 card grid
+        // (pages are homogeneous — a page is either cards or boons).
+        (page.entries[0].kind === "boon" ? (
+          <div className="book-boons">
+            {page.entries.map(
+              (e) => e.kind === "boon" && <BoonRow key={e.boonId} boonId={e.boonId} />
+            )}
+          </div>
+        ) : (
+          <div className="book-cards">
+            {page.entries.map((e) =>
+              e.kind === "monster" ? (
+                <MonsterCard
+                  key={e.defId}
+                  defId={e.defId}
+                  tier={
+                    // Treatise pages: your own warband's instincts are no
+                    // secret — owning the unit reveals its card here.
+                    page.knownReveal && save.unlockedUnits.includes(e.defId)
+                      ? "defeated"
+                      : tierOf(save.bestiary[e.defId])
+                  }
+                  onOpen={onOpenUnit}
+                />
+              ) : e.kind === "item" ? (
+                <ItemCard
+                  key={e.lineId}
+                  lineId={e.lineId}
+                  owned={ownsLine(save, e.lineId)}
+                  onPick={onPickItem}
+                />
+              ) : null
+            )}
+          </div>
+        ))}
       {page.rareTag && <div className="book-rare-tag">{page.rareTag}</div>}
       {page.note && <p className="book-page-note">{page.note}</p>}
       {pageNo != null && <span className="book-pgno">{pageNo}</span>}

@@ -156,12 +156,12 @@ handshake with file anchors + commit sequencing in
    dungeon-signature relics on themed boss chests), rare→epic→legendary ×
    1–3★ with **pairwise-doubling merges** (2 identical → +1★; two 3★ → next
    quality; gold fees for rare/epic work, **Soul Shards for everything
-   legendary**), Bag sheet + combine ceremony + UnitDetail equip slots,
-   per-unit `itemMods` engine channel (a deterministic match input like
-   levels), arena enemy item mirror, Lucky Coin meta trinket. Invariants =
-   NOTES §9. Still open: **item-assuming dungeon tier** (post-gear
-   difficulty band — new content, its own slice) and a **Combine All** QoL
-   sweep for late-game hoards.
+   legendary**), UnitDetail equip slots, per-unit `itemMods` engine channel
+   (a deterministic match input like levels), arena enemy item mirror, Lucky
+   Coin meta trinket. Invariants = NOTES §9. The Bag sheet + combine ceremony
+   were later ABSORBED by the Blacksmith (2026-07-14); Combine All shipped
+   there as **Forge All**. Still open: **item-assuming dungeon tier**
+   (post-gear difficulty band — new content, its own slice).
 5. **General Store — Grubbins' Pawn-Den (v1 BUILT, 2026-07-09, on
    feat/player-shop).** The shop identity question was settled by grilling:
    ONE general store, and the old "Soul Shop sells distinction, never battle
@@ -257,7 +257,25 @@ enemy item mirror, and per-unit proc effects (execute/lifesteal/thorns/
 detonations/tempo/pack tactics/…). All invariants in NOTES §9; specs in
 `engine/__tests__/items.test.ts` + `meta/__tests__/inventory.test.ts`.
 - Still open: **item-assuming dungeon tier** (harder content band tuned for
-  geared warbands) and **Combine All** QoL.
+  geared warbands). Combine All shipped as the Blacksmith's **Forge All**.
+
+### The Blacksmith — "The Forge" (v1 BUILT 2026-07-14, unshipped)
+Replaced the Bag FAB/sheet as the items home: a full-screen NPC smithy on the
+ShopScreen pattern (PixiJS set piece + speech-bubble barks + services below).
+BagSheet + CombineCeremony deleted; equipping stays in UnitDetail. Services:
+**Forge** (the merge ladder with anvil theater — the real item icons ride the
+anvil via `drawItemIcon`→Pixi textures), **Salvage** (melt a FREE copy for
+gold; the yield table is executable spec — below every acquisition price, no
+merge→salvage pump), **Forge All** (gold-only chain-merge to fixpoint in
+canonical order; never auto-spends shards — legendary work stays manual),
+**Commission** (500g → any chosen base line at rare 1★, no RNG, signatures
+excluded). Deliberately STATELESS — no new save fields, no version bump; all
+folds in `meta/blacksmith.ts` over existing fields (NOTES §11). Audio:
+`blacksmithTheme` ("hearth and hammer", A-rooted, anvil backbeats) + the
+smith gibberish voice family (95 Hz gravel) + quench/bellows SFX. Home FAB
+pip = `forgeableStackCount` (merge-ready stacks, self-clearing).
+- Still open: the smith CHARACTER art (mockup round pending pick — the scene
+  ships with a placeholder forge set until then), "Salvage all free ×N" QoL.
 
 ### Anticipated meta systems (still out of scope)
 Trophies / ranks, accounts / auth, replay-playback UI. (Gold, chests, and unit

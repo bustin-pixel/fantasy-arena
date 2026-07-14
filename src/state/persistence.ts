@@ -116,7 +116,7 @@ export interface PlayerSave {
 const KEY = "fantasy-arena/save/v1";
 
 export const DEFAULT_SAVE: PlayerSave = {
-  version: 12,
+  version: 13,
   username: "Champion",
   avatarId: DEFAULT_AVATAR_ID,
   deck: [...STARTER_UNIT_IDS],
@@ -178,6 +178,17 @@ export function migrateSave(parsed: Partial<PlayerSave> | null): PlayerSave {
   merged.questUnlocks = [...(parsed.questUnlocks ?? [])].filter((id) =>
     QUEST_LOCKED_UNITS.has(id)
   );
+  // v13: the Sealed Vault quest now ALSO unlocks the Archmage himself. A save
+  // that already completed it (Aegis Knight buyable or bought) gets the
+  // Archmage's purchase retroactively. Idempotent + monotonic, like the v12
+  // gift retro-grant — safe on every load.
+  if (
+    (merged.questUnlocks.includes("aegis_knight") ||
+      (parsed.unlockedUnits ?? []).includes("aegis_knight")) &&
+    !merged.questUnlocks.includes("archmage")
+  ) {
+    merged.questUnlocks.push("archmage");
+  }
   // v7: endless survival high-water mark (defaults to 0 for older saves).
   merged.endless = { bestWave: Math.max(0, parsed.endless?.bestWave ?? 0) };
   // v8: per-unit XP — keep only deckable ids with finite values, floored and

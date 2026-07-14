@@ -128,6 +128,85 @@ describe("Big-Game Hunter — stalks the largest", () => {
   });
 });
 
+describe("Faithbane — healers die first", () => {
+  it("picks the Cleric over a nearer, more wounded melee, both in range (step 2)", () => {
+    const s = battleState(11);
+    const necro = place(s, "necromancer", "player", 240, 560); // long range
+    const grunt = makeDummy(place(s, "skeleton", "enemy", 240, 520)); // 40px
+    const cleric = makeDummy(place(s, "healer", "enemy", 240, 620)); // 60px
+    grunt.hp = 50; // the wounded default would pick the grunt
+    expect(acquireTarget(necro, uidMap(s), enemiesOf(s, "player"))).toBe(
+      cleric.uid
+    );
+  });
+
+  it("walks past the archer too — support beats ranged (unlike Backline Stalker)", () => {
+    const s = battleState(12);
+    const necro = place(s, "necromancer", "player", 240, 620);
+    makeDummy(place(s, "archer", "enemy", 240, 300)); // ranged, out of range
+    const cleric = makeDummy(place(s, "healer", "enemy", 240, 60)); // deeper
+    expect(acquireTarget(necro, uidMap(s), enemiesOf(s, "player"))).toBe(
+      cleric.uid
+    );
+  });
+});
+
+describe("Focus Fire — piles onto the pack's prey", () => {
+  it("seeks the enemy the most allies already target, not the wounded one (step 4)", () => {
+    const s = battleState(13);
+    const wolf = place(s, "wolf", "player", 240, 560);
+    const stray = makeDummy(place(s, "skeleton", "enemy", 240, 400));
+    const prey = makeDummy(place(s, "skeleton", "enemy", 240, 100)); // farther
+    stray.hp = 50; // wounded AND nearer — default would pick it
+    place(s, "archer", "player", 400, 560).targetUid = prey.uid;
+    place(s, "warrior", "player", 80, 560).targetUid = prey.uid;
+    expect(acquireTarget(wolf, uidMap(s), enemiesOf(s, "player"))).toBe(
+      prey.uid
+    );
+  });
+
+  it("ignores dead allies' locks (falls back to most wounded)", () => {
+    const s = battleState(14);
+    const wolf = place(s, "wolf", "player", 240, 560);
+    const wounded = makeDummy(place(s, "skeleton", "enemy", 240, 400));
+    const other = makeDummy(place(s, "skeleton", "enemy", 240, 100));
+    wounded.hp = 50;
+    const fallen = place(s, "archer", "player", 400, 560);
+    fallen.targetUid = other.uid;
+    fallen.state = "dead"; // its lock must not count
+    expect(acquireTarget(wolf, uidMap(s), enemiesOf(s, "player"))).toBe(
+      wounded.uid
+    );
+  });
+});
+
+describe("Lone Wolf — picks its own fight", () => {
+  it("seeks the foe no ally is fighting, even past a wounded claimed one (step 4)", () => {
+    const s = battleState(15);
+    const outlaw = place(s, "outlaw", "player", 240, 560);
+    const claimed = makeDummy(place(s, "skeleton", "enemy", 240, 440));
+    const unclaimed = makeDummy(place(s, "skeleton", "enemy", 240, 100));
+    claimed.hp = 50; // wounded AND nearer — default would pick it
+    place(s, "archer", "player", 400, 560).targetUid = claimed.uid;
+    expect(acquireTarget(outlaw, uidMap(s), enemiesOf(s, "player"))).toBe(
+      unclaimed.uid
+    );
+  });
+
+  it("when every foe is claimed, takes the most wounded", () => {
+    const s = battleState(16);
+    const outlaw = place(s, "outlaw", "player", 240, 560);
+    const a = makeDummy(place(s, "skeleton", "enemy", 240, 440));
+    const b = makeDummy(place(s, "skeleton", "enemy", 240, 100));
+    b.hp = 50;
+    place(s, "archer", "player", 400, 560).targetUid = a.uid;
+    place(s, "warrior", "player", 80, 560).targetUid = b.uid;
+    expect(acquireTarget(outlaw, uidMap(s), enemiesOf(s, "player"))).toBe(
+      b.uid
+    );
+  });
+});
+
 describe("taunt still wins (locked decision)", () => {
   it("a taunted Backline Stalker attacks the taunter, not the deep archer", () => {
     const s = battleState(10);
@@ -137,6 +216,18 @@ describe("taunt still wins (locked decision)", () => {
     rogue.tauntedByUid = taunter.uid;
     rogue.effects.push({ type: "taunt", ticksLeft: 100, source: taunter.uid });
     expect(acquireTarget(rogue, uidMap(s), enemiesOf(s, "player"))).toBe(
+      taunter.uid
+    );
+  });
+
+  it("a taunted Faithbane attacks the taunter, not the Cleric", () => {
+    const s = battleState(17);
+    const necro = place(s, "necromancer", "player", 240, 560);
+    const taunter = place(s, "knight", "enemy", 240, 480);
+    makeDummy(place(s, "healer", "enemy", 240, 120)); // the preferred catch
+    necro.tauntedByUid = taunter.uid;
+    necro.effects.push({ type: "taunt", ticksLeft: 100, source: taunter.uid });
+    expect(acquireTarget(necro, uidMap(s), enemiesOf(s, "player"))).toBe(
       taunter.uid
     );
   });

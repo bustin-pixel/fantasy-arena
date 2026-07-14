@@ -25,7 +25,8 @@ const BLINK_COOLDOWN_SEC = 5;
 // Teleport away from the nearest visible melee attacker within threat range
 // (radius * 2.6). Returns true if it blinked. Deterministic: the nearest threat
 // wins, first-encountered on a distance tie (ctx.enemies is in unit order).
-function blink(unit: Unit, ctx: KitCtx): boolean {
+// Exported for the Archmage (kits/archMage.ts), which shares the escape.
+export function blink(unit: Unit, ctx: KitCtx): boolean {
   const threatRange = unit.radius * 2.6;
   let threat: Unit | null = null;
   let bestD = Infinity;
@@ -58,28 +59,35 @@ function blink(unit: Unit, ctx: KitCtx): boolean {
   return true;
 }
 
+// Blink as a reactive-slot hook body: fire the escape when its own cooldown is
+// ready. Shared verbatim by the Arcane Mage and the Archmage (kits/archMage.ts).
+export function reactiveBlink(unit: Unit, ctx: KitCtx): void {
+  if (unit.blinkCooldown > 0) return;
+  if (blink(unit, ctx)) {
+    unit.blinkCooldown = secToTicks(BLINK_COOLDOWN_SEC);
+  }
+}
+
+// Arcane Barrage (fired on cast completion): arm a 3-missile volley on the
+// current target; the engine's stepArcaneBarrage streams the missiles out.
+// Exported for the Archmage's Grand Grimoire, which can roll the same volley.
+export function armArcaneBarrage(ctx: KitCtx): boolean {
+  const { unit, unitsByUid } = ctx;
+  const target = unit.targetUid ? unitsByUid.get(unit.targetUid) : null;
+  if (!target || target.state === "dead") return false;
+
+  unit.barrageShots = 3;
+  unit.barrageTimer = 0; // the first missile fires on the next tick
+  unit.barrageTargetUid = target.uid;
+  return true;
+}
+
 export const arcaneMageKit: UnitKit = {
   roleClass: "ranged",
 
   // Blink runs in the pre-idle reactive slot, on its own cooldown (independent of
   // the active cast). blinkCooldown ticks down with the generic cooldowns.
-  onReactTick(unit, ctx) {
-    if (unit.blinkCooldown > 0) return;
-    if (blink(unit, ctx)) {
-      unit.blinkCooldown = secToTicks(BLINK_COOLDOWN_SEC);
-    }
-  },
+  onReactTick: reactiveBlink,
 
-  // Arcane Barrage (fired on cast completion): arm a 3-missile volley on the
-  // current target. The engine's stepArcaneBarrage streams the missiles out.
-  fireAbility(ctx) {
-    const { unit, unitsByUid } = ctx;
-    const target = unit.targetUid ? unitsByUid.get(unit.targetUid) : null;
-    if (!target || target.state === "dead") return false;
-
-    unit.barrageShots = 3;
-    unit.barrageTimer = 0; // the first missile fires on the next tick
-    unit.barrageTargetUid = target.uid;
-    return true;
-  },
+  fireAbility: armArcaneBarrage,
 };

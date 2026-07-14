@@ -314,7 +314,7 @@ export const UNITS: Record<string, UnitDef> = {
     moveSpeed: 102, // fastest legendary (just under the Assassin)
     range: MELEE,
     ability: "killing_spree",
-    tendency: "backline_stalker", // slips past the front line for the soft targets
+    tendency: "lone_wolf", // answers to no one — starts its own fight
     color: "#2f2a33", // dusk-grey duster
     accent: "#e8b04b", // brass / gold trim
     traits: [
@@ -378,6 +378,7 @@ export const UNITS: Record<string, UnitDef> = {
     moveSpeed: 95,
     range: MELEE,
     ability: "lifesteal", // passive, harmless filler
+    tendency: "focus_fire", // the pack mobs the pack's prey
     color: "#6b7280",
     accent: "#a3e635",
   },
@@ -416,6 +417,7 @@ export const UNITS: Record<string, UnitDef> = {
     moveSpeed: 85,
     range: MELEE,
     ability: "lifesteal", // passive, harmless filler
+    tendency: "focus_fire", // piles onto the Hunter's mark when not bodyguarding
     color: "#6b4423", // boar brown
     accent: "#d6d3d1", // tusks
   },
@@ -459,6 +461,7 @@ export const UNITS: Record<string, UnitDef> = {
     ability: "curse", // signature active
     abilities: ["fear_aura"], // Terrify — its second active cast
     school: "magic",
+    tendency: "faithbane", // the unholy snuffs the holy first
     color: "#3b2a52",
     accent: "#a78bfa",
     traits: [
@@ -902,6 +905,7 @@ export const UNITS: Record<string, UnitDef> = {
     moveSpeed: 100, // runs the field down
     range: MELEE,
     ability: "lifesteal", // passive filler — never casts
+    tendency: "focus_fire", // the pack mobs the pack's prey
     color: "#5b6470", // slate-grey pelt
     accent: "#c7ccd4",
   },
@@ -916,6 +920,7 @@ export const UNITS: Record<string, UnitDef> = {
     moveSpeed: 70,
     range: MELEE,
     ability: "lifesteal", // passive filler — never casts
+    tendency: "focus_fire", // runs with the dire wolves' hunt
     color: "#5a3f2c", // bristly brown hide
     accent: "#d9c2a3", // tusks
   },
@@ -1055,10 +1060,10 @@ export const UNITS: Record<string, UnitDef> = {
       },
     ],
   },
-  // Archmage — the rare Sealed Vault catalyst (the fusion quest's spawn). A
-  // slippery burst caster that blinks from melee and looses arcane volleys
-  // (reuses the Arcane Mage kit). Fell it with a Knight fielded to earn the
-  // Aegis Knight.
+  // Archmage — the rare Sealed Vault catalyst AND a playable legendary. Its
+  // Grand Grimoire casts a random spell drawn from every mage's book (see
+  // kits/archMage.ts); Blink keeps it slippery. Fell it with a Knight fielded
+  // and BOTH the Aegis Knight and the Archmage himself become buyable.
   archmage: {
     id: "archmage",
     name: "Archmage",
@@ -1069,21 +1074,39 @@ export const UNITS: Record<string, UnitDef> = {
     attackSpeed: 2.0,
     moveSpeed: 52,
     range: FIELD_WIDTH * 0.34,
-    ability: "arcane_barrage",
+    ability: "grand_grimoire",
     school: "magic",
     wardedAgainst: ["polymorph"],
     color: "#1e3a8a", // deep arcane blue
     accent: "#fcd34d", // gold filigree
     traits: [
       {
-        name: "Arcane Barrage",
-        description: "Looses a volley of three homing arcane missiles.",
-      },
-      {
         name: "Blink",
         description: "Teleports away the instant a melee attacker closes in.",
       },
+      {
+        name: "Above the Flock",
+        description: "Too versed in transmutation to be polymorphed.",
+      },
     ],
+  },
+  // Mirror Image — the Archmage's illusion double (Grand Grimoire roll). A
+  // fragile copy that basic-attacks until it dissolves (~8s lifespan, driven
+  // by its kit); never casts. Summon-only: sheep the master, not the mirage.
+  mirror_image: {
+    id: "mirror_image",
+    name: "Mirror Image",
+    rarity: "rare",
+    role: "Summoned Illusion",
+    hp: 60,
+    damage: 9,
+    attackSpeed: 2.0,
+    moveSpeed: 52,
+    range: FIELD_WIDTH * 0.34,
+    ability: "lifesteal", // passive filler — never casts
+    school: "magic",
+    color: "#1e3a8a",
+    accent: "#93c5fd", // paler arcane shimmer than the real one's gold
   },
   // -------------------------------------------------------------------------
   // The Overgrowth — nature tier (the Druid's dungeon; see data/dungeons).
@@ -1443,6 +1466,7 @@ export const UNITS: Record<string, UnitDef> = {
     moveSpeed: 88,
     range: MELEE,
     ability: "lifesteal", // passive filler — never casts
+    tendency: "faithbane", // its frenzy is for the still-faithful
     color: "#4c1d24", // wine-dark vestments
     accent: "#f6c453", // guttering candle gold
   },
@@ -1457,6 +1481,7 @@ export const UNITS: Record<string, UnitDef> = {
     moveSpeed: 45, // grinding stone gait
     range: MELEE,
     ability: "lifesteal", // passive filler — never casts
+    tendency: "lone_wolf", // a solitary ambusher — picks the unclaimed fight
     color: "#57534e", // weathered granite
     accent: "#a8a29e",
   },
@@ -1644,7 +1669,7 @@ export const UNITS: Record<string, UnitDef> = {
     moveSpeed: 100,
     range: MELEE,
     ability: "killing_spree",
-    tendency: "backline_stalker",
+    tendency: "faithbane", // silences the prayers first
     wardedAgainst: ["polymorph"],
     color: "#1c1a22", // featureless black mask
     accent: "#b91c1c", // a single red thread
@@ -1711,6 +1736,7 @@ export const SUMMONED_UNIT_IDS = new Set<string>([
   "turret",
   "boar",
   "bloatling",
+  "mirror_image",
 ]);
 
 /** Unit ids that are NOT selectable cards (summoned at runtime only, or
@@ -1737,12 +1763,13 @@ export const NON_DECK_UNITS = new Set<string>([
   "grizzly",
   "dire_alpha",
   "apex_beast",
-  // The Sealed Vault (arcane) tier.
+  // The Sealed Vault (arcane) tier. (The Archmage — the vault's rare quest
+  // catalyst — is deliberately NOT here: it doubles as its own quest reward,
+  // a playable legendary once the Sealed Vault quest unlocks its purchase.)
   "arcane_wisp",
   "imp",
   "cultist",
   "rune_golem",
-  "archmage",
   // The Overgrowth (nature) tier.
   "thornbeast",
   "spore_pod",
