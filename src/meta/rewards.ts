@@ -18,6 +18,11 @@ import {
   questForFloorIn,
 } from "@/data/dungeons";
 import {
+  richChestBump,
+  TREASURE_ROOM_TIERS,
+  type EncounterKind,
+} from "@/data/encounters";
+import {
   BASE_LINES_BY_SLOT,
   ITEM_SLOTS,
   luckyCoinBonus,
@@ -204,6 +209,11 @@ export function bossChestTierFor(dungeonId: string): ChestTier {
  *  chestSeed), so adding the replay chest never shifts a first-clear's contents. */
 const BOSS_REPLAY_CHEST_SALT = 0xb055;
 
+/** XOR salts so a treasure room's three chests roll INDEPENDENT contents off the
+ *  one drop-time seed (distinct from 0x5eed / 0xb055 and each other). */
+const TREASURE_SALT_A = 0x77a1;
+const TREASURE_SALT_B = 0x77b2;
+
 /** The full post-battle reward matrix. Callers pass chestSeed from
  *  generateSeed() at drop time so this stays pure. */
 export function computeBattleRewards(input: {
@@ -231,6 +241,17 @@ export function computeBattleRewards(input: {
   /** Consecutive itemless chests so far (save.itemPity). At the threshold the
    *  chest's item roll is forced — see rollChest opts.forceItem. */
   itemPity?: number;
+  /** This floor's encounter flavor — a rich kind (cursed/treasure_vault/
+   *  rare_spawn) bumps the first-clear end-chest a tier. Ignored outside depths. */
+  encounter?: EncounterKind;
+  /** RNG "hunt for the boss" descent: when set, this floor's boss-lair flag.
+   *  Passing it switches the depths reward to the run model (rewards key off the
+   *  run's boss floor + `bossCleared`, not a per-floor high-water mark). Omitted,
+   *  the legacy per-floor path runs (specs, and any non-run caller). */
+  isBoss?: boolean;
+  /** RNG run model: whether the dungeon's boss was ALREADY defeated before this
+   *  battle (first boss kill = first clear; a later kill is a replay farm). */
+  bossCleared?: boolean;
 }): BattleRewards {
   const {
     mode,
@@ -247,6 +268,7 @@ export function computeBattleRewards(input: {
     bestWave = 0,
     itemLoadouts,
     itemPity = 0,
+    encounter = "normal",
   } = input;
   const none: BattleRewards = {
     gold: 0,
@@ -307,7 +329,13 @@ export function computeBattleRewards(input: {
     // Rare-spawn "fusion" quest: clearing the rare enemy while fielding the
     // required unit unlocks the reward's PURCHASE. Counts on a loss too — "clear
     // it during the floor". Announced once: skip if already unlocked or owned.
-    const quest = questForFloorIn(dungeon, floor);
+    // The fusion-quest rare appears on the boss floor OR a rare-quarry
+    // encounter floor — both count for the unlock. Off those, the legacy
+    // floor-number gate (questForFloorIn) still applies (keeps the specs, and
+    // any non-run caller, byte-stable). Slaying the rare is the real gate
+    // regardless — it only ever spawns where the dungeon intends.
+    const rareHere = encounter === "rare_spawn" || input.isBoss === true;
+    const quest = rareHere ? dungeon.quest : questForFloorIn(dungeon, floor);
     const questDone =
       quest != null &&
       slain.includes(quest.spawnId) &&
@@ -334,6 +362,73 @@ export function computeBattleRewards(input: {
         questUnlocks: questUnlock,
       };
     }
+
+    // RNG "hunt for the boss" descent — when the caller flags the boss lair,
+    // rewards key off (isBoss, bossCleared): the run's boss floor and whether
+    // the dungeon is already cleared, not a per-floor high-water mark (there is
+    // none in the fresh-run model). ADDITIVE: callers that don't pass isBoss
+    // keep the legacy per-floor path below (specs, arena, endless).
+    if (input.isBoss !== undefined) {
+      const boss = input.isBoss;
+      const bossCleared = input.bossCleared ?? false;
+      if (boss && !bossCleared) {
+        // First boss kill = the dungeon's first clear (its big payout; gifts are
+        // granted in the state fold off `firstClear`).
+        const shards = (CAPSTONE_DUNGEON_IDS as readonly string[]).includes(
+          dungeonId
+        )
+          ? SHARD_REWARDS.bossFirstClearCapstone
+          : SHARD_REWARDS.bossFirstClear;
+        return {
+          gold: boostGold(
+            GOLD_REWARDS.depthsFirstClearBase +
+              GOLD_REWARDS.depthsFirstClearPerFloor * floor
+          ),
+          xp: winXp,
+          chest: makeChest(bossChestTierFor(dungeonId), dungeonId),
+          shards,
+          firstClear: true,
+          questUnlocks: questUnlock,
+        };
+      }
+      if (boss && bossCleared) {
+        // Boss replay farm: a chance at a chest one tier below the first-clear
+        // tier (its own derived stream, like the legacy replay chest).
+        let replayChest: ChestResult | null = null;
+        const rng = new RNG(chestSeed ^ BOSS_REPLAY_CHEST_SALT);
+        if (rng.next() < BOSS_REPLAY_CHEST_CHANCE) {
+          const b = TIER_ORDER.indexOf(bossChestTierFor(dungeonId));
+          replayChest = makeChest(TIER_ORDER[Math.max(0, b - 1)], dungeonId);
+        }
+        return {
+          ...none,
+          gold: boostGold(replayGoldFor(dungeon.monsterLevel)),
+          xp: winXp,
+          chest: replayChest,
+          questUnlocks: questUnlock,
+        };
+      }
+      // A non-boss floor within a run: a modest, repeatable clear reward — gold
+      // scaled by depth + a wooden chest (bumped a tier on a rich encounter).
+      const floorTier: ChestTier =
+        TIER_ORDER[
+          Math.min(
+            TIER_ORDER.indexOf("wooden") + richChestBump(encounter),
+            TIER_ORDER.length - 1
+          )
+        ];
+      return {
+        ...none,
+        gold: boostGold(
+          GOLD_REWARDS.depthsFirstClearBase +
+            GOLD_REWARDS.depthsFirstClearPerFloor * floor
+        ),
+        xp: winXp,
+        chest: makeChest(floorTier),
+        questUnlocks: questUnlock,
+      };
+    }
+
     const firstClear = floor > highestClearedFloor;
     if (!firstClear) {
       // Boss-floor replays can drop a farm chest, one tier below the boss's
@@ -362,7 +457,15 @@ export function computeBattleRewards(input: {
     // first clears only: a trickle per floor, a chunk per boss, the most on
     // the two chain capstones.
     const isBoss = isBossFloorIn(dungeon, floor);
-    const tier: ChestTier = isBoss ? bossChestTierFor(dungeonId) : "wooden";
+    const baseTier: ChestTier = isBoss ? bossChestTierFor(dungeonId) : "wooden";
+    // A rich encounter (cursed/treasure_vault/rare_spawn) bumps a normal floor's
+    // end chest a tier. Boss floors never carry an omen (assignOmens forces
+    // "normal" there), so this only ever lifts the non-boss "wooden".
+    const bump = isBoss ? 0 : richChestBump(encounter);
+    const tier: ChestTier =
+      TIER_ORDER[
+        Math.min(TIER_ORDER.indexOf(baseTier) + bump, TIER_ORDER.length - 1)
+      ];
     const shards = isBoss
       ? (CAPSTONE_DUNGEON_IDS as readonly string[]).includes(dungeonId)
         ? SHARD_REWARDS.bossFirstClearCapstone
@@ -396,6 +499,36 @@ export function computeBattleRewards(input: {
     shards: 0,
     firstClear: false,
   };
+}
+
+/** A no-combat treasure room's payout: three INDEPENDENT chests (a hoard) plus a
+ *  reduced XP token — combat stays the real XP path. Pure + seeded like
+ *  computeBattleRewards; the caller folds the contents + records the clear. */
+export function computeTreasureRewards(input: {
+  floor: number;
+  highestClearedFloor: number;
+  chestSeed: number;
+  unlockedUnits: readonly string[];
+  itemPity?: number;
+}): { chests: ChestResult[]; xp: number; firstClear: boolean } {
+  const { floor, highestClearedFloor, chestSeed, unlockedUnits, itemPity = 0 } =
+    input;
+  const salts = [0, TREASURE_SALT_A, TREASURE_SALT_B];
+  const chests: ChestResult[] = TREASURE_ROOM_TIERS.map((tier, i) => {
+    const seed = (chestSeed ^ salts[i]) >>> 0;
+    return {
+      tier,
+      seed,
+      contents: rollChest(seed, tier, unlockedUnits, {
+        // Pity insurance rides the first chest only.
+        forceItem: i === 0 && itemPity >= ITEM_PITY_THRESHOLD,
+      }),
+    };
+  });
+  const xp = Math.round(
+    (XP_REWARDS.dungeonWinBase + XP_REWARDS.dungeonWinPerFloor * floor) * 0.4
+  );
+  return { chests, xp, firstClear: floor > highestClearedFloor };
 }
 
 /** The save slice chest contents fold into — PlayerSave satisfies it. */

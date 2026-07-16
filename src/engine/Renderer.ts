@@ -21,6 +21,13 @@ import {
   type ArenaTheme,
   type ArenaThemeId,
 } from "@/assets/arenaThemes";
+import { drawChest, VIEW_W, type Sparkle } from "@/assets/chestArt";
+import {
+  drawCorpse,
+  CORPSE_KIND_BY_ID,
+  CORPSE_SIZE_BY_ID,
+} from "@/assets/corpseArt";
+import type { ChestTier } from "@/meta/economy";
 import { getSettings } from "@/state/settings";
 
 type Ctx = CanvasRenderingContext2D;
@@ -195,6 +202,10 @@ function drawStatusIcons(ctx: Ctx, u: Unit): void {
 }
 
 function drawUnit(ctx: Ctx, u: Unit): void {
+  // Fully faded dead units draw NOTHING — their corpse decal (ground pass)
+  // owns the spot. Without this, sprites that set globalAlpha internally
+  // (slime jelly, zombie rot, wisp glows) stomp the fade and linger forever.
+  if (u.state === "dead" && u.deathFade >= 1) return;
   ctx.save();
   const stealthed = u.effects.some((e) => e.type === "stealth");
   if (u.state === "dead") {
@@ -237,6 +248,197 @@ function drawUnit(ctx: Ctx, u: Unit): void {
     drawHealthBar(ctx, u);
     drawStatusIcons(ctx, u);
   }
+}
+
+// The post-victory campfire is drawn in TWO passes so it composites correctly
+// with the walking warband:
+//   • drawCampfireGround — the ground glow + logs + embers. These lie flat on
+//     the floor, so they draw with the ground decals (traps), UNDER every unit
+//     — a hero walking across the fire steps over the logs, never behind them.
+//   • drawCampfireFlame — the flame (lit) or the rising smoke (doused). These
+//     stand up off the ground, so they slot into the unit y-sort: a hero in
+//     front of the fire occludes it, one behind is occluded by it.
+// Presentation-only — the outro passes the position; the sim knows nothing.
+
+/** Ground-decal pass: glow + logs + embers (always beneath the units). */
+function drawCampfireGround(
+  ctx: Ctx,
+  x: number,
+  y: number,
+  t: number,
+  doused: boolean
+): void {
+  ctx.save();
+  ctx.translate(x, y);
+
+  if (doused) {
+    // Faint dying-ember glow.
+    const eg = ctx.createRadialGradient(0, 2, 1, 0, 2, 20);
+    eg.addColorStop(0, "rgba(200, 80, 25, 0.14)");
+    eg.addColorStop(1, "rgba(200, 80, 25, 0)");
+    ctx.fillStyle = eg;
+    ctx.beginPath();
+    ctx.ellipse(0, 2, 20, 10, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Charred logs (near-black with a cool ashen edge).
+    for (const rot of [0.42, -0.4]) {
+      ctx.save();
+      ctx.rotate(rot);
+      ctx.fillStyle = "#171310";
+      ctx.beginPath();
+      ctx.roundRect(-14, 3, 28, 6, 3);
+      ctx.fill();
+      ctx.fillStyle = "rgba(150, 140, 128, 0.28)";
+      ctx.beginPath();
+      ctx.roundRect(-13, 3, 26, 1.6, 1);
+      ctx.fill();
+      ctx.restore();
+    }
+    // A last ember pulsing in the ash.
+    const ember = 0.4 + Math.sin(t * 3) * 0.25;
+    ctx.fillStyle = `rgba(200, 70, 20, ${Math.max(0, ember)})`;
+    ctx.beginPath();
+    ctx.arc(0, 5, 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    return;
+  }
+
+  const flick = 0.85 + Math.sin(t * 9) * 0.1 + Math.sin(t * 21) * 0.05;
+  // Ground glow.
+  const glow = ctx.createRadialGradient(0, 0, 2, 0, 0, 46 * flick);
+  glow.addColorStop(0, "rgba(255, 170, 70, 0.42)");
+  glow.addColorStop(1, "rgba(255, 170, 70, 0)");
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.ellipse(0, 2, 46 * flick, 22 * flick, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Crossed logs.
+  ctx.fillStyle = "#4a3320";
+  for (const rot of [0.42, -0.4]) {
+    ctx.save();
+    ctx.rotate(rot);
+    ctx.beginPath();
+    ctx.roundRect(-14, 3, 28, 6, 3);
+    ctx.fill();
+    ctx.restore();
+  }
+  // Log end-grain embers.
+  ctx.fillStyle = "#ff7a1e";
+  ctx.beginPath();
+  ctx.arc(0, 5, 2.4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+/** Upright pass: the flame (lit) or smoke wisp (doused), y-sorted with units. */
+function drawCampfireFlame(
+  ctx: Ctx,
+  x: number,
+  y: number,
+  t: number,
+  doused: boolean
+): void {
+  ctx.save();
+  ctx.translate(x, y);
+
+  if (doused) {
+    // Smoke wisp: puffs rising from the embers, drifting and thinning.
+    const puffs = 4;
+    for (let i = 0; i < puffs; i++) {
+      const p = (t * 0.32 + i / puffs) % 1; // 0 at the embers → 1 up high
+      const rise = p * 46;
+      const drift = Math.sin(t * 1.3 + i * 1.7) * 6 * p;
+      const r = 2.5 + p * 7;
+      const alpha = Math.sin(p * Math.PI) * 0.3; // fade in then out
+      if (alpha <= 0.01) continue;
+      const smoke = ctx.createRadialGradient(drift, 2 - rise, 0, drift, 2 - rise, r);
+      smoke.addColorStop(0, `rgba(120, 116, 110, ${alpha})`);
+      smoke.addColorStop(1, "rgba(120, 116, 110, 0)");
+      ctx.fillStyle = smoke;
+      ctx.beginPath();
+      ctx.arc(drift, 2 - rise, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+    return;
+  }
+
+  const flick = 0.85 + Math.sin(t * 9) * 0.1 + Math.sin(t * 21) * 0.05;
+  const h = 26 * flick;
+  // Flame body (orange over a warm tip).
+  ctx.shadowColor = "rgba(255, 150, 50, 0.9)";
+  ctx.shadowBlur = 16;
+  const body = ctx.createLinearGradient(0, 4, 0, 4 - h);
+  body.addColorStop(0, "#c25e10");
+  body.addColorStop(0.55, "#f5b301");
+  body.addColorStop(1, "#ffe9a8");
+  ctx.fillStyle = body;
+  ctx.beginPath();
+  ctx.moveTo(0, 4);
+  ctx.quadraticCurveTo(-9, 4 - h * 0.5, 0, 4 - h);
+  ctx.quadraticCurveTo(9, 4 - h * 0.5, 0, 4);
+  ctx.fill();
+  // Inner core.
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = "rgba(255, 240, 190, 0.9)";
+  ctx.beginPath();
+  ctx.moveTo(0, 3);
+  ctx.quadraticCurveTo(-4, 3 - h * 0.45, 0, 3 - h * 0.62);
+  ctx.quadraticCurveTo(4, 3 - h * 0.45, 0, 3);
+  ctx.fill();
+  ctx.restore();
+}
+
+// A reward chest sitting ON the arena floor during the continue-deeper outro.
+// Like the campfire it draws in two passes: a ground glow (an inviting "tap me"
+// pulse while closed, under the units) + the chest body (y-sorted with units, so
+// the warband gathered in front of it occludes it). The body art is the SHARED
+// core from assets/chestArt.ts, mapped from its 120×112 box into world space.
+export interface FloorChest {
+  x: number;
+  y: number;
+  tier: ChestTier;
+  /** ms since the open tap (0 = closed idle). */
+  t: number;
+  opening: boolean;
+  /** Reveal-burst sparkles, spawned once by the outro at the open beat. */
+  sparkles: Sparkle[];
+}
+
+/** How wide the chest's 120-unit draw box maps to, in world px. */
+const CHEST_DRAW_W = 58;
+
+/** Ground pass: a soft inviting glow while the chest is still closed (drawn with
+ *  the decals, under the units). The chest's own contact shadow lives in the
+ *  body pass (chestArt), so this adds none. */
+function drawFloorChestGround(ctx: Ctx, c: FloorChest, t: number): void {
+  if (c.opening) return;
+  ctx.save();
+  ctx.translate(c.x, c.y);
+  const pulse = 0.5 + Math.sin(t * 3.2) * 0.5;
+  const g = ctx.createRadialGradient(0, -8, 2, 0, -8, 36);
+  g.addColorStop(0, `rgba(255, 224, 138, ${(0.10 + pulse * 0.12).toFixed(3)})`);
+  g.addColorStop(1, "rgba(255, 224, 138, 0)");
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.ellipse(0, -8, 36, 26, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+/** Body pass: the chest itself, mapped from chestArt's local box so its ground
+ *  contact (local 60,96) lands on the world anchor (c.x, c.y). */
+function drawFloorChestBody(ctx: Ctx, c: FloorChest): void {
+  const s = CHEST_DRAW_W / VIEW_W;
+  ctx.save();
+  ctx.translate(c.x, c.y);
+  ctx.scale(s, s);
+  ctx.translate(-60, -96);
+  drawChest(ctx, c.tier, c.opening ? c.t : 0, c.sparkles);
+  ctx.restore();
 }
 
 function drawProjectile(ctx: Ctx, p: BattleSnapshot["projectiles"][number]): void {
@@ -409,10 +611,21 @@ function drawTrap(ctx: Ctx, t: BattleSnapshot["traps"][number]): void {
   ctx.restore();
 }
 
+/** Presentation-only overlays the outro layers onto the resolved match. */
+export interface RenderExtras {
+  /** World-space campfire, drawn y-sorted with the units. `doused` swaps the
+   *  flame for charred logs + a rising smoke wisp. */
+  campfire?: { x: number; y: number; doused?: boolean } | null;
+  /** World-space reward chest(s) on the arena floor, y-sorted with the units.
+   *  One during the continue-deeper reward beat; three in a treasure room. */
+  chests?: FloorChest[] | null;
+}
+
 export function renderBattle(
   ctx: Ctx,
   snap: BattleSnapshot,
-  themeId: ArenaThemeId = "grassField"
+  themeId: ArenaThemeId = "grassField",
+  extras?: RenderExtras
 ): void {
   const theme = ARENA_THEMES[themeId];
   const bufW = ctx.canvas.width;
@@ -451,9 +664,66 @@ export function renderBattle(
   // Ground-level markers under the units.
   for (const t of snap.traps) drawTrap(ctx, t);
 
-  // Draw units sorted by y for simple depth ordering.
-  const sorted = [...snap.units].sort((a, b) => a.pos.y - b.pos.y);
-  for (const u of sorted) drawUnit(ctx, u);
+  const now = performance.now() / 1000;
+
+  // Corpse decals: every dead unit leaves thematic remains where it fell
+  // (bone pile, slime pool, ash…). Drawn with the ground clutter, UNDER the
+  // living, and crossfaded IN as the dying sprite fades out (deathFade). Dead
+  // units persist in the snapshot all match, so this is pure presentation —
+  // no sim state, no determinism impact. Kind lookup + art in assets/corpseArt.
+  for (const u of snap.units) {
+    if (u.state !== "dead" || u.deathFade <= 0) continue;
+    const def = getUnitDef(u.defId);
+    ctx.save();
+    // Anchor near the sprite's foot line so the remains sit where it stood.
+    ctx.translate(u.pos.x, u.pos.y + 18);
+    ctx.globalAlpha = Math.min(1, u.deathFade);
+    drawCorpse(ctx, CORPSE_KIND_BY_ID[u.defId] ?? "generic", {
+      color: def.color,
+      accent: def.accent,
+      size:
+        Math.max(14, u.radius * 1.1) *
+        (def.battleScale ?? 1) *
+        (CORPSE_SIZE_BY_ID[u.defId] ?? 1),
+      seed: u.uid,
+      t: now,
+      fade: u.deathFade,
+    });
+    ctx.restore();
+  }
+
+  // The outro campfire's glow + logs are ground clutter — draw them with the
+  // decals, UNDER every unit, so a hero walking across the fire steps over the
+  // logs. Its flame/smoke (below) rise off the ground and instead join the
+  // unit y-sort so front heroes occlude them.
+  const camp = extras?.campfire;
+  if (camp) drawCampfireGround(ctx, camp.x, camp.y, now, camp.doused ?? false);
+
+  // The reward chest's inviting glow is ground clutter too (its body joins the
+  // y-sort below, so the warband gathered in front of it occludes it).
+  const chests = extras?.chests;
+  if (chests) for (const c of chests) drawFloorChestGround(ctx, c, now);
+
+  // Draw units sorted by y for simple depth ordering. The campfire's upright
+  // flame/smoke slots in as a pseudo-unit at the fire's base, so heroes below
+  // it occlude it and those behind sit behind.
+  const drawList: { y: number; draw: () => void }[] = snap.units.map((u) => ({
+    y: u.pos.y,
+    draw: () => drawUnit(ctx, u),
+  }));
+  if (camp) {
+    drawList.push({
+      y: camp.y,
+      draw: () => drawCampfireFlame(ctx, camp.x, camp.y, now, camp.doused ?? false),
+    });
+  }
+  if (chests) {
+    for (const c of chests) {
+      drawList.push({ y: c.y, draw: () => drawFloorChestBody(ctx, c) });
+    }
+  }
+  drawList.sort((a, b) => a.y - b.y);
+  for (const item of drawList) item.draw();
 
   for (const v of snap.vfx) drawVfx(ctx, v);
   for (const p of snap.projectiles) drawProjectile(ctx, p);

@@ -53,6 +53,7 @@ import {
   ENDLESS_PLAYER_ACTIVE,
   ENDLESS_WAVE_TIME_SEC,
 } from "@/data/endless";
+import type { EncounterKind } from "@/data/encounters";
 
 /** Match ruleset. Arena is the symmetric 2-concurrent card battle; Depths is the
  *  PvE descent (WaveController trickles a floor's horde in). Endless is the
@@ -73,6 +74,17 @@ export interface MatchOptions {
    *  match input, like unitLevels: resolved once at construction, baked/read
    *  via Unit.itemMods, recorded in the replay. */
   itemLoadouts?: ItemLoadouts;
+  /** Depths floor flavor (cursed/rare_spawn/treasure_*). Defaults to "normal";
+   *  reshapes the wave (WaveController) and, for treasure_room, skips combat. */
+  encounter?: EncounterKind;
+  /** Whether this floor is the boss lair. In the RNG "hunt for the boss"
+   *  descent the boss sits at a run-seeded random depth, so the caller passes it
+   *  explicitly; omitted, the WaveController falls back to the every-Nth-floor
+   *  rule (isBossFloorIn). */
+  isBoss?: boolean;
+  /** On the boss floor, skip the fusion-quest rare roll (the run already met its
+   *  rare on a rare-quarry encounter floor). */
+  suppressQuestRare?: boolean;
 }
 
 /** The match clock for a mode. Endless resets its clock per wave (a stalemate
@@ -123,6 +135,10 @@ export class MatchController {
   private autoDeployCountdown = 0;
   readonly seed: number;
   readonly mode: MatchMode;
+  /** This match's encounter flavor (depths only; "normal" elsewhere). */
+  readonly encounter: EncounterKind;
+  /** Peaceful treasure-room floor: warband fielded, sim frozen, no resolution. */
+  private isTreasureRoom = false;
   /** Player unit levels by defId (missing = 1). */
   private unitLevels: Record<string, number>;
   /** Arena mirror: AI units fight at the player's average deck level, so the
@@ -152,6 +168,7 @@ export class MatchController {
   ) {
     this.seed = seed;
     this.mode = opts.mode ?? "arena";
+    this.encounter = opts.encounter ?? "normal";
     this.playerDeck = playerDeck;
     this.enemyDeck = enemyDeck;
     this.unitLevels = opts.unitLevels ?? {};
@@ -185,11 +202,23 @@ export class MatchController {
         player: DEPTHS_PLAYER_ACTIVE,
         enemy: DEPTHS_ENEMY_ACTIVE,
       };
-      this.wave = new WaveController(
-        seed,
-        getDungeon(opts.dungeonId ?? "depths"),
-        opts.floor ?? 1
-      );
+      if (this.encounter === "treasure_room") {
+        // A peaceful loot floor: no horde. Field the whole warband now and
+        // freeze the sim — BattleScreen drives the chest cinematic, and tick()
+        // is a no-op, so nothing ever resolves this to a "victory".
+        this.isTreasureRoom = true;
+        this.autoFillPlayerDeployment();
+        this.state.phase = "battle";
+      } else {
+        this.wave = new WaveController(
+          seed,
+          getDungeon(opts.dungeonId ?? "depths"),
+          opts.floor ?? 1,
+          this.encounter,
+          opts.isBoss,
+          opts.suppressQuestRare
+        );
+      }
     } else if (this.mode === "endless") {
       // Whole warband down, but a SMALLER horde cap than Depths — no reserves
       // means the swarm has to stay a fair fight.
@@ -596,6 +625,9 @@ export class MatchController {
 
   /** Advance one simulation tick (after deployment phase begins). */
   tick(): void {
+    // Treasure room: no combat. The warband is already fielded and the outro
+    // cinematic (client-side) owns the scene — never step or resolve the sim.
+    if (this.isTreasureRoom) return;
     if (this.state.phase === "deployment") {
       // Arena's AI places its opening hand; the Depths horde only arrives once
       // the battle starts (nothing to do here in depths — its deck is empty).

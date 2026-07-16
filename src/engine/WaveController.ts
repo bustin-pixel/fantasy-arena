@@ -39,6 +39,13 @@ import {
   type Dungeon,
   type MonsterSpawnKind,
 } from "@/data/dungeons";
+import {
+  CURSED_BUDGET_MULT,
+  CURSED_DMG_MULT,
+  CURSED_HP_MULT,
+  QUARRY_FODDER_SHARE,
+  type EncounterKind,
+} from "@/data/encounters";
 
 /** Spawn y — nudged to the top edge so monsters visibly creep in from
  *  off-screen (movement clamps them fully on-field on their first step). */
@@ -82,6 +89,19 @@ export class WaveController {
   private rng: RNG;
   private spawnCooldown = 0;
   private readonly isBoss: boolean;
+  /** True when the boss was flagged explicitly (the RNG "hunt for the boss"
+   *  lair) rather than derived from the floor number — the fusion-quest catalyst
+   *  then rides this boss regardless of its floor number. */
+  private readonly bossIsLair: boolean;
+  /** On the boss floor, skip the fusion-quest rare roll — the run already met
+   *  its rare on a rare-quarry encounter floor (mutual exclusivity). */
+  private readonly suppressQuestRare: boolean;
+  /** This floor's encounter flavor (cursed/rare_spawn/… reshape the horde). */
+  private readonly encounter: EncounterKind;
+  /** Runs the phased plan (boss floors AND rare-quarry floors) vs the trickle. */
+  private isPhased = false;
+  /** Whether the phased plan ends in a boss (false for a rare-quarry floor). */
+  private hasBoss = true;
 
   // -- Normal-floor state: a flat trickle queue. --
   private queue: string[] = [];
@@ -97,14 +117,51 @@ export class WaveController {
   private total = 0; // total monsters in the plan (for `remaining`)
   private spawned = 0;
 
-  constructor(seed: number, dungeon: Dungeon, floor: number) {
+  constructor(
+    seed: number,
+    dungeon: Dungeon,
+    floor: number,
+    encounter: EncounterKind = "normal",
+    /** Whether this floor is the boss lair. In the RNG "hunt for the boss"
+     *  descent the boss sits at a run-seeded random depth, so the caller passes
+     *  it explicitly; omitted, it falls back to the legacy every-Nth-floor rule
+     *  (isBossFloorIn) so existing tests stay byte-identical. */
+    isBoss?: boolean,
+    /** On the boss floor, skip the fusion-quest rare roll (the run already met
+     *  its rare on a rare-quarry encounter). Ignored off the boss floor. */
+    suppressQuestRare: boolean = false
+  ) {
     this.floor = floor;
     this.dungeon = dungeon;
+    this.encounter = encounter;
     // Mix the floor into the seed so every floor of one run rolls fresh.
     this.rng = new RNG((seed ^ 0x5eed50a1 ^ Math.imul(floor, 0x9e3779b9)) >>> 0);
-    this.isBoss = isBossFloorIn(dungeon, floor);
-    if (this.isBoss) this.buildBossPlan();
-    else this.queue = this.buildFodder(waveBudgetIn(dungeon, floor));
+    this.isBoss = isBoss ?? isBossFloorIn(dungeon, floor);
+    this.bossIsLair = isBoss === true;
+    this.suppressQuestRare = suppressQuestRare;
+    if (this.isBoss) {
+      this.isPhased = true;
+      this.buildBossPlan();
+    } else if (encounter === "rare_spawn" && dungeon.quest) {
+      // A rare-quarry floor: reuse the phased machine (fodder → rare → done),
+      // spawning the fusion-quest rare as the telegraphed finale, no boss.
+      // Gated on the dungeon HAVING a quest: the rare banner belongs to the
+      // fusion-quest rare alone, so a questless dungeon falls through to a
+      // plain floor rather than promoting an ordinary monster to stand in.
+      // (assignOmens never offers rare_spawn without a quest — belt-and-braces.)
+      this.isPhased = true;
+      this.hasBoss = false;
+      this.buildRarePlan();
+    } else {
+      // Normal / cursed / treasure_vault floors: the flat bounded trickle.
+      // Cursed throws a bigger horde (its own seed stream, so a NORMAL floor's
+      // composition stays byte-identical to before).
+      const budget =
+        encounter === "cursed"
+          ? Math.round(waveBudgetIn(dungeon, floor) * CURSED_BUDGET_MULT)
+          : waveBudgetIn(dungeon, floor);
+      this.queue = this.buildFodder(budget);
+    }
   }
 
   /** Spend `budget` on this floor's tier monsters (cheap fodder dominates). Wraps
@@ -125,7 +182,15 @@ export class WaveController {
     );
     this.fodder = this.buildFodder(fodderBudget);
 
-    const quest = questForFloorIn(this.dungeon, this.floor);
+    // The fusion-quest catalyst rides the boss floor — UNLESS the run already
+    // met its rare on a rare-quarry encounter (suppressQuestRare). In the
+    // RNG-run model the boss lair can sit on any floor, so the quest comes off
+    // the dungeon directly; the legacy every-Nth path keeps the floor match.
+    const quest = this.suppressQuestRare
+      ? undefined
+      : this.bossIsLair
+        ? this.dungeon.quest
+        : questForFloorIn(this.dungeon, this.floor);
     if (quest && this.rng.next() < quest.chance) this.catalyst = quest.spawnId;
     this.boss = tier.boss;
     this.total = this.fodder.length + (this.catalyst ? 1 : 0) + 1; // +1 boss
@@ -142,17 +207,38 @@ export class WaveController {
     }
   }
 
+  /** Compose a RARE QUARRY floor: a lead-in fodder pool, then the dungeon's
+   *  fusion-quest RARE (GUARANTEED — the whole point of the encounter),
+   *  telegraphed like a boss. No dungeon boss; the phase machine ends after the
+   *  rare falls. Only ever called with a quest present (see the constructor). */
+  private buildRarePlan(): void {
+    const fodderBudget = Math.max(
+      2,
+      Math.round(waveBudgetIn(this.dungeon, this.floor) * QUARRY_FODDER_SHARE)
+    );
+    this.fodder = this.buildFodder(fodderBudget);
+    this.catalyst = this.dungeon.quest!.spawnId;
+    this.boss = "";
+    this.total = this.fodder.length + 1; // +1 rare (no boss)
+    if (this.fodder.length > 0) {
+      this.phase = "fodder";
+      this.pending = this.fodder.slice();
+    } else {
+      this.beginTelegraph(null, "rare_telegraph");
+    }
+  }
+
   /** Monsters not yet on the field — the sim's `enemyReserves`, so a cleared
    *  board is only a victory once the whole floor (incl. the un-spawned boss) is
    *  spent. During a telegraph the field can be empty while this stays > 0, which
    *  is exactly what keeps the win check from firing before the boss arrives. */
   get remaining(): number {
-    return this.isBoss ? this.total - this.spawned : this.queue.length;
+    return this.isPhased ? this.total - this.spawned : this.queue.length;
   }
 
   /** Called once per battle tick (before stepSimulation). */
   step(state: SimState): void {
-    if (this.isBoss) this.stepBoss(state);
+    if (this.isPhased) this.stepBoss(state);
     else this.stepTrickle(state);
   }
 
@@ -222,7 +308,9 @@ export class WaveController {
       if (this.catalyst) this.beginTelegraph(state, "rare_telegraph");
       else this.beginTelegraph(state, "boss_telegraph");
     } else if (this.phase === "rare") {
-      this.beginTelegraph(state, "boss_telegraph");
+      // Boss floor → on to the boss; rare quarry → the rare was the finale.
+      if (this.hasBoss) this.beginTelegraph(state, "boss_telegraph");
+      else this.phase = "done";
     } else if (this.phase === "boss") {
       this.phase = "done";
     }
@@ -270,18 +358,23 @@ export class WaveController {
     // Depth pressure: monsters (bosses included) spawn pre-scaled by floor,
     // layered ON TOP of the level bake (nested rounding — see NOTES §8).
     const mult = floorStatMultipliersIn(this.dungeon, this.floor);
-    unit.maxHp = Math.round(unit.maxHp * mult.hp);
+    // Cursed floors also thicken/harden every monster (no RNG draw — a plain
+    // floor's spawned stats are unchanged).
+    const cursed = this.encounter === "cursed";
+    const hpMult = cursed ? mult.hp * CURSED_HP_MULT : mult.hp;
+    const dmgMult = cursed ? mult.dmg * CURSED_DMG_MULT : mult.dmg;
+    unit.maxHp = Math.round(unit.maxHp * hpMult);
     unit.hp = unit.maxHp;
-    unit.damage = Math.round(unit.damage * mult.dmg);
+    unit.damage = Math.round(unit.damage * dmgMult);
     state.units.push(unit);
-    if (this.isBoss) this.spawned++;
+    if (this.isPhased) this.spawned++;
     this.spawnCooldown = secToTicks(WAVE_SPAWN_INTERVAL_SEC);
   }
 
   /** For tests: the boss-floor plan (fodder pool, rolled catalyst, boss). Null on
    *  non-boss floors. Lets specs assert composition without simulating a clear. */
   planForTest(): { fodder: string[]; catalyst: string | null; boss: string } | null {
-    if (!this.isBoss) return null;
+    if (!this.isPhased) return null;
     return { fodder: this.fodder, catalyst: this.catalyst, boss: this.boss };
   }
 }

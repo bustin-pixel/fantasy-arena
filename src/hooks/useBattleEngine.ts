@@ -24,7 +24,10 @@ import type {
 } from "@/types";
 import { MatchController, battleEnemyLedger } from "@/engine/MatchController";
 import type { BoonOffer, BoonTally } from "@/engine/EndlessController";
+import { OutroCinematic, type OutroDir } from "@/hooks/OutroCinematic";
 import { renderBattle } from "@/engine/Renderer";
+import type { ChestTier } from "@/meta/economy";
+import { TREASURE_ROOM_TIERS, type EncounterKind } from "@/data/encounters";
 import { SfxObserver } from "@/audio/sfx";
 import { pickArenaTheme, type ArenaThemeId } from "@/assets/arenaThemes";
 import { getDungeon } from "@/data/dungeons";
@@ -117,6 +120,33 @@ export interface UseBattleEngine {
   retireEndless: () => void;
   /** Endless: waves fully cleared this run (0 outside endless). */
   wavesSurvived: () => number;
+  /** Post-victory outro: materialize the reward chest up-field and gather the
+   *  band in front of it (`onSettled` when they arrive). Precedes the campfire.
+   *  `reviveFallen` (default true) picks the fallen back up to join the gather;
+   *  the boss's Dungeon-Cleared chest passes false so they stay down (no fire). */
+  startOutroChest: (
+    tier: ChestTier,
+    onSettled: () => void,
+    reviveFallen?: boolean
+  ) => void;
+  /** Post-victory outro: the player tapped the on-floor chest — play the open
+   *  animation; `onReveal` fires at the reveal beat (lid fully open). */
+  openOutroChest: (onReveal: () => void) => void;
+  /** Treasure room: materialize N chests and gather the band before the hoard. */
+  startOutroChests: (tiers: ChestTier[], onSettled: () => void) => void;
+  /** Open chest `index` (treasure room); `onReveal` fires at its reveal beat. */
+  openOutroChestAt: (index: number, onReveal: () => void) => void;
+  /** Current chest world points + open state, for tap hit-testing. */
+  outroChestPoints: () => {
+    index: number;
+    point: { x: number; y: number };
+    opened: boolean;
+  }[];
+  /** Post-victory outro: pick up the fallen and gather the whole warband
+   *  around the campfire to heal (presentational only — match is resolved). */
+  startOutroCamp: (onDone: () => void) => void;
+  /** Post-victory outro: file the band off-screen in the chosen direction. */
+  outroWalkOff: (dir: OutroDir, onDone: () => void) => void;
 }
 
 export function useBattleEngine(
@@ -132,7 +162,16 @@ export function useBattleEngine(
   unitLevels?: Record<string, number>,
   /** Player equipped item keys by defId (missing = bare). Same contract as
    *  unitLevels: a STABLE object frozen at mount — a match input. */
-  itemLoadouts?: ItemLoadouts
+  itemLoadouts?: ItemLoadouts,
+  /** Depths encounter flavor for this floor (default "normal"). A match input
+   *  like floor/dungeonId — changing it re-inits the match. */
+  encounter: EncounterKind = "normal",
+  /** Whether this floor is the boss lair (RNG "hunt for the boss" descent). A
+   *  match input; omitted, the WaveController falls back to isBossFloorIn. */
+  isBoss?: boolean,
+  /** On the boss floor, skip the fusion-quest rare roll (the run already met its
+   *  rare on a rare-quarry encounter). A match input. */
+  suppressQuestRare?: boolean
 ): UseBattleEngine {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const controllerRef = useRef<MatchController | null>(null);
@@ -148,6 +187,9 @@ export function useBattleEngine(
   const themeRef = useRef<ArenaThemeId>("grassField");
   // Turns snapshot diffs into unit sound effects (presentation-only).
   const sfxRef = useRef<SfxObserver>(new SfxObserver());
+  // Post-victory walk cinematic. Steps in the rAF loop; the sim tick is a
+  // no-op once the match resolves, so the two never fight.
+  const outroRef = useRef<OutroCinematic | null>(null);
 
   const [ui, setUi] = useState<BattleUiState>({
     phase: "deployment",
@@ -195,6 +237,9 @@ export function useBattleEngine(
         dungeonId,
         unitLevels,
         itemLoadouts,
+        encounter,
+        isBoss,
+        suppressQuestRare,
       });
     } else {
       const enemyDeck = generateEnemyDeck(seed);
@@ -211,10 +256,21 @@ export function useBattleEngine(
       : mode === "endless" ? "dungeon"
       : "grassField";
     sfxRef.current = new SfxObserver();
+    outroRef.current = null;
+    // Treasure room: no fight — stand the hoard up RIGHT HERE, in lockstep with
+    // the controller. Doing this in a separate BattleScreen effect raced the
+    // init: StrictMode's double-mount re-ran this effect and nulled outroRef
+    // AFTER the one-shot setup, orphaning the chests. Tiers are static, so the
+    // reward roll (computeTreasureRewards) lines up chest-for-chest.
+    if (mode === "depths" && encounter === "treasure_room" && controllerRef.current) {
+      const outro = new OutroCinematic(controllerRef.current.state);
+      outro.gatherAtChests([...TREASURE_ROOM_TIERS], () => {});
+      outroRef.current = outro;
+    }
     accRef.current = 0;
     lastRef.current = performance.now();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playerDeck.join(","), seedOverride, mode, floor, dungeonId]);
+  }, [playerDeck.join(","), seedOverride, mode, floor, dungeonId, encounter, isBoss, suppressQuestRare]);
 
   // The combined loop.
   useEffect(() => {
@@ -237,13 +293,20 @@ export function useBattleEngine(
         steps++;
       }
 
+      // Post-victory walk cinematic (real dt — presentational, not sim-paced).
+      outroRef.current?.step(dt);
+
       // Render + sound. The SfxObserver diffs consecutive snapshots to voice
       // deaths/attacks/casts/deploys — render-side, never touching the sim.
       const canvas = canvasRef.current;
       const frameSnap = c.snapshot();
       if (canvas) {
         const ctx = canvas.getContext("2d");
-        if (ctx) renderBattle(ctx, frameSnap, themeRef.current);
+        if (ctx)
+          renderBattle(ctx, frameSnap, themeRef.current, {
+            campfire: outroRef.current?.campfire() ?? null,
+            chests: outroRef.current?.chests() ?? null,
+          });
       }
       sfxRef.current.observe(frameSnap);
 
@@ -385,6 +448,65 @@ export function useBattleEngine(
     return controllerRef.current?.wavesSurvived() ?? 0;
   }, []);
 
+  const startOutroChest = useCallback(
+    (tier: ChestTier, onSettled: () => void, reviveFallen = true) => {
+      const c = controllerRef.current;
+      if (!c) {
+        onSettled();
+        return;
+      }
+      outroRef.current = new OutroCinematic(c.state);
+      outroRef.current.gatherAtChest(tier, onSettled, reviveFallen);
+    },
+    []
+  );
+
+  const openOutroChest = useCallback((onReveal: () => void) => {
+    outroRef.current?.openChest(onReveal);
+  }, []);
+
+  const startOutroChests = useCallback(
+    (tiers: ChestTier[], onSettled: () => void) => {
+      const c = controllerRef.current;
+      if (!c) {
+        onSettled();
+        return;
+      }
+      outroRef.current = new OutroCinematic(c.state);
+      outroRef.current.gatherAtChests(tiers, onSettled);
+    },
+    []
+  );
+
+  const openOutroChestAt = useCallback((index: number, onReveal: () => void) => {
+    outroRef.current?.openChestAt(index, onReveal);
+  }, []);
+
+  const outroChestPoints = useCallback(() => {
+    return outroRef.current?.chestPoints() ?? [];
+  }, []);
+
+  const startOutroCamp = useCallback((onDone: () => void) => {
+    const c = controllerRef.current;
+    if (!c) {
+      onDone();
+      return;
+    }
+    // Reuse the cinematic from the chest beat if one is already running, so the
+    // opened chest lingers up-field as the band strolls down to the fire.
+    if (!outroRef.current) outroRef.current = new OutroCinematic(c.state);
+    outroRef.current.gatherAtCamp(onDone);
+  }, []);
+
+  const outroWalkOff = useCallback((dir: OutroDir, onDone: () => void) => {
+    const o = outroRef.current;
+    if (!o) {
+      onDone();
+      return;
+    }
+    o.walkOff(dir, onDone);
+  }, []);
+
   return {
     canvasRef,
     ui,
@@ -398,6 +520,13 @@ export function useBattleEngine(
     pickBoon,
     retireEndless,
     wavesSurvived,
+    startOutroChest,
+    openOutroChest,
+    startOutroChests,
+    openOutroChestAt,
+    outroChestPoints,
+    startOutroCamp,
+    outroWalkOff,
   };
 }
 

@@ -45,6 +45,16 @@ export function highestClearedFloorOf(
   return save.dungeons[dungeonId]?.highestClearedFloor ?? 0;
 }
 
+/** Whether a dungeon's boss has been defeated (the dungeon is cleared). In the
+ *  RNG "hunt for the boss" descent, clearing a dungeon writes its floor count
+ *  as the high-water mark, so completion is `highestClearedFloor >= floors` —
+ *  the same signal the gate chain and world-map "completed" state already read.
+ *  (Legacy per-floor saves that reached the last floor read as cleared too.) */
+export function isDungeonCleared(save: PlayerSave, dungeonId: string): boolean {
+  const d = DUNGEONS[dungeonId];
+  return d != null && highestClearedFloorOf(save, dungeonId) >= d.floors;
+}
+
 /** Endless survival progress. Just the deepest wave ever reached, for now. */
 export interface EndlessProgress {
   bestWave: number;

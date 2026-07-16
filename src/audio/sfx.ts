@@ -168,7 +168,9 @@ export type SfxKey =
   // The smith's gibberish barks (same syllable engine, dropped to gravel)
   | "smithGreet" | "smithHappy" | "smithGruff"
   // combat hit layer (Crunchy knock)
-  | "hitSoft" | "hitBig";
+  | "hitSoft" | "hitBig"
+  // Dungeon Atlas map-room ambience (noise-based — no square leads, no drones)
+  | "mapRustle" | "torchCrackle" | "mapWhisper";
 
 /** Keys that skip the dungeon-echo bus. Battle sounds (hits, horns) stay wet;
  *  everything the player clicks in menus is dry. */
@@ -181,6 +183,7 @@ const DRY_KEYS: Set<SfxKey> = new Set([
   "coinShower", "grubbinsGreet", "grubbinsHappy", "grubbinsSad",
   "grubbinsNeutral", "smithGreet", "smithHappy", "smithGruff",
   "quench", "bellows",
+  "mapRustle", "torchCrackle", "mapWhisper",
 ]);
 
 // --- NPC voices: Animal-Crossing-style gibberish ----------------------------
@@ -346,6 +349,26 @@ const SOUNDS: Record<SfxKey, (r: number) => void> = {
   // ----- hit layer (quiet texture under the combat palette) — wet -----------
   hitSoft(r) { burst(r, 0, 0.035, 0.1, "bandpass", 900, 350); blip(r, 0, 300, 120, 0.04, "triangle", 0.05); },
   hitBig(r) { burst(r, 0, 0.06, 0.16, "bandpass", 700, 250); blip(r, 0, 220, 80, 0.07, "triangle", 0.12); ring(r, 0.01, [95], 0.1, 0.05); },
+
+  // --- Dungeon Atlas map-room ambience (quiet, all noise/sine — no leads) ---
+  // Parchment unrolled: two dry paper scuffs, the second lighter and higher.
+  mapRustle(r) {
+    burst(r, 0, 0.1, 0.12, "highpass", 2400, 5200);
+    burst(r, 0.08, 0.13, 0.08, "highpass", 1800, 4400);
+    burst(r, 0.18, 0.07, 0.05, "highpass", 3200, 6000);
+  },
+  // A distant torch settles: three tiny band-filtered pops. Callers vary the
+  // rate slightly so repeats don't machine-gun the same three pops.
+  torchCrackle(r) {
+    burst(r, 0, 0.03, 0.055, "bandpass", 1500, 900);
+    burst(r, 0.07, 0.025, 0.04, "bandpass", 2100, 1200);
+    burst(r, 0.16, 0.035, 0.05, "bandpass", 1100, 700);
+  },
+  // A breath over the current node: a soft band-noise swell, nothing tonal.
+  mapWhisper(r) {
+    burst(r, 0, 0.3, 0.045, "bandpass", 900, 1700);
+    burst(r, 0.08, 0.22, 0.035, "highpass", 3000, 2200);
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -426,6 +449,7 @@ const MIN_GAP_MS: Partial<Record<SfxKey, number>> = {
   grubbinsGreet: 300, grubbinsHappy: 300, grubbinsSad: 300, grubbinsNeutral: 300,
   smithGreet: 300, smithHappy: 300, smithGruff: 300, quench: 250, bellows: 400,
   hitSoft: 140, hitBig: 260,
+  mapRustle: 600, torchCrackle: 900, mapWhisper: 700,
 };
 const DEFAULT_GAP_MS = 60;
 const MAX_PER_OBSERVE = 6;

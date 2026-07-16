@@ -1,9 +1,19 @@
 // ============================================================================
-// FloorPickerSheet — choose a floor before descending into a dungeon.
-// Selectable floors: everything cleared (replayable) plus the next uncleared
-// one, capped at the dungeon's deepest floor. Reuses the detail-overlay modal
-// pattern (AppShell exempts it from page-swipe drags). Dungeon-driven: The
-// Depths and every themed legendary dungeon share this one sheet.
+// BANKED — pre-RNG floor-picker page. NOT wired into the app.
+//
+// This is the old "pick a floor, then descend" sheet from before the RNG "hunt
+// for the boss" descent (where you enter a dungeon and descend randomized floors
+// until the boss lair appears). It's parked here — compilable but unimported —
+// so the flat floor-ladder model can be revived if the RNG descent doesn't pan
+// out. To bring it back: render it from the Dungeon Atlas / a dungeon-select
+// screen, feed it `highestClearedFloor`, and route `onDescend(floor)` to a
+// battle at that fixed floor (the old App onBattle("depths", floor, dungeonId)).
+//
+// It still type-checks against the live data modules (dungeons/economy/rewards),
+// but its semantics assume the OLD per-floor high-water-mark progression; the
+// current model writes `highestClearedFloor` as a binary cleared/not-cleared
+// signal, so `maxSelectable` here would read as all-or-nothing until this is
+// re-adapted. Left intact as a reference, not a drop-in.
 // ============================================================================
 
 import { useEffect, useState } from "react";

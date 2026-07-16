@@ -20,6 +20,7 @@ import { RARITIES } from "@/data/rarities";
 import { ITEM_LINES } from "@/data/items";
 import { ChestSprite } from "@/components/ChestSprite";
 import { renderPortrait } from "@/engine/Renderer";
+import { useCountUp } from "@/hooks/useCountUp";
 import { playStinger } from "@/audio/music";
 import { playSfx } from "@/audio/sfx";
 
@@ -40,6 +41,9 @@ interface Props {
   dungeonId?: string;
   /** Per-deck-unit XP gains for the bar ceremony (omit to hide the section). */
   xpGains?: XpGain[];
+  /** Suppress the pop-up chest + contents (the Depths continue-deeper flow
+   *  opens the chest ON the arena floor instead, so it isn't revealed twice). */
+  hideChest?: boolean;
 }
 
 export const CHEST_LABEL: Record<ChestTier, string> = {
@@ -53,21 +57,25 @@ export const CHEST_LABEL: Record<ChestTier, string> = {
 /** closed → (tap) → opening (sprite animates) → open (contents revealed). */
 type ChestPhase = "closed" | "opening" | "open";
 
-export function RewardPanel({ rewards, floor, mode, dungeonId = "depths", xpGains }: Props) {
+export function RewardPanel({ rewards, mode, dungeonId = "depths", xpGains, hideChest }: Props) {
   const [chestPhase, setChestPhase] = useState<ChestPhase>("closed");
   const shownGold = useCountUp(rewards.gold, true);
 
-  const milestoneId =
+  // Clearing a dungeon (first boss kill → firstClear) hands over ALL of its
+  // gifts at once. Floor numbers are hidden in the RNG descent and the boss
+  // sits at a random depth, so the callout lists the dungeon's whole gift set
+  // rather than keying off the (now meaningless) floor number.
+  const milestoneIds =
     mode === "depths" && rewards.firstClear
-      ? MILESTONE_UNLOCKS[dungeonId]?.[floor]
-      : undefined;
+      ? Object.values(MILESTONE_UNLOCKS[dungeonId] ?? {})
+      : [];
 
   // Milestone/quest stings, staggered off the victory stinger (and each other)
   // so the panel's arrival isn't a pile-up.
   useEffect(() => {
     const timers: number[] = [];
-    if (milestoneId) timers.push(window.setTimeout(() => playSfx("unlockFanfare"), 400));
-    if (rewards.questUnlocks?.length) timers.push(window.setTimeout(() => playSfx("questSting"), milestoneId ? 1100 : 400));
+    if (milestoneIds.length) timers.push(window.setTimeout(() => playSfx("unlockFanfare"), 400));
+    if (rewards.questUnlocks?.length) timers.push(window.setTimeout(() => playSfx("questSting"), milestoneIds.length ? 1100 : 400));
     return () => timers.forEach(clearTimeout);
     // Mount-only ceremony: rewards are frozen for this panel's lifetime.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -114,11 +122,11 @@ export function RewardPanel({ rewards, floor, mode, dungeonId = "depths", xpGain
         <XpCeremony xp={rewards.xp} gains={xpGains} />
       )}
 
-      {milestoneId && (
-        <div className="reward-milestone">
-          New recruit: <strong>{getUnitDef(milestoneId).name}</strong>!
+      {milestoneIds.map((id) => (
+        <div className="reward-milestone" key={id}>
+          New recruit: <strong>{getUnitDef(id).name}</strong>!
         </div>
-      )}
+      ))}
 
       {rewards.questUnlocks && rewards.questUnlocks.length > 0 && (
         <div className="reward-milestone reward-quest">
@@ -130,7 +138,7 @@ export function RewardPanel({ rewards, floor, mode, dungeonId = "depths", xpGain
         </div>
       )}
 
-      {rewards.chest && (
+      {rewards.chest && !hideChest && (
         <button
           className={`reward-chest${chestPhase === "closed" ? "" : " opened"}`}
           onClick={() =>
@@ -151,7 +159,7 @@ export function RewardPanel({ rewards, floor, mode, dungeonId = "depths", xpGain
         </button>
       )}
 
-      {rewards.chest && chestPhase === "open" && (
+      {rewards.chest && !hideChest && chestPhase === "open" && (
         <ul className="reward-contents">
           {rewards.chest.contents.map((entry, i) => {
             if (entry.kind === "gold") {
@@ -304,34 +312,4 @@ function useXpReveal(gains: XpGain[]): number[] {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   return shown;
-}
-
-/** Animate 0 → target over ~800ms. Presentation only — the real value is
- *  already in the save. With `tick`, plays a coin tick as the counter rolls —
- *  time-throttled (≥90ms) rather than per-value so big totals don't machine-gun;
- *  the ease-out makes the ticks decelerate like coins settling, pitch rising
- *  as the count lands. */
-function useCountUp(target: number, tick = false): number {
-  const [value, setValue] = useState(0);
-  const rafRef = useRef(0);
-  const prevRef = useRef(0);
-  const lastTickRef = useRef(0);
-  useEffect(() => {
-    const start = performance.now();
-    const DURATION = 800;
-    const step = (now: number) => {
-      const t = Math.min(1, (now - start) / DURATION);
-      const v = Math.round(target * (1 - Math.pow(1 - t, 3))); // ease-out cubic
-      if (tick && v !== prevRef.current && now - lastTickRef.current >= 90) {
-        lastTickRef.current = now;
-        playSfx("coinTick", 1 + t * 0.25);
-      }
-      prevRef.current = v;
-      setValue(v);
-      if (t < 1) rafRef.current = requestAnimationFrame(step);
-    };
-    rafRef.current = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, [target, tick]);
-  return value;
 }

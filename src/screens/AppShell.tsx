@@ -7,18 +7,26 @@ import { DungeonVines } from "@/components/DungeonVines";
 import { DungeonGate } from "@/components/DungeonGate";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import { QuestBoardSheet } from "@/components/QuestBoardSheet";
+import { DungeonAtlas } from "@/components/atlas/DungeonAtlas";
 import { GoldPill, ShardPill } from "@/components/CurrencyPills";
 import type { BattleMode } from "@/hooks/useBattleEngine";
 import { playSfx } from "@/audio/sfx";
 
 interface Props {
-  /** Launch a battle in the given mode (from a Home mode card). Depths passes
-   *  the floor picked in the floor sheet + the chosen dungeon id. */
-  onBattle: (mode: BattleMode, floor?: number, dungeonId?: string) => void;
+  /** Launch a non-dungeon battle (Arena / Endless) from a Home mode card.
+   *  Dungeon dives go through onEnterDungeon (the atlas), not this. */
+  onBattle: (mode: BattleMode) => void;
+  /** Start a fresh dungeon RUN at floor 1 (the atlas "Enter Dungeon" button). */
+  onEnterDungeon: (dungeonId: string) => void;
   /** Open Grubbins' shop — a full-screen App view, like Battle (not a sheet). */
   onOpenShop: () => void;
   /** Open the Blacksmith's forge — the items home, a full-screen App view. */
   onOpenBlacksmith: () => void;
+  /** After a dungeon is CLEARED, auto-open the atlas world map so its unlock
+   *  ceremony (the newly-revealed next dungeon) plays. */
+  openAtlasWorld?: boolean;
+  /** The auto-open was honored — App clears the flag. */
+  onAtlasConsumed?: () => void;
 }
 
 // Page order: Collection (0) ← Home (1) → Compendium (2). Home is the landing.
@@ -33,7 +41,14 @@ const PAGES = ["Collection", "Home", "Compendium"] as const;
  * Battle is NOT a page here — it's a full-screen overlay owned by App, so the
  * pager never fights the finger mid-fight.
  */
-export function AppShell({ onBattle, onOpenShop, onOpenBlacksmith }: Props) {
+export function AppShell({
+  onBattle,
+  onEnterDungeon,
+  onOpenShop,
+  onOpenBlacksmith,
+  openAtlasWorld = false,
+  onAtlasConsumed,
+}: Props) {
   const trackRef = useRef<HTMLDivElement>(null);
   const hallRef = useRef<HTMLDivElement>(null);
   // Pending "restore scroll-snap" timeout from the last drag (see endDrag).
@@ -41,6 +56,20 @@ export function AppShell({ onBattle, onOpenShop, onOpenBlacksmith }: Props) {
   const [page, setPage] = useState(1); // land on Home (center)
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [questsOpen, setQuestsOpen] = useState(false);
+  // The Dungeon Atlas overlay (always opens on the world map now): tapped open
+  // by Home's Dungeons card, or auto-opened after a dungeon clear so its unlock
+  // ceremony plays.
+  const [atlasOpen, setAtlasOpen] = useState<boolean>(openAtlasWorld);
+
+  // A dungeon-clear arrival while the shell is already mounted.
+  useEffect(() => {
+    if (openAtlasWorld) setAtlasOpen(true);
+  }, [openAtlasWorld]);
+
+  const closeAtlas = () => {
+    setAtlasOpen(false);
+    onAtlasConsumed?.();
+  };
   // Live drag state in a ref so pointer handlers never trigger re-renders.
   const drag = useRef({
     pending: false,
@@ -195,6 +224,15 @@ export function AppShell({ onBattle, onOpenShop, onOpenBlacksmith }: Props) {
       {questsOpen && (
         <QuestBoardSheet onClose={() => { playSfx("uiClose"); setQuestsOpen(false); }} />
       )}
+      {atlasOpen && (
+        <DungeonAtlas
+          onEnterDungeon={(dungeonId) => {
+            closeAtlas();
+            onEnterDungeon(dungeonId);
+          }}
+          onClose={closeAtlas}
+        />
+      )}
       <div className="shell-bg" aria-hidden="true">
         {/* One continuous hall (3 pages wide) panned 1:1 with the pager. Brick
             spans it all; the gate lives in the middle (Home) third. */}
@@ -231,6 +269,7 @@ export function AppShell({ onBattle, onOpenShop, onOpenBlacksmith }: Props) {
             onOpenBlacksmith={onOpenBlacksmith}
             onOpenShop={onOpenShop}
             onOpenQuests={() => { playSfx("uiOpen"); setQuestsOpen(true); }}
+            onOpenAtlas={() => setAtlasOpen(true)}
           />
         </section>
         <section className="pager-page" aria-label="Compendium">

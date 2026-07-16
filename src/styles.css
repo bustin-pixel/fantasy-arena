@@ -1956,6 +1956,135 @@ body.modal-open .pager-nav {
   font-weight: 700;
 }
 
+/* ---- On-floor loot reveal (floats up out of the arena chest) ------------- */
+.floor-loot {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  z-index: 5;
+  text-align: center;
+  cursor: pointer;
+  animation: floor-loot-rise 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.25) both;
+}
+@keyframes floor-loot-rise {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -72%);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -100%);
+  }
+}
+.floor-loot-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  animation: floor-loot-item-rise 0.9s ease-out both;
+}
+@keyframes floor-loot-item-rise {
+  from {
+    transform: translateY(14px) scale(0.8);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+.floor-loot-item .item-icon {
+  animation: floor-loot-glow 1.4s ease-in-out infinite;
+}
+@keyframes floor-loot-glow {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 8px rgba(255, 224, 138, 0.55));
+  }
+  50% {
+    filter: drop-shadow(0 0 16px rgba(255, 224, 138, 0.95));
+  }
+}
+.floor-loot-name {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+  white-space: nowrap;
+}
+.floor-loot-gold,
+.floor-loot-shards {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--gold);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.floor-loot-gold .coin {
+  color: #f5b301;
+  font-size: 0.8rem;
+  text-shadow: 0 0 6px rgba(245, 179, 1, 0.9);
+}
+.floor-loot-shards {
+  color: #b39ddb;
+}
+.floor-loot-shards .shard-gem {
+  color: #b39ddb;
+  font-size: 0.8rem;
+}
+.floor-loot-hint {
+  margin-top: 2px;
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(243, 227, 194, 0.6);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+  /* Delayed so it only nudges the player if they linger past the loot beat. */
+  opacity: 0;
+  animation: floor-loot-hint-in 0.6s ease 1.2s forwards;
+}
+@keyframes floor-loot-hint-in {
+  to {
+    opacity: 1;
+  }
+}
+
+/* Treasure-room entry banner (styled like an encounter telegraph). */
+.treasure-banner {
+  position: absolute;
+  top: 16%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 26px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(60, 44, 12, 0.92), rgba(30, 22, 8, 0.92));
+  border: 1px solid var(--gold);
+  color: #ffe9a8;
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-shadow: 0 0 10px rgba(245, 179, 1, 0.7);
+  box-shadow: 0 0 22px rgba(245, 179, 1, 0.45);
+  white-space: nowrap;
+  z-index: 6;
+  pointer-events: none;
+  animation: treasure-banner-in 0.5s ease both;
+}
+@keyframes treasure-banner-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -10px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
 /* ---- XP ceremony (per-unit bars on the results screen) ------------------- */
 .reward-xp {
   width: 100%;
@@ -2071,66 +2200,6 @@ body.modal-open .pager-nav {
   color: #1a140d;
   background: var(--gold);
   border-color: var(--gold);
-}
-
-/* ---- Depths floor picker ------------------------------------------------- */
-.floor-sheet {
-  padding: 20px;
-  width: min(340px, 92vw);
-}
-.floor-sheet-title {
-  margin: 0 0 14px;
-  text-align: center;
-  color: var(--gold);
-  font-size: 1.2rem;
-  letter-spacing: 0.05em;
-}
-.floor-list {
-  list-style: none;
-  margin: 0 0 16px;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: 46vh;
-  overflow-y: auto;
-}
-.floor-row {
-  font: inherit;
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 14px;
-  border-radius: 10px;
-  border: 1px solid rgba(245, 179, 1, 0.25);
-  background: rgba(0, 0, 0, 0.25);
-  color: #f3e3c2;
-  cursor: pointer;
-  text-align: left;
-}
-.floor-row.selected {
-  border-color: var(--gold);
-  background: rgba(245, 179, 1, 0.12);
-  box-shadow: 0 0 10px rgba(245, 179, 1, 0.25);
-}
-.floor-row.boss {
-  border-style: dashed;
-}
-.floor-num {
-  font-weight: 700;
-}
-.floor-reward {
-  font-size: 0.78rem;
-  color: var(--stone);
-}
-.floor-locked {
-  font-size: 0.78rem;
-  color: var(--stone);
-  text-align: center;
-  padding: 6px 0;
-  opacity: 0.7;
 }
 
 /* ---- Gold wallet + locked collection ------------------------------------- */
@@ -4368,3 +4437,1161 @@ body.modal-open .pager-nav {
   width: 100%;
   padding: 12px;
 }
+
+/* ==========================================================================
+   Dungeon Atlas — the winding-trail map (world dungeons + per-dungeon floors)
+   ========================================================================== */
+
+/* Overlay root (a .detail-overlay, so the pager swipe-exempt rule applies). */
+.dungeon-atlas {
+  padding: 10px;
+  transition: background 0.28s ease;
+}
+.dungeon-atlas.phase-enter,
+.dungeon-atlas.phase-closing {
+  background: rgba(0, 0, 0, 0);
+}
+
+/* The tall iron-framed map case. */
+.atlas-modal {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(520px, 100%);
+  height: min(880px, 100%);
+  background: linear-gradient(180deg, #221a11, #17110a);
+  border: 2px solid #57432c;
+  border-radius: 16px;
+  box-shadow: 0 0 0 1px #120d07, inset 0 1px 0 rgba(236, 227, 207, 0.07),
+    0 14px 34px rgba(0, 0, 0, 0.65);
+  overflow: hidden;
+  transition: opacity 0.28s ease, transform 0.28s ease;
+}
+.dungeon-atlas.phase-enter .atlas-modal {
+  opacity: 0;
+  transform: translateY(16px) scale(0.985);
+}
+.dungeon-atlas.phase-closing .atlas-modal {
+  opacity: 0;
+  transform: translateY(10px) scale(0.99);
+}
+
+.atlas-header {
+  position: relative;
+  padding: 12px 46px 9px 16px;
+  border-bottom: 1px solid #57432c;
+  background: linear-gradient(180deg, #241b11, #1a130b);
+}
+.atlas-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  letter-spacing: 0.04em;
+  color: var(--gold);
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+}
+.atlas-sub {
+  margin: 2px 0 0;
+  font-size: 0.74rem;
+  opacity: 0.8;
+}
+.atlas-hint {
+  margin: 3px 0 0;
+  font-size: 0.7rem;
+  font-style: italic;
+  opacity: 0.62;
+}
+.atlas-back {
+  margin: 0 0 4px;
+  padding: 3px 10px;
+  border: 1px solid #57432c;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.4);
+  color: var(--parchment);
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* The scrollable parchment. */
+.atlas-scroll {
+  position: relative;
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  /* Reserve the scrollbar gutter so the measured width (which drives the floor
+     map's fill height) can't oscillate as a desktop scrollbar toggles. */
+  scrollbar-gutter: stable;
+}
+.atlas-map {
+  position: relative;
+  /* Fill the case even when the trail is shorter than the viewport (the
+     parchment runs edge to edge; the trail centers in the leftover). */
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  /* Painted-terrain map (Painted Realm): the BiomeLayer canvas fills the
+     trail box; any leftover strip above/below is flooded with the biome's own
+     ground tone (set inline per view in DungeonAtlas) so the map reads
+     edge-to-edge. This gradient is only the fallback if that inline is absent. */
+  background: linear-gradient(180deg, #8f8878, #6f6659);
+  box-shadow: inset 0 0 44px rgba(30, 22, 10, 0.45);
+  transition: transform 0.24s ease, opacity 0.24s ease;
+}
+.dungeon-atlas.phase-level-out .atlas-map {
+  transform: scale(1.16);
+  opacity: 0;
+}
+.dungeon-atlas.phase-level-in .atlas-map {
+  animation: atlas-level-in 0.24s ease both;
+}
+@keyframes atlas-level-in {
+  from {
+    transform: scale(0.92);
+    opacity: 0;
+  }
+}
+
+.atlas-trail {
+  position: relative;
+  width: 100%;
+}
+/* Torch ambience + edge shadow, painted over the parchment, under the nodes. */
+.atlas-trail::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(55% 30% at 14% 6%, rgba(255, 160, 60, 0.2), transparent 70%),
+    radial-gradient(55% 30% at 88% 34%, rgba(255, 160, 60, 0.13), transparent 70%),
+    radial-gradient(55% 30% at 10% 66%, rgba(255, 160, 60, 0.12), transparent 70%),
+    radial-gradient(130% 26% at 50% 100%, rgba(40, 22, 6, 0.28), transparent 70%);
+}
+.atlas-paths {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* The dotted trail. Stroke units are viewBox units (box is 100 wide), so the
+   dots scale with the map. Round caps on near-zero dashes = round dots. */
+.atlas-paths {
+  /* The biome layer adds filled art — never let the svg eat node taps. */
+  pointer-events: none;
+}
+.atlas-biome-doodad {
+  /* Unlock ceremony: a revealed region's props fade in (reduced motion never
+     conceals, so this transition simply never runs there). */
+  transition: opacity 0.7s ease;
+}
+.atlas-seg {
+  fill: none;
+  /* Pale worn-road dots — reads on every painted biome (halo below). */
+  stroke: #f0e3c0;
+  stroke-width: 1.3;
+  stroke-linecap: round;
+  stroke-dasharray: 0.01 3;
+  opacity: 0.9;
+}
+.atlas-seg.faint {
+  stroke: #d8c9a2;
+  opacity: 0.45;
+}
+.atlas-seg-halo {
+  fill: none;
+  stroke: rgba(30, 20, 12, 0.35);
+  stroke-width: 2.1;
+  stroke-linecap: round;
+}
+.atlas-seg-halo.fogged {
+  opacity: 0.16;
+}
+/* Mask paths: pathLength=1 normalized, dasharray 1 — dashoffset 1 hides the
+   segment, 0 shows it; the unlock ceremony transitions between them. */
+.atlas-seg-mask {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 4;
+  stroke-dasharray: 1;
+  stroke-linecap: butt;
+}
+
+/* ---- Nodes ---------------------------------------------------------------- */
+.atlas-node {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  z-index: 2;
+  -webkit-tap-highlight-color: transparent;
+}
+.atlas-node-circle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 2px solid #6b4a22;
+  background: radial-gradient(circle at 40% 32%, #3d2e1a, #241a10 75%);
+  color: #d9c9a3;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1rem;
+  /* Polish: inner rim catch-light, kept in every box-shadow override below. */
+  box-shadow: 0 2px 7px rgba(40, 25, 8, 0.5),
+    inset 1px 1px 2px rgba(255, 240, 200, 0.14);
+}
+.atlas-node-label {
+  position: absolute;
+  top: calc(100% + 3px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 92px;
+  text-align: center;
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1.2;
+  /* Light ink + dark halo — readable on any painted terrain. */
+  color: #f7f0dc;
+  text-shadow:
+    0 1px 2px rgba(25, 18, 10, 0.85),
+    0 0 4px rgba(25, 18, 10, 0.6);
+  pointer-events: none;
+}
+/* Completed: parchment-dim with a quiet check. */
+.atlas-node.completed {
+  opacity: 0.78;
+}
+.atlas-node.completed .atlas-node-circle {
+  border-color: #7a6a4e;
+  color: #9c8f72;
+  background: radial-gradient(circle at 40% 32%, #33291c, #201811 75%);
+  filter: saturate(0.6);
+}
+/* Current: gold, glowing, alive. */
+.atlas-node.current .atlas-node-circle {
+  border-color: var(--gold);
+  color: var(--gold);
+  background: radial-gradient(circle at 40% 32%, #4a3618, #2a1c0c 75%);
+  animation: atlas-node-pulse 1.7s ease-in-out infinite;
+}
+@keyframes atlas-node-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 6px rgba(245, 179, 1, 0.45), 0 2px 7px rgba(40, 25, 8, 0.5),
+      inset 1px 1px 2px rgba(255, 240, 200, 0.14);
+  }
+  50% {
+    box-shadow: 0 0 17px rgba(245, 179, 1, 0.85), 0 2px 7px rgba(40, 25, 8, 0.5),
+      inset 1px 1px 2px rgba(255, 240, 200, 0.14);
+  }
+}
+/* Locked: muted iron + a padlock. */
+.atlas-node.locked {
+  cursor: pointer; /* still tappable — it shakes and explains itself */
+}
+.atlas-node.locked .atlas-node-circle {
+  border-color: #5c5c58;
+  background: radial-gradient(circle at 40% 32%, #34322e, #211f1c 75%);
+  color: #8d8a83;
+  font-size: 0.85rem;
+  filter: grayscale(1);
+  opacity: 0.85;
+}
+.atlas-node.locked .atlas-node-label {
+  color: #cfc6b2;
+}
+/* Boss floors: a blood-tinged ring. */
+.atlas-node.boss:not(.locked) .atlas-node-circle {
+  box-shadow: 0 0 0 2px rgba(140, 40, 30, 0.35), 0 2px 7px rgba(40, 25, 8, 0.5),
+    inset 1px 1px 2px rgba(255, 240, 200, 0.14);
+}
+.atlas-node.boss.current .atlas-node-circle {
+  animation: atlas-node-pulse 1.7s ease-in-out infinite;
+}
+/* Locked tap: rattle the medallion, not the button (its transform centers it). */
+.atlas-node.shaking .atlas-node-circle {
+  animation: shelf-rattle 0.38s ease;
+}
+
+/* ---- Player marker (a torch flame hovering over the current node). -------- */
+.atlas-marker {
+  position: absolute;
+  /* The whole marker column (flame + portrait ring + pointer) hangs ABOVE the
+     node point so it never covers the node's own vignette. */
+  transform: translate(-50%, calc(-100% - 26px));
+  z-index: 3;
+  pointer-events: none;
+  filter: drop-shadow(0 0 7px rgba(245, 179, 1, 0.75));
+}
+/* Selection glide: the "you are here" avatar eases to the tapped node. Not
+   applied during a ceremony (the marker's JS path-walk sets left/top per
+   frame; a transition would smear it). */
+.atlas-marker.gliding {
+  transition: left 0.42s cubic-bezier(0.45, 0.05, 0.2, 1),
+    top 0.42s cubic-bezier(0.45, 0.05, 0.2, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .atlas-marker.gliding {
+    transition: none;
+  }
+}
+.atlas-marker-flame {
+  display: block;
+  width: 13px;
+  height: 18px;
+  background: radial-gradient(ellipse at 50% 72%, #ffe9a8, #f5b301 52%, #c25e10 82%, rgba(194, 94, 16, 0));
+  border-radius: 50% 50% 50% 50% / 62% 62% 38% 38%;
+  animation: atlas-flame 1.15s ease-in-out infinite alternate;
+}
+.atlas-marker::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: calc(100% - 1px);
+  transform: translateX(-50%);
+  border: 4px solid transparent;
+  border-top-color: rgba(120, 70, 10, 0.85);
+}
+@keyframes atlas-flame {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.16) translateY(-1px);
+  }
+}
+
+/* ---- Locked toast ---------------------------------------------------------- */
+.atlas-toast {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  z-index: 6;
+  max-width: calc(100% - 24px);
+  padding: 8px 14px;
+  border: 1px solid #57432c;
+  border-radius: 10px;
+  background: rgba(12, 9, 6, 0.94);
+  color: var(--parchment);
+  font-size: 0.76rem;
+  text-align: center;
+  animation: fade 0.25s ease;
+}
+
+/* ---- Floor info panel (bottom sheet inside the map case) ------------------- */
+.atlas-info {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  z-index: 5;
+  padding: 12px 14px 14px;
+  border: 2px solid #57432c;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #241b11, #17110a);
+  box-shadow: 0 -8px 26px rgba(0, 0, 0, 0.55);
+  animation: atlas-info-up 0.22s ease;
+}
+@keyframes atlas-info-up {
+  from {
+    transform: translateY(16px);
+    opacity: 0;
+  }
+}
+.atlas-info-title {
+  margin: 0 26px 2px 0;
+  font-family: var(--font-display);
+  font-size: 1.08rem;
+  color: var(--gold);
+}
+.atlas-info-sub {
+  margin: 0 0 9px;
+  font-size: 0.72rem;
+  opacity: 0.8;
+}
+.atlas-info-warn {
+  color: #e08a3c;
+}
+.atlas-enemies {
+  display: flex;
+  gap: 9px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.atlas-enemy {
+  flex: 0 0 auto;
+  width: 62px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+.atlas-enemy canvas {
+  width: 52px;
+  height: 52px;
+  border: 1px solid #57432c;
+  border-radius: 9px;
+  background: #17110a;
+}
+.atlas-enemy.boss canvas {
+  border-color: #8c2820;
+}
+.atlas-enemy.rare canvas {
+  border-color: var(--gold);
+}
+.atlas-enemy-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.6rem;
+  font-weight: 700;
+}
+.atlas-enemy-sub {
+  font-size: 0.56rem;
+  opacity: 0.7;
+}
+.atlas-rewards {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 8px 0 2px;
+  font-size: 0.74rem;
+  color: #c9b26b;
+}
+.atlas-gift {
+  color: #7fd07f;
+}
+.atlas-quest-hint {
+  margin: 5px 0 0;
+  font-size: 0.68rem;
+  font-style: italic;
+  opacity: 0.68;
+}
+.atlas-enter {
+  width: 100%;
+  margin-top: 10px;
+}
+
+/* ---- Fog of war (uncharted dungeons) --------------------------------------- */
+/* A shrouded ink smudge: no medallion, no name, just something under the fog. */
+.atlas-node.uncharted .atlas-node-circle {
+  border-color: transparent;
+  background: radial-gradient(circle at 45% 40%, rgba(70, 58, 40, 0.5), rgba(70, 58, 40, 0.14) 62%, transparent 78%);
+  box-shadow: none;
+  filter: blur(1.5px);
+  opacity: 0.9;
+}
+.atlas-node.uncharted .atlas-node-label {
+  color: #b5ab94;
+  font-style: italic;
+  font-weight: 600;
+  opacity: 0.85;
+}
+.atlas-seg.fogged {
+  opacity: 0.16;
+}
+
+/* ---- Living map: vignettes, trophies, pins --------------------------------- */
+/* World vignette glyphs are emoji — size them down inside the medallion. */
+.atlas-node-circle {
+  position: relative;
+}
+.atlas-node.current .atlas-node-circle,
+.atlas-node.completed .atlas-node-circle {
+  font-size: 1.05rem;
+}
+/* Completed world nodes: dimmed vignette + a small parchment check seal. */
+.atlas-node-check {
+  position: absolute;
+  right: -4px;
+  bottom: -3px;
+  width: 15px;
+  height: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid #7a6a4e;
+  background: #ece3cf;
+  color: #4a6b2a;
+  font-size: 0.6rem;
+  font-weight: 900;
+  filter: none;
+}
+/* Faction banner planted on a conquered fork dungeon. */
+.atlas-banner {
+  position: absolute;
+  top: -17px;
+  right: -9px;
+  font-size: 0.95rem;
+  filter: drop-shadow(0 1px 2px rgba(40, 25, 8, 0.6));
+  animation: atlas-banner-sway 2.6s ease-in-out infinite alternate;
+  transform-origin: bottom center;
+}
+@keyframes atlas-banner-sway {
+  from {
+    transform: rotate(-4deg);
+  }
+  to {
+    transform: rotate(5deg);
+  }
+}
+/* Wax-seal quest pin: a crimson blob with the quest-giver's "!". */
+.atlas-pin {
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  width: 17px;
+  height: 17px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50% 46% 52% 48% / 48% 52% 46% 54%;
+  background: radial-gradient(circle at 38% 32%, #c8402e, #8c2820 70%);
+  border: 1px solid #5c1812;
+  color: #f5d78a;
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  font-weight: 900;
+  box-shadow: 0 1px 3px rgba(40, 10, 5, 0.55);
+}
+
+/* ---- Marker identity: deck-lead portrait in a gold ring -------------------- */
+.atlas-marker-ring {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin-top: -3px;
+  border-radius: 50%;
+  border: 2px solid var(--gold);
+  background: radial-gradient(circle at 40% 32%, #3d2e1a, #241a10 78%);
+  box-shadow: 0 0 8px rgba(245, 179, 1, 0.55), 0 2px 5px rgba(40, 25, 8, 0.5);
+  overflow: hidden;
+}
+.atlas-marker-face {
+  width: 22px;
+  height: 22px;
+}
+.atlas-marker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+/* With the portrait ring below it, the flame shrinks into a little crest. */
+.atlas-marker:has(.atlas-marker-ring) .atlas-marker-flame {
+  width: 10px;
+  height: 13px;
+}
+
+/* ---- Hand-written margin notes --------------------------------------------- */
+.atlas-note {
+  position: absolute;
+  z-index: 1;
+  width: 118px;
+  pointer-events: none;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 0.6rem;
+  line-height: 1.3;
+  color: #f3e9cd;
+  text-shadow: 0 1px 2px rgba(25, 18, 10, 0.8);
+}
+.atlas-note.right-of {
+  transform: translate(30px, -50%) rotate(-2deg);
+}
+.atlas-note.left-of {
+  transform: translate(calc(-100% - 30px), -50%) rotate(2deg);
+}
+/* Enchanted Chart: the ink breathes. */
+.atlas-note {
+  animation: atlas-note-breathe 4.4s ease-in-out infinite alternate;
+}
+@keyframes atlas-note-breathe {
+  from {
+    opacity: 0.68;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ---- Enchanted Chart: the map is a magical artifact ------------------------ */
+/* Breathing warm edges: candlelight wash along the map frame. */
+.atlas-map::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 30px rgba(255, 196, 90, 0.16);
+  animation: atlas-edge-breathe 5.2s ease-in-out infinite alternate;
+}
+@keyframes atlas-edge-breathe {
+  from {
+    opacity: 0.35;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Ley-pulse: a golden comet walking the conquered trail (rAF-positioned). */
+.atlas-leypulse {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle, #ffe082, rgba(255, 190, 60, 0) 72%);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+.atlas-leypulse.head {
+  width: 11px;
+  height: 11px;
+  background: radial-gradient(circle, #fff3c4, #ffd863 45%, rgba(255, 190, 60, 0) 75%);
+}
+
+/* Rolling fog: breathing mist over uncharted / undescended ground. */
+.atlas-fogbank {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.atlas-fog {
+  position: absolute;
+  aspect-ratio: 1.6;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(158, 150, 132, 0.42), rgba(158, 150, 132, 0));
+  animation: atlas-fog-drift 8s ease-in-out infinite alternate;
+}
+@keyframes atlas-fog-drift {
+  from {
+    transform: translate(-50%, -50%);
+    opacity: 0.65;
+  }
+  to {
+    transform: translate(-44%, -54%) scale(1.1);
+    opacity: 0.95;
+  }
+}
+
+/* Orbiting sparks around the current objective node. */
+.atlas-orbit {
+  position: absolute;
+  inset: -11px;
+  pointer-events: none;
+  animation: atlas-orbit-spin 4.2s linear infinite;
+}
+.atlas-orbit.second {
+  animation-delay: -2.1s;
+}
+.atlas-orbit-dot {
+  position: absolute;
+  left: -1px;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff3c4, #f5b301 60%, rgba(245, 179, 1, 0) 100%);
+  box-shadow: 0 0 6px rgba(245, 179, 1, 0.8);
+  animation: atlas-orbit-twinkle 1.1s ease-in-out infinite alternate;
+}
+@keyframes atlas-orbit-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes atlas-orbit-twinkle {
+  from {
+    opacity: 0.55;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Unlocked world vignettes bob gently. */
+.atlas-node.world.current .atlas-node-glyph,
+.atlas-node.world.completed .atlas-node-glyph {
+  display: inline-block;
+  animation: atlas-glyph-bob 2.3s ease-in-out infinite alternate;
+}
+@keyframes atlas-glyph-bob {
+  from {
+    transform: translateY(0.5px);
+  }
+  to {
+    transform: translateY(-1px);
+  }
+}
+
+/* "You are here" ripple expanding from under the marker. */
+.atlas-marker-ripple {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  margin: -15px 0 0 -15px;
+  border: 2px solid rgba(245, 179, 1, 0.55);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 1;
+  animation: atlas-ripple 2.4s ease-out infinite;
+}
+.atlas-marker-ripple.gliding {
+  transition: left 0.42s cubic-bezier(0.45, 0.05, 0.2, 1),
+    top 0.42s cubic-bezier(0.45, 0.05, 0.2, 1);
+}
+@keyframes atlas-ripple {
+  from {
+    transform: scale(0.3);
+    opacity: 0.7;
+  }
+  to {
+    transform: scale(1.25);
+    opacity: 0;
+  }
+}
+
+/* Rotating runic circle under a dungeon's entry node (floor views). */
+.atlas-runecircle {
+  position: absolute;
+  width: 64px;
+  height: 64px;
+  margin: -32px 0 0 -32px;
+  pointer-events: none;
+  z-index: 1;
+  animation: atlas-rune-spin 16s linear infinite;
+}
+.atlas-runecircle-ring {
+  position: absolute;
+  inset: 4px;
+  border: 1.5px dashed rgba(255, 214, 110, 0.5);
+  border-radius: 50%;
+}
+.atlas-runecircle-glyph {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 214, 110, 0.7);
+  font-size: 10px;
+  animation: atlas-rune-spin 16s linear infinite reverse;
+}
+.atlas-runecircle-glyph.g0 { left: 50%; top: -2px; margin-left: -6px; }
+.atlas-runecircle-glyph.g1 { right: -2px; top: 50%; margin-top: -6px; }
+.atlas-runecircle-glyph.g2 { left: 50%; bottom: -2px; margin-left: -6px; }
+.atlas-runecircle-glyph.g3 { left: -2px; top: 50%; margin-top: -6px; }
+@keyframes atlas-rune-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Drifting arcane runes (floor views) — same spirit as the embers. */
+.atlas-runes {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.atlas-rune {
+  position: absolute;
+  bottom: -14px;
+  color: #ffd66e;
+  font-size: 12px;
+  opacity: 0;
+  text-shadow: 0 0 5px rgba(255, 190, 60, 0.6);
+  animation: atlas-rune-rise 10s linear infinite;
+}
+.atlas-rune:nth-child(1) { left: 12%; animation-delay: 0s; }
+.atlas-rune:nth-child(2) { left: 32%; animation-delay: 2.3s; animation-duration: 12s; }
+.atlas-rune:nth-child(3) { left: 55%; animation-delay: 4.8s; animation-duration: 9s; }
+.atlas-rune:nth-child(4) { left: 72%; animation-delay: 7.1s; animation-duration: 11s; }
+.atlas-rune:nth-child(5) { left: 88%; animation-delay: 9.4s; animation-duration: 10s; }
+@keyframes atlas-rune-rise {
+  0% {
+    transform: translateY(0) rotate(-6deg);
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.55;
+  }
+  60% {
+    opacity: 0.4;
+  }
+  100% {
+    transform: translateY(-420px) rotate(8deg);
+    opacity: 0;
+  }
+}
+
+/* Inked compass rose with a wobbling needle (world view). */
+.atlas-compass {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  width: 58px;
+  height: 58px;
+  opacity: 0.8;
+  pointer-events: none;
+  z-index: 1;
+}
+.atlas-compass svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.atlas-compass-needle {
+  transform-box: fill-box;
+  transform-origin: 50% 83%;
+  animation: atlas-needle-wobble 3.4s ease-in-out infinite alternate;
+}
+@keyframes atlas-needle-wobble {
+  from {
+    transform: rotate(-8deg);
+  }
+  to {
+    transform: rotate(9deg);
+  }
+}
+
+/* Living landmarks (BiomeLayer hero props): CSS-animated SVG children, in
+   user units. No SVG filters — soft edges come from gradients. */
+.atlas-fx-smoke {
+  animation: atlas-fx-smoke 8s linear infinite;
+  opacity: 0;
+}
+@keyframes atlas-fx-smoke {
+  0% {
+    transform: translateY(1.5px) scale(0.55);
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.5;
+  }
+  100% {
+    transform: translate(1px, -6px) scale(1.35);
+    opacity: 0;
+  }
+}
+.atlas-fx-wisp {
+  animation: atlas-fx-wisp 5.4s ease-in-out infinite;
+  opacity: 0;
+}
+@keyframes atlas-fx-wisp {
+  0% {
+    transform: translateY(2.5px);
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.6;
+  }
+  70% {
+    transform: translate(0.8px, -2px);
+    opacity: 0.35;
+  }
+  100% {
+    transform: translateY(-4.5px);
+    opacity: 0;
+  }
+}
+.atlas-fx-spore {
+  animation: atlas-fx-spore 6.5s linear infinite;
+  opacity: 0;
+}
+@keyframes atlas-fx-spore {
+  0% {
+    transform: translateY(2px);
+    opacity: 0;
+  }
+  25% {
+    opacity: 0.7;
+  }
+  100% {
+    transform: translate(-1px, -4px);
+    opacity: 0;
+  }
+}
+.atlas-fx-sparkle {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: atlas-fx-sparkle 2.6s ease-in-out infinite;
+  opacity: 0;
+}
+@keyframes atlas-fx-sparkle {
+  0%,
+  55% {
+    opacity: 0;
+    transform: scale(0.4) rotate(0deg);
+  }
+  75% {
+    opacity: 0.9;
+    transform: scale(1) rotate(20deg);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.5) rotate(40deg);
+  }
+}
+.atlas-fx-cave-glow {
+  animation: atlas-fx-cave-glow 3.6s ease-in-out infinite alternate;
+}
+/* The cathedral's stained-glass rose window breathes the same way. */
+.atlas-fx-window-glow {
+  animation: atlas-fx-cave-glow 4.2s ease-in-out infinite alternate;
+}
+@keyframes atlas-fx-cave-glow {
+  from {
+    opacity: 0.5;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ---- Living map: embers + torch sconces ------------------------------------ */
+.atlas-embers {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.atlas-ember {
+  position: absolute;
+  bottom: -4px;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #ffd57a, #e07818 70%);
+  opacity: 0;
+  animation: atlas-ember-drift 7s linear infinite;
+}
+.atlas-ember:nth-child(1) { left: 8%; animation-delay: 0s; animation-duration: 6.5s; }
+.atlas-ember:nth-child(2) { left: 22%; animation-delay: 2.1s; animation-duration: 8s; }
+.atlas-ember:nth-child(3) { left: 34%; animation-delay: 4.4s; animation-duration: 7.2s; }
+.atlas-ember:nth-child(4) { left: 47%; animation-delay: 1.2s; animation-duration: 9s; }
+.atlas-ember:nth-child(5) { left: 58%; animation-delay: 3.6s; animation-duration: 6.8s; }
+.atlas-ember:nth-child(6) { left: 69%; animation-delay: 5.3s; animation-duration: 7.6s; }
+.atlas-ember:nth-child(7) { left: 81%; animation-delay: 0.8s; animation-duration: 8.4s; }
+.atlas-ember:nth-child(8) { left: 90%; animation-delay: 2.9s; animation-duration: 7s; }
+.atlas-ember:nth-child(9) { left: 15%; animation-delay: 6.1s; animation-duration: 8.8s; }
+@keyframes atlas-ember-drift {
+  0% {
+    transform: translateY(0) translateX(0);
+    opacity: 0;
+  }
+  8% {
+    opacity: 0.7;
+  }
+  55% {
+    opacity: 0.35;
+    transform: translateY(-46vh) translateX(6px);
+  }
+  100% {
+    transform: translateY(-88vh) translateX(-4px);
+    opacity: 0;
+  }
+}
+/* Reduced motion: the global block kills keyframes; also still the atlas's
+   transitions (transforms read as motion — fades alone would be fine, but
+   keeping one rule simple beats special-casing). */
+@media (prefers-reduced-motion: reduce) {
+  .dungeon-atlas,
+  .atlas-modal,
+  .atlas-map {
+    transition: none !important;
+  }
+}
+
+/* ==========================================================================
+   Victory outro — the "continue deeper" exit-archway choice
+   ========================================================================== */
+
+.result-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.result-actions .btn-close-ghost {
+  align-self: center;
+}
+
+/* Boss-lair telegraph — replaces the three omen arrows when the NEXT floor is
+   the boss lair. A single centered "Enter the Lair" prompt over the arena. */
+.lair-choice {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  pointer-events: none; /* only the button catches taps — the field stays visible */
+  animation: fade 0.45s ease;
+}
+.lair-omen {
+  max-width: calc(100% - 80px);
+  padding: 8px 18px;
+  border: 1px solid #6b2f2f;
+  border-radius: 10px;
+  background: rgba(20, 6, 6, 0.86);
+  color: #f2c14e;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+  text-align: center;
+  text-shadow: 0 0 10px rgba(210, 40, 40, 0.6);
+}
+.lair-enter {
+  pointer-events: auto;
+  box-shadow: 0 0 18px rgba(210, 40, 40, 0.55);
+}
+
+.exit-choice {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  pointer-events: none; /* only the arches catch taps — the field stays visible */
+  animation: fade 0.35s ease;
+}
+.exit-choice-banner {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100% - 90px);
+  padding: 7px 14px;
+  border: 1px solid #57432c;
+  border-radius: 10px;
+  background: rgba(12, 9, 6, 0.9);
+  color: var(--parchment);
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  letter-spacing: 0.03em;
+  text-align: center;
+  white-space: nowrap;
+}
+/* Big gold chevron arrows at the field's edges — tap one and the band walks
+   off-screen that way. The chevron is two borders of a rotated square. */
+.exit-arrow {
+  position: absolute;
+  width: 58px;
+  height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(12, 9, 6, 0.35);
+  cursor: pointer;
+  pointer-events: auto;
+  filter: drop-shadow(0 0 8px rgba(245, 179, 1, 0.45));
+  animation: fade 0.35s ease;
+}
+.exit-arrow.up {
+  top: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.exit-arrow.left {
+  top: 44%;
+  left: 10px;
+}
+.exit-arrow.right {
+  top: 44%;
+  right: 10px;
+}
+.exit-arrow-chevron {
+  display: block;
+  width: 22px;
+  height: 22px;
+  border-top: 6px solid var(--gold);
+  border-right: 6px solid var(--gold);
+  border-radius: 2px;
+}
+.exit-arrow.up .exit-arrow-chevron {
+  transform: rotate(-45deg) translate(3px, 3px);
+  animation: exit-nudge-up 1.1s ease-in-out infinite;
+}
+.exit-arrow.left .exit-arrow-chevron {
+  transform: rotate(-135deg);
+  animation: exit-nudge-left 1.1s ease-in-out infinite;
+}
+.exit-arrow.right .exit-arrow-chevron {
+  transform: rotate(45deg);
+  animation: exit-nudge-right 1.1s ease-in-out infinite;
+}
+@keyframes exit-nudge-up {
+  0%, 100% { translate: 0 2px; }
+  50% { translate: 0 -3px; }
+}
+@keyframes exit-nudge-left {
+  0%, 100% { translate: 2px 0; }
+  50% { translate: -3px 0; }
+}
+@keyframes exit-nudge-right {
+  0%, 100% { translate: -2px 0; }
+  50% { translate: 3px 0; }
+}
+.exit-arrow:hover,
+.exit-arrow:focus-visible {
+  background: rgba(12, 9, 6, 0.55);
+  filter: drop-shadow(0 0 14px rgba(245, 179, 1, 0.75));
+}
+/* Omen glyph just below each arrow + a per-omen tint on the chevron/glow. */
+.exit-arrow-omen {
+  position: absolute;
+  bottom: -19px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 1.05rem;
+  line-height: 1;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.9));
+  pointer-events: none;
+}
+.exit-arrow.omen-ominous {
+  filter: drop-shadow(0 0 8px rgba(229, 74, 74, 0.55));
+}
+.exit-arrow.omen-ominous .exit-arrow-chevron {
+  border-color: #ff8a7a;
+}
+.exit-arrow.omen-ominous:hover,
+.exit-arrow.omen-ominous:focus-visible {
+  filter: drop-shadow(0 0 14px rgba(229, 74, 74, 0.85));
+}
+.exit-arrow.omen-treasure {
+  filter: drop-shadow(0 0 8px rgba(120, 220, 150, 0.5));
+}
+.exit-arrow.omen-treasure .exit-arrow-chevron {
+  border-color: #8fe3a6;
+}
+.exit-arrow.omen-treasure:hover,
+.exit-arrow.omen-treasure:focus-visible {
+  filter: drop-shadow(0 0 14px rgba(120, 220, 150, 0.8));
+}
+/* (There is deliberately no .omen-rare: the fusion-quest rare hides behind
+   another arrow's omen and must never be identifiable — see assignOmens. Its
+   old violet glow would have been exactly the tell we removed.) */

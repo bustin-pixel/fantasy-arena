@@ -44,7 +44,12 @@ import {
   normalizeQuestBoard,
   tickQuestProgress,
 } from "@/meta/quests";
-import { questForUnlock, QUEST_LOCKED_UNITS, DUNGEON_IDS } from "@/data/dungeons";
+import {
+  getDungeon,
+  questForUnlock,
+  QUEST_LOCKED_UNITS,
+  DUNGEON_IDS,
+} from "@/data/dungeons";
 import {
   ITEM_LINES,
   ITEM_QUALITIES,
@@ -264,15 +269,20 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
           : s.endless;
       let dungeons = s.dungeons;
       if (ctx.mode === "depths" && rewards.firstClear) {
+        // First boss kill CLEARS the dungeon (the RNG "hunt for the boss" model:
+        // firstClear fires only on the first boss defeat). Write the dungeon's
+        // floor count as the completion high-water mark — the same >= floors
+        // signal the gate chain and world map already read as "cleared".
+        const floors = getDungeon(ctx.dungeonId).floors;
         const prev = s.dungeons[ctx.dungeonId]?.highestClearedFloor ?? 0;
         dungeons = {
           ...s.dungeons,
-          [ctx.dungeonId]: { highestClearedFloor: Math.max(prev, ctx.floor) },
+          [ctx.dungeonId]: { highestClearedFloor: Math.max(prev, floors) },
         };
-        // Per-dungeon gift: every dungeon hands the player a new unit on a
-        // first clear (MILESTONE_UNLOCKS is dungeonId → floor → unit id).
-        const gift = MILESTONE_UNLOCKS[ctx.dungeonId]?.[ctx.floor];
-        if (gift) unlocked.add(gift);
+        // Clearing a dungeon hands over ALL of its milestone gifts at once
+        // (MILESTONE_UNLOCKS is dungeonId → floor → unit id).
+        const gifts = MILESTONE_UNLOCKS[ctx.dungeonId];
+        if (gifts) for (const unitId of Object.values(gifts)) unlocked.add(unitId);
       }
       // Rare-spawn quest completion → the reward unit(s) become purchasable
       // (the Sealed Vault quest pays out two from the one kill).
