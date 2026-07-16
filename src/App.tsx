@@ -8,17 +8,29 @@ import { DevPanel } from "@/components/DevPanel";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { pickDungeonTrack, setMusicTrack } from "@/audio/music";
 import type { BattleMode } from "@/hooks/useBattleEngine";
+import { getDungeon } from "@/data/dungeons";
+import { isBossDepth, makeRun, type DungeonRun } from "@/data/dungeonRun";
+import { generateSeed } from "@/utils/rng";
 
 function Shell() {
   const [view, setView] = useState<"shell" | "battle" | "shop" | "blacksmith">(
     "shell"
   );
   const [battleMode, setBattleMode] = useState<BattleMode>("solo");
-  const [battleFloor, setBattleFloor] = useState(1);
-  const [battleDungeonId, setBattleDungeonId] = useState("depths");
+  // The active dungeon dive (the RNG "hunt for the boss" descent): floor number
+  // + run seed + the rolled boss depth, carried seamlessly across floors WITHOUT
+  // bouncing back to the atlas. Null outside a dungeon (arena/endless). The floor
+  // number is hidden from the player; it only drives scaling.
+  const [run, setRun] = useState<DungeonRun | null>(null);
   const { save } = useGameState();
   // Snapshot the deck at battle start so mid-battle edits can't mutate it.
   const [activeDeck, setActiveDeck] = useState<string[]>([]);
+  // After a dungeon is CLEARED (boss defeated), open the atlas world map on
+  // return so its unlock ceremony (a newly-revealed dungeon) plays.
+  const [openAtlasWorld, setOpenAtlasWorld] = useState(false);
+
+  const inDungeon = view === "battle" && battleMode === "depths" && run != null;
+  const floor = inDungeon ? run.depth : 1;
 
   // Soundtrack follows the view: hub theme in the shell; battles get the
   // Arena groove or the dungeon's own floor/boss tracks; Grubbins gets his
@@ -27,7 +39,7 @@ function Shell() {
     if (view === "battle") {
       setMusicTrack(
         battleMode === "depths"
-          ? pickDungeonTrack(battleDungeonId, battleFloor)
+          ? pickDungeonTrack(run?.dungeonId ?? "depths", floor)
           : // Endless borrows the Depths soundtrack for now (per-cycle track
             // rotation is a later polish pass); Arena keeps its groove.
             battleMode === "endless"
@@ -41,33 +53,85 @@ function Shell() {
     } else {
       setMusicTrack("emberfall");
     }
-  }, [view, battleMode, battleFloor, battleDungeonId]);
+  }, [view, battleMode, floor, run?.dungeonId]);
+
+  // Start a fresh dungeon run at floor 1 (the atlas "Enter Dungeon" button).
+  const enterDungeon = (dungeonId: string) => {
+    setActiveDeck(save.deck.slice(0, 4));
+    setBattleMode("depths");
+    setRun(makeRun(dungeonId, getDungeon(dungeonId), generateSeed()));
+    setView("battle");
+  };
+
+  const leaveBattle = () => {
+    setRun(null);
+    setView("shell");
+  };
 
   return (
     <>
       {view === "battle" ? (
-        <BattleScreen
-          deck={activeDeck}
-          mode={battleMode}
-          floor={battleFloor}
-          dungeonId={battleDungeonId}
-          onExit={() => setView("shell")}
-        />
+        battleMode === "depths" && run ? (
+          <BattleScreen
+            // Re-key per floor so React mounts a FRESH sim each descent — the
+            // seamless walk-off → next-arena hand-off, with no atlas in between.
+            key={`${run.dungeonId}:${run.depth}`}
+            deck={activeDeck}
+            mode="depths"
+            floor={run.depth}
+            dungeonId={run.dungeonId}
+            encounter={run.encounter}
+            isBoss={isBossDepth(run)}
+            nextIsBoss={isBossDepth(run, run.depth + 1)}
+            // On the boss floor, skip the fusion-quest rare if the run already
+            // met it on a rare-quarry encounter (mutual exclusivity).
+            suppressQuestRare={run.rareSpawned}
+            onExit={leaveBattle}
+            onContinueDeeper={(_dungeonId, encounter) =>
+              // Advance in place — bump the depth + carry the chosen omen; the
+              // key change above remounts the battle on the next floor. Entering
+              // a rare-quarry floor marks the run's rare as met.
+              setRun((r) =>
+                r
+                  ? {
+                      ...r,
+                      depth: r.depth + 1,
+                      encounter,
+                      rareSpawned: r.rareSpawned || encounter === "rare_spawn",
+                    }
+                  : r
+              )
+            }
+            onDungeonCleared={() => {
+              setRun(null);
+              setOpenAtlasWorld(true);
+              setView("shell");
+            }}
+          />
+        ) : (
+          <BattleScreen
+            deck={activeDeck}
+            mode={battleMode}
+            onExit={leaveBattle}
+          />
+        )
       ) : view === "shop" ? (
         <ShopScreen onExit={() => setView("shell")} />
       ) : view === "blacksmith" ? (
         <BlacksmithScreen onExit={() => setView("shell")} />
       ) : (
         <AppShell
-          onBattle={(mode, floor = 1, dungeonId = "depths") => {
+          onBattle={(mode) => {
             setActiveDeck(save.deck.slice(0, 4));
             setBattleMode(mode);
-            setBattleFloor(floor);
-            setBattleDungeonId(dungeonId);
+            setRun(null);
             setView("battle");
           }}
+          onEnterDungeon={enterDungeon}
           onOpenShop={() => setView("shop")}
           onOpenBlacksmith={() => setView("blacksmith")}
+          openAtlasWorld={openAtlasWorld}
+          onAtlasConsumed={() => setOpenAtlasWorld(false)}
         />
       )}
       {/* Local-only cheats. `import.meta.env.DEV` is a literal `false` in the

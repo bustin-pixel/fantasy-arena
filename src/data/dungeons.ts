@@ -52,6 +52,14 @@ export interface Dungeon {
   /** The rare-spawn fusion quest hosted here (its `floor` = this dungeon's boss
    *  floor). Absent = no quest. */
   quest?: RareSpawnQuest;
+  /** RNG boss-depth tuning (all optional — dungeonRun.ts supplies the defaults).
+   *  In the "hunt for the boss" descent the boss lair sits at a run-seeded random
+   *  floor: always safe below `bossMinFloor`, then a chance that ramps each floor
+   *  deeper, GUARANTEED by `bossMaxFloor`. Leave unset for the standard curve. */
+  bossMinFloor?: number;
+  bossMaxFloor?: number;
+  bossBaseChance?: number;
+  bossChanceStep?: number;
   /** Availability gate: locked until `floor` of dungeon `dungeonId` is cleared.
    *  Absent = always available (The Depths itself). The gates form a chain
    *  through the Eclipse Spire, then FORK: the Fallen Cathedral and the

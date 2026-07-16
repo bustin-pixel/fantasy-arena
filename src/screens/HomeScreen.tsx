@@ -1,11 +1,8 @@
 import { useState } from "react";
 import { useGameState } from "@/state/GameStateContext";
 import { ArenaIcon, EndlessIcon, SwarmIcon } from "@/components/ModeIcons";
-import { FloorPickerSheet } from "@/components/FloorPickerSheet";
-import { DungeonMapSheet } from "@/components/DungeonMapSheet";
 import { ProfilePlate } from "@/components/ProfilePlate";
 import { ProfileSheet } from "@/components/ProfileSheet";
-import { getDungeon } from "@/data/dungeons";
 import { endlessBestWave, highestClearedFloorOf } from "@/state/persistence";
 import { dayIndexLocal } from "@/meta/shop";
 import { forgeableStackCount } from "@/meta/blacksmith";
@@ -24,18 +21,21 @@ interface Props {
   onOpenShop: () => void;
   /** Open the quest bulletin board (rendered by AppShell as an overlay). */
   onOpenQuests: () => void;
+  /** Open the Dungeon Atlas (rendered by AppShell as an overlay). */
+  onOpenAtlas: () => void;
 }
 
 /**
  * The landing page — pick a game mode. Arena battles an AI-generated warband
- * (mode "solo"); the Dungeons card opens the dungeon-select map (The Depths +
- * the themed legendary dungeons), then a floor picker for the chosen dungeon.
+ * (mode "solo"); the Dungeons card opens the Dungeon Atlas (the winding-trail
+ * map of The Depths + the themed legendary dungeons and their floors).
  */
 export function HomeScreen({
   onBattle,
   onOpenBlacksmith,
   onOpenShop,
   onOpenQuests,
+  onOpenAtlas,
 }: Props) {
   const { save } = useGameState();
   // Forge pip: stacks with an affordable merge RIGHT NOW — self-clears as
@@ -55,10 +55,7 @@ export function HomeScreen({
   const endlessUnlocked =
     highestClearedFloorOf(save, "depths") >= ENDLESS_GATE_FLOOR;
   const bestWave = endlessBestWave(save);
-  const [mapOpen, setMapOpen] = useState(false);
-  const [pickDungeonId, setPickDungeonId] = useState<string | null>(null);
   const [editingProfile, setEditingProfile] = useState(false);
-  const pickDungeon = pickDungeonId ? getDungeon(pickDungeonId) : null;
 
   return (
     <div className="screen home">
@@ -94,7 +91,7 @@ export function HomeScreen({
           type="button"
           className="mode-card swarm"
           disabled={!ready}
-          onClick={() => { playSfx("uiOpen"); setMapOpen(true); }}
+          onClick={() => { playSfx("uiOpen"); onOpenAtlas(); }}
         >
           <SwarmIcon />
           <span className="mode-card-title">Dungeons</span>
@@ -173,29 +170,6 @@ export function HomeScreen({
 
       {editingProfile && (
         <ProfileSheet onClose={() => setEditingProfile(false)} />
-      )}
-
-      {mapOpen && (
-        <DungeonMapSheet
-          save={save}
-          onPick={(id) => {
-            setMapOpen(false);
-            setPickDungeonId(id);
-          }}
-          onClose={() => { playSfx("uiClose"); setMapOpen(false); }}
-        />
-      )}
-
-      {pickDungeon && (
-        <FloorPickerSheet
-          dungeon={pickDungeon}
-          highestClearedFloor={highestClearedFloorOf(save, pickDungeon.id)}
-          onDescend={(floor) => {
-            setPickDungeonId(null);
-            onBattle("depths", floor, pickDungeon.id);
-          }}
-          onClose={() => { playSfx("uiClose"); setPickDungeonId(null); }}
-        />
       )}
     </div>
   );

@@ -204,7 +204,7 @@ function dungeonBook(dungeon: Dungeon, save: PlayerSave): BookDef {
     ...spine,
     locked,
     gateHint: locked
-      ? `Clear ${getDungeon(dungeon.gate!.dungeonId).name} floor ${dungeon.gate!.floor} to unlock`
+      ? `Clear ${getDungeon(dungeon.gate!.dungeonId).name} to unlock`
       : undefined,
     spreads: toSpreads(pages),
     progress: locked
