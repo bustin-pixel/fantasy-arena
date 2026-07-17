@@ -22,8 +22,7 @@ import {
   type PlayerSave,
 } from "./persistence";
 import { isAvatarUnlocked } from "@/meta/avatars";
-import { MILESTONE_UNLOCKS, UNLOCK_PRICES } from "@/meta/economy";
-import { addXp } from "@/meta/leveling";
+import { UNLOCK_PRICES } from "@/meta/economy";
 import { canEquip, combineFold } from "@/meta/inventory";
 import {
   commissionFold,
@@ -42,10 +41,8 @@ import {
   applyBoardRefresh,
   applyClaimQuest,
   normalizeQuestBoard,
-  tickQuestProgress,
 } from "@/meta/quests";
 import {
-  getDungeon,
   questForUnlock,
   QUEST_LOCKED_UNITS,
   DUNGEON_IDS,
@@ -59,13 +56,11 @@ import {
   type ItemKey,
 } from "@/data/items";
 import type { ItemSlot } from "@/types";
+import { type BattleRewards, type ChestContent } from "@/meta/rewards";
 import {
-  foldChestContents,
-  nextItemPity,
-  type BattleRewards,
-  type ChestContent,
-} from "@/meta/rewards";
-import type { BattleMode } from "@/hooks/useBattleEngine";
+  applyBattleGrant,
+  type BattleGrantCtx,
+} from "@/meta/battleGrant";
 import { UNITS, DECKABLE_UNIT_IDS } from "@/data/units";
 
 /** Local-only playtest cheats, exposed on the context as `dev`. This whole object
@@ -102,21 +97,7 @@ interface GameStateValue {
    *  progress + milestone unlock on a first clear) in ONE atomic save write.
    *  Idempotence is the caller's job (BattleScreen's recordedRef); rolling
    *  happens before this call so the updater stays pure under StrictMode. */
-  grantBattleRewards: (
-    rewards: BattleRewards,
-    ctx: {
-      mode: BattleMode;
-      floor: number;
-      dungeonId: string;
-      /** Endless: waves cleared this run, folded into the best-wave record. */
-      wavesSurvived?: number;
-      /** The warband fielded this battle — every unit in it earns rewards.xp. */
-      deck?: readonly string[];
-      /** How the battle ended + what died — the quest-progress facts. */
-      outcome?: "victory" | "defeat" | "draw";
-      slain?: readonly string[];
-    }
-  ) => void;
+  grantBattleRewards: (rewards: BattleRewards, ctx: BattleGrantCtx) => void;
   /** Buy a locked unit with gold. No-op unless locked and affordable. */
   purchaseUnit: (unitId: string) => void;
   /** Equip an item on a unit (the key's slot type picks the slot; a same-slot
@@ -212,96 +193,10 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
 
   // One atomic fold per battle: gold + chest gold + unlock drops + Depths
   // progress + milestone all land in a single setSave, so a crash can never
-  // persist half a grant. The updater is pure (StrictMode runs it twice in
-  // dev) — every random roll already happened in computeBattleRewards.
-  const grantBattleRewards = (
-    rewards: BattleRewards,
-    ctx: {
-      mode: BattleMode;
-      floor: number;
-      dungeonId: string;
-      wavesSurvived?: number;
-      deck?: readonly string[];
-      outcome?: "victory" | "defeat" | "draw";
-      slain?: readonly string[];
-    }
-  ) =>
-    setSave((s) => {
-      // Whole-deck XP: every fielded unit earns the full amount (addXp is the
-      // same clamp the RewardPanel preview uses, so preview ≡ persisted).
-      const unitXp = { ...s.unitXp };
-      if (rewards.xp > 0) {
-        for (const id of new Set(ctx.deck ?? [])) {
-          unitXp[id] = addXp(unitXp[id] ?? 0, rewards.xp);
-        }
-      }
-      // Chest contents → currency/unlocks/stacks (the fold shared with quest
-      // claims), on top of the flat battle gold/shards.
-      const folded = foldChestContents(
-        {
-          gold: s.gold + rewards.gold,
-          soulShards: s.soulShards + rewards.shards,
-          items: s.items,
-          unlockedUnits: s.unlockedUnits,
-        },
-        rewards.chest?.contents ?? []
-      );
-      const gold = folded.gold;
-      const soulShards = folded.soulShards;
-      const items = folded.items;
-      const unlocked = new Set(folded.unlockedUnits);
-      // Quest progress: fold this battle's facts into the accepted quests.
-      const activeQuests = tickQuestProgress(s.quests.active, {
-        mode: ctx.mode,
-        outcome: ctx.outcome ?? "draw",
-        deck: ctx.deck ?? [],
-        slain: ctx.slain ?? [],
-        wavesSurvived: ctx.wavesSurvived ?? 0,
-      });
-      const quests =
-        activeQuests === s.quests.active
-          ? s.quests
-          : { ...s.quests, active: activeQuests };
-      // Endless: fold the run's depth into the best-wave high-water mark.
-      const endless =
-        ctx.mode === "endless"
-          ? { bestWave: Math.max(s.endless.bestWave, ctx.wavesSurvived ?? 0) }
-          : s.endless;
-      let dungeons = s.dungeons;
-      if (ctx.mode === "depths" && rewards.firstClear) {
-        // First boss kill CLEARS the dungeon (the RNG "hunt for the boss" model:
-        // firstClear fires only on the first boss defeat). Write the dungeon's
-        // floor count as the completion high-water mark — the same >= floors
-        // signal the gate chain and world map already read as "cleared".
-        const floors = getDungeon(ctx.dungeonId).floors;
-        const prev = s.dungeons[ctx.dungeonId]?.highestClearedFloor ?? 0;
-        dungeons = {
-          ...s.dungeons,
-          [ctx.dungeonId]: { highestClearedFloor: Math.max(prev, floors) },
-        };
-        // Clearing a dungeon hands over ALL of its milestone gifts at once
-        // (MILESTONE_UNLOCKS is dungeonId → floor → unit id).
-        const gifts = MILESTONE_UNLOCKS[ctx.dungeonId];
-        if (gifts) for (const unitId of Object.values(gifts)) unlocked.add(unitId);
-      }
-      // Rare-spawn quest completion → the reward unit(s) become purchasable
-      // (the Sealed Vault quest pays out two from the one kill).
-      const questUnlocks = new Set(s.questUnlocks);
-      for (const id of rewards.questUnlocks ?? []) questUnlocks.add(id);
-      return {
-        ...s,
-        gold,
-        soulShards,
-        items,
-        unitXp,
-        unlockedUnits: [...unlocked],
-        dungeons,
-        questUnlocks: [...questUnlocks],
-        endless,
-        quests,
-        itemPity: nextItemPity(s.itemPity, rewards.chest?.contents ?? null),
-      };
-    });
+  // persist half a grant. The fold is pure (StrictMode runs it twice in dev) —
+  // every random roll already happened in computeBattleRewards.
+  const grantBattleRewards = (rewards: BattleRewards, ctx: BattleGrantCtx) =>
+    setSave((s) => applyBattleGrant(s, rewards, ctx));
 
   const purchaseUnit = (unitId: string) =>
     setSave((s) => {

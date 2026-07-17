@@ -74,7 +74,7 @@ export interface BattleRewards {
   /** Flat battle gold (chest gold lives inside the chest contents). */
   gold: number;
   /** Battle XP, granted in full to EVERY unit in the fielded deck (the grant
-   *  fold in GameStateContext caps each unit at TOTAL_XP_CAP). Dungeon wins
+   *  fold in meta/battleGrant caps each unit at TOTAL_XP_CAP). Dungeon wins
    *  scale by floor; losses pay a fraction; replays pay full — XP is the
    *  grind currency, unlike first-clear gold. */
   xp: number;
