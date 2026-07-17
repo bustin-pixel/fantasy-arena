@@ -359,7 +359,6 @@ export function BattleScreen({
         dungeonId,
         outcome,
         unlockedUnits: save.unlockedUnits,
-        highestClearedFloor: highestClearedFloorOf(save, dungeonId),
         chestSeed: generateSeed(),
         // Rare-spawn quest check: the fielded warband + which enemies died.
         deck,

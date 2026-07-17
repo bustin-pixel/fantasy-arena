@@ -187,9 +187,8 @@ export const MERGE_COSTS: Record<
  *  clears, fresh endless milestones), so the reward fold stays idempotent
  *  without a claims ledger. The repeatable drip lives in SHARD_CHEST_DRIP. */
 export const SHARD_REWARDS = {
-  /** Any dungeon's non-boss floor, first clear. */
-  floorFirstClear: 3,
-  /** A dungeon boss floor, first clear. */
+  /** A dungeon's boss lair, first kill — the run model's only clear signal.
+   *  (There is no per-floor rung: ordinary floors pay no shards.) */
   bossFirstClear: 15,
   /** The chain capstones (Deep Forge / Eclipse Spire bosses), first clear. */
   bossFirstClearCapstone: 25,

@@ -130,12 +130,11 @@ describe("rollChest", () => {
 
 describe("computeBattleRewards — rare-spawn quest unlock", () => {
   const quest = rareSpawnQuestForFloor(5)!; // slime → slime_knight, requires knight
-  const base = { unlockedUnits: NO_UNITS, highestClearedFloor: 0, chestSeed: 42 };
+  const base = { unlockedUnits: NO_UNITS, chestSeed: 42 };
 
   it("slaying the rare spawn while fielding the required unit unlocks its purchase", () => {
     const r = computeBattleRewards({
       ...base, mode: "depths", floor: quest.floor, outcome: "victory",
-      highestClearedFloor: quest.floor, // replay branch — isolates the field
       deck: questRequiredUnits(quest), slain: [quest.spawnId],
     });
     expect(r.questUnlocks).toEqual(questUnlockIds(quest));
@@ -194,12 +193,12 @@ describe("computeBattleRewards — rare-spawn quest unlock", () => {
 describe("computeBattleRewards — themed dungeon quest (The Bonefields)", () => {
   const dungeon = getDungeon("bonefields");
   const quest = dungeon.quest!; // lich → necromancer, requires fire_mage, floor 3
-  const base = { unlockedUnits: NO_UNITS, highestClearedFloor: 0, chestSeed: 7 };
+  const base = { unlockedUnits: NO_UNITS, chestSeed: 7 };
 
   it("slaying the rare Lich with a Fire Mage fielded unlocks the Necromancer", () => {
     const r = computeBattleRewards({
       ...base, mode: "depths", dungeonId: "bonefields", floor: quest.floor,
-      outcome: "victory", highestClearedFloor: quest.floor, // replay isolates the field
+      outcome: "victory",
       deck: questRequiredUnits(quest), slain: [quest.spawnId],
     });
     expect(r.questUnlocks).toEqual(["necromancer"]);
@@ -209,16 +208,16 @@ describe("computeBattleRewards — themed dungeon quest (The Bonefields)", () =>
     // The Slime is the Depths catalyst; slaying it inside The Bonefields is inert.
     const r = computeBattleRewards({
       ...base, mode: "depths", dungeonId: "bonefields", floor: quest.floor,
-      outcome: "victory", highestClearedFloor: quest.floor,
+      outcome: "victory",
       deck: ["knight"], slain: ["slime"],
     });
     expect(r.questUnlocks).toBeUndefined();
   });
 
-  it("its boss floor drops a gold chest (a deep boss), not silver", () => {
+  it("its boss lair drops a gold chest (a deep boss), not silver", () => {
     const r = computeBattleRewards({
       ...base, mode: "depths", dungeonId: "bonefields", floor: dungeon.floors,
-      outcome: "victory", highestClearedFloor: 0, // first clear → chest
+      outcome: "victory", isBoss: true, // first boss kill → the clear chest
     });
     expect(r.chest?.tier).toBe("gold");
   });
@@ -227,11 +226,11 @@ describe("computeBattleRewards — themed dungeon quest (The Bonefields)", () =>
 describe("computeBattleRewards — any-of quest anchors (The Rogue's Den)", () => {
   // The Silencer quest accepts ANY stealth unit: Assassin, Rogue, or Trickster.
   const quest = getDungeon("rogues_den").quest!;
-  const base = { unlockedUnits: NO_UNITS, highestClearedFloor: 0, chestSeed: 7 };
+  const base = { unlockedUnits: NO_UNITS, chestSeed: 7 };
   const run = (deck: string[]) =>
     computeBattleRewards({
       ...base, mode: "depths", dungeonId: "rogues_den", floor: quest.floor,
-      outcome: "victory", highestClearedFloor: quest.floor,
+      outcome: "victory",
       deck, slain: [quest.spawnId],
     });
 
@@ -252,11 +251,11 @@ describe("computeBattleRewards — dual-payout quest (The Sealed Vault)", () => 
   // and the Archmage himself; each drops out of the announcement independently
   // once unlocked/owned.
   const quest = getDungeon("sealed_vault").quest!;
-  const base = { unlockedUnits: NO_UNITS, highestClearedFloor: 0, chestSeed: 7 };
+  const base = { unlockedUnits: NO_UNITS, chestSeed: 7 };
   const run = (over: Partial<Parameters<typeof computeBattleRewards>[0]> = {}) =>
     computeBattleRewards({
       ...base, mode: "depths", dungeonId: "sealed_vault", floor: quest.floor,
-      outcome: "victory", highestClearedFloor: quest.floor,
+      outcome: "victory",
       deck: questRequiredUnits(quest), slain: [quest.spawnId],
       ...over,
     });
@@ -280,7 +279,7 @@ describe("computeBattleRewards — dual-payout quest (The Sealed Vault)", () => 
 });
 
 describe("computeBattleRewards — boss chest ladder (chain capstones)", () => {
-  const base = { unlockedUnits: NO_UNITS, highestClearedFloor: 0, chestSeed: 7 };
+  const base = { unlockedUnits: NO_UNITS, chestSeed: 7 };
   const bossTier = (dungeonId: string) =>
     computeBattleRewards({
       ...base,
@@ -288,6 +287,7 @@ describe("computeBattleRewards — boss chest ladder (chain capstones)", () => {
       dungeonId,
       floor: getDungeon(dungeonId).floors,
       outcome: "victory",
+      isBoss: true,
     }).chest?.tier;
 
   it("mid-chain dungeons pay gold; the two capstones pay arcane and dragon", () => {
@@ -310,67 +310,93 @@ describe("computeBattleRewards — boss chest ladder (chain capstones)", () => {
 describe("computeBattleRewards — the reward matrix", () => {
   const base = {
     unlockedUnits: NO_UNITS,
-    highestClearedFloor: 0,
     chestSeed: 42,
   };
 
-  it("depths first clear: 50 + 15×floor gold + wooden chest", () => {
+  it("an ordinary floor pays 50 + 15×floor gold + a wooden chest — never a first clear", () => {
     const r = computeBattleRewards({
-      ...base, mode: "depths", floor: 3, outcome: "victory",
-      highestClearedFloor: 2,
+      ...base, mode: "depths", floor: 3, outcome: "victory", isBoss: false,
     });
     expect(r.gold).toBe(95);
-    expect(r.firstClear).toBe(true);
     expect(r.chest?.tier).toBe("wooden");
     expect(r.chest?.seed).toBe(42);
     expect(r.chest?.contents).toEqual(rollChest(42, "wooden", NO_UNITS));
+    // Only the lair pays out: a floor's NUMBER earns no clear and no shards.
+    expect(r.firstClear).toBe(false);
+    expect(r.shards).toBe(0);
   });
 
-  it("depths boss-floor first clear drops a silver chest", () => {
+  it("the Depths lair's first kill: 50 + 15×floor gold, silver chest, the clear + its shards", () => {
     const r = computeBattleRewards({
-      ...base, mode: "depths", floor: 5, outcome: "victory",
-      highestClearedFloor: 4,
+      ...base, mode: "depths", floor: 5, outcome: "victory", isBoss: true,
     });
     expect(r.gold).toBe(125);
     expect(r.chest?.tier).toBe("silver");
+    expect(r.firstClear).toBe(true);
+    expect(r.shards).toBe(SHARD_REWARDS.bossFirstClear);
   });
 
-  it("depths replay: trickle gold but FULL floor XP, no chest, not a first clear", () => {
+  it("a capstone's first kill pays the capstone shard rate", () => {
     const r = computeBattleRewards({
-      ...base, mode: "depths", floor: 2, outcome: "victory",
-      highestClearedFloor: 4,
+      ...base, mode: "depths", dungeonId: "eclipse_spire", floor: 5,
+      outcome: "victory", isBoss: true,
     });
-    expect(r).toEqual({
-      gold: replayGoldFor(getDungeon("depths").monsterLevel), // scales by depth
-      xp: XP_REWARDS.dungeonWinBase + XP_REWARDS.dungeonWinPerFloor * 2,
-      chest: null, // floor 2 isn't a boss floor → no replay chest
-      shards: 0,
-      firstClear: false,
-    });
+    expect(r.shards).toBe(SHARD_REWARDS.bossFirstClearCapstone);
   });
 
-  it("boss-floor replays can drop a farm chest, one tier below the first-clear tier", () => {
+  it("ordinary floors pay the same whether or not the dungeon is already cleared", () => {
+    // The run model has no per-floor high-water mark: only the lair tracks a
+    // clear, so re-descending a beaten dungeon's floors pays full freight.
+    const fresh = computeBattleRewards({
+      ...base, mode: "depths", floor: 3, outcome: "victory", isBoss: false,
+      bossCleared: false,
+    });
+    const again = computeBattleRewards({
+      ...base, mode: "depths", floor: 3, outcome: "victory", isBoss: false,
+      bossCleared: true,
+    });
+    expect(again).toEqual(fresh);
+    expect(again.gold).toBe(95);
+    expect(again.chest?.tier).toBe("wooden");
+  });
+
+  it("a cleared dungeon's lair drops to replay gold + FULL floor XP, no clear", () => {
+    const r = computeBattleRewards({
+      ...base, mode: "depths", floor: 5, outcome: "victory",
+      isBoss: true, bossCleared: true, chestSeed: 42,
+    });
+    expect(r.gold).toBe(replayGoldFor(getDungeon("depths").monsterLevel));
+    expect(r.xp).toBe(
+      XP_REWARDS.dungeonWinBase + XP_REWARDS.dungeonWinPerFloor * 5
+    );
+    expect(r.firstClear).toBe(false);
+    expect(r.shards).toBe(0);
+  });
+
+  it("boss replays can drop a farm chest, one tier below the first-clear tier", () => {
     // Scan seeds for a replay roll that drops a chest (~40% each). Deep Forge's
     // boss first-clear is arcane → its replay chest is gold (one tier below).
     let chest: ReturnType<typeof computeBattleRewards>["chest"] = null;
     for (let seed = 1; seed <= 200 && !chest; seed++) {
       chest = computeBattleRewards({
         ...base, mode: "depths", dungeonId: "deep_forge", floor: 5,
-        outcome: "victory", highestClearedFloor: 5, chestSeed: seed,
+        outcome: "victory", isBoss: true, bossCleared: true, chestSeed: seed,
       }).chest;
     }
     expect(chest).not.toBeNull();
     expect(chest!.tier).toBe("gold");
   });
 
-  it("non-boss replays never drop a chest", () => {
-    for (let seed = 1; seed <= 50; seed++) {
-      const r = computeBattleRewards({
-        ...base, mode: "depths", dungeonId: "deep_forge", floor: 3,
-        outcome: "victory", highestClearedFloor: 5, chestSeed: seed,
-      });
-      expect(r.chest).toBeNull();
+  it("a boss replay's farm chest is only a CHANCE — some seeds pay none", () => {
+    let chestless = false;
+    for (let seed = 1; seed <= 200 && !chestless; seed++) {
+      chestless =
+        computeBattleRewards({
+          ...base, mode: "depths", dungeonId: "deep_forge", floor: 5,
+          outcome: "victory", isBoss: true, bossCleared: true, chestSeed: seed,
+        }).chest === null;
     }
+    expect(chestless).toBe(true);
   });
 
   it("depths defeat and draw both pay the consolation + fractional XP, no chest", () => {
@@ -419,8 +445,7 @@ describe("computeBattleRewards — the reward matrix", () => {
 
   it("XP scales with the floor fought (win) and arena pays its flat rates", () => {
     const floor5 = computeBattleRewards({
-      ...base, mode: "depths", floor: 5, outcome: "victory",
-      highestClearedFloor: 4,
+      ...base, mode: "depths", floor: 5, outcome: "victory", isBoss: true,
     });
     expect(floor5.xp).toBe(
       XP_REWARDS.dungeonWinBase + XP_REWARDS.dungeonWinPerFloor * 5
@@ -695,35 +720,34 @@ describe("rollChest — item drops", () => {
 });
 
 describe("computeBattleRewards — Soul Shards", () => {
-  const base = { unlockedUnits: NO_UNITS, highestClearedFloor: 0, chestSeed: 42 };
+  const base = { unlockedUnits: NO_UNITS, chestSeed: 42 };
 
-  it("depths first clears pay the shard ladder: floor / boss / capstone", () => {
-    const floorClear = computeBattleRewards({
-      ...base, mode: "depths", floor: 2, outcome: "victory",
-      highestClearedFloor: 1,
-    });
-    expect(floorClear.shards).toBe(SHARD_REWARDS.floorFirstClear);
+  it("only a lair's FIRST kill pays shards: boss rate, or the capstone rate", () => {
     const bossClear = computeBattleRewards({
       ...base, mode: "depths", dungeonId: "bonefields", floor: 5,
-      outcome: "victory", highestClearedFloor: 4,
+      outcome: "victory", isBoss: true,
     });
     expect(bossClear.shards).toBe(SHARD_REWARDS.bossFirstClear);
     const capstone = computeBattleRewards({
       ...base, mode: "depths", dungeonId: "eclipse_spire", floor: 5,
-      outcome: "victory", highestClearedFloor: 4,
+      outcome: "victory", isBoss: true,
     });
     expect(capstone.shards).toBe(SHARD_REWARDS.bossFirstClearCapstone);
   });
 
-  it("replays and losses pay zero shards (first-time signals only)", () => {
-    const replay = computeBattleRewards({
-      ...base, mode: "depths", floor: 2, outcome: "victory",
-      highestClearedFloor: 4,
+  it("ordinary floors, boss replays, and losses all pay zero (first-time signals only)", () => {
+    const ordinary = computeBattleRewards({
+      ...base, mode: "depths", floor: 2, outcome: "victory", isBoss: false,
+    });
+    const bossReplay = computeBattleRewards({
+      ...base, mode: "depths", floor: 5, outcome: "victory",
+      isBoss: true, bossCleared: true,
     });
     const loss = computeBattleRewards({
       ...base, mode: "depths", floor: 2, outcome: "defeat",
     });
-    expect(replay.shards).toBe(0);
+    expect(ordinary.shards).toBe(0);
+    expect(bossReplay.shards).toBe(0);
     expect(loss.shards).toBe(0);
     expect(
       computeBattleRewards({ ...base, mode: "solo", floor: 1, outcome: "victory" })
