@@ -461,6 +461,14 @@ export function drawUnitSprite(
     case "imp":
       drawImp(ctx, body, dark, light, accent, A);
       break;
+    // The Warlock's pact imp — the same body, painted from its own (blue) def.
+    case "void_imp":
+      ctx.scale(0.9, 0.9); // smaller than the Vault's — a lesser thing
+      drawImp(ctx, body, dark, light, accent, A);
+      break;
+    case "warlock":
+      drawWarlock(ctx, body, dark, light, accent, A);
+      break;
     case "cultist":
       drawCultist(ctx, body, dark, light, accent, A);
       break;
@@ -1883,6 +1891,88 @@ function drawOrcWarAxe(ctx: Ctx, body: string, light: string, accent: string) {
   ctx.restore();
 }
 
+/** The deep-cowl archer hood (2026-07-05 mockup pick B): a pitch-black face with
+ *  two glowing eyes, an outer shell + inner lip, and a drape over the shoulders.
+ *  Every color derives from the caller's `body`/`accent`, so it repaints itself
+ *  for whoever wears it — the Ranger's forest green, the Archer's tan leather,
+ *  the Warlock's ember-red. Shared by drawRanger and drawWarlock.
+ *  Leaves fillStyle/strokeStyle dirty exactly as the inline block did; callers
+ *  set their own before the next shape.
+ *
+ *  `fillCavity`: the face circle, hood shell and drape don't quite meet — they
+ *  leave bare wedges either side of the face (~±4..5.4, y -9..-6.5) that show
+ *  whatever is behind the unit. The Ranger/Archer have always had them (their
+ *  quiver+cape sit behind, so nothing reads through); the Warlock's are visible,
+ *  so it packs the cowl silhouette black first. Everything else draws on top, so
+ *  this ONLY changes those gaps. Off by default = Ranger/Archer untouched. */
+function deepCowlHood(ctx: Ctx, body: string, accent: string, A: SpriteAnim, fillCavity = false) {
+  if (fillCavity) {
+    ctx.fillStyle = "#000";
+    ctx.beginPath();
+    ctx.moveTo(-6.6, -9.6);
+    ctx.quadraticCurveTo(-7.4, -19, 0, -19.8);
+    ctx.quadraticCurveTo(7.4, -19, 6.6, -9.6);
+    ctx.lineTo(7.0, -5.5);
+    ctx.quadraticCurveTo(0, -2.5, -7.0, -5.5);
+    ctx.closePath();
+    ctx.fill();
+  }
+  // shadowed face with glowing eyes (same trick as the Rogue's hood-eyes)
+  ctx.fillStyle = "#141410";
+  ctx.beginPath();
+  ctx.arc(0, -12, 5.6, 0, PI2);
+  ctx.fill();
+  ctx.save();
+  ctx.fillStyle = accent;
+  ctx.shadowColor = accent;
+  ctx.shadowBlur = 4 + A.glow * 5;
+  ctx.fillRect(-2.8, -12.6, 1.9, 1.6);
+  ctx.fillRect(1, -12.6, 1.9, 1.6);
+  ctx.restore();
+  // deep cowl: outer shell + inner lip shading the face
+  const hd = withShade(body, -40);
+  ctx.fillStyle = hd;
+  ctx.beginPath();
+  ctx.moveTo(-6.6, -9.6);
+  ctx.quadraticCurveTo(-7.4, -19, 0, -19.8);
+  ctx.quadraticCurveTo(7.4, -19, 6.6, -9.6);
+  ctx.quadraticCurveTo(7.4, -7, 5.4, -7.6);
+  ctx.quadraticCurveTo(6, -14.8, 0, -16.4);
+  ctx.quadraticCurveTo(-6, -14.8, -5.4, -7.6);
+  ctx.quadraticCurveTo(-7.4, -7, -6.6, -9.6);
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(-5.4, -8);
+  ctx.quadraticCurveTo(-6, -15.2, 0, -16.6);
+  ctx.quadraticCurveTo(6, -15.2, 5.4, -8);
+  ctx.quadraticCurveTo(4, -15, 0, -15.4);
+  ctx.quadraticCurveTo(-4, -15, -5.4, -8);
+  ctx.closePath();
+  ctx.fill();
+  // cowl drape over the shoulders
+  ctx.beginPath();
+  ctx.moveTo(-7, -7.6);
+  ctx.quadraticCurveTo(0, -4.4, 7, -7.6);
+  ctx.quadraticCurveTo(7.6, -4.6, 6.2, -3.2);
+  ctx.quadraticCurveTo(0, -0.8, -6.2, -3.2);
+  ctx.quadraticCurveTo(-7.6, -4.6, -7, -7.6);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = withShade(body, 25);
+  ctx.lineWidth = 0.7;
+  ctx.beginPath();
+  ctx.moveTo(-6.4, -4);
+  ctx.quadraticCurveTo(0, -1.8, 6.4, -4);
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(255,255,255,0.18)";
+  ctx.lineWidth = 0.9;
+  ctx.beginPath();
+  ctx.moveTo(-5.6, -12);
+  ctx.quadraticCurveTo(0, -18.8, 5.6, -12);
+  ctx.stroke();
+}
+
 // Ranger — the deep-cowl hooded archer sprite (2026-07-05 mockup pick B):
 // shadowed face with glowing eyes, shoulder mantle over a long swaying cape,
 // recurve wooden bow with leather wraps. The Archer draws the SAME sprite as a
@@ -1951,60 +2041,7 @@ function drawRanger(ctx: Ctx, body: string, dark: string, light: string, accent:
   ctx.quadraticCurveTo(0, 1.6, 7, -1.6);
   ctx.stroke();
   ctx.restore();
-  // shadowed face with glowing eyes (same trick as the Rogue's hood-eyes)
-  ctx.fillStyle = "#141410";
-  ctx.beginPath();
-  ctx.arc(0, -12, 5.6, 0, PI2);
-  ctx.fill();
-  ctx.save();
-  ctx.fillStyle = accent;
-  ctx.shadowColor = accent;
-  ctx.shadowBlur = 4 + A.glow * 5;
-  ctx.fillRect(-2.8, -12.6, 1.9, 1.6);
-  ctx.fillRect(1, -12.6, 1.9, 1.6);
-  ctx.restore();
-  // deep cowl: outer shell + inner lip shading the face
-  const hd = withShade(body, -40);
-  ctx.fillStyle = hd;
-  ctx.beginPath();
-  ctx.moveTo(-6.6, -9.6);
-  ctx.quadraticCurveTo(-7.4, -19, 0, -19.8);
-  ctx.quadraticCurveTo(7.4, -19, 6.6, -9.6);
-  ctx.quadraticCurveTo(7.4, -7, 5.4, -7.6);
-  ctx.quadraticCurveTo(6, -14.8, 0, -16.4);
-  ctx.quadraticCurveTo(-6, -14.8, -5.4, -7.6);
-  ctx.quadraticCurveTo(-7.4, -7, -6.6, -9.6);
-  ctx.closePath();
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(-5.4, -8);
-  ctx.quadraticCurveTo(-6, -15.2, 0, -16.6);
-  ctx.quadraticCurveTo(6, -15.2, 5.4, -8);
-  ctx.quadraticCurveTo(4, -15, 0, -15.4);
-  ctx.quadraticCurveTo(-4, -15, -5.4, -8);
-  ctx.closePath();
-  ctx.fill();
-  // cowl drape over the shoulders
-  ctx.beginPath();
-  ctx.moveTo(-7, -7.6);
-  ctx.quadraticCurveTo(0, -4.4, 7, -7.6);
-  ctx.quadraticCurveTo(7.6, -4.6, 6.2, -3.2);
-  ctx.quadraticCurveTo(0, -0.8, -6.2, -3.2);
-  ctx.quadraticCurveTo(-7.6, -4.6, -7, -7.6);
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = withShade(body, 25);
-  ctx.lineWidth = 0.7;
-  ctx.beginPath();
-  ctx.moveTo(-6.4, -4);
-  ctx.quadraticCurveTo(0, -1.8, 6.4, -4);
-  ctx.stroke();
-  ctx.strokeStyle = "rgba(255,255,255,0.18)";
-  ctx.lineWidth = 0.9;
-  ctx.beginPath();
-  ctx.moveTo(-5.6, -12);
-  ctx.quadraticCurveTo(0, -18.8, 5.6, -12);
-  ctx.stroke();
+  deepCowlHood(ctx, body, accent, A);
   // recurve wooden bow: dark outline, wood core, leather wraps at the limb
   // joints and grip
   ctx.strokeStyle = "#6b4420";
@@ -4650,6 +4687,123 @@ function drawBerserker(ctx: Ctx, body: string, dark: string, light: string, acce
     }
     ctx.restore();
   }
+}
+
+// Warlock — the rare pact summoner (2026-07-17 mockup pick 1, "Ember Cowl"; the
+// three losing variants are archived in docs/warlock-mockups.md). A black-and-ember
+// robed summoner: a tattered shroud under the Archer's deep cowl (cavity packed
+// black — see deepCowlHood's `fillCavity`), a slow-rotating pentagram, rising
+// embers, and a black staff crowned with red flame. It shares the Necromancer's
+// robe silhouette by lineage, but is its own draw fn — the two diverge from here.
+function drawWarlock(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {
+  const t = A.t;
+  // slow-rotating summoning pentagram underfoot (no encircling ring)
+  ctx.save();
+  ctx.globalAlpha = 0.45 + 0.18 * Math.sin(t * 1.6);
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = 1.1;
+  ctx.shadowColor = accent;
+  ctx.shadowBlur = 8;
+  ctx.beginPath();
+  for (let i = 0; i < 5; i++) {
+    const a = -Math.PI / 2 + t * 0.25 + i * ((PI2 * 2) / 5);
+    const x = Math.cos(a) * 12;
+    const y = 24 + Math.sin(a) * 3.4;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.stroke();
+  ctx.restore();
+  // ember backlight
+  ctx.save();
+  ctx.globalAlpha = 0.2;
+  const bl = ctx.createRadialGradient(0, -2, 4, 0, -2, 24);
+  bl.addColorStop(0, accent);
+  bl.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = bl;
+  ctx.beginPath();
+  ctx.arc(0, -2, 24, 0, PI2);
+  ctx.fill();
+  ctx.restore();
+  // embers rising off the pact (motion only)
+  if (A.live) {
+    for (let w = 0; w < 5; w++) {
+      const seed = w * 1.9;
+      const life = (t * 0.45 + seed) % 1;
+      const wx = (w - 2) * 6 + Math.sin(t + seed) * 3;
+      const wy = 16 - life * 28;
+      ctx.save();
+      ctx.globalAlpha = (1 - life) * 0.55;
+      ctx.fillStyle = "#fca5a5";
+      ctx.shadowColor = accent;
+      ctx.shadowBlur = 6;
+      ctx.beginPath();
+      ctx.ellipse(wx, wy, 1.8, 2.4, 0, 0, PI2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+  // tattered pact-shroud with a ragged hem
+  const rg = ctx.createLinearGradient(0, -14, 0, 20);
+  rg.addColorStop(0, withShade(body, 10));
+  rg.addColorStop(0.6, body);
+  rg.addColorStop(1, withShade(body, -28));
+  ctx.fillStyle = rg;
+  ctx.beginPath();
+  ctx.moveTo(0, -14);
+  ctx.lineTo(14, 18);
+  const hem: [number, number][] = [
+    [11, 14], [8, 19], [5, 14], [2, 19], [-1, 14], [-4, 19], [-7, 14], [-10, 19], [-14, 18],
+  ];
+  for (const [hx, hy] of hem) ctx.lineTo(hx, hy);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = withShade(body, -35);
+  ctx.beginPath();
+  ctx.moveTo(0, -4);
+  ctx.lineTo(8, 18);
+  ctx.lineTo(-8, 18);
+  ctx.closePath();
+  ctx.fill();
+  // the Archer's deep cowl, cavity packed black so no seam shows through
+  deepCowlHood(ctx, body, accent, A, true);
+  // black staff crowned with red flame
+  ctx.strokeStyle = "#1c1917";
+  ctx.lineWidth = 2.2;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(13, 18);
+  ctx.lineTo(13, -8);
+  ctx.stroke();
+  ctx.lineCap = "butt";
+  ctx.save();
+  ctx.fillStyle = accent;
+  ctx.shadowColor = accent;
+  ctx.shadowBlur = 10;
+  ctx.globalAlpha = 0.85;
+  for (let k = 0; k < 5; k++) {
+    const an = t * 3 + k * 1.256;
+    const fl = 6 * (0.9 + 0.3 * Math.abs(Math.sin(t * 6 + k)));
+    ctx.beginPath();
+    ctx.moveTo(13 + Math.cos(an) * 3, -14 + Math.sin(an) * 3);
+    ctx.lineTo(13 + Math.cos(an - 0.2) * fl, -14 + Math.sin(an - 0.2) * fl);
+    ctx.lineTo(13 + Math.cos(an + 0.2) * fl, -14 + Math.sin(an + 0.2) * fl);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+  // ember core at the staff's crown (where the Necromancer carries a skull)
+  ctx.save();
+  ctx.fillStyle = "#fca5a5";
+  ctx.shadowColor = accent;
+  ctx.shadowBlur = 8;
+  ctx.beginPath();
+  ctx.arc(13, -14, 2.6, 0, PI2);
+  ctx.fill();
+  ctx.restore();
+  void dark;
+  void light;
 }
 
 function drawNecromancer(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {

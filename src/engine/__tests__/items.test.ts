@@ -11,9 +11,16 @@ import { hasEffect } from "@/engine/StatusEffectSystem";
 import { abilityCooldownTicks } from "@/engine/AbilitySystem";
 import { MatchController } from "@/engine/MatchController";
 import { getUnitDef } from "@/data/units";
-import { resolveLoadoutMods } from "@/data/items";
+import {
+  ITEM_LINES,
+  describeItemKey,
+  makeItemKey,
+  nextItemKey,
+  resolveItemMods,
+  resolveLoadoutMods,
+} from "@/data/items";
 import { levelStatMultipliers } from "@/meta/leveling";
-import type { ItemLoadout, ItemLoadouts, Unit } from "@/types";
+import type { ItemLoadout, ItemLoadouts, ItemMods, Unit } from "@/types";
 import type { ItemCarry } from "@/entities/createUnit";
 import { battleState, digest, makeDummy, place, runMatch } from "./helpers";
 
@@ -71,7 +78,9 @@ describe("items — the stat bake (createUnit)", () => {
     const u = place(s, "skeleton", "player", 100, 100, 3, items);
     const def = getUnitDef("skeleton");
     const lvl = levelStatMultipliers(3);
-    expect(u.maxHp).toBe(Math.round(Math.round(def.hp * lvl.hp) * 1)); // no armor
+    expect(u.maxHp).toBe(
+      Math.round(Math.round(def.hp * lvl.hp) * items.mods.hpMult) // the blade's hp sub
+    );
     expect(u.damage).toBe(
       Math.round(Math.round(def.damage * lvl.dmg) * items.mods.dmgMult)
     );
@@ -207,8 +216,12 @@ describe("items — swing effects", () => {
     const { s, wearer, dummy } = duel(10, { weapon: "stormpiercer:legendary:1" });
     const bystander = makeDummy(place(s, "skeleton", "enemy", 180, 100));
     for (let i = 0; i < 300 && wearer.attackCount < 4; i++) stepSimulation(s);
-    expect(100000 - bystander.hp).toBe(Math.round(wearer.damage * 0.5));
-    expect(100000 - dummy.hp).toBe(4 * wearer.damage); // primary unaffected
+    // The giant-slayer sub is live here: the huge dummies out-HP the wearer.
+    const gs = 1 + wearer.itemMods!.giantSlayerPct;
+    expect(100000 - bystander.hp).toBe(
+      Math.round(Math.round(wearer.damage * 0.5) * gs)
+    );
+    expect(100000 - dummy.hp).toBe(4 * Math.round(wearer.damage * gs));
   });
 
   it("Windlash Tempo: consecutive hits on one target stack (count − 1)", () => {
@@ -379,5 +392,160 @@ describe("items — arena mirror", () => {
     expect(mirrored.itemMods).toBeDefined();
     // Deterministic: the same loadouts produce the same bump.
     expect(deploy(FULL_LOADOUTS).maxHp).toBe(mirrored.maxHp);
+  });
+});
+
+describe("items — sub-stats (weapons & armors)", () => {
+  // Every weapon/armor line's fixed secondary (the SUB table): the rare 1★
+  // pin, and at legendary BOTH the grown sub and the signature must show.
+  const PINS: Record<string, { rare1: string; leg1: string; leg1Sig: string }> = {
+    soldiers_blade: {
+      rare1: "+3% health",
+      leg1: "+10% health",
+      leg1Sig: "below 25% HP",
+    },
+    bloodletter_axe: {
+      rare1: "+5% damage vs enemies below 25% HP",
+      leg1: "+15% damage vs enemies below 25% HP",
+      leg1Sig: "Heals 10% of attack damage dealt",
+    },
+    stormpiercer: {
+      rare1: "+4% damage vs larger foes",
+      leg1: "+12% damage vs larger foes",
+      leg1Sig: "chains to a second enemy",
+    },
+    hexblade: {
+      rare1: "Takes 4% less magic damage",
+      leg1: "Takes 12% less magic damage",
+      leg1Sig: "silence",
+    },
+    twinfang_daggers: {
+      rare1: "+3% attack speed",
+      leg1: "+8% attack speed",
+      leg1Sig: "strikes twice",
+    },
+    windlash_saber: {
+      rare1: "+2% move speed",
+      leg1: "+6% move speed",
+      leg1Sig: "max 5 stacks",
+    },
+    gravewhisper_blade: {
+      rare1: "Heals 2% of attack damage dealt",
+      leg1: "Heals 8% of attack damage dealt",
+      leg1Sig: "Kills heal the wearer 15 HP",
+    },
+    forgemasters_hammer: {
+      rare1: "Takes 1% less damage",
+      leg1: "Takes 5% less damage",
+      leg1Sig: "Every 5th attack crits",
+    },
+    guildmasters_dirk: {
+      rare1: "Kills heal the wearer 4 HP",
+      leg1: "Kills heal the wearer 12 HP",
+      leg1Sig: "Kills grant +30% speed",
+    },
+    squires_plate: {
+      rare1: "+2% damage",
+      leg1: "+9% damage",
+      leg1Sig: "Reflects 10% of damage taken",
+    },
+    bulwark_shield: {
+      rare1: "Takes 3% less magic damage",
+      leg1: "Takes 10% less magic damage",
+      leg1Sig: "Takes 5% less damage",
+    },
+    wanderers_cloak: {
+      rare1: "Every 10th attack crits",
+      leg1: "Every 8th attack crits",
+      leg1Sig: "+8% move speed",
+    },
+    golem_core: {
+      rare1: "Summons spawn with +5% stats",
+      leg1: "Summons spawn with +18% stats",
+      leg1Sig: "Starts battle with a shield",
+    },
+    phasecloak: {
+      rare1: "Ability cooldown reduced 3%",
+      leg1: "Ability cooldown reduced 10%",
+      leg1Sig: "stealth",
+    },
+  };
+
+  it("every line carries its sub at rare 1★ and keeps it, plus the signature, at legendary", () => {
+    for (const [lineId, pin] of Object.entries(PINS)) {
+      const rare = describeItemKey(makeItemKey(lineId, "rare", 1)).join(" · ");
+      const leg = describeItemKey(makeItemKey(lineId, "legendary", 1)).join(" · ");
+      expect(rare, lineId).toContain(pin.rare1);
+      expect(leg, lineId).toContain(pin.leg1);
+      expect(leg, lineId).toContain(pin.leg1Sig);
+    }
+  });
+
+  it("no two same-slot lines read identically at rare 1★, and none is a bare primary", () => {
+    for (const slot of ["weapon", "armor"] as const) {
+      const texts = Object.values(ITEM_LINES)
+        .filter((l) => l.slot === slot)
+        .map((l) => describeItemKey(makeItemKey(l.id, "rare", 1)).join(" · "));
+      expect(new Set(texts).size).toBe(texts.length);
+      for (const t of texts) expect(t).toContain(" · "); // ≥ 2 effect lines
+    }
+  });
+
+  it("each sub only grows along the 9-step merge path (rare 1★ → legendary 3★)", () => {
+    const GOODNESS: Record<string, (m: ItemMods) => number> = {
+      soldiers_blade: (m) => m.hpMult,
+      bloodletter_axe: (m) => m.executeBonus,
+      stormpiercer: (m) => m.giantSlayerPct,
+      hexblade: (m) => 1 - m.magicTakenMult,
+      twinfang_daggers: (m) => 1 / m.atkDelayMult,
+      windlash_saber: (m) => m.moveSpeedMult,
+      gravewhisper_blade: (m) => m.lifesteal,
+      forgemasters_hammer: (m) => 1 - m.damageTakenMult,
+      guildmasters_dirk: (m) => m.killHeal,
+      squires_plate: (m) => m.dmgMult,
+      bulwark_shield: (m) => 1 - m.magicTakenMult,
+      wanderers_cloak: (m) => -m.critEveryNth,
+      golem_core: (m) => m.summonStatPct,
+      phasecloak: (m) => 1 - m.cooldownMult,
+    };
+    for (const [lineId, goodness] of Object.entries(GOODNESS)) {
+      let key: string | null = makeItemKey(lineId, "rare", 1);
+      let prev = -Infinity;
+      let steps = 0;
+      while (key) {
+        const g = goodness(resolveItemMods(key));
+        expect(g, key).toBeGreaterThanOrEqual(prev);
+        prev = g;
+        key = nextItemKey(key);
+        steps++;
+      }
+      expect(steps).toBe(9);
+    }
+  });
+
+  it("sub-stat folds: crit min-rule and multiplicative magic resist", () => {
+    const hammerAndCloak = resolveLoadoutMods({
+      weapon: "forgemasters_hammer:legendary:1",
+      armor: "wanderers_cloak:rare:1",
+    })!;
+    expect(hammerAndCloak.critEveryNth).toBe(5); // the more frequent source wins
+    expect(resolveItemMods("wanderers_cloak:rare:1").critEveryNth).toBe(10);
+    const antiMage = resolveLoadoutMods({
+      weapon: "hexblade:rare:1",
+      armor: "bulwark_shield:rare:1",
+    })!;
+    expect(antiMage.magicTakenMult).toBeCloseTo(0.96 * 0.97, 12);
+  });
+
+  it("Wanderer's crit cadence fires from the armor slot: the 10th swing crits", () => {
+    const s = battleState(31);
+    const wearer = place(s, "skeleton", "player", 100, 100, 1, carry("skeleton", {
+      armor: "wanderers_cloak:rare:1",
+    }));
+    wearer.moveSpeed = 0;
+    const dummy = makeDummy(place(s, "skeleton", "enemy", 130, 100));
+    for (let i = 0; i < 600 && wearer.attackCount < 10; i++) stepSimulation(s);
+    expect(wearer.attackCount).toBe(10);
+    expect(100000 - dummy.hp).toBe(11 * wearer.damage); // 9 swings + a double
   });
 });

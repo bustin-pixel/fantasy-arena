@@ -100,6 +100,14 @@ export const ABILITIES: Record<AbilityId, AbilityDef> = {
     cooldown: 10,
     castTimeSec: 0.5,
   },
+  summon_imps: {
+    id: "summon_imps",
+    name: "Summon Imps",
+    description:
+      "Tears open a rift and calls two void imps — ranged minions that fight until they fall. Limited by the battlefield's summon cap.",
+    cooldown: 10,
+    castTimeSec: 0.5,
+  },
   rejuvenation: {
     id: "rejuvenation",
     name: "Rejuvenation",

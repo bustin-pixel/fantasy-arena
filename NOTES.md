@@ -517,6 +517,16 @@ playbook — one bake point, deterministic match input — plus its own invarian
   `resolveItemMods`) lives in `data/items.ts`; item ACQUISITION (drop odds,
   quality weights, merge costs, shard rewards/drip) lives in
   `meta/economy.ts`. Tune in the right file.
+- **Every weapon/armor line carries a fixed SUB-STAT** (the `SUB` table in
+  `data/items.ts`) at ALL qualities, kept at legendary alongside the
+  signature — that's what makes rare/epic picks distinct (trinkets have
+  none; they're already unique per tier). A sub must never share a field
+  with its own line's signature (`mods()` returns a plain object — a shared
+  field silently OVERWRITES via spread, it doesn't fold), and its ladder
+  must be non-decreasing along the 9-step merge path (flat seams ok). The
+  sub-stats spec block in `items.test.ts` enforces both, plus "no two
+  same-slot lines read identically at rare 1★" — a new line can't ship as
+  a clone.
 - **Items bake at `createUnit` only** — nested rounding, LEVEL FIRST:
   `round(round(def × lvlMult) × itemMult)`. UnitDetail mirrors this exact
   math so the panel equals the battlefield. No loadout = no `latentItems`/
@@ -561,6 +571,10 @@ playbook — one bake point, deterministic match input — plus its own invarian
   flat hp/dmg mods with `owner = defId`, so the normal bake applies): derived
   purely from the replay inputs, identity when nothing is equipped. PvE enemy
   tuning is untouched by design — the player's own gear DOES apply everywhere.
+  Only stat-shaped mods mirror (hp, damage, attack speed, damage taken);
+  weapon/armor sub-stats outside those four (execute, giant-slayer, magic
+  resist, move, lifesteal, kill heal, CDR, summon stats, crit cadence) are
+  accepted drift — the mirror approximates, like `TRINKET_MIRROR_PCT`.
 - **The Lucky Coin is the ONLY meta-read item**: `computeBattleRewards` takes
   `itemLoadouts` just for it (gold boost + a chest-tier upgrade rolled on a
   SEPARATE seeded stream, `RNG(chestSeed ^ 0x5eed)`, so chest contents stay
