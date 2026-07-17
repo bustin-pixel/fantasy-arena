@@ -4,22 +4,19 @@ Forward-looking only — what's planned, deferred, and open. For what's already
 **done** and why, read the git history (`git log --oneline`, `gh pr list`) — that's
 the source of truth, so this file deliberately doesn't duplicate it.
 
-> **⏳ OPEN: the architecture deepening batch — 6 of 7 done, unshipped.**
-> Branch `refactor/deepening-batch` (6 commits off `master`, 659 tests green, no
-> gameplay change). Shipped in-batch: the battle-grant fold → `meta/battleGrant`;
-> the DEAD legacy reward path deleted (its 812-line suite was testing only the
-> dead branch); dungeon facets onto the `Dungeon` def + a completeness spec for
-> the ones that can't move; the post-victory ceremony → a pure stage machine
-> (`hooks/ceremony.ts`); item swing effects → `engine/items/swingEffects.ts`
-> (⚠ their resolve order is SIMULATION — see that file's header); the enemy
-> tactical AI → `engine/EnemyAI.ts`.
-> **Left: #7 only** — split `assets/sprites.ts`'s 83-case `switch (def.id)` into a
-> per-defId art registry. The risk is a silent sprite mis-mapping that nothing
-> tests, so it needs a pixel-hash before/after harness, not a blind transcription.
-> Full plan + the reusable digest-equivalence trick: the `architecture-refactor-batch`
-> memory.
-> **Before merging:** the ceremony's canvas cinematic (chest → campfire → walkout)
-> needs a device eyeball on a depths run — the preview pane suspends rAF.
+> **✅ The architecture deepening batch SHIPPED** (PR #65, merge `6d5a4e9`,
+> 2026-07-17, deploy hash-verified). Six refactors, no gameplay change, 663 tests.
+> Two hazards it left behind that are worth knowing before you touch the area:
+> **item swing effects resolve in a FIXED order that is simulation, not layout**
+> (`engine/items/swingEffects.ts` header explains why a kind-keyed loop would be a
+> bug), and **adding a dungeon is guarded by `data/__tests__/dungeonFacets.test.ts`**
+> — a red line there is the checklist.
+>
+> **Deferred: the sprites art registry** — splitting `assets/sprites.ts`'s 83-case
+> `switch (def.id)` into a per-defId registry. Cut deliberately: it buys locality
+> only (no bug fixed, no coverage gained, no feature unblocked). Plan + the
+> exceptions to preserve live in the `architecture-refactor-batch` memory if it's
+> ever wanted.
 
 **Current state:** deterministic 4v4 auto-battler, 24 deckable units (engine fully
 kit-based — see `docs/adr/0001-unitkit-seam.md`), a swipeable 3-page app shell
