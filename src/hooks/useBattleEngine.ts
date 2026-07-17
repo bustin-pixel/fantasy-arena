@@ -129,12 +129,9 @@ export interface UseBattleEngine {
     onSettled: () => void,
     reviveFallen?: boolean
   ) => void;
-  /** Post-victory outro: the player tapped the on-floor chest — play the open
-   *  animation; `onReveal` fires at the reveal beat (lid fully open). */
-  openOutroChest: (onReveal: () => void) => void;
-  /** Treasure room: materialize N chests and gather the band before the hoard. */
-  startOutroChests: (tiers: ChestTier[], onSettled: () => void) => void;
-  /** Open chest `index` (treasure room); `onReveal` fires at its reveal beat. */
+  /** Open chest `index` (0 = the single reward chest); `onReveal` fires at its
+   *  reveal beat (lid fully open). A treasure room's hoard is stood up by the
+   *  init effect above, not from the screen — see the StrictMode note there. */
   openOutroChestAt: (index: number, onReveal: () => void) => void;
   /** Current chest world points + open state, for tap hit-testing. */
   outroChestPoints: () => {
@@ -461,23 +458,6 @@ export function useBattleEngine(
     []
   );
 
-  const openOutroChest = useCallback((onReveal: () => void) => {
-    outroRef.current?.openChest(onReveal);
-  }, []);
-
-  const startOutroChests = useCallback(
-    (tiers: ChestTier[], onSettled: () => void) => {
-      const c = controllerRef.current;
-      if (!c) {
-        onSettled();
-        return;
-      }
-      outroRef.current = new OutroCinematic(c.state);
-      outroRef.current.gatherAtChests(tiers, onSettled);
-    },
-    []
-  );
-
   const openOutroChestAt = useCallback((index: number, onReveal: () => void) => {
     outroRef.current?.openChestAt(index, onReveal);
   }, []);
@@ -521,8 +501,6 @@ export function useBattleEngine(
     retireEndless,
     wavesSurvived,
     startOutroChest,
-    openOutroChest,
-    startOutroChests,
     openOutroChestAt,
     outroChestPoints,
     startOutroCamp,

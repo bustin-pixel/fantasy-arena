@@ -29,6 +29,13 @@ import {
   type ChestResult,
 } from "@/meta/rewards";
 import { assignOmens, type EncounterKind } from "@/data/encounters";
+import {
+  ceremonyStep,
+  type CeremonyCtx,
+  type CeremonyEffect,
+  type CeremonyEvent,
+  type CeremonyStage,
+} from "@/hooks/ceremony";
 import { getDungeon } from "@/data/dungeons";
 import { addXp, levelFromXp } from "@/meta/leveling";
 import { RewardPanel } from "@/components/RewardPanel";
@@ -161,13 +168,21 @@ export function BattleScreen({
   const [retired, setRetired] = useState(false);
   // uid of the unit whose stat tooltip is open (tap a combatant to inspect).
   const [inspectedUid, setInspectedUid] = useState<string | null>(null);
-  // Post-victory continue-deeper cinematic: open the reward chest on the floor →
-  // gather at the campfire → pick an exit → walk out → App opens the Dungeon
-  // Atlas. Null = not playing. The "chest" stage is skipped when there's no
-  // chest (normal-floor replays), going straight to "camp".
-  const [outroStage, setOutroStage] = useState<
-    null | "chest" | "camp" | "choice" | "walkout"
-  >(null);
+  // Post-victory ceremony: open the reward chest on the floor → gather at the
+  // campfire → pick an exit → walk out → App opens the Dungeon Atlas. The GRAPH
+  // (which stage follows which, on every branch) lives in hooks/ceremony as a
+  // pure machine with specs; this screen renders the stage it reports and
+  // performs the effects it returns. "idle" = not playing.
+  const [outroStage, setOutroStage] = useState<CeremonyStage>("idle");
+  // The machine is driven from timers and cinematic callbacks, which close over
+  // stale renders — so the dispatcher reads the live stage/ctx from refs.
+  const stageRef = useRef<CeremonyStage>("idle");
+  const ceremonyCtxRef = useRef<CeremonyCtx>({
+    isBoss,
+    isTreasureRoom: false,
+    hasChest: false,
+    reducedMotion: false,
+  });
   // The single reward chest's lid has landed and its loot is floating up.
   const [chestRevealed, setChestRevealed] = useState(false);
   // Treasure room (no-combat 3-chest floor): the hoard's data, which chests have
@@ -192,38 +207,70 @@ export function BattleScreen({
     };
   }, []);
 
-  // The band strolls down to the campfire and heals; then the exit arrows.
-  const goToCamp = () => {
-    setOutroStage("camp");
-    startOutroCamp(() => {
-      if (!aliveRef.current) return;
-      playSfx("heal"); // the fire closes their wounds
-      setOutroStage("choice");
-    });
+  // The reward bundle + treasure hoard, mirrored into refs so the effect
+  // performer (driven from timers/callbacks) reads the landed values.
+  const rewardsRef = useRef<BattleRewards | null>(null);
+
+  /** Perform ONE effect the machine asked for. Every side effect the ceremony
+   *  has — timers, SFX, OutroCinematic, the handoff — is performed here and
+   *  nowhere else, so the graph itself stays pure. */
+  const performCeremony = (fx: CeremonyEffect) => {
+    switch (fx.kind) {
+      case "startChest": {
+        const tier = rewardsRef.current?.chest?.tier;
+        if (!tier) return;
+        const start = () => {
+          if (!aliveRef.current) return;
+          startOutroChest(
+            tier,
+            () => {
+              /* band gathered at the chest; the tap opens it (handleTap). */
+            },
+            fx.reviveFallen
+          );
+        };
+        if (fx.delayMs > 0) window.setTimeout(start, fx.delayMs);
+        else start();
+        break;
+      }
+      case "startCamp":
+        startOutroCamp(() => {
+          if (!aliveRef.current) return;
+          playSfx("heal"); // the fire closes their wounds
+          dispatchCeremony({ kind: "campSettled" });
+        });
+        break;
+      case "walkOff":
+        outroWalkOff(fx.dir, () => {
+          if (!aliveRef.current) return;
+          dispatchCeremony({ kind: "walkedOff", encounter: fx.encounter });
+        });
+        break;
+      case "showResult":
+        if (fx.delayMs > 0) {
+          window.setTimeout(() => {
+            if (aliveRef.current) setShowResult(true);
+          }, fx.delayMs);
+        } else setShowResult(true);
+        break;
+      case "handOff":
+        onContinueDeeper?.(dungeonId, fx.encounter);
+        break;
+    }
+  };
+
+  const dispatchCeremony = (event: CeremonyEvent) => {
+    const step = ceremonyStep(stageRef.current, event, ceremonyCtxRef.current);
+    stageRef.current = step.stage;
+    setOutroStage(step.stage);
+    for (const fx of step.effects) performCeremony(fx);
   };
 
   const continueDeeper = () => {
     if (!onContinueDeeper) return;
     playSfx("uiConfirm");
-    // Reduced motion: skip the whole cinematic (and the path choice), so the
-    // next floor is a plain descent.
-    if (prefersReducedMotion()) {
-      onContinueDeeper(dungeonId, "normal");
-      return;
-    }
     setShowResult(false);
-    // A chest this floor → materialize it up-field and gather in front of it;
-    // the player taps to open (handleTap). No chest (a normal-floor replay) →
-    // straight to the campfire.
-    const chest = rewards?.chest;
-    if (chest) {
-      setOutroStage("chest");
-      startOutroChest(chest.tier, () => {
-        /* band gathered at the chest; the tap opens it. */
-      });
-    } else {
-      goToCamp();
-    }
+    dispatchCeremony({ kind: "continueDeeper" });
   };
 
   // Player tapped chest `index`: play the open, float its loot at the reveal
@@ -251,20 +298,16 @@ export function BattleScreen({
       if (treasureOpenedRef.current.size === (treasureChests?.length ?? 3)) {
         // Last chest opened — let the reveals settle, then to the campfire.
         window.setTimeout(() => {
-          if (aliveRef.current) goToCamp();
+          if (aliveRef.current) dispatchCeremony({ kind: "treasureSettled" });
         }, 3400);
       }
     }
   };
 
   const chooseExit = (dir: OutroDir) => {
-    setOutroStage("walkout");
     // The arrow's KIND decides what the next floor holds — which is not always
     // what its omen showed (a rare quarry hides behind another arrow's omen).
-    const kind = omens[dir].kind;
-    outroWalkOff(dir, () => {
-      if (aliveRef.current) onContinueDeeper?.(dungeonId, kind);
-    });
+    dispatchCeremony({ kind: "exitChosen", dir, encounter: omens[dir].kind });
   };
 
   // The campfire crackles while the band rests at it.
@@ -386,38 +429,20 @@ export function BattleScreen({
         slain,
       });
       setRewards(bundle);
-      // Boss floor (full motion, with a chest): the reward chest opens ON the
-      // arena floor — the warband gathers, the player taps it open, the loot
-      // reveals, THEN the "Dungeon Cleared!" screen appears. No campfire/exit
-      // arrows: the dungeon is over. Reduced motion, a chestless replay, or a
-      // non-boss floor fall through to the result card (its own ceremony reveals
-      // the reward). Grant already happened, so leaving mid-cinematic is safe.
-      const bossFloorChest =
-        mode === "depths" &&
-        outcome === "victory" &&
-        isBoss &&
-        !!bundle.chest &&
-        !prefersReducedMotion();
-      if (bossFloorChest && bundle.chest) {
-        const chestTier = bundle.chest.tier;
-        // Let the victory stinger + the "boss slain" beat land, then the chest
-        // materializes at the end of the lair and the band gathers at it.
-        setTimeout(() => {
-          if (!aliveRef.current) return;
-          setOutroStage("chest");
-          startOutroChest(
-            chestTier,
-            () => {
-              /* survivors gathered at the chest; the tap opens it (handleTap). */
-            },
-            // The run is over — no campfire to raise the fallen, so they stay
-            // down where they fell; only the survivors walk up to the chest.
-            false
-          );
-        }, 900);
-      } else {
-        setTimeout(() => setShowResult(true), 700);
-      }
+      rewardsRef.current = bundle;
+      // Freeze the facts the ceremony branches on, THEN hand the resolution to
+      // the machine: a won lair with a chest opens it ON the arena floor (the
+      // band gathers, the player taps, the loot reveals, and only then does the
+      // "Dungeon Cleared!" card appear). Everything else — a loss, a chestless
+      // replay, reduced motion, an ordinary floor — routes to the result card.
+      // The grant already happened, so leaving mid-cinematic is safe.
+      ceremonyCtxRef.current = {
+        isBoss: mode === "depths" && outcome === "victory" && isBoss,
+        isTreasureRoom,
+        hasChest: !!bundle.chest,
+        reducedMotion: prefersReducedMotion(),
+      };
+      dispatchCeremony({ kind: "resolved" });
     }
   }, [
     ui.phase,
@@ -468,9 +493,15 @@ export function BattleScreen({
     window.setTimeout(() => {
       if (aliveRef.current) setTreasureBanner(false);
     }, 2400);
-    // The chests themselves are stood up by useBattleEngine's init effect (in
-    // lockstep with the controller); here we just open the chest stage.
-    setOutroStage("chest");
+    // A treasure room has no fight to win, so the hoard's grant IS its
+    // resolution — hand it to the ceremony machine to open the chest stage.
+    ceremonyCtxRef.current = {
+      isBoss: false,
+      isTreasureRoom: true,
+      hasChest: true,
+      reducedMotion: prefersReducedMotion(),
+    };
+    dispatchCeremony({ kind: "treasureGranted" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -578,10 +609,9 @@ export function BattleScreen({
             bufH={canvasRef.current?.height ?? FIELD_HEIGHT}
             onDismiss={() => {
               setChestRevealed(false);
-              // Boss floor: the dungeon is over — no campfire/exit arrows. Surface
-              // the "Dungeon Cleared!" screen. Non-boss: on to the campfire.
-              if (isBoss) setShowResult(true);
-              else goToCamp();
+              // The lair ends the run ("Dungeon Cleared!"); an ordinary floor
+              // walks on to the campfire. The machine owns which.
+              dispatchCeremony({ kind: "revealDismissed" });
             }}
           />
         )}
