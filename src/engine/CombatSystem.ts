@@ -51,6 +51,10 @@ import {
   type AbilityContext,
 } from "./AbilitySystem";
 import { getKit, type KitCtx } from "./kits/UnitKit";
+import {
+  applyItemRider as applyItemRiderTo,
+  runSwingEffects,
+} from "./items/swingEffects";
 import { stepMovement } from "./MovementSystem";
 import { updateTarget } from "./TargetingSystem";
 import {
@@ -243,31 +247,15 @@ function packTacticsFrac(state: SimState, unit: Unit): number {
   return pt.perAlly * allies;
 }
 
-/** Apply an item rider's status + impact vfx to a target (melee hits, item
- *  projectile riders, detonation novae all funnel through here). */
+/** Apply an item rider's status + impact vfx to a target. Thin wrapper over the
+ *  items-module resolver, binding this module's local spawnVfx. */
 function applyItemRider(
   state: SimState,
   target: Unit,
   sourceUid: string,
   r: ShotRider
 ): void {
-  applyEffect(
-    target,
-    makeEffect(r.effectType, {
-      source: sourceUid,
-      durationSec: r.durationSec,
-      damagePerTick: r.damagePerTick,
-      tickIntervalSec: r.tickIntervalSec,
-      magnitude: r.magnitude,
-    })
-  );
-  spawnVfx(state, {
-    kind: r.vfxKind,
-    pos: { x: target.pos.x, y: target.pos.y },
-    life: secToTicks(0.4),
-    maxLife: secToTicks(0.4),
-    color: r.color,
-  });
+  applyItemRiderTo(target, sourceUid, r, (v) => spawnVfx(state, v));
 }
 
 /** Per-tick equipment upkeep: Heartwood regen (through the heal funnel, once
@@ -1535,90 +1523,19 @@ function performBasicAttack(
   }
 
   // --- Equipment swing effects (default swings only — a kit-replaced swing
-  // returned above). All share the attackCount cadence counter. -------------
+  // returned above). All share the attackCount cadence counter, and they
+  // resolve in a FIXED order that is part of the sim — see items/swingEffects.
   if (!im) return;
-
-  // Twinfang: every Nth attack strikes twice (a second full swing).
-  const twin = findItemEffect(unit, "doubleStrikeNth");
-  if (twin && unit.attackCount % twin.everyNth === 0) {
-    if (ranged) {
-      spawnProjectile(state, {
-        pos: { x: unit.pos.x, y: unit.pos.y },
-        target: { x: target.pos.x, y: target.pos.y },
-        targetUid: target.uid,
-        speed: 380,
-        damage: unit.damage * critMult,
-        team: unit.team,
-        sourceUid: unit.uid,
-        ability: "lifesteal",
-        color: def.accent,
-        angle: 0,
-      });
-    } else {
-      dealDamage(target, unit.damage * critMult, unit);
-      applyLifesteal(
-        unit,
-        unit.damage * critMult,
-        heal,
-        tmods.lifestealBonus + im.lifesteal
-      );
-    }
-  }
-
-  // Stormpiercer: every Nth attack arcs to the nearest OTHER enemy.
-  const chain = findItemEffect(unit, "chainNth");
-  if (chain && unit.attackCount % chain.everyNth === 0) {
-    let nearest: Unit | null = null;
-    let nd = Infinity;
-    for (const e of ctx.enemies) {
-      if (e === target || e.state === "dead") continue;
-      const d = dist(unit.pos, e.pos);
-      if (d < nd) {
-        nd = d;
-        nearest = e;
-      }
-    }
-    if (nearest) {
-      spawnVfx(state, {
-        kind: "lightning",
-        pos: { x: target.pos.x, y: target.pos.y },
-        to: { x: nearest.pos.x, y: nearest.pos.y },
-        life: secToTicks(0.3),
-        maxLife: secToTicks(0.3),
-        color: "#38bdf8",
-      });
-      dealDamage(nearest, Math.round(unit.damage * chain.frac), unit);
-    }
-  }
-
-  // Eclipse Pendant: every Nth hit lands bonus shadow damage (+ leg. stun).
-  const eclipse = findItemEffect(unit, "nthBonusDamage");
-  if (eclipse && unit.attackCount % eclipse.everyNth === 0) {
-    spawnVfx(state, {
-      kind: "burn_burst",
-      pos: { x: target.pos.x, y: target.pos.y },
-      life: secToTicks(0.35),
-      maxLife: secToTicks(0.35),
-      color: "#facc15",
-    });
-    dealDamage(target, eclipse.bonus, unit);
-    if (eclipse.stunSec) {
-      applyEffect(
-        target,
-        makeEffect("stun", { source: unit.uid, durationSec: eclipse.stunSec })
-      );
-    }
-  }
-
-  // Venom Fang legendary: hits on a poisoned target splash the poison nearby.
-  const spread = findItemEffect(unit, "spreadPoisonOnAttack");
-  if (spread && target.effects.some((e) => e.type === "poison")) {
-    for (const foe of ctx.enemies) {
-      if (foe === target || foe.state === "dead") continue;
-      if (dist(foe.pos, target.pos) > spread.radius) continue;
-      applyItemRider(state, foe, unit.uid, spread.rider);
-    }
-  }
+  runSwingEffects({
+    ctx,
+    unit,
+    target,
+    critMult,
+    ranged,
+    accent: def.accent,
+    lifestealFrac: tmods.lifestealBonus + im.lifesteal,
+    applyLifesteal: (u, dmg, frac) => applyLifesteal(u, dmg, heal, frac),
+  });
 }
 
 // (Mystic Archer's on-hit resolution now lives in kits/mysticArcher.ts
