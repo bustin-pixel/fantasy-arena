@@ -473,6 +473,39 @@ export const UNITS: Record<string, UnitDef> = {
     ],
   },
   // Skeleton — raised by the Necromancer, never in a deck. Weak, expendable body.
+  warlock: {
+    id: "warlock",
+    name: "Warlock",
+    rarity: "rare",
+    role: "Pact Summoner",
+    hp: 100,
+    damage: 9,
+    attackSpeed: 1.7,
+    moveSpeed: 58,
+    range: FIELD_WIDTH * 0.3, // medium, hangs back behind its imps
+    ability: "summon_imps",
+    school: "magic",
+    color: "#2b1b1b", // charred black robe
+    accent: "#ef4444", // ember red — eyes, pentagram, staff flame
+    // No traits: the pact IS Summon Imps, and a "Pact of Two" trait line only
+    // restated the ability. Traits are for mechanics the ability text doesn't
+    // already surface (cf. the Priest, whose two mechanics are both actives).
+  },
+  void_imp: {
+    id: "void_imp",
+    name: "Void Imp",
+    rarity: "rare",
+    role: "Summoned",
+    hp: 40,
+    damage: 7,
+    attackSpeed: 1.3,
+    moveSpeed: 76,
+    range: FIELD_WIDTH * 0.26, // shorter reach than its master
+    ability: "lifesteal", // passive filler — never casts
+    school: "magic",
+    color: "#2563eb", // the Warlock's blue, one shade deeper
+    accent: "#93c5fd", // same rift light as its summoner
+  },
   skeleton: {
     id: "skeleton",
     name: "Skeleton",
@@ -1737,6 +1770,9 @@ export const SUMMONED_UNIT_IDS = new Set<string>([
   "boar",
   "bloatling",
   "mirror_image",
+  // The Warlock's pact imps. Deliberately its OWN def, not the Sealed Vault's
+  // "imp": that monster must stay polymorph-fair (this set grants immunity).
+  "void_imp",
 ]);
 
 /** Unit ids that are NOT selectable cards (summoned at runtime only, or

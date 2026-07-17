@@ -60,6 +60,7 @@ import { seraphKit } from "./seraph";
 import { slimeKit, slimeCloneKit } from "./slime";
 import { slimeKnightKit, slimeBlobKit } from "./slimeKnight";
 import { tricksterKit } from "./trickster";
+import { warlockKit } from "./warlock";
 import { warriorKit } from "./warrior";
 import { wildheartKit } from "./wildheart";
 import { zombieShamblerKit } from "./zombieShambler";
@@ -227,6 +228,7 @@ export const UNIT_KITS: UnitKitRegistry = {
   slime_squire: slimeBlobKit,
   summoner: druidKit,
   trickster: tricksterKit,
+  warlock: warlockKit, // rare pact summoner: two void imps per cast
   warrior: warriorKit,
   wildheart: wildheartKit, // The Overgrowth catalyst: Verdant Pulse + Thorned Hide + Final Bloom (bespoke)
   zombie_shambler: zombieShamblerKit,

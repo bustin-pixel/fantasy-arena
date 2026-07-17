@@ -61,6 +61,7 @@ export const CORPSE_KIND_BY_ID: Record<string, CorpseKind> = {
   grave_chorister: "robes",
   // -- demons & stone --
   imp: "ash",
+  void_imp: "ash",
   gargoyle: "rubble",
   rune_golem: "rune_rubble",
   forge_golem: "rune_rubble",

@@ -66,6 +66,7 @@ export type AbilityId =
   | "mend_beast"
   | "scatter_trap"
   | "summon_wolves"
+  | "summon_imps"
   | "gelatinous_guard"
   | "divide_reconvene"
   | "killing_spree"
