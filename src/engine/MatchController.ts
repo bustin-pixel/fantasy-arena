@@ -41,6 +41,7 @@ import { getKit } from "./kits/UnitKit";
 import { WaveController } from "./WaveController";
 import { EndlessController, type EndlessStatus } from "./EndlessController";
 import { isMelee, getUnitDef } from "@/data/units";
+import { planEnemyDeploy } from "./EnemyAI";
 import { getDungeon } from "@/data/dungeons";
 import {
   arenaMirrorMultipliers,
@@ -479,10 +480,9 @@ export class MatchController {
   }
 
   // -- AI ---------------------------------------------------------------------
-  // Smarter, still fully deterministic (all randomness from the sim RNG).
-  // The AI (1) picks the card from its remaining hand that best answers what the
-  // player currently has on the field, and (2) positions it tactically: ranged
-  // and support units hang back, melee/assassins push toward player threats.
+  // The lifecycle half: when the AI gets a deploy window, and the pacing after
+  // it takes one. HOW it thinks — matchup opinions + threat positioning — lives
+  // in EnemyAI, and every random decision draws from the sim RNG there.
   runAI(): void {
     if (this.aiCooldown > 0) {
       this.aiCooldown--;
@@ -490,137 +490,20 @@ export class MatchController {
     }
     if (!this.canDeploy("enemy")) return;
 
-    const card = this.chooseEnemyCard();
-    if (!card) return;
-    const def = getUnitDef(card);
-    const rng = this.state.rng;
-
-    const playerUnits = this.state.units.filter(
-      (u) => u.team === "player" && u.state !== "dead"
-    );
-
-    const yLo = ENEMY_ZONE.top;
-    const yHi = ENEMY_ZONE.bottom;
-
-    let x: number;
-    let y: number;
-    const role = this.unitRoleClass(def);
-
-    if (role === "ranged" || role === "support") {
-      // Stay at the back edge.
-      y = rng.float(yLo, yLo + (yHi - yLo) * 0.35);
-      // Line up roughly with the player's strongest cluster, else center.
-      x = playerUnits.length
-        ? this.clampX(this.avgX(playerUnits) + rng.float(-50, 50))
-        : rng.float(80, FIELD_WIDTH - 80);
-    } else if (role === "assassin") {
-      // Flank toward the player's backline-most (highest-y) unit.
-      const prey = this.lowestThreat(playerUnits);
-      y = rng.float(yLo + (yHi - yLo) * 0.5, yHi);
-      x = prey ? this.clampX(prey.pos.x + rng.float(-30, 30)) : rng.float(60, FIELD_WIDTH - 60);
-    } else {
-      // Melee/tank: push forward toward the nearest player threat.
-      const threat = this.nearestTo(playerUnits, FIELD_WIDTH / 2, yHi);
-      y = rng.float(yLo + (yHi - yLo) * 0.45, yHi);
-      x = threat ? this.clampX(threat.pos.x + rng.float(-40, 40)) : rng.float(60, FIELD_WIDTH - 60);
-    }
-
-    this.deploy("enemy", card, { x, y });
-    // Same shared reinforcement pacing as the player's auto-deploy grace.
-    this.aiCooldown = secToTicks(REINFORCE_GRACE_SEC);
-  }
-
-  private clampX(x: number): number {
-    return Math.max(60, Math.min(FIELD_WIDTH - 60, x));
-  }
-  private avgX(units: { pos: { x: number } }[]): number {
-    if (!units.length) return FIELD_WIDTH / 2;
-    return units.reduce((s, u) => s + u.pos.x, 0) / units.length;
-  }
-  private nearestTo(
-    units: { pos: { x: number; y: number } }[],
-    x: number,
-    y: number
-  ) {
-    let best: (typeof units)[number] | null = null;
-    let bd = Infinity;
-    for (const u of units) {
-      const d = (u.pos.x - x) ** 2 + (u.pos.y - y) ** 2;
-      if (d < bd) {
-        bd = d;
-        best = u;
-      }
-    }
-    return best;
-  }
-  /** The player unit furthest back (highest y) — the assassin's preferred prey. */
-  private lowestThreat(units: { pos: { y: number; x: number } }[]) {
-    let best: (typeof units)[number] | null = null;
-    for (const u of units) {
-      if (!best || u.pos.y > best.pos.y) best = u;
-    }
-    return best;
-  }
-
-  private unitRoleClass(def: ReturnType<typeof getUnitDef>):
-    | "melee"
-    | "ranged"
-    | "support"
-    | "assassin" {
-    // Every unit declares its tactical class on its kit now (support / assassin /
-    // melee / ranged). The geometric default is just a safety net for any kit-less
-    // unit that ever reaches here; the AI's matchup *opinions* stay in chooseEnemyCard.
-    return getKit(def.id)?.roleClass ?? (isMelee(def) ? "melee" : "ranged");
-  }
-
-  /**
-   * Choose the enemy card that best answers the player's board. Heuristic:
-   * - if the player fields ranged/casters, prefer an assassin or fast melee to
-   *   dive them;
-   * - if the player fields heavy tanks, prefer casters/ranged DPS;
-   * - otherwise fall back to the first card in hand.
-   * Deterministic tie-breaks via RNG drawn from sim state.
-   */
-  private chooseEnemyCard(): string | null {
     const hand: string[] = [];
     this.enemyDeck.forEach((id, i) => {
       if (!this.enemyUsed.has(i)) hand.push(id);
     });
-    if (hand.length === 0) return null;
-    if (hand.length === 1) return hand[0];
-
-    const players = this.state.units.filter(
+    const playerUnits = this.state.units.filter(
       (u) => u.team === "player" && u.state !== "dead"
     );
-    if (players.length === 0) return hand[0];
 
-    const playerDefs = players.map((u) => getUnitDef(u.defId));
-    const playerHasRanged = playerDefs.some(
-      (d) => !isMelee(d) && d.ability !== "mend"
-    );
-    const playerHasTank = playerDefs.some((d) => d.hp >= 200);
+    const plan = planEnemyDeploy(hand, playerUnits, this.state.rng);
+    if (!plan) return;
 
-    const score = (id: string): number => {
-      const def = getUnitDef(id);
-      const role = this.unitRoleClass(def);
-      let s = 0;
-      if (playerHasRanged && (role === "assassin" || role === "melee")) s += 3;
-      if (playerHasTank && role === "ranged") s += 2;
-      if (playerHasTank && def.ability === "fireball") s += 1; // DoT vs big HP
-      if (role === "support") s -= 1; // don't lead with the healer
-      return s;
-    };
-
-    let best = hand[0];
-    let bestScore = -Infinity;
-    for (const id of hand) {
-      const s = score(id);
-      if (s > bestScore || (s === bestScore && this.state.rng.next() < 0.5)) {
-        best = id;
-        bestScore = s;
-      }
-    }
-    return best;
+    this.deploy("enemy", plan.card, plan.pos);
+    // Same shared reinforcement pacing as the player's auto-deploy grace.
+    this.aiCooldown = secToTicks(REINFORCE_GRACE_SEC);
   }
 
   /** Advance one simulation tick (after deployment phase begins). */
