@@ -9,7 +9,10 @@
 // qualities (rare → epic → legendary, palette-swapped); stars run 1–3 within
 // a quality. Two identical items merge into +1 star; two 3★ merge into the
 // next quality at 1★; legendary 3★ is the cap (see meta/inventory.ts).
-// Each line's SIGNATURE effect switches on only at legendary quality.
+// Each line's SIGNATURE effect switches on only at legendary quality; every
+// weapon/armor line ALSO carries a fixed SUB-STAT (the SUB table below) at
+// all qualities — kept at legendary alongside the signature — so low-tier
+// picks stay distinct. Trinkets have none (already unique per tier).
 // ============================================================================
 
 import type {
@@ -79,8 +82,9 @@ export interface ItemLineDef {
 
 // ---------------------------------------------------------------------------
 // Power ladders — ALL tunable numbers, indexed [qualityIndex][starIndex].
-// Budget: a full legendary 3★ loadout ≈ doubles a unit (weapon +40% dmg,
-// armor +40% HP, plus the trinket's effect).
+// Budget: a full legendary 3★ loadout lands a bit past double (weapon +40%
+// dmg, armor +40% HP, each with its minor sub-stat on top, plus the
+// trinket's effect).
 // ---------------------------------------------------------------------------
 
 /** Weapon +damage% / armor +health% (the slot-standard primaries). */
@@ -176,6 +180,34 @@ const HALO_SHIELD_PCT = [
   [22, 26, 30],
 ];
 
+/** Weapon/armor SUB-STATS — each line's fixed minor secondary, granted at ALL
+ *  qualities and kept at legendary alongside the signature (trinkets have no
+ *  entries: their effects are already unique per tier; alphas_pelt/heartwood
+ *  keep their pre-existing inline secondaries). Rules: a sub never shares a
+ *  field with its OWN line's signature — mods() returns a plain object, so a
+ *  shared field would silently overwrite via spread, not fold; it stays below
+ *  the same-stat trinket primary at equal quality/star and well below any
+ *  same-field legendary signature; and every ladder is non-decreasing along
+ *  the 9-step merge path (flat seams allowed — the sub-stats spec in
+ *  items.test.ts walks it). Values are %, indexed [q][s], except
+ *  guildmasters_dirk (flat HP). Wanderer's crit cadence is inline in its line
+ *  (quality-only, like alphas_pelt's move speed). */
+const SUB: Record<string, number[][]> = {
+  soldiers_blade: [[3, 4, 5], [6, 7, 8], [10, 12, 14]], // +health%
+  bloodletter_axe: [[5, 6, 8], [9, 11, 13], [15, 17, 20]], // +execute%
+  stormpiercer: [[4, 5, 6], [8, 9, 10], [12, 14, 16]], // +giant slayer%
+  hexblade: [[4, 5, 6], [8, 9, 10], [12, 14, 16]], // magic resist%
+  twinfang_daggers: [[3, 4, 5], [6, 7, 8], [8, 10, 12]], // +attack speed%
+  windlash_saber: [[2, 3, 4], [4, 5, 6], [6, 7, 8]], // +move speed%
+  gravewhisper_blade: [[2, 3, 4], [5, 6, 7], [8, 9, 10]], // lifesteal%
+  forgemasters_hammer: [[1, 2, 3], [3, 4, 5], [5, 6, 7]], // damage reduction%
+  guildmasters_dirk: [[4, 5, 6], [8, 10, 12], [12, 15, 18]], // kill heal (flat HP)
+  squires_plate: [[2, 3, 4], [5, 6, 7], [9, 10, 12]], // +damage%
+  bulwark_shield: [[3, 4, 5], [6, 7, 8], [10, 12, 14]], // magic resist%
+  golem_core: [[5, 6, 8], [10, 12, 14], [18, 21, 24]], // +summon stats%
+  phasecloak: [[3, 4, 5], [6, 7, 8], [10, 11, 12]], // cooldown reduction%
+};
+
 const LEG = 2; // legendary quality index
 
 const pct = (table: number[][], q: number, s: number) => table[q][s] / 100;
@@ -235,6 +267,7 @@ export const ITEM_LINES: Record<string, ItemLineDef> = {
     color: "#cbd5e1",
     mods: (q, s) => ({
       ...dmgOf(PRIMARY_PCT)(q, s),
+      hpMult: 1 + pct(SUB.soldiers_blade, q, s),
       ...(q === LEG ? { executeBonus: [0.25, 0.3, 0.35][s] } : {}),
     }),
   },
@@ -247,6 +280,7 @@ export const ITEM_LINES: Record<string, ItemLineDef> = {
     color: "#ef4444",
     mods: (q, s) => ({
       ...dmgOf(PRIMARY_PCT)(q, s),
+      executeBonus: pct(SUB.bloodletter_axe, q, s),
       ...(q === LEG ? { lifesteal: [0.1, 0.15, 0.2][s] } : {}),
     }),
   },
@@ -259,6 +293,7 @@ export const ITEM_LINES: Record<string, ItemLineDef> = {
     color: "#38bdf8",
     mods: (q, s) => ({
       ...dmgOf(PRIMARY_PCT)(q, s),
+      giantSlayerPct: pct(SUB.stormpiercer, q, s),
       ...(q === LEG
         ? {
             effects: [
@@ -277,6 +312,7 @@ export const ITEM_LINES: Record<string, ItemLineDef> = {
     color: "#a855f7",
     mods: (q, s) => ({
       ...dmgOf(PRIMARY_PCT)(q, s),
+      magicTakenMult: 1 - pct(SUB.hexblade, q, s),
       ...(q === LEG
         ? {
             effects: [
@@ -295,6 +331,7 @@ export const ITEM_LINES: Record<string, ItemLineDef> = {
     color: "#f97316",
     mods: (q, s) => ({
       ...dmgOf(TWINFANG_PCT)(q, s),
+      atkDelayMult: asDelay(SUB.twinfang_daggers, q, s),
       ...(q === LEG
         ? { effects: [{ kind: "doubleStrikeNth", everyNth: 3 }] as ItemEffect[] }
         : {}),
@@ -309,6 +346,7 @@ export const ITEM_LINES: Record<string, ItemLineDef> = {
     color: "#5eead4",
     mods: (q, s) => ({
       atkDelayMult: asDelay(WINDLASH_AS_PCT, q, s),
+      moveSpeedMult: 1 + pct(SUB.windlash_saber, q, s),
       ...(q === LEG
         ? {
             effects: [
@@ -333,6 +371,7 @@ export const ITEM_LINES: Record<string, ItemLineDef> = {
     color: "#86efac",
     mods: (q, s) => ({
       ...dmgOf(PRIMARY_PCT)(q, s),
+      lifesteal: pct(SUB.gravewhisper_blade, q, s),
       ...(q === LEG ? { killHeal: [15, 25, 35][s] } : {}),
     }),
   },
@@ -346,6 +385,7 @@ export const ITEM_LINES: Record<string, ItemLineDef> = {
     color: "#fbbf24",
     mods: (q, s) => ({
       ...dmgOf(PRIMARY_PCT)(q, s),
+      damageTakenMult: 1 - pct(SUB.forgemasters_hammer, q, s),
       ...(q === LEG ? { critEveryNth: 5 } : {}),
     }),
   },
@@ -359,6 +399,7 @@ export const ITEM_LINES: Record<string, ItemLineDef> = {
     color: "#e8b04b",
     mods: (q, s) => ({
       ...dmgOf(PRIMARY_PCT)(q, s),
+      killHeal: SUB.guildmasters_dirk[q][s],
       ...(q === LEG
         ? {
             effects: [
@@ -382,6 +423,7 @@ export const ITEM_LINES: Record<string, ItemLineDef> = {
     color: "#cbd5e1",
     mods: (q, s) => ({
       ...hpOf(PRIMARY_PCT)(q, s),
+      dmgMult: 1 + pct(SUB.squires_plate, q, s),
       ...(q === LEG ? { thornsFrac: [0.1, 0.13, 0.16][s] } : {}),
     }),
   },
@@ -394,6 +436,7 @@ export const ITEM_LINES: Record<string, ItemLineDef> = {
     color: "#94a3b8",
     mods: (q, s) => ({
       ...hpOf(PRIMARY_PCT)(q, s),
+      magicTakenMult: 1 - pct(SUB.bulwark_shield, q, s),
       ...(q === LEG ? { damageTakenMult: [0.95, 0.93, 0.9][s] } : {}),
     }),
   },
@@ -406,6 +449,9 @@ export const ITEM_LINES: Record<string, ItemLineDef> = {
     color: "#34d399",
     mods: (q, s) => ({
       ...hpOf(PRIMARY_PCT)(q, s),
+      // Sub-stat: crit cadence, quality-only. foldMods keeps the SMALLEST N,
+      // so this goes inert next to a legendary Forgemaster's Hammer (5).
+      critEveryNth: [10, 9, 8][q],
       ...(q === LEG ? { moveSpeedMult: [1.08, 1.11, 1.15][s] } : {}),
     }),
   },
@@ -418,6 +464,7 @@ export const ITEM_LINES: Record<string, ItemLineDef> = {
     color: "#f59e0b",
     mods: (q, s) => ({
       ...hpOf(PRIMARY_PCT)(q, s),
+      summonStatPct: pct(SUB.golem_core, q, s),
       ...(q === LEG
         ? {
             effects: [
@@ -436,6 +483,7 @@ export const ITEM_LINES: Record<string, ItemLineDef> = {
     color: "#818cf8",
     mods: (q, s) => ({
       ...hpOf(PRIMARY_PCT)(q, s),
+      cooldownMult: 1 - pct(SUB.phasecloak, q, s),
       ...(q === LEG
         ? {
             effects: [
@@ -1036,7 +1084,12 @@ export function luckyCoinBonus(
 
 /** Arena mirror: the flat hp/dmg bump the generated enemy deck fights with,
  *  approximating the player's average equipped power (the item twin of
- *  leveling's averageDeckLevel). Deterministic pure math — a match input. */
+ *  leveling's averageDeckLevel). Deterministic pure math — a match input.
+ *  Only stat-shaped mods fold in (hp, damage, attack speed, damage taken) —
+ *  weapon/armor sub-stats outside those four (execute, giant-slayer, magic
+ *  resist, move, lifesteal, kill heal, CDR, summon stats, crit cadence) do
+ *  NOT mirror. Accepted drift: the mirror approximates, like the trinket
+ *  allowance above. */
 export function arenaMirrorMultipliers(
   deck: readonly string[],
   loadouts: ItemLoadouts | undefined
