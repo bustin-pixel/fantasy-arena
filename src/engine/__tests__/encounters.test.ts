@@ -370,7 +370,6 @@ describe("rare quarry encounter", () => {
       floor: 3, // a rare-quarry floor sits at any depth, not floor 5
       outcome: "victory",
       unlockedUnits: [],
-      highestClearedFloor: 0,
       chestSeed: 7,
       encounter: "rare_spawn",
       deck: questRequiredUnits(q),

@@ -28,7 +28,12 @@ import { OPEN_AT, spawnSparkles, type Sparkle } from "@/assets/chestArt";
 
 /** Presentational stroll speed (field px/s) — unhurried victors. */
 const WALK_SPEED = 120;
-const ARRIVE_DIST = 6;
+/** How close counts as "on your mark". Kept sub-pixel because `finish()` SNAPS
+ *  everyone to their exact slot: any hero who stopped short of it pops that far
+ *  the instant the slowest one lands, and the whole band visibly hitches
+ *  together. Overshoot isn't a risk to guard against — the step below clamps to
+ *  1, so a hero closer than one frame of travel lands exactly on the mark. */
+const ARRIVE_DIST = 0.5;
 /** If someone gets stuck (shouldn't happen — nothing collides), end anyway. */
 const FAILSAFE_MS = 4500;
 /** Campfire healing: wounds close over ~2.2s at the fire. */

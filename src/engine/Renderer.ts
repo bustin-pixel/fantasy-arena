@@ -393,10 +393,14 @@ function drawCampfireFlame(
 }
 
 // A reward chest sitting ON the arena floor during the continue-deeper outro.
-// Like the campfire it draws in two passes: a ground glow (an inviting "tap me"
-// pulse while closed, under the units) + the chest body (y-sorted with units, so
-// the warband gathered in front of it occludes it). The body art is the SHARED
-// core from assets/chestArt.ts, mapped from its 120×112 box into world space.
+// Like the campfire it draws in two passes, and for the same reason: a ground
+// glow (an inviting "tap me" pulse while closed) THEN the chest body — both
+// under every unit, exactly how the fire's logs work. The chest is a low prop
+// the band gathers in front of and then files past on the way out; y-sorting it
+// meant the exit walk (up-field, across the chest's own y) put the chest ON TOP
+// of the departing heroes. A hero steps over the chest, never behind it — the
+// same trade the campfire logs already make. The body art is the SHARED core
+// from assets/chestArt.ts, mapped from its 120×112 box into world space.
 export interface FloorChest {
   x: number;
   y: number;
@@ -430,7 +434,8 @@ function drawFloorChestGround(ctx: Ctx, c: FloorChest, t: number): void {
 }
 
 /** Body pass: the chest itself, mapped from chestArt's local box so its ground
- *  contact (local 60,96) lands on the world anchor (c.x, c.y). */
+ *  contact (local 60,96) lands on the world anchor (c.x, c.y). Ground clutter
+ *  like the campfire's logs — drawn before the units, never y-sorted. */
 function drawFloorChestBody(ctx: Ctx, c: FloorChest): void {
   const s = CHEST_DRAW_W / VIEW_W;
   ctx.save();
@@ -699,10 +704,19 @@ export function renderBattle(
   const camp = extras?.campfire;
   if (camp) drawCampfireGround(ctx, camp.x, camp.y, now, camp.doused ?? false);
 
-  // The reward chest's inviting glow is ground clutter too (its body joins the
-  // y-sort below, so the warband gathered in front of it occludes it).
+  // The reward chest is ground clutter, glow AND body — the same treatment as
+  // the fire's logs. The band gathers in FRONT of it (nearer the camera) so it
+  // still reads as standing behind them, and when they file out up-field they
+  // step over it instead of vanishing behind it.
   const chests = extras?.chests;
-  if (chests) for (const c of chests) drawFloorChestGround(ctx, c, now);
+  if (chests) {
+    for (const c of chests) drawFloorChestGround(ctx, c, now);
+    // Still y-sorted among THEMSELVES, so a treasure room's hoard keeps its
+    // depth if the spread ever tightens enough for them to overlap.
+    for (const c of [...chests].sort((a, b) => a.y - b.y)) {
+      drawFloorChestBody(ctx, c);
+    }
+  }
 
   // Draw units sorted by y for simple depth ordering. The campfire's upright
   // flame/smoke slots in as a pseudo-unit at the fire's base, so heroes below
@@ -716,11 +730,6 @@ export function renderBattle(
       y: camp.y,
       draw: () => drawCampfireFlame(ctx, camp.x, camp.y, now, camp.doused ?? false),
     });
-  }
-  if (chests) {
-    for (const c of chests) {
-      drawList.push({ y: c.y, draw: () => drawFloorChestBody(ctx, c) });
-    }
   }
   drawList.sort((a, b) => a.y - b.y);
   for (const item of drawList) item.draw();

@@ -816,6 +816,13 @@ const SCENES: Record<string, (g: Ctx, w: number, h: number, rnd: () => number) =
   items,
 };
 
+/** Whether a book id has its own painted scene. `drawSplash` falls back to the
+ *  armory still-life for unknown ids, so a dungeon missing from SCENES ships
+ *  with plausible-but-wrong art; a spec asserts every dungeon has one. */
+export function hasSplashScene(bookId: string): boolean {
+  return bookId in SCENES;
+}
+
 /** Books whose portrait COVER shows a plate-scale cutout of the landscape
  *  painting (a window centered on this focal x) instead of squeezing the whole
  *  scene into the portrait box. The dungeon books keep the squeeze — their

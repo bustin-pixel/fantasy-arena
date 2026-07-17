@@ -17,9 +17,13 @@
 // ============================================================================
 
 import { useEffect, useState } from "react";
-import { isBossFloorIn, monsterLevelFor, type Dungeon } from "@/data/dungeons";
+import {
+  bossChestTierFor,
+  isBossFloorIn,
+  monsterLevelFor,
+  type Dungeon,
+} from "@/data/dungeons";
 import { GOLD_REWARDS, replayGoldFor } from "@/meta/economy";
-import { bossChestTierFor } from "@/meta/rewards";
 import { playSfx } from "@/audio/sfx";
 
 interface Props {

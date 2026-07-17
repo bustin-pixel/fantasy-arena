@@ -110,29 +110,8 @@ export const CHEST_GOLD_RANGE: Record<ChestTier, [number, number]> = {
   dragon: [700, 1100],
 };
 
-/** Designer-controlled free unlocks: dungeonId → floor → unit id, granted on
- *  that floor's FIRST clear. Every dungeon hands the player a new toy as they
- *  clear it (not just the Depths anymore), pacing acquisition across the whole
- *  chain. Ids, not display names ("healer" shows as Cleric). Keep every value
- *  deckable and outside STARTER_UNIT_IDS + QUEST_LOCKED_UNITS.
- *  INVARIANT (spec-enforced in rewards.test): a unit that a dungeon's fusion
- *  quest REQUIRES is a starter or gifted at/before that dungeon's quest floor —
- *  so you always own the key before the lock. */
-export const MILESTONE_UNLOCKS: Record<string, Record<number, string>> = {
-  depths: {
-    2: "healer", // Cleric — sustain; the Overgrowth quest needs it
-    3: "fire_mage", // burn — the Bonefields quest needs it
-    5: "berserker", // epic capstone for downing the Bloater
-  },
-  bonefields: { 5: "holy_knight" }, // light vs undead
-  wilds: { 5: "ogre" }, // the Deep Forge quest needs it (arrives a few dungeons early)
-  overgrowth: { 5: "ranger" }, // woodland archer
-  sealed_vault: { 5: "arcane_mage" }, // the vault of arcana
-  deep_forge: { 5: "electric_mage" }, // lightning + machinery
-  eclipse_spire: { 5: "trickster" }, // satisfies the Den's any-of quest
-  fallen_cathedral: { 2: "priest" }, // the Cathedral's own F5 quest needs it
-  rogues_den: { 2: "rogue" }, // the Den's own F5 quest needs it
-};
+// Milestone gift units now live on the Dungeon def (`milestoneUnlocks`, read
+// via milestoneUnlocksFor in data/dungeons) — a dungeon owns its own facets.
 
 // ---------------------------------------------------------------------------
 // Items — ACQUISITION numbers (drop odds, merge costs, shard economy). Item
@@ -187,9 +166,8 @@ export const MERGE_COSTS: Record<
  *  clears, fresh endless milestones), so the reward fold stays idempotent
  *  without a claims ledger. The repeatable drip lives in SHARD_CHEST_DRIP. */
 export const SHARD_REWARDS = {
-  /** Any dungeon's non-boss floor, first clear. */
-  floorFirstClear: 3,
-  /** A dungeon boss floor, first clear. */
+  /** A dungeon's boss lair, first kill — the run model's only clear signal.
+   *  (There is no per-floor rung: ordinary floors pay no shards.) */
   bossFirstClear: 15,
   /** The chain capstones (Deep Forge / Eclipse Spire bosses), first clear. */
   bossFirstClearCapstone: 25,
@@ -197,8 +175,8 @@ export const SHARD_REWARDS = {
   endlessPerMilestone: 8,
 } as const;
 
-/** Dungeons whose boss first-clear pays the capstone shard grant. */
-export const CAPSTONE_DUNGEON_IDS = ["deep_forge", "eclipse_spire"] as const;
+// Which dungeons are chain capstones now lives on the Dungeon def
+// (`capstone`, read via isCapstoneDungeon in data/dungeons).
 
 /** Repeatable shard drip inside top-tier chests (seeded roll in rollChest). */
 export const SHARD_CHEST_DRIP: Partial<

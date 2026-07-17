@@ -1183,8 +1183,14 @@ export function getCurrentMusicTrack(): MusicTrackId | null {
 }
 
 /** Per-dungeon soundtrack sets: each dungeon draws one of its floor tracks at
- *  random per floor, and its boss floor gets the bespoke boss track. */
-const DUNGEON_TRACKS: Record<string, { floors: MusicTrackId[]; boss: MusicTrackId }> = {
+ *  random per floor, and its boss floor gets the bespoke boss track.
+ *  Exported so a spec can assert every dungeon has a set — the lookup below
+ *  falls back to the Depths set, which would otherwise hide a missing entry
+ *  behind plausible-sounding music. */
+export const DUNGEON_TRACKS: Record<
+  string,
+  { floors: MusicTrackId[]; boss: MusicTrackId }
+> = {
   depths: { floors: ["longDark", "coldVigil", "catacombHymn"], boss: "warden" },
   bonefields: { floors: ["barrowWind", "theRestless"], boss: "abomination" },
   wilds: { floors: ["underCanopy", "packTrails"], boss: "direAlpha" },

@@ -327,11 +327,21 @@ Aegis Knight's soak is the answer, which a generic sweep deck lacks).
   `dungeons.ts`; `monsterLevelFor` clamps to it, not the player cap — the fork
   bosses/rares ride the +1 elite bump to **Lv 11**, a notch above a maxed warband.
 - **Starter is all-rare** (`STARTER_UNIT_IDS` knight/archer/warrior/mage) and
-  **every dungeon gifts a unit on a first clear** (`MILESTONE_UNLOCKS` is now
-  `dungeonId → floor → unitId`). INVARIANT (rewards.test): a unit a dungeon's
-  fusion quest REQUIRES is a starter or gifted at/before that dungeon's quest — you
-  always own the key before the lock. Save **v12** retro-grants gifts for cleared
-  floors (`persistence.migrateSave`).
+  **every dungeon gifts a unit on a first clear** (`Dungeon.milestoneUnlocks`,
+  `floor → unitId`, read via `milestoneUnlocksFor` — a dungeon owns its own
+  facets). INVARIANT (rewards.test): a unit a dungeon's fusion quest REQUIRES is
+  a starter or gifted at/before that dungeon's quest — you always own the key
+  before the lock. Save **v12** retro-grants gifts for cleared floors
+  (`persistence.migrateSave`).
+- **A dungeon owns its facets** (`data/dungeons.ts`): `bossChestTier`,
+  `capstone`, and `milestoneUnlocks` live on the def (they used to be parallel
+  `Record<dungeonId, …>` maps in `meta/rewards` + `meta/economy`). The facets
+  that CAN'T move — `DUNGEON_TRACKS` (audio/music), the splash `SCENES`
+  (compendium), `WORLD_POINTS`/`ATLAS_BIOMES` (atlas) — all sit in layers that
+  import `data/dungeons`, so moving them would cycle. Every one of those lookups
+  **falls back silently** (Depths music, armory still-life, no pin), so
+  `data/__tests__/dungeonFacets.test.ts` asserts each dungeon has an entry.
+  **Adding a dungeon? A red line there is the checklist.**
 
 ### 4f. Bespoke boss kits (2026-07-13) — engine-contract changes
 The 10 copy-paste boss/rare kits (`abomination`/`dire_alpha`/`elder_treant`/

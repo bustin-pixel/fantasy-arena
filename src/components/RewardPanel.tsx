@@ -7,7 +7,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { BattleRewards } from "@/meta/rewards";
-import { MILESTONE_UNLOCKS, type ChestTier } from "@/meta/economy";
+import { type ChestTier } from "@/meta/economy";
+import { milestoneUnlocksFor } from "@/data/dungeons";
 import {
   LEVEL_CAP,
   levelFromXp,
@@ -67,7 +68,7 @@ export function RewardPanel({ rewards, mode, dungeonId = "depths", xpGains, hide
   // rather than keying off the (now meaningless) floor number.
   const milestoneIds =
     mode === "depths" && rewards.firstClear
-      ? Object.values(MILESTONE_UNLOCKS[dungeonId] ?? {})
+      ? Object.values(milestoneUnlocksFor(dungeonId))
       : [];
 
   // Milestone/quest stings, staggered off the victory stinger (and each other)

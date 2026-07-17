@@ -12,8 +12,9 @@ import { DECKABLE_UNIT_IDS, getUnitDef } from "@/data/units";
 import { questRequiredUnits, questUnlockIds } from "@/data/depths";
 import { RARITIES } from "@/data/rarities";
 import {
+  bossChestTierFor,
   getDungeon,
-  isBossFloorIn,
+  isCapstoneDungeon,
   QUEST_LOCKED_UNITS,
   questForFloorIn,
 } from "@/data/dungeons";
@@ -33,7 +34,6 @@ import {
 import { RNG } from "@/utils/rng";
 import {
   BOSS_REPLAY_CHEST_CHANCE,
-  CAPSTONE_DUNGEON_IDS,
   CHEST_GOLD_RANGE,
   CHEST_UNIT_CHANCE,
   DUPLICATE_GOLD,
@@ -74,7 +74,7 @@ export interface BattleRewards {
   /** Flat battle gold (chest gold lives inside the chest contents). */
   gold: number;
   /** Battle XP, granted in full to EVERY unit in the fielded deck (the grant
-   *  fold in GameStateContext caps each unit at TOTAL_XP_CAP). Dungeon wins
+   *  fold in meta/battleGrant caps each unit at TOTAL_XP_CAP). Dungeon wins
    *  scale by floor; losses pay a fraction; replays pay full — XP is the
    *  grind currency, unlike first-clear gold. */
   xp: number;
@@ -187,23 +187,6 @@ function pickWeightedUnit(rng: RNG): string {
   return CHEST_POOL[CHEST_POOL.length - 1];
 }
 
-/** Boss-floor first-clear chest tier per dungeon. Unlisted themed dungeons are
- *  "gold" deep bosses; the chain's two capstones pay the top tiers (the only
- *  place arcane/dragon chests drop). FloorPickerSheet previews from this too. */
-const BOSS_CHEST_TIERS: Record<string, ChestTier> = {
-  depths: "silver",
-  deep_forge: "arcane",
-  eclipse_spire: "dragon",
-  // The endgame fork bosses pay arcane first-clears — so their replay chests
-  // (one tier below) are gold, a worthwhile late-game farm.
-  fallen_cathedral: "arcane",
-  rogues_den: "arcane",
-};
-
-export function bossChestTierFor(dungeonId: string): ChestTier {
-  return BOSS_CHEST_TIERS[dungeonId] ?? "gold";
-}
-
 /** XOR salt for the boss-replay-chest chance roll. Derives an INDEPENDENT stream
  *  off chestSeed (distinct from the Lucky Coin's 0x5eed and rollChest's plain
  *  chestSeed), so adding the replay chest never shifts a first-clear's contents. */
@@ -223,7 +206,6 @@ export function computeBattleRewards(input: {
   dungeonId?: string;
   outcome: "victory" | "defeat" | "draw";
   unlockedUnits: readonly string[];
-  highestClearedFloor: number;
   chestSeed: number;
   /** The warband fielded this battle — for rare-spawn quest `requires` checks. */
   deck?: readonly string[];
@@ -244,10 +226,8 @@ export function computeBattleRewards(input: {
   /** This floor's encounter flavor — a rich kind (cursed/treasure_vault/
    *  rare_spawn) bumps the first-clear end-chest a tier. Ignored outside depths. */
   encounter?: EncounterKind;
-  /** RNG "hunt for the boss" descent: when set, this floor's boss-lair flag.
-   *  Passing it switches the depths reward to the run model (rewards key off the
-   *  run's boss floor + `bossCleared`, not a per-floor high-water mark). Omitted,
-   *  the legacy per-floor path runs (specs, and any non-run caller). */
+  /** Depths: whether this floor is the run's boss lair — the only floor that
+   *  pays a first clear. Absent = an ordinary floor. */
   isBoss?: boolean;
   /** RNG run model: whether the dungeon's boss was ALREADY defeated before this
    *  battle (first boss kill = first clear; a later kill is a replay farm). */
@@ -259,7 +239,6 @@ export function computeBattleRewards(input: {
     dungeonId = "depths",
     outcome,
     unlockedUnits,
-    highestClearedFloor,
     chestSeed,
     deck = [],
     slain = [],
@@ -363,85 +342,43 @@ export function computeBattleRewards(input: {
       };
     }
 
-    // RNG "hunt for the boss" descent — when the caller flags the boss lair,
-    // rewards key off (isBoss, bossCleared): the run's boss floor and whether
-    // the dungeon is already cleared, not a per-floor high-water mark (there is
-    // none in the fresh-run model). ADDITIVE: callers that don't pass isBoss
-    // keep the legacy per-floor path below (specs, arena, endless).
-    if (input.isBoss !== undefined) {
-      const boss = input.isBoss;
-      const bossCleared = input.bossCleared ?? false;
-      if (boss && !bossCleared) {
-        // First boss kill = the dungeon's first clear (its big payout; gifts are
-        // granted in the state fold off `firstClear`).
-        const shards = (CAPSTONE_DUNGEON_IDS as readonly string[]).includes(
-          dungeonId
-        )
-          ? SHARD_REWARDS.bossFirstClearCapstone
-          : SHARD_REWARDS.bossFirstClear;
-        return {
-          gold: boostGold(
-            GOLD_REWARDS.depthsFirstClearBase +
-              GOLD_REWARDS.depthsFirstClearPerFloor * floor
-          ),
-          xp: winXp,
-          chest: makeChest(bossChestTierFor(dungeonId), dungeonId),
-          shards,
-          firstClear: true,
-          questUnlocks: questUnlock,
-        };
-      }
-      if (boss && bossCleared) {
-        // Boss replay farm: a chance at a chest one tier below the first-clear
-        // tier (its own derived stream, like the legacy replay chest).
-        let replayChest: ChestResult | null = null;
-        const rng = new RNG(chestSeed ^ BOSS_REPLAY_CHEST_SALT);
-        if (rng.next() < BOSS_REPLAY_CHEST_CHANCE) {
-          const b = TIER_ORDER.indexOf(bossChestTierFor(dungeonId));
-          replayChest = makeChest(TIER_ORDER[Math.max(0, b - 1)], dungeonId);
-        }
-        return {
-          ...none,
-          gold: boostGold(replayGoldFor(dungeon.monsterLevel)),
-          xp: winXp,
-          chest: replayChest,
-          questUnlocks: questUnlock,
-        };
-      }
-      // A non-boss floor within a run: a modest, repeatable clear reward — gold
-      // scaled by depth + a wooden chest (bumped a tier on a rich encounter).
-      const floorTier: ChestTier =
-        TIER_ORDER[
-          Math.min(
-            TIER_ORDER.indexOf("wooden") + richChestBump(encounter),
-            TIER_ORDER.length - 1
-          )
-        ];
+    // RNG "hunt for the boss" descent: rewards key off (isBoss, bossCleared) —
+    // the run's boss floor and whether the dungeon is already cleared — never a
+    // per-floor high-water mark (a fresh run has none). A floor's NUMBER buys
+    // nothing but XP/gold scaling; only the lair pays out.
+    const boss = input.isBoss ?? false;
+    const bossCleared = input.bossCleared ?? false;
+    if (boss && !bossCleared) {
+      // First boss kill = the dungeon's first clear (its big payout; gifts are
+      // granted in the state fold off `firstClear`). Chests are graded by the
+      // dungeon's place in the chain (Depths silver → themed gold → Forge
+      // arcane → Spire dragon) and roll the dungeon's signature item line;
+      // capstones pay the most shards.
+      const shards = isCapstoneDungeon(dungeonId)
+        ? SHARD_REWARDS.bossFirstClearCapstone
+        : SHARD_REWARDS.bossFirstClear;
       return {
-        ...none,
         gold: boostGold(
           GOLD_REWARDS.depthsFirstClearBase +
             GOLD_REWARDS.depthsFirstClearPerFloor * floor
         ),
         xp: winXp,
-        chest: makeChest(floorTier),
+        chest: makeChest(bossChestTierFor(dungeonId), dungeonId),
+        shards,
+        firstClear: true,
         questUnlocks: questUnlock,
       };
     }
-
-    const firstClear = floor > highestClearedFloor;
-    if (!firstClear) {
-      // Boss-floor replays can drop a farm chest, one tier below the boss's
-      // first-clear tier, with its signature-line roll intact. Rolled on a
-      // SEPARATE derived stream off chestSeed (never touches rollChest's stream),
-      // so every first-clear seed stays byte-stable. Gold scales by dungeon depth.
+    if (boss) {
+      // Boss replay farm: a chance at a chest one tier below the first-clear
+      // tier, signature roll intact. Rolled on a SEPARATE derived stream off
+      // chestSeed (never touches rollChest's own stream), so first-clear seeds
+      // stay byte-stable. Gold scales by dungeon depth.
       let replayChest: ChestResult | null = null;
-      if (isBossFloorIn(dungeon, floor)) {
-        const rng = new RNG(chestSeed ^ BOSS_REPLAY_CHEST_SALT);
-        if (rng.next() < BOSS_REPLAY_CHEST_CHANCE) {
-          const base = TIER_ORDER.indexOf(bossChestTierFor(dungeonId));
-          replayChest = makeChest(TIER_ORDER[Math.max(0, base - 1)], dungeonId);
-        }
+      const rng = new RNG(chestSeed ^ BOSS_REPLAY_CHEST_SALT);
+      if (rng.next() < BOSS_REPLAY_CHEST_CHANCE) {
+        const b = TIER_ORDER.indexOf(bossChestTierFor(dungeonId));
+        replayChest = makeChest(TIER_ORDER[Math.max(0, b - 1)], dungeonId);
       }
       return {
         ...none,
@@ -451,35 +388,23 @@ export function computeBattleRewards(input: {
         questUnlocks: questUnlock,
       };
     }
-    // Boss floors drop a chest, graded by the dungeon's place in the chain
-    // (Depths silver → themed gold → Forge arcane → Spire dragon). A themed
-    // boss chest also rolls its dungeon's signature item line. Shards pay on
-    // first clears only: a trickle per floor, a chunk per boss, the most on
-    // the two chain capstones.
-    const isBoss = isBossFloorIn(dungeon, floor);
-    const baseTier: ChestTier = isBoss ? bossChestTierFor(dungeonId) : "wooden";
-    // A rich encounter (cursed/treasure_vault/rare_spawn) bumps a normal floor's
-    // end chest a tier. Boss floors never carry an omen (assignOmens forces
-    // "normal" there), so this only ever lifts the non-boss "wooden".
-    const bump = isBoss ? 0 : richChestBump(encounter);
-    const tier: ChestTier =
+    // A non-boss floor within a run: a modest, repeatable clear reward — gold
+    // scaled by depth + a wooden chest (bumped a tier on a rich encounter).
+    const floorTier: ChestTier =
       TIER_ORDER[
-        Math.min(TIER_ORDER.indexOf(baseTier) + bump, TIER_ORDER.length - 1)
+        Math.min(
+          TIER_ORDER.indexOf("wooden") + richChestBump(encounter),
+          TIER_ORDER.length - 1
+        )
       ];
-    const shards = isBoss
-      ? (CAPSTONE_DUNGEON_IDS as readonly string[]).includes(dungeonId)
-        ? SHARD_REWARDS.bossFirstClearCapstone
-        : SHARD_REWARDS.bossFirstClear
-      : SHARD_REWARDS.floorFirstClear;
     return {
+      ...none,
       gold: boostGold(
         GOLD_REWARDS.depthsFirstClearBase +
           GOLD_REWARDS.depthsFirstClearPerFloor * floor
       ),
       xp: winXp,
-      chest: makeChest(tier, isBoss ? dungeonId : undefined),
-      shards,
-      firstClear: true,
+      chest: makeChest(floorTier),
       questUnlocks: questUnlock,
     };
   }

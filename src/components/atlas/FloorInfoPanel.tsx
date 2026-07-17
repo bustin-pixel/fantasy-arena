@@ -5,19 +5,19 @@
 // (small canvas portraits, bestiary silhouettes for the unmet), what clearing
 // it pays, the rare-spawn quest whisper, and the big Enter Dungeon button.
 // Reward copy mirrors the reward fold's own sources (bossChestTierFor /
-// MILESTONE_UNLOCKS) so the preview can't drift from what actually drops.
+// milestoneUnlocksFor) so the preview can't drift from what actually drops.
 // ============================================================================
 
 import { useLayoutEffect, useRef } from "react";
 import {
+  bossChestTierFor,
+  milestoneUnlocksFor,
   monsterLevelFor,
   tierForFloorIn,
   type Dungeon,
 } from "@/data/dungeons";
 import { questUnlockIds } from "@/data/depths";
 import { getUnitDef } from "@/data/units";
-import { MILESTONE_UNLOCKS } from "@/meta/economy";
-import { bossChestTierFor } from "@/meta/rewards";
 import { CHEST_LABEL } from "@/components/RewardPanel";
 import { renderPortrait } from "@/engine/Renderer";
 import { playSfx } from "@/audio/sfx";
@@ -99,7 +99,7 @@ export function FloorInfoPanel({
 
   const bossChest = CHEST_LABEL[bossChestTierFor(dungeon.id)];
   // Gifts the whole dungeon hands over on its first clear.
-  const gifts = Object.values(MILESTONE_UNLOCKS[dungeon.id] ?? {}).filter(
+  const gifts = Object.values(milestoneUnlocksFor(dungeon.id)).filter(
     (id) => !save.unlockedUnits.includes(id)
   );
   const underleveled = warbandLv < dungeon.monsterLevel;

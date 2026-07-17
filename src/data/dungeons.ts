@@ -12,6 +12,7 @@
 
 import type { ArenaThemeId } from "@/assets/arenaThemes";
 import { LEVEL_CAP } from "@/meta/leveling"; // leaf constants module — no cycle
+import type { ChestTier } from "@/meta/economy"; // leaf constants module — no cycle
 import {
   BOSS_FLOOR_FODDER_SHARE,
   BOSS_FLOOR_INTERVAL,
@@ -68,6 +69,16 @@ export interface Dungeon {
   gate?: { dungeonId: string; floor: number };
   /** Lore blurb shown on the dungeon-select card. */
   entryHint: string;
+  /** Chest tier this dungeon's boss pays on its first kill. Absent = "gold"
+   *  (an ordinary deep boss); the chain's capstones pay the top tiers, the only
+   *  place arcane/dragon chests drop. Read via bossChestTierFor. */
+  bossChestTier?: ChestTier;
+  /** A chain capstone: its boss first-kill pays the top shard grant. */
+  capstone?: boolean;
+  /** Units gifted on clearing this dungeon, keyed by the floor they're themed
+   *  around (the grant hands over ALL of them at once — see meta/battleGrant).
+   *  Read via milestoneUnlocksFor. */
+  milestoneUnlocks?: Record<number, string>;
 }
 
 // ---------------------------------------------------------------------------
@@ -199,6 +210,12 @@ export const DUNGEONS: Record<string, Dungeon> = {
     quest: RARE_SPAWN_QUESTS[0], // Slime Knight
     entryHint:
       "The endless descent beneath the arena — a rising horde, floor after floor.",
+    bossChestTier: "silver", // the starter dungeon: a rung below the themed bosses
+    milestoneUnlocks: {
+      2: "healer", // Cleric — sustain; the Overgrowth quest needs it
+      3: "fire_mage", // burn — the Bonefields quest needs it
+      5: "berserker", // epic capstone for downing the Bloater
+    },
   },
   bonefields: {
     id: "bonefields",
@@ -226,6 +243,7 @@ export const DUNGEONS: Record<string, Dungeon> = {
     gate: { dungeonId: "depths", floor: 5 },
     entryHint:
       "A haunted barrow of the restless dead — and something older still commanding them.",
+    milestoneUnlocks: { 5: "holy_knight" }, // light vs undead
   },
   wilds: {
     id: "wilds",
@@ -250,6 +268,8 @@ export const DUNGEONS: Record<string, Dungeon> = {
     gate: { dungeonId: "bonefields", floor: 5 },
     entryHint:
       "Untamed hunting grounds where the whole pack answers to one apex beast.",
+    // The Deep Forge quest needs the Ogre (arrives a few dungeons early).
+    milestoneUnlocks: { 5: "ogre" },
   },
   overgrowth: {
     id: "overgrowth",
@@ -274,6 +294,7 @@ export const DUNGEONS: Record<string, Dungeon> = {
     gate: { dungeonId: "wilds", floor: 5 },
     entryHint:
       "A blighted grove run wild — brambles, spores, and an ancient heart beating at its center.",
+    milestoneUnlocks: { 5: "ranger" }, // woodland archer
   },
   sealed_vault: {
     id: "sealed_vault",
@@ -298,6 +319,7 @@ export const DUNGEONS: Record<string, Dungeon> = {
     gate: { dungeonId: "overgrowth", floor: 5 },
     entryHint:
       "A quarantined hall of loosed magic — its wards strain against the arcana within.",
+    milestoneUnlocks: { 5: "arcane_mage" }, // the vault of arcana
   },
   deep_forge: {
     id: "deep_forge",
@@ -322,6 +344,9 @@ export const DUNGEONS: Record<string, Dungeon> = {
     gate: { dungeonId: "sealed_vault", floor: 5 },
     entryHint:
       "A dwarven foundry gone silent — its constructs still clank the halls, tended by one great engine.",
+    bossChestTier: "arcane",
+    capstone: true,
+    milestoneUnlocks: { 5: "electric_mage" }, // lightning + machinery
   },
   eclipse_spire: {
     id: "eclipse_spire",
@@ -346,6 +371,9 @@ export const DUNGEONS: Record<string, Dungeon> = {
     gate: { dungeonId: "deep_forge", floor: 5 },
     entryHint:
       "A tower where light and dark war without end — motes, shades, and the Warden between them.",
+    bossChestTier: "dragon",
+    capstone: true,
+    milestoneUnlocks: { 5: "trickster" }, // satisfies the Den's any-of quest
   },
   fallen_cathedral: {
     id: "fallen_cathedral",
@@ -374,6 +402,10 @@ export const DUNGEONS: Record<string, Dungeon> = {
     gate: { dungeonId: "eclipse_spire", floor: 5 },
     entryHint:
       "A desecrated sanctum where hymns curdled into heresy — something holy fell here.",
+    // A fork boss pays an arcane first-clear, so its replay chest (one tier
+    // below) is gold — a worthwhile late-game farm. Not a chain capstone.
+    bossChestTier: "arcane",
+    milestoneUnlocks: { 2: "priest" }, // the Cathedral's own F5 quest needs it
   },
   rogues_den: {
     id: "rogues_den",
@@ -400,6 +432,8 @@ export const DUNGEONS: Record<string, Dungeon> = {
     gate: { dungeonId: "eclipse_spire", floor: 5 },
     entryHint:
       "A lantern-lit warren of cutthroats and coin — the guild does not welcome guests.",
+    bossChestTier: "arcane", // fork boss, like the Cathedral
+    milestoneUnlocks: { 2: "rogue" }, // the Den's own F5 quest needs it
   },
 };
 
@@ -411,6 +445,30 @@ export function getDungeon(id: string): Dungeon {
 
 /** Ordered dungeon ids for the select map (gate-chain order, Depths first). */
 export const DUNGEON_IDS: string[] = Object.keys(DUNGEONS);
+
+/** Chest tier a dungeon's boss pays on its first kill. Unlisted dungeons are
+ *  "gold" deep bosses; the chain's capstones pay the top tiers (the only place
+ *  arcane/dragon chests drop). The reward fold and the atlas preview read this
+ *  one source, so a preview can't drift from what actually drops. */
+export function bossChestTierFor(dungeonId: string): ChestTier {
+  return DUNGEONS[dungeonId]?.bossChestTier ?? "gold";
+}
+
+/** Whether a dungeon's boss first-kill pays the capstone shard grant. */
+export function isCapstoneDungeon(dungeonId: string): boolean {
+  return DUNGEONS[dungeonId]?.capstone === true;
+}
+
+/** Units gifted on clearing a dungeon, keyed by the floor they're themed
+ *  around. Gifted units pace acquisition across the whole chain.
+ *  INVARIANT (spec-enforced in dungeons.test): a unit that a dungeon's fusion
+ *  quest REQUIRES is a starter or gifted at/before that dungeon's quest floor —
+ *  so you always own the key before the lock. Ids, not display names ("healer"
+ *  shows as Cleric); every value stays deckable and outside STARTER_UNIT_IDS +
+ *  QUEST_LOCKED_UNITS. */
+export function milestoneUnlocksFor(dungeonId: string): Record<number, string> {
+  return DUNGEONS[dungeonId]?.milestoneUnlocks ?? {};
+}
 
 /** Bosses and telegraphed rare quest catalysts spawn this many levels above the
  *  dungeon's fodder (uniform rule: the Depths Bloater is Lv 2, the Eclipse
