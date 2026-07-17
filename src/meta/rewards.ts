@@ -12,7 +12,9 @@ import { DECKABLE_UNIT_IDS, getUnitDef } from "@/data/units";
 import { questRequiredUnits, questUnlockIds } from "@/data/depths";
 import { RARITIES } from "@/data/rarities";
 import {
+  bossChestTierFor,
   getDungeon,
+  isCapstoneDungeon,
   QUEST_LOCKED_UNITS,
   questForFloorIn,
 } from "@/data/dungeons";
@@ -32,7 +34,6 @@ import {
 import { RNG } from "@/utils/rng";
 import {
   BOSS_REPLAY_CHEST_CHANCE,
-  CAPSTONE_DUNGEON_IDS,
   CHEST_GOLD_RANGE,
   CHEST_UNIT_CHANCE,
   DUPLICATE_GOLD,
@@ -184,23 +185,6 @@ function pickWeightedUnit(rng: RNG): string {
     if (roll < 0) return id;
   }
   return CHEST_POOL[CHEST_POOL.length - 1];
-}
-
-/** Boss-floor first-clear chest tier per dungeon. Unlisted themed dungeons are
- *  "gold" deep bosses; the chain's two capstones pay the top tiers (the only
- *  place arcane/dragon chests drop). FloorPickerSheet previews from this too. */
-const BOSS_CHEST_TIERS: Record<string, ChestTier> = {
-  depths: "silver",
-  deep_forge: "arcane",
-  eclipse_spire: "dragon",
-  // The endgame fork bosses pay arcane first-clears — so their replay chests
-  // (one tier below) are gold, a worthwhile late-game farm.
-  fallen_cathedral: "arcane",
-  rogues_den: "arcane",
-};
-
-export function bossChestTierFor(dungeonId: string): ChestTier {
-  return BOSS_CHEST_TIERS[dungeonId] ?? "gold";
 }
 
 /** XOR salt for the boss-replay-chest chance roll. Derives an INDEPENDENT stream
@@ -370,9 +354,7 @@ export function computeBattleRewards(input: {
       // dungeon's place in the chain (Depths silver → themed gold → Forge
       // arcane → Spire dragon) and roll the dungeon's signature item line;
       // capstones pay the most shards.
-      const shards = (CAPSTONE_DUNGEON_IDS as readonly string[]).includes(
-        dungeonId
-      )
+      const shards = isCapstoneDungeon(dungeonId)
         ? SHARD_REWARDS.bossFirstClearCapstone
         : SHARD_REWARDS.bossFirstClear;
       return {

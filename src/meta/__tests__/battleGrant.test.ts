@@ -16,9 +16,8 @@ import {
   type BattleGrantSlice,
 } from "@/meta/battleGrant";
 import type { BattleRewards, ChestContent } from "@/meta/rewards";
-import { MILESTONE_UNLOCKS } from "@/meta/economy";
 import { TOTAL_XP_CAP } from "@/meta/leveling";
-import { getDungeon } from "@/data/dungeons";
+import { getDungeon, milestoneUnlocksFor } from "@/data/dungeons";
 
 const baseSave = (over: Partial<BattleGrantSlice> = {}): BattleGrantSlice => ({
   gold: 100,
@@ -183,7 +182,7 @@ describe("applyBattleGrant dungeon clears", () => {
     expect(out.dungeons.depths.highestClearedFloor).toBe(
       getDungeon("depths").floors
     );
-    for (const unitId of Object.values(MILESTONE_UNLOCKS.depths)) {
+    for (const unitId of Object.values(milestoneUnlocksFor("depths"))) {
       expect(out.unlockedUnits).toContain(unitId);
     }
   });

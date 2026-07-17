@@ -10,8 +10,7 @@
 // ============================================================================
 
 import type { BattleMode } from "@/hooks/useBattleEngine"; // type-only: erased at runtime
-import { getDungeon } from "@/data/dungeons";
-import { MILESTONE_UNLOCKS } from "@/meta/economy";
+import { getDungeon, milestoneUnlocksFor } from "@/data/dungeons";
 import { addXp } from "@/meta/leveling";
 import { tickQuestProgress, type QuestSaveState } from "@/meta/quests";
 import {
@@ -96,10 +95,10 @@ export function applyBattleGrant<S extends BattleGrantSlice>(
       ...save.dungeons,
       [ctx.dungeonId]: { highestClearedFloor: Math.max(prev, floors) },
     };
-    // Clearing a dungeon hands over ALL of its milestone gifts at once
-    // (MILESTONE_UNLOCKS is dungeonId → floor → unit id).
-    const gifts = MILESTONE_UNLOCKS[ctx.dungeonId];
-    if (gifts) for (const unitId of Object.values(gifts)) unlocked.add(unitId);
+    // Clearing a dungeon hands over ALL of its milestone gifts at once.
+    for (const unitId of Object.values(milestoneUnlocksFor(ctx.dungeonId))) {
+      unlocked.add(unitId);
+    }
   }
   // Rare-spawn quest completion → the reward unit(s) become purchasable
   // (the Sealed Vault quest pays out two from the one kill).

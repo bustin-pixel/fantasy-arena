@@ -8,13 +8,18 @@
 
 import type { ItemLoadouts } from "@/types";
 import { DECKABLE_UNIT_IDS, UNITS } from "@/data/units";
-import { MILESTONE_UNLOCKS, STARTER_UNIT_IDS } from "@/meta/economy";
+import { STARTER_UNIT_IDS } from "@/meta/economy";
 import { TOTAL_XP_CAP } from "@/meta/leveling";
 import { sanitizeItems, sanitizeLoadouts } from "@/meta/inventory";
 import { sanitizeShop, type ShopState } from "@/meta/shop";
 import { sanitizeQuests, type QuestSaveState } from "@/meta/quests";
 import { DEFAULT_AVATAR_ID, isAvatarUnlocked } from "@/meta/avatars";
-import { DUNGEON_IDS, DUNGEONS, QUEST_LOCKED_UNITS } from "@/data/dungeons";
+import {
+  DUNGEON_IDS,
+  DUNGEONS,
+  milestoneUnlocksFor,
+  QUEST_LOCKED_UNITS,
+} from "@/data/dungeons";
 
 /** Compendium knowledge of one unit/monster. Encountered = faced it in battle
  *  (silhouette + name); defeated = it died to you at least once (full page). */
@@ -253,9 +258,11 @@ export function migrateSave(parsed: Partial<PlayerSave> | null): PlayerSave {
     // gift whose floor is at/below that dungeon's cleared high-water mark.
     // Idempotent + monotonic (only ever adds), so it's safe on every load and
     // covers saves made before a dungeon's gift existed.
-    for (const [dungeonId, byFloor] of Object.entries(MILESTONE_UNLOCKS)) {
+    for (const dungeonId of DUNGEON_IDS) {
       const cleared = merged.dungeons[dungeonId]?.highestClearedFloor ?? 0;
-      for (const [floorStr, unitId] of Object.entries(byFloor)) {
+      for (const [floorStr, unitId] of Object.entries(
+        milestoneUnlocksFor(dungeonId)
+      )) {
         if (Number(floorStr) <= cleared) owned.add(unitId);
       }
     }

@@ -3,7 +3,6 @@
 // (fixed scan range) rather than hardcoded, so number tuning doesn't break them.
 import { describe, expect, it } from "vitest";
 import {
-  bossChestTierFor,
   computeBattleRewards,
   rollChest,
   type ChestContent,
@@ -16,7 +15,6 @@ import {
   endlessMilestoneChestTier,
   freshMilestonesCrossed,
   GOLD_REWARDS,
-  MILESTONE_UNLOCKS,
   replayGoldFor,
   SHARD_CHEST_DRIP,
   SHARD_REWARDS,
@@ -33,7 +31,14 @@ import {
   questUnlockIds,
   rareSpawnQuestForFloor,
 } from "@/data/depths";
-import { DUNGEONS, QUEST_LOCKED_UNITS, getDungeon } from "@/data/dungeons";
+import {
+  bossChestTierFor,
+  DUNGEON_IDS,
+  DUNGEONS,
+  milestoneUnlocksFor,
+  QUEST_LOCKED_UNITS,
+  getDungeon,
+} from "@/data/dungeons";
 
 const NO_UNITS: string[] = [];
 const ALL_UNITS = [...DECKABLE_UNIT_IDS];
@@ -463,7 +468,7 @@ describe("computeBattleRewards — the reward matrix", () => {
   it("is deterministic end to end", () => {
     const input = {
       ...base, mode: "depths" as const, floor: 5,
-      outcome: "victory" as const, highestClearedFloor: 4,
+      outcome: "victory" as const, isBoss: true,
     };
     expect(computeBattleRewards(input)).toEqual(computeBattleRewards(input));
   });
@@ -471,9 +476,11 @@ describe("computeBattleRewards — the reward matrix", () => {
 
 describe("economy data sanity (guards designer typos)", () => {
   it("every dungeon gift grants a non-starter, non-quest-locked deckable unit on a real floor", () => {
-    for (const [dungeonId, byFloor] of Object.entries(MILESTONE_UNLOCKS)) {
+    for (const dungeonId of DUNGEON_IDS) {
       const dungeon = getDungeon(dungeonId); // throws on an unknown dungeon id
-      for (const [floorStr, unitId] of Object.entries(byFloor)) {
+      for (const [floorStr, unitId] of Object.entries(
+        milestoneUnlocksFor(dungeonId)
+      )) {
         const floor = Number(floorStr);
         expect(floor).toBeGreaterThanOrEqual(1);
         expect(floor).toBeLessThanOrEqual(dungeon.floors);
@@ -494,7 +501,7 @@ describe("economy data sanity (guards designer typos)", () => {
     ): Set<string> => {
       const owned = new Set<string>(STARTER_UNIT_IDS);
       const qFloor = dungeon.quest?.floor ?? dungeon.floors;
-      for (const [fStr, u] of Object.entries(MILESTONE_UNLOCKS[dungeon.id] ?? {})) {
+      for (const [fStr, u] of Object.entries(milestoneUnlocksFor(dungeon.id))) {
         if (Number(fStr) < qFloor) owned.add(u);
       }
       let cur = dungeon;
@@ -502,7 +509,7 @@ describe("economy data sanity (guards designer typos)", () => {
       while (cur.gate && !seen.has(cur.gate.dungeonId)) {
         seen.add(cur.gate.dungeonId);
         const anc = getDungeon(cur.gate.dungeonId);
-        for (const u of Object.values(MILESTONE_UNLOCKS[anc.id] ?? {})) owned.add(u);
+        for (const u of Object.values(milestoneUnlocksFor(anc.id))) owned.add(u);
         cur = anc;
       }
       return owned;
