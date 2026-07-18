@@ -39,6 +39,7 @@ import {
 } from "@/hooks/ceremony";
 import { getDungeon } from "@/data/dungeons";
 import { addXp, levelFromXp } from "@/meta/leveling";
+import { buildSlayerBonusTable } from "@/meta/slayer";
 import { RewardPanel } from "@/components/RewardPanel";
 import { generateSeed } from "@/utils/rng";
 import { playStinger, setMusicTrack } from "@/audio/music";
@@ -127,6 +128,11 @@ export function BattleScreen({
   const [formationAtMount] = useState<FormationMark[] | null>(
     () => formation ?? null
   );
+  // Compendium slayer table, frozen at mount like unitLevels: this match's
+  // kills land in the save at resolution and pay out from the NEXT match.
+  const [slayerBonuses] = useState<Record<string, number>>(() =>
+    buildSlayerBonusTable(save.monsterKills)
+  );
   // Omens for the three exit arrows — what each path leads to on the NEXT floor.
   // Frozen once (seeded meta stream), so re-renders can't reshuffle them; only
   // meaningful in the depths continue-deeper flow, harmless elsewhere.
@@ -172,7 +178,8 @@ export function BattleScreen({
     isBoss,
     suppressQuestRare,
     tier,
-    formationAtMount
+    formationAtMount,
+    slayerBonuses
   );
   const wrapRef = useRef<HTMLDivElement>(null);
   const recordedRef = useRef(false);

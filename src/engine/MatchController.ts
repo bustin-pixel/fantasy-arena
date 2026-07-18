@@ -105,6 +105,12 @@ export interface MatchOptions {
    *  like the deployments themselves; the resulting deploys are recorded, so the
    *  replay log fully captures its effect. */
   formation?: FormationMark[];
+  /** Player slayer bonuses: defId → outgoing damage multiplier (e.g. 1.04),
+   *  meta-precomputed from lifetime monsterKills (meta/slayer). A deterministic
+   *  match input like unitLevels: FROZEN for the whole match — kills made this
+   *  match land in the save and pay out from the NEXT one — and recorded in the
+   *  replay. Missing/empty = identity. */
+  slayerBonuses?: Record<string, number>;
 }
 
 /** The match clock for a mode. Endless resets its clock per wave (a stalemate
@@ -191,6 +197,8 @@ export class MatchController {
   private enemyLevel: number;
   /** The raw loadouts input, kept only for the replay record. */
   private itemLoadouts: ItemLoadouts;
+  /** Slayer bonus table (defId → mult), installed on teamMods.player. */
+  private slayerBonuses: Record<string, number>;
   /** Player gear resolved once per defId (missing = bare unit). */
   private playerItems = new Map<string, ItemCarry>();
   /** Arena item mirror: the flat hp/dmg mods every AI unit fights with,
@@ -241,6 +249,11 @@ export class MatchController {
     }
     resetUidCounter();
     this.state = createSimState(seed, matchClockSec(this.mode));
+    // Compendium slayer bonuses: player-side only, read at the damage funnel.
+    // Identity {} leaves teamMods untouched-in-effect, so slayer-less matches
+    // stay byte-identical to pre-feature sims.
+    this.slayerBonuses = opts.slayerBonuses ?? {};
+    this.state.teamMods.player.slayerVs = this.slayerBonuses;
     if (this.mode === "depths") {
       this.state.activeCaps = {
         player: DEPTHS_PLAYER_ACTIVE,
@@ -873,6 +886,7 @@ export class MatchController {
       picks: this.pickIndices.slice(),
       unitLevels: { ...this.unitLevels },
       itemLoadouts: structuredClone(this.itemLoadouts),
+      slayerBonuses: { ...this.slayerBonuses },
     };
   }
 }

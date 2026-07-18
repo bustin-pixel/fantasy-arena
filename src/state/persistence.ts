@@ -7,7 +7,7 @@
 // ============================================================================
 
 import type { ItemLoadouts } from "@/types";
-import { DECKABLE_UNIT_IDS, UNITS } from "@/data/units";
+import { DECKABLE_UNIT_IDS, SLAYER_MONSTER_IDS, UNITS } from "@/data/units";
 import { STARTER_UNIT_IDS } from "@/meta/economy";
 import { TOTAL_XP_CAP } from "@/meta/leveling";
 import { sanitizeItems, sanitizeLoadouts } from "@/meta/inventory";
@@ -157,6 +157,11 @@ export interface PlayerSave {
   /** Consecutive chests opened without an item drop — at ITEM_PITY_THRESHOLD
    *  the next chest is forced to contain one. (Save v11.) */
   itemPity: number;
+  /** Lifetime kills per monster defId (SLAYER_MONSTER_IDS only — heroes and
+   *  summons never appear). SLAYER LEVEL IS ALWAYS DERIVED from this via
+   *  meta/slayer.slayerLevelFromKills — never store a level, the unitXp rule.
+   *  Missing id = 0 kills. (Save v15.) */
+  monsterKills: Record<string, number>;
 }
 
 // The key names the storage SLOT, not the schema — the version lives inside
@@ -164,7 +169,7 @@ export interface PlayerSave {
 const KEY = "fantasy-arena/save/v1";
 
 export const DEFAULT_SAVE: PlayerSave = {
-  version: 14,
+  version: 15,
   username: "Champion",
   avatarId: DEFAULT_AVATAR_ID,
   deck: [...STARTER_UNIT_IDS],
@@ -183,6 +188,7 @@ export const DEFAULT_SAVE: PlayerSave = {
   shop: { day: -1, rerolls: 0, bought: [] },
   quests: { day: -1, refreshes: 0, taken: [], active: [] },
   itemPity: 0,
+  monsterKills: {},
 };
 
 export function loadSave(): PlayerSave {
@@ -283,6 +289,15 @@ export function migrateSave(parsed: Partial<PlayerSave> | null): PlayerSave {
   merged.itemPity = Number.isFinite(rawPity)
     ? Math.max(0, Math.floor(rawPity))
     : 0;
+  // v15: lifetime monster kills — keep only slayer-trackable ids with finite
+  // values, floored and clamped ≥ 0 (defensive against hand-edited saves).
+  const monsterKills: Record<string, number> = {};
+  for (const [id, n] of Object.entries(parsed.monsterKills ?? {})) {
+    if (!SLAYER_MONSTER_IDS.has(id)) continue;
+    if (typeof n !== "number" || !Number.isFinite(n)) continue;
+    monsterKills[id] = Math.max(0, Math.floor(n));
+  }
+  merged.monsterKills = monsterKills;
 
   // Grandfathering: saves from before the unlock system keep every unit that
   // exists today — EXCEPT quest-locked ones, whose purchase must always be
@@ -363,6 +378,7 @@ function structuredCloneSave(save: PlayerSave): PlayerSave {
       taken: [...save.quests.taken],
       active: save.quests.active.map((q) => ({ ...q })),
     },
+    monsterKills: { ...save.monsterKills },
   };
 }
 

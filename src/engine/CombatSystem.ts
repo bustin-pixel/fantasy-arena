@@ -119,6 +119,11 @@ export interface TeamMods {
   rhythmBonus: number;
   /** Thunderclap / Venom Coating on-hit riders. */
   onHitRiders: TeamRider[];
+  /** Compendium slayer bonus: outgoing damage multiplier vs a specific enemy
+   *  defId (missing = 1). Meta-precomputed per match from lifetime kills
+   *  (MatchOptions.slayerBonuses); identity {} keeps slayer-less sims
+   *  byte-identical. */
+  slayerVs: Record<string, number>;
 }
 
 export function identityTeamMods(): TeamMods {
@@ -138,6 +143,7 @@ export function identityTeamMods(): TeamMods {
     rangedLifesteal: 0,
     rhythmBonus: 0,
     onHitRiders: [],
+    slayerVs: {},
   };
 }
 
@@ -341,6 +347,8 @@ function makeDamageDealer(
       target.hp / target.maxHp < EXECUTE_THRESHOLD
         ? 1 + srcMods.executeBonus
         : 1;
+    // Compendium slayer: the team's lifetime-kill bonus vs this exact monster.
+    const slayerMult = srcMods.slayerVs[target.defId] ?? 1;
     // Equipment mods, the per-unit twins: source-side execute / giant slayer /
     // pack tactics, target-side damage reduction / magic reduction / pack
     // tactics. Both stay exactly 1 for unequipped units.
@@ -377,6 +385,7 @@ function makeDamageDealer(
       effAmount *
       srcMods.dmgMult *
       execMult *
+      slayerMult *
       itemMult *
       target.damageTakenMult *
       state.teamMods[target.team].damageTakenMult *

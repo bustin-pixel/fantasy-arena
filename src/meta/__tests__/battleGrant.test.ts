@@ -30,6 +30,7 @@ const baseSave = (over: Partial<BattleGrantSlice> = {}): BattleGrantSlice => ({
   endless: { bestWave: 0 },
   quests: { day: -1, refreshes: 0, taken: [], active: [] },
   itemPity: 0,
+  monsterKills: {},
   ...over,
 });
 
@@ -256,6 +257,45 @@ describe("applyBattleGrant dungeon clears", () => {
       ctx({ mode: "depths", dungeonId: "depths", tier: "normal" })
     );
     expect(b).toEqual(a);
+  });
+});
+
+describe("applyBattleGrant slayer kills", () => {
+  it("accumulates the slain MULTISET on top of existing lifetime counts", () => {
+    const out = applyBattleGrant(
+      baseSave({ monsterKills: { giant_rat: 5 } }),
+      noRewards(),
+      ctx({ slain: ["giant_rat", "giant_rat", "zombie_shambler"] })
+    );
+    expect(out.monsterKills).toEqual({ giant_rat: 7, zombie_shambler: 1 });
+  });
+
+  it("filters out heroes (arena mirrors) and enemy summons", () => {
+    const out = applyBattleGrant(
+      baseSave(),
+      noRewards(),
+      // knight = deckable hero, skeleton = a summon def — neither is tracked.
+      ctx({ mode: "solo", slain: ["knight", "skeleton", "ghoul"] })
+    );
+    expect(out.monsterKills).toEqual({ ghoul: 1 });
+  });
+
+  it("counts pre-wipe kills on a defeat (like slay bounties)", () => {
+    const out = applyBattleGrant(
+      baseSave(),
+      noRewards(),
+      ctx({ outcome: "defeat", slain: ["lich"] })
+    );
+    expect(out.monsterKills).toEqual({ lich: 1 });
+  });
+
+  it("leaves the ledger untouched when nothing trackable died", () => {
+    const out = applyBattleGrant(
+      baseSave({ monsterKills: { ghoul: 3 } }),
+      noRewards(),
+      ctx({ slain: [] })
+    );
+    expect(out.monsterKills).toEqual({ ghoul: 3 });
   });
 });
 

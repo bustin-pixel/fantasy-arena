@@ -43,7 +43,7 @@ function v2Save(): Partial<PlayerSave> {
 describe("migrateSave", () => {
   it("null (new player) → defaults: starter units, 0 gold, floor 0", () => {
     const save = migrateSave(null);
-    expect(save.version).toBe(14);
+    expect(save.version).toBe(15);
     expect(save.shop).toEqual({ day: -1, rerolls: 0, bought: [] });
     expect(save.quests).toEqual({
       day: -1,
@@ -235,6 +235,34 @@ describe("migrateSave", () => {
     });
     expect(save.dungeons.wilds.clearedTiers).toBeUndefined(); // empty drops
     expect(save.dungeons.overgrowth.clearedTiers).toBeUndefined(); // non-object drops
+  });
+
+  it("v15: monsterKills defaults to {} for an older save", () => {
+    expect(migrateSave({ version: 14, gold: 100 }).monsterKills).toEqual({});
+  });
+
+  it("v15: keeps trackable monsterKills and drops/clamps junk", () => {
+    const save = migrateSave({
+      version: 15,
+      monsterKills: {
+        giant_rat: 37,
+        ghoul: 12.9, // floats floor
+        lich: -3, // negatives clamp to 0
+        knight: 50, // hero → dropped
+        skeleton: 50, // summon def → dropped
+        not_a_unit: 50, // unknown → dropped
+        dire_wolf: Number.POSITIVE_INFINITY, // non-finite → dropped
+      },
+    });
+    expect(save.monsterKills).toEqual({ giant_rat: 37, ghoul: 12, lich: 0 });
+  });
+
+  it("v15: two migrations never share a monsterKills reference", () => {
+    const raw = { version: 15, monsterKills: { giant_rat: 5 } };
+    const a = migrateSave(raw);
+    const b = migrateSave(raw);
+    a.monsterKills.giant_rat = 999;
+    expect(b.monsterKills.giant_rat).toBe(5);
   });
 
   it("v14: two migrations never share a clearedTiers reference", () => {

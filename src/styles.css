@@ -3462,6 +3462,53 @@ body.modal-open .pager-nav {
   line-height: 1.15;
   text-align: center;
 }
+/* Compendium slayer track: level tag + kill-progress bar under a revealed
+ * card. Book-page inks (browns on parchment) with the tome's accent for the
+ * fill; compact enough that the 2×2 card grid still fits a phone spread. */
+.book-slayer {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  margin-top: 3px;
+  gap: 2px;
+}
+.book-slayer-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.54rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8a5a1c;
+}
+.book-slayer-bonus {
+  color: #a02c2c;
+}
+.book-slayer-bar {
+  display: block;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(74, 45, 14, 0.22);
+  overflow: hidden;
+}
+.book-slayer-fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent);
+}
+.book-slayer-sub {
+  font-size: 0.52rem;
+  color: #8a6a3a;
+  text-align: center;
+}
+/* The boss showcase box is wider — cap the track so it hugs the portrait. */
+.book-bossbox .book-slayer {
+  max-width: 120px;
+}
+
 .book-rare-tag {
   margin: 8px auto 0;
   width: fit-content;

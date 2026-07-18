@@ -1838,6 +1838,15 @@ export const NON_DECK_UNITS = new Set<string>([
   "silencer",
 ]);
 
+/** Monsters the compendium Slayer track counts and displays: real dungeon
+ *  denizens — everything undeckable EXCEPT runtime summons. Heroes (arena
+ *  mirrors) and summoned minions never accrue kills or take slayer bonus
+ *  damage. (The Archmage — a deckable rare-quest catalyst — is a hero and
+ *  deliberately untracked.) */
+export const SLAYER_MONSTER_IDS = new Set<string>(
+  [...NON_DECK_UNITS].filter((id) => !SUMMONED_UNIT_IDS.has(id))
+);
+
 /** Units that can appear in a player/AI deck or the hub card grid. */
 export const DECKABLE_UNIT_IDS = UNIT_IDS.filter(
   (id) => !NON_DECK_UNITS.has(id)

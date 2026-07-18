@@ -188,7 +188,12 @@ export function useBattleEngine(
    *  present, the warband is fielded on these spots and a walk-in cinematic plays
    *  before the countdown. A STABLE object frozen at mount, like unitLevels.
    *  Null/absent = manual placement (floor 1, or non-descent modes). */
-  formation: FormationMark[] | null = null
+  formation: FormationMark[] | null = null,
+  /** Compendium slayer bonuses: enemy defId → damage multiplier, precomputed
+   *  from lifetime monsterKills (meta/slayer.buildSlayerBonusTable). A STABLE
+   *  object frozen at mount, like unitLevels — kills made this match pay out
+   *  from the next one. Missing/empty = identity. */
+  slayerBonuses?: Record<string, number>
 ): UseBattleEngine {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const controllerRef = useRef<MatchController | null>(null);
@@ -275,6 +280,7 @@ export function useBattleEngine(
         tier,
         // Depths floors 2+: field on the previous floor's marks (the march-in).
         formation: formation ?? undefined,
+        slayerBonuses,
       });
     } else {
       const enemyDeck = generateEnemyDeck(seed);
@@ -282,7 +288,9 @@ export function useBattleEngine(
         seed,
         playerDeck.slice(0, 4),
         enemyDeck,
-        { unitLevels, itemLoadouts }
+        // Slayer bonuses are harmless in arena (hero defIds never match the
+        // table) — passing them keeps the plumbing uniform across modes.
+        { unitLevels, itemLoadouts, slayerBonuses }
       );
     }
     themeRef.current =

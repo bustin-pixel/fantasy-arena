@@ -11,6 +11,7 @@
 
 import type { BattleMode } from "@/hooks/useBattleEngine"; // type-only: erased at runtime
 import { getDungeon, milestoneUnlocksFor } from "@/data/dungeons";
+import { SLAYER_MONSTER_IDS } from "@/data/units";
 import type { TierId } from "@/data/tiers";
 import { addXp } from "@/meta/leveling";
 import { tickQuestProgress, type QuestSaveState } from "@/meta/quests";
@@ -24,6 +25,7 @@ import {
 /** The save slice a battle grant folds into — PlayerSave satisfies it. */
 export interface BattleGrantSlice extends ChestGrantSlice {
   unitXp: Record<string, number>;
+  monsterKills: Record<string, number>;
   dungeons: Record<
     string,
     {
@@ -63,6 +65,19 @@ export function applyBattleGrant<S extends BattleGrantSlice>(
   if (rewards.xp > 0) {
     for (const id of new Set(ctx.deck ?? [])) {
       unitXp[id] = addXp(unitXp[id] ?? 0, rewards.xp);
+    }
+  }
+  // Slayer kills: every trackable monster in the slain multiset adds one
+  // lifetime kill (any outcome — pre-wipe kills count, like slay bounties).
+  // Heroes (arena mirrors) and enemy summons are filtered out here.
+  let monsterKills = save.monsterKills;
+  const slainMonsters = (ctx.slain ?? []).filter((id) =>
+    SLAYER_MONSTER_IDS.has(id)
+  );
+  if (slainMonsters.length > 0) {
+    monsterKills = { ...save.monsterKills };
+    for (const id of slainMonsters) {
+      monsterKills[id] = (monsterKills[id] ?? 0) + 1;
     }
   }
   // Chest contents → currency/unlocks/stacks (the fold shared with quest
@@ -139,6 +154,7 @@ export function applyBattleGrant<S extends BattleGrantSlice>(
     soulShards: folded.soulShards,
     items: folded.items,
     unitXp,
+    monsterKills,
     unlockedUnits: [...unlocked],
     dungeons,
     questUnlocks: [...questUnlocks],

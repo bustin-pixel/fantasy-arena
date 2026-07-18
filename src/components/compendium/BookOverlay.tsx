@@ -10,7 +10,12 @@
 // ============================================================================
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { getUnitDef } from "@/data/units";
+import { getUnitDef, SLAYER_MONSTER_IDS } from "@/data/units";
+import {
+  SLAYER_DMG_PER_LEVEL,
+  SLAYER_LEVEL_CAP,
+  slayerProgress,
+} from "@/meta/slayer";
 import { RARITIES } from "@/data/rarities";
 import { ITEM_LINES, makeItemKey } from "@/data/items";
 import { BOONS } from "@/data/boons";
@@ -111,13 +116,46 @@ function SplashArt({
   return <canvas ref={ref} className={className} aria-hidden />;
 }
 
+const SLAYER_ROMAN = ["", "I", "II", "III", "IV", "V"];
+
+/** The compendium slayer track: lifetime kills → slayer level → bonus damage
+ *  vs exactly this monster. Renders nothing for untracked defIds (heroes on
+ *  the treatise/heroes pages, quest-catalyst rares), so callers can attach it
+ *  to any revealed card unconditionally. */
+function SlayerTrack({ defId, kills }: { defId: string; kills: number }) {
+  if (!SLAYER_MONSTER_IDS.has(defId)) return null;
+  const { level, into, needed } = slayerProgress(kills);
+  const mastered = level >= SLAYER_LEVEL_CAP;
+  const fillPct = mastered ? 100 : (into / (into + (needed ?? 1))) * 100;
+  return (
+    <span className="book-slayer">
+      <span className="book-slayer-row">
+        <span>{level > 0 ? `Slayer ${SLAYER_ROMAN[level]}` : "Slayer"}</span>
+        {level > 0 && (
+          <span className="book-slayer-bonus">
+            +{Math.round(level * SLAYER_DMG_PER_LEVEL * 100)}%
+          </span>
+        )}
+      </span>
+      <span className="book-slayer-bar" aria-hidden>
+        <span className="book-slayer-fill" style={{ width: `${fillPct}%` }} />
+      </span>
+      <span className="book-slayer-sub">
+        {mastered ? `${kills} slain · Mastered` : `${kills} slain · ${needed} to next`}
+      </span>
+    </span>
+  );
+}
+
 function MonsterCard({
   defId,
   tier,
+  kills,
   onOpen,
 }: {
   defId: string;
   tier: RevealTier;
+  kills: number;
   onOpen: (defId: string) => void;
 }) {
   const def = getUnitDef(defId);
@@ -143,6 +181,7 @@ function MonsterCard({
       {!revealed && (
         <span className="comp-hint-tag">{tier === "encountered" ? "Sighted" : "Unknown"}</span>
       )}
+      {revealed && <SlayerTrack defId={defId} kills={kills} />}
     </button>
   );
 }
@@ -241,6 +280,12 @@ function PageView({
           <span className="book-boss-tag">
             {revealed ? "Slain — lore recorded" : tier === "encountered" ? "Sighted" : "Awaits below"}
           </span>
+          {revealed && (
+            <SlayerTrack
+              defId={page.boss.defId}
+              kills={save.monsterKills[page.boss.defId] ?? 0}
+            />
+          )}
         </button>
         {page.rareTag && <div className="book-rare-tag">{page.rareTag}</div>}
         {page.note && <p className="book-page-note">{page.note}</p>}
@@ -273,6 +318,7 @@ function PageView({
                 <MonsterCard
                   key={e.defId}
                   defId={e.defId}
+                  kills={save.monsterKills[e.defId] ?? 0}
                   tier={
                     // Treatise pages: your own warband's instincts are no
                     // secret — owning the unit reveals its card here.
