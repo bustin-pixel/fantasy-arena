@@ -60,6 +60,37 @@ the source of truth, so this file deliberately doesn't duplicate it.
 > (`OutroCinematic.braceToRow`, a `braceRef`); no UI/App changes. ⚠ the retreat
 > cinematic needs a **device eyeball**. Memory: `boss-brace-cinematic-built`.
 
+> **✅ The Commander BUILT (2026-07-18, on `feature/commander` — UNSHIPPED).**
+> The meta centerpiece: YOU as a customizable commander above the deck. An
+> account-wide XP pool (fed the same per-battle XP the deck earns, cap Lv 20 →
+> 19 talent points), a 3-branch talent tree (Warlord / Guardian / Arcanist,
+> tier gates at 0/2/5/8 in-branch, keystones), and one castable battle spell
+> per branch (unlocked at 8 points in; Rally / Bulwark / Arcane Storm, one
+> charge per battle via a HUD button). Talents resolve to a `CommanderMods`
+> fold on `teamMods.player` — a deterministic match input like slayerBonuses,
+> replay-recorded; arena stat-mirrors the flat talents onto the AI side so the
+> fair fight holds. Save **v17** (`commanderXp`, `talents`, `equippedSpell` —
+> all derived-never-stored rules; the sanitizer REPLAYS the tree's gate rules
+> on load, so hand-edited/rolled-back saves self-heal). 814 tests (+37:
+> meta/commander, engine commanderMods + commanderSpell, migration). UI: Home
+> banner under the profile plate → CommanderSheet; results-screen commander
+> XP bar. Memory: `commander-built`.
+>
+> **Meta decisions recorded (2026-07-18):** a "Hero" tier above Legendary with
+> a 2-unit deck was considered and **REJECTED** — it devalues the legendaries
+> (each is a themed dungeon's trophy), deletes the deploy-2-of-4 reserve game,
+> and ripples through AI budgets/mirrors/sweeps. Deferred meta levers for
+> later: **player-facing deck budget** (expose the AIDeck rare=1/epic=2/
+> legendary=4 cost system — a future Hero-class unit could slot in as a
+> cost-6 card, forcing the tiny-warband tradeoff emergently), **faction/tag
+> synergies** (undead/skeleton tags exist), **legendary ascension** (pairs
+> with the deferred prestige note).
+>
+> **Still open on the Commander:** a "War Tent" full-screen scene (Forge
+> pattern, `/mockup` round) — the sheet ships plain; spell cast VFX/SFX polish
+> + a field-edge commander banner (presentation); a talent-numbers sweep once
+> players saturate the tree; device eyeball of the HUD spell button feel.
+
 **Current state:** deterministic 4v4 auto-battler, 24 deckable units (engine fully
 kit-based — see `docs/adr/0001-unitkit-seam.md`), a swipeable 3-page app shell
 (Collection / Home / Compendium) over a scrolling dungeon-crypt background,

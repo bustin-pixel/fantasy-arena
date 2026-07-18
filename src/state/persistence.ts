@@ -19,6 +19,15 @@ import {
   earnedTitleIds,
 } from "@/meta/bestiaryRewards";
 import {
+  addCommanderXp,
+  commanderLevelFromXp,
+  sanitizeEquippedSpell,
+  sanitizeTalentAllocation,
+  talentPointsForLevel,
+  type SpellId,
+  type TalentAllocation,
+} from "@/meta/commander";
+import {
   DUNGEON_IDS,
   DUNGEONS,
   milestoneUnlocksFor,
@@ -172,6 +181,16 @@ export interface PlayerSave {
    *  — never stored, the unitXp rule; only the player's choice lives here, and
    *  it's cleared on load if no longer earned. (Save v16.) */
   title: string | null;
+  /** Commander XP — the account-wide pool every battle feeds. LEVEL AND TALENT
+   *  POINTS ARE ALWAYS DERIVED via meta/commander (the unitXp rule). (Save v17.) */
+  commanderXp: number;
+  /** Talent ranks bought, keyed by talent id. Sanitized on load by replaying
+   *  the tree's gate rules, so it can never hold an unreachable build. (v17.) */
+  talents: TalentAllocation;
+  /** The EQUIPPED commander spell, or null. The UNLOCKED set is always derived
+   *  from branch investment (the title rule); cleared on load if the pick is
+   *  no longer unlocked. (Save v17.) */
+  equippedSpell: SpellId | null;
 }
 
 // The key names the storage SLOT, not the schema — the version lives inside
@@ -179,7 +198,7 @@ export interface PlayerSave {
 const KEY = "fantasy-arena/save/v1";
 
 export const DEFAULT_SAVE: PlayerSave = {
-  version: 16,
+  version: 17,
   username: "Champion",
   avatarId: DEFAULT_AVATAR_ID,
   deck: [...STARTER_UNIT_IDS],
@@ -200,6 +219,9 @@ export const DEFAULT_SAVE: PlayerSave = {
   itemPity: 0,
   monsterKills: {},
   title: null,
+  commanderXp: 0,
+  talents: {},
+  equippedSpell: null,
 };
 
 export function loadSave(): PlayerSave {
@@ -328,6 +350,22 @@ export function migrateSave(parsed: Partial<PlayerSave> | null): PlayerSave {
     merged.gold += retro.gold;
     merged.soulShards += retro.shards;
   }
+  // v17: the Commander — XP pool clamped, talents replayed through the tree's
+  // gate rules against the points the CLAMPED level actually grants, and the
+  // equipped spell kept only while still unlocked. Older saves start at the
+  // zero state (no retro-grant — XP simply starts accruing).
+  const rawCommanderXp = Number(parsed.commanderXp ?? 0);
+  merged.commanderXp = Number.isFinite(rawCommanderXp)
+    ? addCommanderXp(0, Math.floor(rawCommanderXp))
+    : 0;
+  merged.talents = sanitizeTalentAllocation(
+    parsed.talents,
+    talentPointsForLevel(commanderLevelFromXp(merged.commanderXp))
+  );
+  merged.equippedSpell = sanitizeEquippedSpell(
+    parsed.equippedSpell,
+    merged.talents
+  );
 
   // Grandfathering: saves from before the unlock system keep every unit that
   // exists today — EXCEPT quest-locked ones, whose purchase must always be
@@ -409,6 +447,7 @@ function structuredCloneSave(save: PlayerSave): PlayerSave {
       active: save.quests.active.map((q) => ({ ...q })),
     },
     monsterKills: { ...save.monsterKills },
+    talents: { ...save.talents },
   };
 }
 

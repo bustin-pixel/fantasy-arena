@@ -5,6 +5,8 @@
 // lifted onto a Node.js/Colyseus server unchanged for multiplayer.
 // ============================================================================
 
+import type { CommanderMods, SpellId } from "@/meta/commander"; // type-only: meta/commander imports nothing
+
 export type Rarity = "rare" | "epic" | "legendary";
 
 export type Team = "player" | "enemy";
@@ -634,4 +636,10 @@ export interface ReplayData {
    *  — re-simulation must install the same damage multipliers). Absent/empty
    *  = identity. */
   slayerBonuses?: Record<string, number>;
+  /** The player's resolved commander talents (a match input, like unitLevels —
+   *  re-simulation must install the same teamMods folds). Absent = identity. */
+  commanderMods?: CommanderMods;
+  /** Commander spell casts (tick + spell) — a logged player input, like
+   *  `deployments`. Absent/empty = no cast this match. */
+  commanderCasts?: { tick: number; spell: SpellId }[];
 }

@@ -15,6 +15,7 @@ import type { BattleMode } from "@/hooks/useBattleEngine"; // type-only: erased 
 import { getDungeon, milestoneUnlocksFor } from "@/data/dungeons";
 import type { TierId } from "@/data/tiers";
 import { addXp } from "@/meta/leveling";
+import { addCommanderXp } from "@/meta/commander";
 import {
   foldBestiarySeen,
   foldMonsterKills,
@@ -31,6 +32,7 @@ import {
 /** The save slice a battle grant folds into — PlayerSave satisfies it. */
 export interface BattleGrantSlice extends ChestGrantSlice {
   unitXp: Record<string, number>;
+  commanderXp: number;
   monsterKills: Record<string, number>;
   bestiary: BestiaryMap;
   dungeons: Record<
@@ -78,6 +80,10 @@ export function applyBattleGrant<S extends BattleGrantSlice>(
       unitXp[id] = addXp(unitXp[id] ?? 0, rewards.xp);
     }
   }
+  // Commander XP: the account-wide pool eats the same per-battle amount the
+  // deck earns — one feed, so every mode already tuned for unit XP paces the
+  // commander identically (meta/commander holds the curve).
+  const commanderXp = addCommanderXp(save.commanderXp, rewards.xp);
   // Slayer kills: every trackable monster in the slain multiset adds one
   // lifetime kill, PvE ONLY — arena (solo/pvp) grants nothing, which is what
   // lets the skeleton be trackable without arena Necromancer-summon farming.
@@ -173,6 +179,7 @@ export function applyBattleGrant<S extends BattleGrantSlice>(
     soulShards: folded.soulShards,
     items: folded.items,
     unitXp,
+    commanderXp,
     monsterKills,
     bestiary,
     unlockedUnits: [...unlocked],

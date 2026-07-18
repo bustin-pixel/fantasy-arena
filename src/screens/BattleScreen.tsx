@@ -40,6 +40,11 @@ import {
 import { getDungeon } from "@/data/dungeons";
 import { addXp, levelFromXp } from "@/meta/leveling";
 import { buildSlayerBonusTable } from "@/meta/slayer";
+import {
+  addCommanderXp,
+  resolveCommanderMods,
+  type CommanderMods,
+} from "@/meta/commander";
 import { RewardPanel } from "@/components/RewardPanel";
 import { generateSeed } from "@/utils/rng";
 import { playStinger, setMusicTrack } from "@/audio/music";
@@ -112,6 +117,8 @@ export function BattleScreen({
   const [xpAtStart] = useState<Record<string, number>>(() =>
     Object.fromEntries(deck.map((id) => [id, save.unitXp[id] ?? 0]))
   );
+  // Commander pool snapshot, frozen for the same reason as xpAtStart.
+  const [commanderXpAtStart] = useState<number>(() => save.commanderXp);
   const [unitLevels] = useState<Record<string, number>>(() =>
     Object.fromEntries(deck.map((id) => [id, levelFromXp(save.unitXp[id] ?? 0)]))
   );
@@ -132,6 +139,13 @@ export function BattleScreen({
   const [slayerBonuses] = useState<Record<string, number>>(() =>
     buildSlayerBonusTable(save.monsterKills)
   );
+  // Commander talents resolved once at mount (a match input like the levels —
+  // XP earned this battle levels the commander for the NEXT one).
+  const [commanderMods] = useState<CommanderMods | null>(() =>
+    resolveCommanderMods(save.talents)
+  );
+  // The equipped commander spell, frozen at mount (its cast is a logged input).
+  const [commanderSpell] = useState(() => save.equippedSpell);
   // Omens for the three exit arrows — what each path leads to on the NEXT floor.
   // Frozen once (seeded meta stream), so re-renders can't reshuffle them; only
   // meaningful in the depths continue-deeper flow, harmless elsewhere.
@@ -165,6 +179,7 @@ export function BattleScreen({
     outroWalkOff,
     regroup,
     playerFormation,
+    castCommanderSpell,
   } = useBattleEngine(
     deck,
     mode,
@@ -178,7 +193,9 @@ export function BattleScreen({
     suppressQuestRare,
     tier,
     formationAtMount,
-    slayerBonuses
+    slayerBonuses,
+    commanderMods,
+    commanderSpell
   );
   const wrapRef = useRef<HTMLDivElement>(null);
   const recordedRef = useRef(false);
@@ -632,6 +649,7 @@ export function BattleScreen({
             onSpeed={setSpeed}
             mode={mode}
             onRegroup={regroup}
+            onCastSpell={castCommanderSpell}
           />
         )}
         {treasureBanner && (
@@ -803,6 +821,10 @@ export function BattleScreen({
                   before: xpAtStart[id] ?? 0,
                   after: addXp(xpAtStart[id] ?? 0, rewards.xp),
                 }))}
+                commanderGain={{
+                  before: commanderXpAtStart,
+                  after: addCommanderXp(commanderXpAtStart, rewards.xp),
+                }}
               />
             )}
             {mode === "depths" && ui.phase === "victory" && isBoss ? (

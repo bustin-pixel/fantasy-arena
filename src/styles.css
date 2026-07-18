@@ -5795,3 +5795,275 @@ body.modal-open .pager-nav {
 /* (There is deliberately no .omen-rare: the fusion-quest rare hides behind
    another arrow's omen and must never be identifiable — see assignOmens. Its
    old violet glow would have been exactly the tell we removed.) */
+
+/* ==========================================================================
+   The Commander — Home banner + talent-tree sheet (CommanderSheet).
+   ========================================================================== */
+.commander-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 300px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--brown);
+  border-radius: 12px;
+  padding: 7px 12px;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.commander-banner:hover,
+.commander-banner:focus-visible {
+  border-color: var(--gold);
+}
+.commander-crest {
+  font-size: 1.35rem;
+  line-height: 1;
+  color: var(--gold);
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
+}
+.commander-banner-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.commander-banner-title {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.commander-banner-sub {
+  font-size: 0.72rem;
+  opacity: 0.75;
+}
+.commander-pip {
+  flex: none;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: #1a140d;
+  background: var(--gold);
+  border-radius: 999px;
+  padding: 3px 8px;
+  animation: cmd-pip-pulse 1.6s ease-in-out infinite;
+}
+@keyframes cmd-pip-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+
+/* --- the sheet ---------------------------------------------------------- */
+.commander-sheet {
+  max-width: 420px;
+  width: min(94vw, 420px);
+}
+.cmd-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 2px;
+}
+.cmd-level-chip {
+  flex: none;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #dfe8ff;
+  background: rgba(90, 110, 160, 0.35);
+  border: 1px solid rgba(160, 180, 230, 0.4);
+  border-radius: 999px;
+  padding: 2px 9px;
+}
+.cmd-level-chip.max {
+  color: #1a140d;
+  background: var(--gold);
+  border-color: var(--gold);
+}
+.cmd-xp-bar {
+  flex: 1;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid #57432c;
+  overflow: hidden;
+}
+.cmd-xp-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #8a6cf0, #c9a6ff);
+  transition: width 0.3s ease;
+}
+.cmd-xp-label {
+  flex: none;
+  font-size: 0.68rem;
+  opacity: 0.8;
+}
+.cmd-points {
+  font-size: 0.75rem;
+  opacity: 0.7;
+  margin-bottom: 8px;
+}
+.cmd-points.has-free {
+  opacity: 1;
+  color: var(--gold);
+  font-weight: 700;
+}
+.cmd-branches {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.cmd-branch {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 6px;
+  border: 1px solid color-mix(in srgb, var(--branch) 45%, #000);
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--branch) 14%, transparent), transparent 55%),
+    rgba(0, 0, 0, 0.3);
+}
+.cmd-branch-name {
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+  color: var(--branch);
+  text-align: center;
+}
+.cmd-branch-pts {
+  font-size: 0.62rem;
+  text-align: center;
+  opacity: 0.6;
+  margin-bottom: 2px;
+}
+.cmd-node {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font: inherit;
+  color: var(--parchment);
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid #57432c;
+  border-radius: 8px;
+  padding: 6px 6px;
+  cursor: pointer;
+  text-align: center;
+}
+.cmd-node-name {
+  font-size: 0.66rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+.cmd-node-ranks {
+  font-size: 0.6rem;
+  letter-spacing: 0.18em;
+  color: var(--branch);
+}
+.cmd-node.gated {
+  opacity: 0.45;
+}
+.cmd-node.buyable {
+  border-color: var(--branch);
+  box-shadow: 0 0 7px color-mix(in srgb, var(--branch) 45%, transparent);
+}
+.cmd-node.maxed {
+  border-color: var(--gold);
+  opacity: 0.9;
+}
+.cmd-node.maxed .cmd-node-ranks {
+  color: var(--gold);
+}
+.cmd-node.selected {
+  outline: 2px solid var(--parchment);
+  outline-offset: 1px;
+}
+.cmd-node.keystone {
+  background:
+    radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--branch) 28%, transparent), transparent 70%),
+    rgba(0, 0, 0, 0.45);
+  padding: 9px 6px;
+}
+.cmd-detail {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px solid #57432c;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.35);
+}
+.cmd-detail-name {
+  font-weight: 800;
+  font-size: 0.82rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.cmd-keystone-tag {
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #1a140d;
+  background: var(--gold);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+.cmd-detail-ranks {
+  font-weight: 600;
+  opacity: 0.7;
+  font-size: 0.72rem;
+}
+.cmd-detail-desc {
+  font-size: 0.74rem;
+  opacity: 0.85;
+  margin: 3px 0 6px;
+}
+.cmd-detail-gate {
+  font-size: 0.72rem;
+  color: #ff9c8a;
+}
+.cmd-buy {
+  width: 100%;
+}
+.cmd-footer {
+  display: flex;
+  gap: 8px;
+}
+.cmd-respec {
+  flex: 1;
+}
+
+/* --- in-battle commander spell button ----------------------------------- */
+.cmd-spell-btn {
+  pointer-events: auto;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  border-radius: 999px;
+  padding: 7px 14px;
+}
+.cmd-spell-btn.ready {
+  color: #1a140d;
+  background: linear-gradient(180deg, #ffd76a, var(--gold));
+  border: 1px solid #8a6a10;
+  box-shadow: 0 0 10px rgba(245, 179, 1, 0.55);
+  animation: cmd-pip-pulse 1.6s ease-in-out infinite;
+}
+.cmd-spell-btn.spent {
+  opacity: 0.45;
+}
+
+/* --- results-screen commander XP row ------------------------------------ */
+.cmd-xp-row {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(160, 140, 100, 0.35);
+}
+.cmd-xp-crest {
+  flex: none;
+  width: 36px;
+  text-align: center;
+  font-size: 1.3rem;
+  color: var(--gold);
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
+}
+

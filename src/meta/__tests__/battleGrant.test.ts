@@ -17,6 +17,7 @@ import {
 } from "@/meta/battleGrant";
 import type { BattleRewards, ChestContent } from "@/meta/rewards";
 import { TOTAL_XP_CAP } from "@/meta/leveling";
+import { COMMANDER_XP_CAP } from "@/meta/commander";
 import { getDungeon, milestoneUnlocksFor } from "@/data/dungeons";
 
 const baseSave = (over: Partial<BattleGrantSlice> = {}): BattleGrantSlice => ({
@@ -25,6 +26,7 @@ const baseSave = (over: Partial<BattleGrantSlice> = {}): BattleGrantSlice => ({
   items: {},
   unlockedUnits: ["knight"],
   unitXp: {},
+  commanderXp: 0,
   dungeons: {},
   questUnlocks: [],
   endless: { bestWave: 0 },
@@ -126,6 +128,28 @@ describe("applyBattleGrant currency + XP", () => {
       ctx({ deck: ["knight"] })
     );
     expect(out.unitXp).toEqual({});
+  });
+
+  it("feeds the commander pool the same per-battle XP, clamped at its cap", () => {
+    const out = applyBattleGrant(
+      baseSave({ commanderXp: 100 }),
+      noRewards({ xp: 40 }),
+      ctx({ deck: ["knight"] })
+    );
+    expect(out.commanderXp).toBe(140);
+    const capped = applyBattleGrant(
+      baseSave({ commanderXp: COMMANDER_XP_CAP - 5 }),
+      noRewards({ xp: 999 }),
+      ctx({ deck: ["knight"] })
+    );
+    expect(capped.commanderXp).toBe(COMMANDER_XP_CAP);
+    // Every mode pays — arena feeds the commander too (unlike slayer).
+    const arena = applyBattleGrant(
+      baseSave(),
+      noRewards({ xp: 25 }),
+      ctx({ mode: "solo", deck: ["knight"] })
+    );
+    expect(arena.commanderXp).toBe(25);
   });
 });
 

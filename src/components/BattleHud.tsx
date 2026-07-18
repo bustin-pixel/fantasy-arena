@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { BattleMode, BattleUiState } from "@/hooks/useBattleEngine";
 import { getUnitDef } from "@/data/units";
+import { SPELLS } from "@/meta/commander";
 import { getSettings, updateSettings } from "@/state/settings";
 import { playSfx } from "@/audio/sfx";
 
@@ -13,6 +14,9 @@ interface Props {
   /** Descent march-in: scrap the auto-line-up for manual placement. Absent when
    *  the affordance doesn't apply (arena/endless, or floor 1). */
   onRegroup?: () => void;
+  /** Cast the commander's equipped battle spell (ui.commanderSpell drives the
+   *  button; absent when the screen doesn't wire it). */
+  onCastSpell?: () => void;
 }
 
 function fmtClock(sec: number): string {
@@ -82,6 +86,7 @@ export function BattleHud({
   onSpeed,
   mode,
   onRegroup,
+  onCastSpell,
 }: Omit<Props, "onExit">) {
   const next = ui.playerNext ? getUnitDef(ui.playerNext) : null;
 
@@ -198,6 +203,23 @@ export function BattleHud({
                   </button>
                 ))}
               </div>
+            )}
+            {/* The commander's castable — one charge per battle. Spent = the
+                button stays, grayed, so the player knows it's gone not hidden. */}
+            {ui.commanderSpell && onCastSpell && (
+              <button
+                type="button"
+                className={`btn cmd-spell-btn${ui.commanderSpell.ready ? " ready" : " spent"}`}
+                disabled={!ui.commanderSpell.ready}
+                title={SPELLS[ui.commanderSpell.spell].description}
+                onClick={() => {
+                  playSfx("uiConfirm");
+                  onCastSpell();
+                }}
+              >
+                <span aria-hidden="true">⚜</span>{" "}
+                {SPELLS[ui.commanderSpell.spell].name}
+              </button>
             )}
           </>
         )}

@@ -20,6 +20,7 @@ import {
   earnedTitleIds,
 } from "@/meta/bestiaryRewards";
 import { TOTAL_XP_CAP } from "@/meta/leveling";
+import { COMMANDER_XP_CAP, pointsSpent } from "@/meta/commander";
 
 /** Legacy (pre-v6) shape: carried a single `depths` high-water mark before the
  *  per-dungeon `dungeons` map replaced it. */
@@ -47,7 +48,7 @@ function v2Save(): Partial<PlayerSave> {
 describe("migrateSave", () => {
   it("null (new player) → defaults: starter units, 0 gold, floor 0", () => {
     const save = migrateSave(null);
-    expect(save.version).toBe(16);
+    expect(save.version).toBe(17);
     expect(save.shop).toEqual({ day: -1, rerolls: 0, bought: [] });
     expect(save.quests).toEqual({
       day: -1,
@@ -332,6 +333,72 @@ describe("migrateSave", () => {
     expect(migrateSave({ version: 15, bestiary, title: "slayer:abomination" }).title)
       .toBeNull();
     expect(migrateSave({ version: 15, bestiary, title: "not_a_title" }).title).toBeNull();
+  });
+
+  it("v17: commander fields default to the zero state for older saves", () => {
+    const save = migrateSave({ version: 16 });
+    expect(save.commanderXp).toBe(0);
+    expect(save.talents).toEqual({});
+    expect(save.equippedSpell).toBeNull();
+  });
+
+  it("v17: clamps commanderXp and replays talents through the gate rules", () => {
+    // 4,500 XP = commander level 10 = 9 talent points.
+    const save = migrateSave({
+      version: 17,
+      commanderXp: 4500,
+      talents: {
+        sharpened_steel: 3,
+        drill_sergeant: 3,
+        forced_march: 2,
+        bloodlust: 99, // clamps to maxRanks(2), but the 9-point budget caps it at 1
+        warpath: 1, // keystone needs 8 in-branch and the budget is spent — drops
+        junk_talent: 5,
+      },
+    });
+    expect(save.commanderXp).toBe(4500);
+    expect(save.talents.sharpened_steel).toBe(3);
+    expect(save.talents.junk_talent).toBeUndefined();
+    expect(save.talents.warpath).toBeUndefined();
+    expect(pointsSpent(save.talents)).toBe(9);
+    // Junk XP resets rather than crashes.
+    expect(migrateSave({ version: 17, commanderXp: NaN }).commanderXp).toBe(0);
+    expect(migrateSave({ version: 17, commanderXp: 1e12 }).commanderXp).toBe(
+      COMMANDER_XP_CAP
+    );
+  });
+
+  it("v17: equipped spell survives only while its branch is deep enough", () => {
+    // 8 points into warlord (needs level ≥ 9 → 3,600 XP).
+    const talents = {
+      sharpened_steel: 3,
+      drill_sergeant: 3,
+      forced_march: 2,
+    };
+    const kept = migrateSave({
+      version: 17,
+      commanderXp: 4500,
+      talents,
+      equippedSpell: "rally",
+    });
+    expect(kept.equippedSpell).toBe("rally");
+    // Not that branch's spell / not unlocked → cleared.
+    expect(
+      migrateSave({ version: 17, commanderXp: 4500, talents, equippedSpell: "bulwark" })
+        .equippedSpell
+    ).toBeNull();
+    expect(
+      migrateSave({ version: 17, commanderXp: 0, talents: {}, equippedSpell: "rally" })
+        .equippedSpell
+    ).toBeNull();
+  });
+
+  it("v17: two migrations never share a talents reference", () => {
+    const raw = { version: 17, commanderXp: 1000, talents: { sharpened_steel: 2 } };
+    const a = migrateSave(structuredClone(raw));
+    const b = migrateSave(structuredClone(raw));
+    a.talents.sharpened_steel = 1;
+    expect(b.talents.sharpened_steel).toBe(2);
   });
 
   it("v14: two migrations never share a clearedTiers reference", () => {

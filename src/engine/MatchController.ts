@@ -56,6 +56,10 @@ import {
   resolveLoadoutMods,
 } from "@/data/items";
 import { averageDeckLevel } from "@/meta/leveling";
+import type {
+  CommanderMods,
+  SpellId as CommanderSpellId,
+} from "@/meta/commander";
 import {
   ENDLESS_ENEMY_ACTIVE,
   ENDLESS_PLAYER_ACTIVE,
@@ -111,6 +115,17 @@ export interface MatchOptions {
    *  match land in the save and pay out from the NEXT one — and recorded in the
    *  replay. Missing/empty = identity. */
   slayerBonuses?: Record<string, number>;
+  /** The player's resolved commander talents (meta/commander
+   *  resolveCommanderMods). A deterministic match input like slayerBonuses:
+   *  folded onto teamMods.player at construction, FROZEN for the match, and
+   *  recorded in the replay. Absent/null = identity (byte-identical to a
+   *  commander-less sim). Arena mirrors the flat STAT talents onto the AI
+   *  side (the enemyLevel/enemyItemMods twin); proc talents stay player-only. */
+  commanderMods?: CommanderMods | null;
+  /** The commander's EQUIPPED battle spell (save.equippedSpell), or null for
+   *  none. A match input like commanderMods; the actual cast is a logged
+   *  player input (castCommanderSpell), one charge per battle. */
+  commanderSpell?: CommanderSpellId | null;
 }
 
 /** The match clock for a mode. Endless resets its clock per wave (a stalemate
@@ -199,6 +214,15 @@ export class MatchController {
   private itemLoadouts: ItemLoadouts;
   /** Slayer bonus table (defId → mult), installed on teamMods.player. */
   private slayerBonuses: Record<string, number>;
+  /** The commander talent fold (null = no talents), installed on
+   *  teamMods.player at construction; kept for the replay record and the
+   *  deploy-shield read. */
+  private commanderMods: CommanderMods | null;
+  /** The equipped commander spell (null = none) and its one-per-battle charge. */
+  private commanderSpell: CommanderSpellId | null;
+  private spellChargeUsed = false;
+  /** Logged commander casts — an input log, like `deployments`/`pickIndices`. */
+  private commanderCasts: { tick: number; spell: CommanderSpellId }[] = [];
   /** Player gear resolved once per defId (missing = bare unit). */
   private playerItems = new Map<string, ItemCarry>();
   /** Arena item mirror: the flat hp/dmg mods every AI unit fights with,
@@ -254,6 +278,44 @@ export class MatchController {
     // stay byte-identical to pre-feature sims.
     this.slayerBonuses = opts.slayerBonuses ?? {};
     this.state.teamMods.player.slayerVs = this.slayerBonuses;
+    // Commander talents: fold the resolved mods onto teamMods.player once, at
+    // construction (the slayerBonuses pattern — frozen for the match). Null
+    // leaves both sides' identity teamMods untouched, so commander-less
+    // matches stay byte-identical to pre-feature sims.
+    this.commanderMods = opts.commanderMods ?? null;
+    this.commanderSpell = opts.commanderSpell ?? null;
+    if (this.commanderMods) {
+      const c = this.commanderMods;
+      const t = this.state.teamMods.player;
+      t.dmgMult *= c.dmgMult;
+      t.atkDelayMult *= c.atkDelayMult;
+      t.moveSpeedMult *= c.moveSpeedMult;
+      t.damageTakenMult *= c.damageTakenMult;
+      t.lifestealBonus += c.lifestealBonus;
+      t.executeBonus += c.executeBonus;
+      t.killHeal += c.killHeal;
+      t.thornsFrac += c.thornsFrac;
+      t.overheal = t.overheal || c.overheal;
+      t.lastBreath = t.lastBreath || c.lastBreath;
+      if (c.critEveryNth > 0) t.critEveryNth = c.critEveryNth;
+      t.rangedLifesteal += c.rangedLifesteal;
+      t.deployShieldFrac += c.deployShieldFrac;
+      t.abilityCooldownMult *= c.abilityCooldownMult;
+      t.summonStatPct += c.summonStatPct;
+      t.magicDmgMult *= c.magicDmgMult;
+      t.abilitiesStartReady = t.abilitiesStartReady || c.abilitiesStartReady;
+      // Arena commander mirror: the AI side fights with the player's flat STAT
+      // talents (the enemyLevel / enemyItemMods twin), so the fair-fight mode
+      // stays fair as the commander levels. Proc/keystone talents don't mirror
+      // — an approximation, matching how the item mirror flattens proc gear.
+      if (this.mode === "arena") {
+        const e = this.state.teamMods.enemy;
+        e.dmgMult *= c.dmgMult;
+        e.atkDelayMult *= c.atkDelayMult;
+        e.moveSpeedMult *= c.moveSpeedMult;
+        e.damageTakenMult *= c.damageTakenMult;
+      }
+    }
     if (this.mode === "depths") {
       this.state.activeCaps = {
         player: DEPTHS_PLAYER_ACTIVE,
@@ -300,6 +362,36 @@ export class MatchController {
 
   get phase(): MatchPhase {
     return this.state.phase;
+  }
+
+  /** The HUD's spell-button state: the equipped spell + whether the one
+   *  per-battle charge is still up (castable only mid-battle). Null = no
+   *  spell equipped, no button. */
+  commanderSpellStatus(): {
+    spell: CommanderSpellId;
+    ready: boolean;
+  } | null {
+    if (!this.commanderSpell) return null;
+    return {
+      spell: this.commanderSpell,
+      ready: !this.spellChargeUsed && this.state.phase === "battle",
+    };
+  }
+
+  /** Cast the equipped commander spell (a logged player input, like deploy).
+   *  One charge per battle; the effect lands at the TOP of the next tick
+   *  (SimState.pendingCommanderSpell), so a tap's wall-clock timing can never
+   *  shift the sim. Returns whether the cast was accepted. */
+  castCommanderSpell(): boolean {
+    if (!this.commanderSpell || this.spellChargeUsed) return false;
+    if (this.state.phase !== "battle") return false;
+    this.spellChargeUsed = true;
+    this.state.pendingCommanderSpell = this.commanderSpell;
+    this.commanderCasts.push({
+      tick: this.state.tick,
+      spell: this.commanderSpell,
+    });
+    return true;
   }
 
   countActive(team: Team): number {
@@ -397,6 +489,17 @@ export class MatchController {
       items
     );
     this.state.units.push(unit);
+
+    // Commander Bulwark Training: deck deploys arrive shielded (an absorb
+    // shield, additive on top of any item shield — Fallen Halo). Summons don't
+    // route through deploy(), so they stay bare (by design). Identity 0 on
+    // both sides unless a commander talent installed it.
+    const deployShieldFrac = this.state.teamMods[team].deployShieldFrac;
+    if (deployShieldFrac > 0) {
+      const bonus = Math.round(unit.maxHp * deployShieldFrac);
+      unit.shieldHp += bonus;
+      unit.shieldHpMax = unit.shieldHp;
+    }
 
     // [seam] kit spawn hook (opening stealth for the Assassin/Rogue/Trickster rides
     // their kits here).
@@ -887,6 +990,12 @@ export class MatchController {
       unitLevels: { ...this.unitLevels },
       itemLoadouts: structuredClone(this.itemLoadouts),
       slayerBonuses: { ...this.slayerBonuses },
+      ...(this.commanderMods
+        ? { commanderMods: { ...this.commanderMods } }
+        : {}),
+      ...(this.commanderCasts.length > 0
+        ? { commanderCasts: this.commanderCasts.map((c) => ({ ...c })) }
+        : {}),
     };
   }
 }

@@ -3,6 +3,12 @@ import { useGameState } from "@/state/GameStateContext";
 import { ArenaIcon, EndlessIcon, SwarmIcon } from "@/components/ModeIcons";
 import { ProfilePlate } from "@/components/ProfilePlate";
 import { ProfileSheet } from "@/components/ProfileSheet";
+import { CommanderSheet } from "@/components/CommanderSheet";
+import {
+  commanderLevelFromXp,
+  pointsSpent,
+  talentPointsForLevel,
+} from "@/meta/commander";
 import { endlessBestWave, highestClearedFloorOf } from "@/state/persistence";
 import { titleLabel } from "@/meta/bestiaryRewards";
 import { dayIndexLocal } from "@/meta/shop";
@@ -57,6 +63,11 @@ export function HomeScreen({
     highestClearedFloorOf(save, "depths") >= ENDLESS_GATE_FLOOR;
   const bestWave = endlessBestWave(save);
   const [editingProfile, setEditingProfile] = useState(false);
+  const [showCommander, setShowCommander] = useState(false);
+  // Commander banner: level + a pip while unspent talent points wait.
+  const commanderLevel = commanderLevelFromXp(save.commanderXp);
+  const freePoints =
+    talentPointsForLevel(commanderLevel) - pointsSpent(save.talents);
 
   return (
     <div className="screen home">
@@ -74,6 +85,26 @@ export function HomeScreen({
         title={titleLabel(save.title)}
         onEdit={() => { playSfx("uiOpen"); setEditingProfile(true); }}
       />
+
+      {/* The Commander — the account-wide talent tree (meta/commander). */}
+      <button
+        type="button"
+        className="commander-banner"
+        onClick={() => { playSfx("uiOpen"); setShowCommander(true); }}
+        aria-label={`Commander, level ${commanderLevel}`}
+      >
+        <span className="commander-crest" aria-hidden="true">⚜</span>
+        <span className="commander-banner-main">
+          <span className="commander-banner-title">Commander</span>
+          <span className="commander-banner-sub">Level {commanderLevel}</span>
+        </span>
+        {freePoints > 0 && (
+          <span className="commander-pip">
+            {freePoints} pt{freePoints === 1 ? "" : "s"}
+          </span>
+        )}
+        <span className="profile-chevron" aria-hidden="true">›</span>
+      </button>
 
       <div className="mode-cards">
         <button
@@ -172,6 +203,9 @@ export function HomeScreen({
 
       {editingProfile && (
         <ProfileSheet onClose={() => setEditingProfile(false)} />
+      )}
+      {showCommander && (
+        <CommanderSheet onClose={() => setShowCommander(false)} />
       )}
     </div>
   );

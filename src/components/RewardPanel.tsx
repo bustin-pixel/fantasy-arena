@@ -18,6 +18,12 @@ import {
   xpForNext,
   xpIntoLevel,
 } from "@/meta/leveling";
+import {
+  COMMANDER_LEVEL_CAP,
+  commanderLevelFromXp,
+  commanderXpForNext,
+  commanderXpIntoLevel,
+} from "@/meta/commander";
 import { getUnitDef } from "@/data/units";
 import { RARITIES } from "@/data/rarities";
 import { ITEM_LINES } from "@/data/items";
@@ -48,6 +54,9 @@ interface Props {
   tier?: TierId;
   /** Per-deck-unit XP gains for the bar ceremony (omit to hide the section). */
   xpGains?: XpGain[];
+  /** The commander pool's movement this battle (same pre-clamped contract as
+   *  xpGains — the panel animates exactly what persisted). Omit to hide. */
+  commanderGain?: { before: number; after: number };
   /** Suppress the pop-up chest + contents (the Depths continue-deeper flow
    *  opens the chest ON the arena floor instead, so it isn't revealed twice). */
   hideChest?: boolean;
@@ -64,7 +73,7 @@ export const CHEST_LABEL: Record<ChestTier, string> = {
 /** closed → (tap) → opening (sprite animates) → open (contents revealed). */
 type ChestPhase = "closed" | "opening" | "open";
 
-export function RewardPanel({ rewards, mode, dungeonId = "depths", tier = "normal", xpGains, hideChest }: Props) {
+export function RewardPanel({ rewards, mode, dungeonId = "depths", tier = "normal", xpGains, commanderGain, hideChest }: Props) {
   const [chestPhase, setChestPhase] = useState<ChestPhase>("closed");
   const shownGold = useCountUp(rewards.gold, true);
 
@@ -131,6 +140,10 @@ export function RewardPanel({ rewards, mode, dungeonId = "depths", tier = "norma
 
       {rewards.xp > 0 && xpGains && xpGains.length > 0 && (
         <XpCeremony xp={rewards.xp} gains={xpGains} />
+      )}
+
+      {commanderGain && commanderGain.after > commanderGain.before && (
+        <CommanderXpRow gain={commanderGain} />
       )}
 
       {milestoneIds.map((id) => (
@@ -366,4 +379,65 @@ function useXpReveal(gains: XpGain[]): number[] {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   return shown;
+}
+
+// ---------------------------------------------------------------------------
+// Commander XP — one account-wide bar under the unit rows. Same reveal shape
+// as useXpReveal but on the COMMANDER curve (its own cap and thresholds), so
+// its LEVEL UP fires on commander levels, not unit ones. A fresh level means
+// a talent point — the tag says so, pointing the player at the tree.
+// ---------------------------------------------------------------------------
+function CommanderXpRow({ gain }: { gain: { before: number; after: number } }) {
+  const [shown, setShown] = useState(gain.before);
+  const rafRef = useRef(0);
+  const levelRef = useRef(commanderLevelFromXp(gain.before));
+  const [leveled, setLeveled] = useState(false);
+  useEffect(() => {
+    const DELAY = 700; // land after the unit bars start moving
+    const DURATION = 1100;
+    const start = performance.now() + DELAY;
+    const step = (now: number) => {
+      const t = Math.min(1, Math.max(0, (now - start) / DURATION));
+      const eased = 1 - Math.pow(1 - t, 3);
+      const next = Math.round(gain.before + (gain.after - gain.before) * eased);
+      const lv = commanderLevelFromXp(next);
+      if (lv > levelRef.current) {
+        playStinger("levelup");
+        setLeveled(true);
+      }
+      levelRef.current = lv;
+      setShown(next);
+      if (t < 1) rafRef.current = requestAnimationFrame(step);
+    };
+    rafRef.current = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(rafRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const level = commanderLevelFromXp(shown);
+  const need = commanderXpForNext(shown);
+  const frac = need === null ? 1 : commanderXpIntoLevel(shown) / need;
+  return (
+    <div className={`xp-row cmd-xp-row${leveled ? " leveled" : ""}`}>
+      <span className="cmd-xp-crest" aria-hidden="true">⚜</span>
+      <div className="xp-body">
+        <div className="xp-name-line">
+          <span className="xp-name">Commander</span>
+          {leveled ? (
+            <span className="xp-levelup-tag">TALENT POINT!</span>
+          ) : (
+            need === null && <span className="xp-max-tag">MAX</span>
+          )}
+        </div>
+        <div className="xp-bar">
+          <div className="xp-fill" style={{ width: `${frac * 100}%` }} />
+        </div>
+      </div>
+      <span
+        className={`xp-level-chip${level >= COMMANDER_LEVEL_CAP ? " max" : ""}`}
+      >
+        {level}
+      </span>
+    </div>
+  );
 }

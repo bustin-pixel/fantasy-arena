@@ -63,6 +63,16 @@ import {
   type BattleGrantCtx,
 } from "@/meta/battleGrant";
 import { UNITS, DECKABLE_UNIT_IDS } from "@/data/units";
+import {
+  buyTalent,
+  canBuyTalent,
+  commanderLevelFromXp,
+  pointsSpent,
+  RESPEC_GOLD,
+  spellsUnlocked,
+  talentPointsForLevel,
+  type SpellId,
+} from "@/meta/commander";
 
 /** Local-only playtest cheats, exposed on the context as `dev`. This whole object
  *  is `undefined` in production builds (see the provider — the `import.meta.env.DEV`
@@ -143,6 +153,15 @@ interface GameStateValue {
    *  (rolled in the sheet, RNG-before-fold like battle rewards) in one atomic
    *  write, steps the item-pity counter, and retires the quest. */
   claimQuest: (questId: string, chestContents: ChestContent[]) => void;
+  /** Spend one commander talent point on a talent rank. No-op unless the
+   *  point exists and the talent's tier gate is met — meta/commander. */
+  spendTalentPoint: (talentId: string) => void;
+  /** Refund every spent talent point for RESPEC_GOLD. No-op when nothing is
+   *  spent or gold is short. Clears the equipped spell (nothing stays
+   *  unlocked with zero points in). */
+  respecTalents: () => void;
+  /** Equip a commander spell (or null for none). No-op unless unlocked. */
+  setEquippedSpell: (spellId: SpellId | null) => void;
   /** Local-only playtest cheats — `undefined` in production builds, so the live
    *  site never exposes them (see DevCheats + the DevPanel mount gate). */
   dev?: DevCheats;
@@ -292,6 +311,26 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
   const claimQuest = (questId: string, chestContents: ChestContent[]) =>
     setSave((s) => applyClaimQuest(s, questId, chestContents));
 
+  // ---- commander — the tree rules live in meta/commander (pure); these
+  // wrappers bind them to setSave. Points are always DERIVED from the level.
+  const spendTalentPoint = (talentId: string) =>
+    setSave((s) => {
+      const points = talentPointsForLevel(commanderLevelFromXp(s.commanderXp));
+      if (!canBuyTalent(s.talents, talentId, points)) return s;
+      return { ...s, talents: buyTalent(s.talents, talentId) };
+    });
+  const respecTalents = () =>
+    setSave((s) => {
+      if (pointsSpent(s.talents) === 0 || s.gold < RESPEC_GOLD) return s;
+      return { ...s, gold: s.gold - RESPEC_GOLD, talents: {}, equippedSpell: null };
+    });
+  const setEquippedSpell = (spellId: SpellId | null) =>
+    setSave((s) =>
+      spellId === null || spellsUnlocked(s.talents).includes(spellId)
+        ? { ...s, equippedSpell: spellId }
+        : s
+    );
+
   // ---- dev cheats (LOCAL ONLY) — the entire object is undefined in production.
   // `import.meta.env.DEV` is statically `false` in `vite build`, so this ternary
   // folds to `undefined`, the closures below are dropped, and DevPanel (mounted
@@ -372,6 +411,9 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
         abandonQuest,
         refreshQuestBoard,
         claimQuest,
+        spendTalentPoint,
+        respecTalents,
+        setEquippedSpell,
         dev,
       }}
     >
