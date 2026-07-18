@@ -17,6 +17,7 @@ import {
 } from "@/meta/battleGrant";
 import type { BattleRewards, ChestContent } from "@/meta/rewards";
 import { TOTAL_XP_CAP } from "@/meta/leveling";
+import { COMMANDER_XP_CAP } from "@/meta/commander";
 import { getDungeon, milestoneUnlocksFor } from "@/data/dungeons";
 
 const baseSave = (over: Partial<BattleGrantSlice> = {}): BattleGrantSlice => ({
@@ -25,11 +26,14 @@ const baseSave = (over: Partial<BattleGrantSlice> = {}): BattleGrantSlice => ({
   items: {},
   unlockedUnits: ["knight"],
   unitXp: {},
+  commanderXp: 0,
   dungeons: {},
   questUnlocks: [],
   endless: { bestWave: 0 },
   quests: { day: -1, refreshes: 0, taken: [], active: [] },
   itemPity: 0,
+  monsterKills: {},
+  bestiary: {},
   ...over,
 });
 
@@ -124,6 +128,28 @@ describe("applyBattleGrant currency + XP", () => {
       ctx({ deck: ["knight"] })
     );
     expect(out.unitXp).toEqual({});
+  });
+
+  it("feeds the commander pool the same per-battle XP, clamped at its cap", () => {
+    const out = applyBattleGrant(
+      baseSave({ commanderXp: 100 }),
+      noRewards({ xp: 40 }),
+      ctx({ deck: ["knight"] })
+    );
+    expect(out.commanderXp).toBe(140);
+    const capped = applyBattleGrant(
+      baseSave({ commanderXp: COMMANDER_XP_CAP - 5 }),
+      noRewards({ xp: 999 }),
+      ctx({ deck: ["knight"] })
+    );
+    expect(capped.commanderXp).toBe(COMMANDER_XP_CAP);
+    // Every mode pays — arena feeds the commander too (unlike slayer).
+    const arena = applyBattleGrant(
+      baseSave(),
+      noRewards({ xp: 25 }),
+      ctx({ mode: "solo", deck: ["knight"] })
+    );
+    expect(arena.commanderXp).toBe(25);
   });
 });
 
@@ -256,6 +282,129 @@ describe("applyBattleGrant dungeon clears", () => {
       ctx({ mode: "depths", dungeonId: "depths", tier: "normal" })
     );
     expect(b).toEqual(a);
+  });
+});
+
+describe("applyBattleGrant bestiary reveals", () => {
+  it("folds seen → encountered and slain → defeated in the SAME write", () => {
+    const out = applyBattleGrant(
+      baseSave(),
+      noRewards(),
+      ctx({ seen: ["giant_rat", "ghoul"], slain: ["ghoul"] })
+    );
+    expect(out.bestiary).toEqual({
+      giant_rat: { encountered: true, defeated: false },
+      ghoul: { encountered: true, defeated: true },
+    });
+  });
+
+  it("reveals only ever go forward — a later sighting can't un-defeat", () => {
+    const out = applyBattleGrant(
+      baseSave({ bestiary: { ghoul: { encountered: true, defeated: true } } }),
+      noRewards(),
+      ctx({ seen: ["ghoul"], slain: [] })
+    );
+    expect(out.bestiary.ghoul).toEqual({ encountered: true, defeated: true });
+  });
+
+  it("adds the bundle's bestiary gold/shards on top of the flat battle pay", () => {
+    const out = applyBattleGrant(
+      baseSave({ gold: 100, soulShards: 5 }),
+      noRewards({
+        gold: 10,
+        shards: 1,
+        bestiary: {
+          discoveries: [],
+          milestones: [],
+          completedBooks: [],
+          gold: 250,
+          shards: 2,
+        },
+      }),
+      ctx({ seen: ["ghoul"], slain: ["ghoul"] })
+    );
+    expect(out.gold).toBe(100 + 10 + 250);
+    expect(out.soulShards).toBe(5 + 1 + 2);
+  });
+
+  it("a bundle with no bestiary slice pays nothing extra", () => {
+    const out = applyBattleGrant(
+      baseSave({ gold: 100, soulShards: 5 }),
+      noRewards({ gold: 10, shards: 1 }),
+      ctx({ seen: ["ghoul"], slain: ["ghoul"] })
+    );
+    expect(out.gold).toBe(110);
+    expect(out.soulShards).toBe(6);
+  });
+
+  it("arena still records the Compendium even though kills don't count", () => {
+    const out = applyBattleGrant(
+      baseSave(),
+      noRewards(),
+      ctx({ mode: "solo", outcome: "victory", seen: ["ghoul"], slain: ["ghoul"] })
+    );
+    expect(out.bestiary.ghoul).toEqual({ encountered: true, defeated: true });
+    expect(out.monsterKills).toEqual({}); // PvE-only gate holds
+  });
+});
+
+describe("applyBattleGrant slayer kills", () => {
+  it("accumulates the slain MULTISET on top of existing lifetime counts", () => {
+    const out = applyBattleGrant(
+      baseSave({ monsterKills: { giant_rat: 5 } }),
+      noRewards(),
+      ctx({ slain: ["giant_rat", "giant_rat", "zombie_shambler"] })
+    );
+    expect(out.monsterKills).toEqual({ giant_rat: 7, zombie_shambler: 1 });
+  });
+
+  it("filters out heroes and summon-only defs — but the skeleton counts", () => {
+    const out = applyBattleGrant(
+      baseSave(),
+      noRewards(),
+      // knight = deckable hero, wolf = summon-only def — neither is tracked.
+      // skeleton IS: a summon def that doubles as a real dungeon denizen.
+      ctx({ slain: ["knight", "wolf", "skeleton", "ghoul"] })
+    );
+    expect(out.monsterKills).toEqual({ skeleton: 1, ghoul: 1 });
+  });
+
+  it("grants NOTHING from arena — slayer XP is PvE-only", () => {
+    for (const mode of ["solo", "pvp"] as const) {
+      const out = applyBattleGrant(
+        baseSave({ monsterKills: { ghoul: 3 } }),
+        noRewards(),
+        ctx({ mode, outcome: "victory", slain: ["ghoul", "skeleton"] })
+      );
+      expect(out.monsterKills).toEqual({ ghoul: 3 });
+    }
+  });
+
+  it("counts in endless (the other PvE mode)", () => {
+    const out = applyBattleGrant(
+      baseSave(),
+      noRewards(),
+      ctx({ mode: "endless", wavesSurvived: 3, slain: ["ghoul", "ghoul"] })
+    );
+    expect(out.monsterKills).toEqual({ ghoul: 2 });
+  });
+
+  it("counts pre-wipe kills on a defeat (like slay bounties)", () => {
+    const out = applyBattleGrant(
+      baseSave(),
+      noRewards(),
+      ctx({ outcome: "defeat", slain: ["lich"] })
+    );
+    expect(out.monsterKills).toEqual({ lich: 1 });
+  });
+
+  it("leaves the ledger untouched when nothing trackable died", () => {
+    const out = applyBattleGrant(
+      baseSave({ monsterKills: { ghoul: 3 } }),
+      noRewards(),
+      ctx({ slain: [] })
+    );
+    expect(out.monsterKills).toEqual({ ghoul: 3 });
   });
 });
 

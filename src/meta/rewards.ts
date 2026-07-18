@@ -53,6 +53,11 @@ import {
   type ChestTier,
 } from "./economy";
 import { XP_REWARDS } from "./leveling";
+import {
+  computeBattleBestiaryRewards,
+  type BestiaryMap,
+  type BestiaryRewardResult,
+} from "./bestiaryRewards";
 import type { TierId } from "@/data/tiers";
 
 /** One thing inside a chest. A discriminated union so later slices can add
@@ -94,6 +99,12 @@ export interface BattleRewards {
    *  Present (non-empty) only the first time each is earned — left undefined
    *  otherwise so exact reward comparisons stay stable. */
   questUnlocks?: string[];
+  /** Bestiary/slayer/book payouts from this battle's discoveries + kills
+   *  (meta/bestiaryRewards). Its gold/shards are ADDED by the grant fold on top
+   *  of `gold`/`shards`; the lists drive the results screen. Present only when
+   *  something new crossed — absent (identity) otherwise, so a battle with no
+   *  new Compendium progress keeps a byte-stable bundle. */
+  bestiary?: BestiaryRewardResult;
 }
 
 /** Roll a chest's contents. Pure: same (seed, tier, unlockedUnits, opts) →
@@ -211,9 +222,7 @@ export function effectiveBossChestTier(
   return bumpChestTier(bossChestTierFor(dungeonId), TIER_REWARDS[tier].chestBump);
 }
 
-/** The full post-battle reward matrix. Callers pass chestSeed from
- *  generateSeed() at drop time so this stays pure. */
-export function computeBattleRewards(input: {
+export interface BattleRewardInput {
   mode: BattleMode;
   floor: number;
   /** Which dungeon this Depths battle ran in (defaults to "depths"). */
@@ -251,7 +260,36 @@ export function computeBattleRewards(input: {
    *  chest tiers, and grades the per-tier first-clear shards (TIER_REWARDS).
    *  Ignored outside depths. */
   tier?: TierId;
-}): BattleRewards {
+  /** Pre-battle Compendium snapshots (save.bestiary / save.monsterKills) + this
+   *  battle's `seen` ledger — the inputs to the bestiary/slayer/book payouts.
+   *  Default to empty (a non-combat caller pays no bestiary rewards). */
+  priorBestiary?: BestiaryMap;
+  priorKills?: Record<string, number>;
+  seen?: readonly string[];
+}
+
+/** The full post-battle reward matrix. Callers pass chestSeed from
+ *  generateSeed() at drop time so this stays pure. Wraps the combat/currency
+ *  rewards (baseBattleRewards) with the one-time bestiary payouts, attached only
+ *  when something new crossed so a no-progress battle keeps a byte-stable bundle. */
+export function computeBattleRewards(input: BattleRewardInput): BattleRewards {
+  const base = baseBattleRewards(input);
+  const bestiary = computeBattleBestiaryRewards({
+    priorBestiary: input.priorBestiary ?? {},
+    priorKills: input.priorKills ?? {},
+    seen: input.seen ?? [],
+    slain: input.slain ?? [],
+    // Slayer kills — and thus milestones — accrue in PvE only (the arena gate).
+    countKills: input.mode === "depths" || input.mode === "endless",
+  });
+  const hasBestiary =
+    bestiary.discoveries.length > 0 ||
+    bestiary.milestones.length > 0 ||
+    bestiary.completedBooks.length > 0;
+  return hasBestiary ? { ...base, bestiary } : base;
+}
+
+function baseBattleRewards(input: BattleRewardInput): BattleRewards {
   const {
     mode,
     floor,

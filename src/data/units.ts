@@ -1838,6 +1838,18 @@ export const NON_DECK_UNITS = new Set<string>([
   "silencer",
 ]);
 
+/** Monsters the compendium Slayer track counts and displays: real dungeon
+ *  denizens — everything undeckable except summon-ONLY defs. The skeleton
+ *  stays despite being a summon: it's ALSO a real Bonefields/Depths denizen,
+ *  and slayer kills accrue only in PvE (battleGrant gates on mode), so arena
+ *  Necromancer summons can't farm it. Heroes (deckable, incl. the Archmage
+ *  rare-quest catalyst) are never tracked. */
+export const SLAYER_MONSTER_IDS = new Set<string>(
+  [...NON_DECK_UNITS].filter(
+    (id) => !SUMMONED_UNIT_IDS.has(id) || id === "skeleton"
+  )
+);
+
 /** Units that can appear in a player/AI deck or the hub card grid. */
 export const DECKABLE_UNIT_IDS = UNIT_IDS.filter(
   (id) => !NON_DECK_UNITS.has(id)

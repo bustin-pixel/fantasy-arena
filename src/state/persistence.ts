@@ -7,13 +7,26 @@
 // ============================================================================
 
 import type { ItemLoadouts } from "@/types";
-import { DECKABLE_UNIT_IDS, UNITS } from "@/data/units";
+import { DECKABLE_UNIT_IDS, SLAYER_MONSTER_IDS, UNITS } from "@/data/units";
 import { STARTER_UNIT_IDS } from "@/meta/economy";
 import { TOTAL_XP_CAP } from "@/meta/leveling";
 import { sanitizeItems, sanitizeLoadouts } from "@/meta/inventory";
 import { sanitizeShop, type ShopState } from "@/meta/shop";
 import { sanitizeQuests, type QuestSaveState } from "@/meta/quests";
 import { DEFAULT_AVATAR_ID, isAvatarUnlocked } from "@/meta/avatars";
+import {
+  computeRetroBestiaryRewards,
+  earnedTitleIds,
+} from "@/meta/bestiaryRewards";
+import {
+  addCommanderXp,
+  commanderLevelFromXp,
+  sanitizeEquippedSpell,
+  sanitizeTalentAllocation,
+  talentPointsForLevel,
+  type SpellId,
+  type TalentAllocation,
+} from "@/meta/commander";
 import {
   DUNGEON_IDS,
   DUNGEONS,
@@ -157,6 +170,27 @@ export interface PlayerSave {
   /** Consecutive chests opened without an item drop — at ITEM_PITY_THRESHOLD
    *  the next chest is forced to contain one. (Save v11.) */
   itemPity: number;
+  /** Lifetime kills per monster defId (SLAYER_MONSTER_IDS only — heroes and
+   *  summon-only defs never appear; PvE kills only, arena grants nothing).
+   *  SLAYER LEVEL IS ALWAYS DERIVED from this via
+   *  meta/slayer.slayerLevelFromKills — never store a level, the unitXp rule.
+   *  Missing id = 0 kills. (Save v15.) */
+  monsterKills: Record<string, number>;
+  /** The EQUIPPED cosmetic title id, or null for none. The earned SET is always
+   *  derived from bestiary + monsterKills (meta/bestiaryRewards.earnedTitleIds)
+   *  — never stored, the unitXp rule; only the player's choice lives here, and
+   *  it's cleared on load if no longer earned. (Save v16.) */
+  title: string | null;
+  /** Commander XP — the account-wide pool every battle feeds. LEVEL AND TALENT
+   *  POINTS ARE ALWAYS DERIVED via meta/commander (the unitXp rule). (Save v17.) */
+  commanderXp: number;
+  /** Talent ranks bought, keyed by talent id. Sanitized on load by replaying
+   *  the tree's gate rules, so it can never hold an unreachable build. (v17.) */
+  talents: TalentAllocation;
+  /** The EQUIPPED commander spell, or null. The UNLOCKED set is always derived
+   *  from branch investment (the title rule); cleared on load if the pick is
+   *  no longer unlocked. (Save v17.) */
+  equippedSpell: SpellId | null;
 }
 
 // The key names the storage SLOT, not the schema — the version lives inside
@@ -164,7 +198,7 @@ export interface PlayerSave {
 const KEY = "fantasy-arena/save/v1";
 
 export const DEFAULT_SAVE: PlayerSave = {
-  version: 14,
+  version: 17,
   username: "Champion",
   avatarId: DEFAULT_AVATAR_ID,
   deck: [...STARTER_UNIT_IDS],
@@ -183,6 +217,11 @@ export const DEFAULT_SAVE: PlayerSave = {
   shop: { day: -1, rerolls: 0, bought: [] },
   quests: { day: -1, refreshes: 0, taken: [], active: [] },
   itemPity: 0,
+  monsterKills: {},
+  title: null,
+  commanderXp: 0,
+  talents: {},
+  equippedSpell: null,
 };
 
 export function loadSave(): PlayerSave {
@@ -283,6 +322,50 @@ export function migrateSave(parsed: Partial<PlayerSave> | null): PlayerSave {
   merged.itemPity = Number.isFinite(rawPity)
     ? Math.max(0, Math.floor(rawPity))
     : 0;
+  // v15: lifetime monster kills — keep only slayer-trackable ids with finite
+  // values, floored and clamped ≥ 0 (defensive against hand-edited saves).
+  const monsterKills: Record<string, number> = {};
+  for (const [id, n] of Object.entries(parsed.monsterKills ?? {})) {
+    if (!SLAYER_MONSTER_IDS.has(id)) continue;
+    if (typeof n !== "number" || !Number.isFinite(n)) continue;
+    monsterKills[id] = Math.max(0, Math.floor(n));
+  }
+  merged.monsterKills = monsterKills;
+  // v16: the equipped title — kept only while it's still in the DERIVED earned
+  // set (a title can't be un-earned today, but this stays honest if a boss or
+  // dungeon is ever removed). Runs after bestiary + monsterKills are final.
+  merged.title =
+    typeof parsed.title === "string" &&
+    earnedTitleIds(merged.bestiary, merged.monsterKills).includes(parsed.title)
+      ? parsed.title
+      : null;
+  // v16: one-time bestiary retro-grant. Everything this save already
+  // discovered, every slayer threshold already crossed, and every already-
+  // complete Compendium book pays its reward ONCE, so the feature doesn't
+  // silently skip a veteran's whole back catalog. Version-gated (not
+  // idempotent-by-nature like the v12 gift grant — this one MOVES currency),
+  // so it fires exactly once per save and never on a brand-new account.
+  if ((parsed.version ?? 1) < 16) {
+    const retro = computeRetroBestiaryRewards(merged.bestiary, merged.monsterKills);
+    merged.gold += retro.gold;
+    merged.soulShards += retro.shards;
+  }
+  // v17: the Commander — XP pool clamped, talents replayed through the tree's
+  // gate rules against the points the CLAMPED level actually grants, and the
+  // equipped spell kept only while still unlocked. Older saves start at the
+  // zero state (no retro-grant — XP simply starts accruing).
+  const rawCommanderXp = Number(parsed.commanderXp ?? 0);
+  merged.commanderXp = Number.isFinite(rawCommanderXp)
+    ? addCommanderXp(0, Math.floor(rawCommanderXp))
+    : 0;
+  merged.talents = sanitizeTalentAllocation(
+    parsed.talents,
+    talentPointsForLevel(commanderLevelFromXp(merged.commanderXp))
+  );
+  merged.equippedSpell = sanitizeEquippedSpell(
+    parsed.equippedSpell,
+    merged.talents
+  );
 
   // Grandfathering: saves from before the unlock system keep every unit that
   // exists today — EXCEPT quest-locked ones, whose purchase must always be
@@ -363,6 +446,8 @@ function structuredCloneSave(save: PlayerSave): PlayerSave {
       taken: [...save.quests.taken],
       active: save.quests.active.map((q) => ({ ...q })),
     },
+    monsterKills: { ...save.monsterKills },
+    talents: { ...save.talents },
   };
 }
 

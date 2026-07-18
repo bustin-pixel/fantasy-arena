@@ -18,7 +18,7 @@ the source of truth, so this file deliberately doesn't duplicate it.
 > exceptions to preserve live in the `architecture-refactor-batch` memory if it's
 > ever wanted.
 
-> **BUILT, UNSHIPPED (2026-07-17): level cap 30 + per-dungeon difficulty tiers.**
+> **✅ SHIPPED PR #67 (2026-07-17): level cap 30 + per-dungeon difficulty tiers.**
 > `LEVEL_CAP` 10→30 (same XP curve — 21,750 to max; old capped saves load as
 > Lv 10 of 30), the Normal chain's `monsterLevel` re-spread 1→20 (forks at 20,
 > bosses 21), and a per-dungeon Normal/Hard/Elite ladder picked on the atlas
@@ -33,7 +33,7 @@ the source of truth, so this file deliberately doesn't duplicate it.
 > **Deferred: prestige / cosmetic ascension.** Cap 30 + the tier ladder carry
 > the long game; revisit prestige as its own slice once players saturate Elite.
 
-> **BUILT, UNSHIPPED (2026-07-17): descent march-in + Regroup.** Dungeon floors
+> **✅ SHIPPED PR #67 (2026-07-17): descent march-in + Regroup.** Dungeon floors
 > 2+ auto-field the warband on the *previous floor's deploy-time marks* (a walk-in
 > cinematic — the twin of the walk-off), then the normal 3s countdown runs with a
 > **Regroup** button that drops back to manual placement. Uniform incl. the boss
@@ -45,7 +45,7 @@ the source of truth, so this file deliberately doesn't duplicate it.
 > placing the same marks). ⚠ walk-in + floor-2 button need a **device eyeball**
 > (preview pane suspends rAF). Memory: `descent-march-in-formation-built`.
 
-> **BUILT, UNSHIPPED (2026-07-17): boss "brace up" cinematic.** The mid-battle
+> **✅ SHIPPED PR #67 (2026-07-17): boss "brace up" cinematic.** The mid-battle
 > sibling of the march-in: when a boss (or the rare quest catalyst) telegraphs onto
 > a cleared field, the sim FREEZES and the survivors pull back into a centered
 > horizontal row at the arena mid-line to face the entrance; the fight then resumes
@@ -59,6 +59,37 @@ the source of truth, so this file deliberately doesn't duplicate it.
 > tests (+6 `brace.test.ts`). Lives entirely in `MatchController` + the hook
 > (`OutroCinematic.braceToRow`, a `braceRef`); no UI/App changes. ⚠ the retreat
 > cinematic needs a **device eyeball**. Memory: `boss-brace-cinematic-built`.
+
+> **✅ The Commander BUILT (2026-07-18, on `feature/commander` — UNSHIPPED).**
+> The meta centerpiece: YOU as a customizable commander above the deck. An
+> account-wide XP pool (fed the same per-battle XP the deck earns, cap Lv 20 →
+> 19 talent points), a 3-branch talent tree (Warlord / Guardian / Arcanist,
+> tier gates at 0/2/5/8 in-branch, keystones), and one castable battle spell
+> per branch (unlocked at 8 points in; Rally / Bulwark / Arcane Storm, one
+> charge per battle via a HUD button). Talents resolve to a `CommanderMods`
+> fold on `teamMods.player` — a deterministic match input like slayerBonuses,
+> replay-recorded; arena stat-mirrors the flat talents onto the AI side so the
+> fair fight holds. Save **v17** (`commanderXp`, `talents`, `equippedSpell` —
+> all derived-never-stored rules; the sanitizer REPLAYS the tree's gate rules
+> on load, so hand-edited/rolled-back saves self-heal). 814 tests (+37:
+> meta/commander, engine commanderMods + commanderSpell, migration). UI: Home
+> banner under the profile plate → CommanderSheet; results-screen commander
+> XP bar. Memory: `commander-built`.
+>
+> **Meta decisions recorded (2026-07-18):** a "Hero" tier above Legendary with
+> a 2-unit deck was considered and **REJECTED** — it devalues the legendaries
+> (each is a themed dungeon's trophy), deletes the deploy-2-of-4 reserve game,
+> and ripples through AI budgets/mirrors/sweeps. Deferred meta levers for
+> later: **player-facing deck budget** (expose the AIDeck rare=1/epic=2/
+> legendary=4 cost system — a future Hero-class unit could slot in as a
+> cost-6 card, forcing the tiny-warband tradeoff emergently), **faction/tag
+> synergies** (undead/skeleton tags exist), **legendary ascension** (pairs
+> with the deferred prestige note).
+>
+> **Still open on the Commander:** a "War Tent" full-screen scene (Forge
+> pattern, `/mockup` round) — the sheet ships plain; spell cast VFX/SFX polish
+> + a field-edge commander banner (presentation); a talent-numbers sweep once
+> players saturate the tree; device eyeball of the HUD spell button feel.
 
 **Current state:** deterministic 4v4 auto-battler, 24 deckable units (engine fully
 kit-based — see `docs/adr/0001-unitkit-seam.md`), a swipeable 3-page app shell
@@ -200,13 +231,25 @@ handshake with file anchors + commit sequencing in
    crypt → Gargoyle), 16–20 (the throne → Lich) per the approved monster list
    below; difficulty pass as the curve extends; gold-tier chests on deep bosses.
    Content work — interleaves with slices 3+.
-3. **Bestiary rewards (+ the REMAINING Soul Shard earn ideas):** one-time gold
-   on first encounter/defeat (hook into the `recordBestiary` tier-upgrade
-   write — inherently unfarmable); 3-star floors. NOTE: the Soul Shard
+3. **~~Bestiary rewards~~ — ✅ BUILT (save v16, on `feature/slayer-xp`):**
+   one-time discovery gold (first encounter + first defeat, bosses at a
+   premium band + a Soul Shard), slayer-milestone gold at each of the five
+   kill thresholds (+1 shard at the cap), and per-dungeon book-completion
+   gold+shards. Plus the cosmetic layer: **titles** (a slayer epithet per
+   dungeon boss — "Bloaterbane", "Kingslayer" — plus **Loremaster** for a
+   complete monster bestiary), worn on the profile plate and picked in the
+   ProfileSheet, and a **gilded card** in the Compendium at slayer 5.
+   Every stream keys off a monotonic false→true crossing, so it's
+   unfarmable without a claims ledger. Architecturally this ALSO folded
+   Compendium recording into `applyBattleGrant` — `recordBestiary` is gone,
+   so a reveal and the gold it pays are one atomic write. Numbers in
+   `meta/economy.ts` (`BESTIARY_REWARDS`, `SLAYER_MILESTONE_GOLD`); math in
+   the new pure `meta/bestiaryRewards.ts`. Save **v16** adds `title` and a
+   one-time retro-grant so an existing save's whole back catalog pays out.
+   **Still open from this slice: 3-star floors.** NOTE: the Soul Shard
    currency itself SHIPPED with Items v1 (save v9, not the sketched v4) —
    earned from floor/boss/capstone first clears + fresh endless milestones +
-   an arcane/dragon chest drip; spent on legendary-tier merges. Bestiary
-   shard grants would be additive on top.
+   an arcane/dragon chest drip; spent on legendary-tier merges.
 4. ~~**Items v1**~~ — **✅ BUILT (feat/items-v1, save v9 — bigger than the
    sketch):** 25 item lines (6 weapons / 5 armors / 8 trinkets base + 6
    dungeon-signature relics on themed boss chests), rare→epic→legendary ×
@@ -287,8 +330,9 @@ and the 3-tier reveal (Undiscovered `???` silhouette → Encountered/Sighted nam
 silhouette → Defeated full lore via read-only `UnitDetail`). Two sections:
 Monsters of the Depths (roster derives from `data/depths.ts` tiers, so it grows
 automatically) and Heroes of the Arena (all deckables).
-- Still open: **per-monster kill counters** (v2 idea, parked with the bestiary
-  rewards), and Compendium `lastPage` persistence if it ever gets sub-pages.
+- ~~Per-monster kill counters~~ — shipped as Slayer XP (save v15); the cards
+  now carry a slayer track, and crossing a level pays gold (save v16, above).
+- Still open: Compendium `lastPage` persistence if it ever gets sub-pages.
 - Still open: a **dedicated desktop battle/layout** — the shell is phone-first (gate
   tuned so torches flank on narrow screens; the battle canvas is capped at 480px, safe
   to scale up on desktop since the 480×720 sim is display-independent).

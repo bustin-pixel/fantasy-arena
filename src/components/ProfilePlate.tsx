@@ -44,12 +44,16 @@ interface Props {
   avatarId: string;
   wins: number;
   losses: number;
+  /** Equipped cosmetic title LABEL (already resolved — meta/bestiaryRewards
+   *  titleLabel), or null to show none. Earned by boss first-kills and a
+   *  complete bestiary. */
+  title?: string | null;
   /** Present = this is the player's own editable plate (adds the pencil hint,
    *  chevron, and button semantics). */
   onEdit?: () => void;
 }
 
-export function ProfilePlate({ name, avatarId, wins, losses, onEdit }: Props) {
+export function ProfilePlate({ name, avatarId, wins, losses, title, onEdit }: Props) {
   const total = wins + losses;
   const winRate = total === 0 ? 0 : Math.round((wins / total) * 100);
 
@@ -65,6 +69,7 @@ export function ProfilePlate({ name, avatarId, wins, losses, onEdit }: Props) {
             </span>
           )}
         </span>
+        {title && <span className="profile-title">{title}</span>}
         <span className="profile-stats">
           <span className="profile-stat">
             <b>{wins}</b> wins

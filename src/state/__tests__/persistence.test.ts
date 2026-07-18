@@ -14,8 +14,13 @@ import {
 import { DECKABLE_UNIT_IDS } from "@/data/units";
 import { QUEST_LOCKED_UNITS } from "@/data/dungeons";
 import { DEFAULT_AVATAR_ID } from "@/meta/avatars";
-import { STARTER_UNIT_IDS } from "@/meta/economy";
+import { BESTIARY_REWARDS, STARTER_UNIT_IDS } from "@/meta/economy";
+import {
+  computeRetroBestiaryRewards,
+  earnedTitleIds,
+} from "@/meta/bestiaryRewards";
 import { TOTAL_XP_CAP } from "@/meta/leveling";
+import { COMMANDER_XP_CAP, pointsSpent } from "@/meta/commander";
 
 /** Legacy (pre-v6) shape: carried a single `depths` high-water mark before the
  *  per-dungeon `dungeons` map replaced it. */
@@ -43,7 +48,7 @@ function v2Save(): Partial<PlayerSave> {
 describe("migrateSave", () => {
   it("null (new player) → defaults: starter units, 0 gold, floor 0", () => {
     const save = migrateSave(null);
-    expect(save.version).toBe(14);
+    expect(save.version).toBe(17);
     expect(save.shop).toEqual({ day: -1, rerolls: 0, bought: [] });
     expect(save.quests).toEqual({
       day: -1,
@@ -77,7 +82,13 @@ describe("migrateSave", () => {
       expect(save.unlockedUnits).not.toContain(id);
     }
     expect(save.questUnlocks).toEqual([]);
-    expect(save.gold).toBe(0);
+    // Gold is NOT 0: this v2 fixture already had the Bloater (a dungeon boss)
+    // defeated, so the v16 bestiary retro-grant pays that page once — boss
+    // encounter + boss defeat + its shard. See the retro spec below.
+    expect(save.gold).toBe(
+      BESTIARY_REWARDS.bossEncounterGold + BESTIARY_REWARDS.bossDefeatGold
+    );
+    expect(save.soulShards).toBe(BESTIARY_REWARDS.bossDefeatShards);
     expect(save.dungeons.depths.highestClearedFloor).toBe(0);
   });
 
@@ -235,6 +246,159 @@ describe("migrateSave", () => {
     });
     expect(save.dungeons.wilds.clearedTiers).toBeUndefined(); // empty drops
     expect(save.dungeons.overgrowth.clearedTiers).toBeUndefined(); // non-object drops
+  });
+
+  it("v15: monsterKills defaults to {} for an older save", () => {
+    expect(migrateSave({ version: 14, gold: 100 }).monsterKills).toEqual({});
+  });
+
+  it("v15: keeps trackable monsterKills and drops/clamps junk", () => {
+    const save = migrateSave({
+      version: 15,
+      monsterKills: {
+        giant_rat: 37,
+        ghoul: 12.9, // floats floor
+        lich: -3, // negatives clamp to 0
+        skeleton: 8, // summon def BUT a real dungeon denizen → kept
+        knight: 50, // hero → dropped
+        wolf: 50, // summon-only def → dropped
+        not_a_unit: 50, // unknown → dropped
+        dire_wolf: Number.POSITIVE_INFINITY, // non-finite → dropped
+      },
+    });
+    expect(save.monsterKills).toEqual({
+      giant_rat: 37,
+      ghoul: 12,
+      lich: 0,
+      skeleton: 8,
+    });
+  });
+
+  it("v15: two migrations never share a monsterKills reference", () => {
+    const raw = { version: 15, monsterKills: { giant_rat: 5 } };
+    const a = migrateSave(raw);
+    const b = migrateSave(raw);
+    a.monsterKills.giant_rat = 999;
+    expect(b.monsterKills.giant_rat).toBe(5);
+  });
+
+  // --- v16: the bestiary retro-grant + equipped title -----------------------
+
+  it("v16: retro-grants every already-earned bestiary reward exactly once", () => {
+    // A veteran save: an ordinary monster discovered + defeated, a boss page
+    // complete, and enough kills to have crossed slayer levels I and II.
+    const raw = {
+      version: 15,
+      gold: 1000,
+      soulShards: 10,
+      bestiary: {
+        giant_rat: { encountered: true, defeated: true },
+        bloater: { encountered: true, defeated: true },
+        zombie_shambler: { encountered: true, defeated: false },
+      },
+      monsterKills: { giant_rat: 30 }, // ≥25 ⇒ slayer II
+    };
+    const expected = computeRetroBestiaryRewards(raw.bestiary, raw.monsterKills);
+    // Sanity: the fixture really does earn something on each stream.
+    expect(expected.discoveries.length).toBeGreaterThan(0);
+    expect(expected.milestones.map((m) => m.level)).toEqual([1, 2]);
+
+    const save = migrateSave(raw);
+    expect(save.gold).toBe(1000 + expected.gold);
+    expect(save.soulShards).toBe(10 + expected.shards);
+
+    // Re-migrating the ALREADY-migrated save must not pay a second time —
+    // that's what the version gate buys.
+    const again = migrateSave(save);
+    expect(again.gold).toBe(save.gold);
+    expect(again.soulShards).toBe(save.soulShards);
+  });
+
+  it("v16: a brand-new save gets no retro grant", () => {
+    const save = migrateSave(null);
+    expect(save.gold).toBe(0);
+    expect(save.soulShards).toBe(0);
+    expect(save.title).toBeNull();
+  });
+
+  it("v16: keeps an earned title and clears an unearned/junk one", () => {
+    const bestiary = { bloater: { encountered: true, defeated: true } };
+    const earned = earnedTitleIds(bestiary, {});
+    expect(earned).toContain("slayer:bloater");
+
+    expect(migrateSave({ version: 15, bestiary, title: "slayer:bloater" }).title).toBe(
+      "slayer:bloater"
+    );
+    // Never defeated that boss → the title isn't in the derived set.
+    expect(migrateSave({ version: 15, bestiary, title: "slayer:abomination" }).title)
+      .toBeNull();
+    expect(migrateSave({ version: 15, bestiary, title: "not_a_title" }).title).toBeNull();
+  });
+
+  it("v17: commander fields default to the zero state for older saves", () => {
+    const save = migrateSave({ version: 16 });
+    expect(save.commanderXp).toBe(0);
+    expect(save.talents).toEqual({});
+    expect(save.equippedSpell).toBeNull();
+  });
+
+  it("v17: clamps commanderXp and replays talents through the gate rules", () => {
+    // 4,500 XP = commander level 10 = 9 talent points.
+    const save = migrateSave({
+      version: 17,
+      commanderXp: 4500,
+      talents: {
+        sharpened_steel: 3,
+        drill_sergeant: 3,
+        forced_march: 2,
+        victory_feast: 99, // clamps to maxRanks(2), but the 9-point budget caps it at 1
+        bloodlust: 1, // keystone needs 8 in-branch and the budget is spent — drops
+        junk_talent: 5,
+      },
+    });
+    expect(save.commanderXp).toBe(4500);
+    expect(save.talents.sharpened_steel).toBe(3);
+    expect(save.talents.junk_talent).toBeUndefined();
+    expect(save.talents.bloodlust).toBeUndefined();
+    expect(pointsSpent(save.talents)).toBe(9);
+    // Junk XP resets rather than crashes.
+    expect(migrateSave({ version: 17, commanderXp: NaN }).commanderXp).toBe(0);
+    expect(migrateSave({ version: 17, commanderXp: 1e12 }).commanderXp).toBe(
+      COMMANDER_XP_CAP
+    );
+  });
+
+  it("v17: equipped spell survives only while its branch is deep enough", () => {
+    // 8 points into warlord (needs level ≥ 9 → 3,600 XP).
+    const talents = {
+      sharpened_steel: 3,
+      drill_sergeant: 3,
+      forced_march: 2,
+    };
+    const kept = migrateSave({
+      version: 17,
+      commanderXp: 4500,
+      talents,
+      equippedSpell: "rally",
+    });
+    expect(kept.equippedSpell).toBe("rally");
+    // Not that branch's spell / not unlocked → cleared.
+    expect(
+      migrateSave({ version: 17, commanderXp: 4500, talents, equippedSpell: "bulwark" })
+        .equippedSpell
+    ).toBeNull();
+    expect(
+      migrateSave({ version: 17, commanderXp: 0, talents: {}, equippedSpell: "rally" })
+        .equippedSpell
+    ).toBeNull();
+  });
+
+  it("v17: two migrations never share a talents reference", () => {
+    const raw = { version: 17, commanderXp: 1000, talents: { sharpened_steel: 2 } };
+    const a = migrateSave(structuredClone(raw));
+    const b = migrateSave(structuredClone(raw));
+    a.talents.sharpened_steel = 1;
+    expect(b.talents.sharpened_steel).toBe(2);
   });
 
   it("v14: two migrations never share a clearedTiers reference", () => {

@@ -39,6 +39,10 @@ import { ABILITIES } from "@/data/abilities";
 import { DEPLOY_TIME_SEC, TICK_MS, TICK_RATE, UNIT_RADIUS } from "@/utils/constants";
 import { generateSeed } from "@/utils/rng";
 import { getSettings } from "@/state/settings";
+import type {
+  CommanderMods,
+  SpellId as CommanderSpellId,
+} from "@/meta/commander";
 import { prefersReducedMotion } from "@/utils/motion";
 
 /** Battle mode. Solo allows client-side fast-forward; PVP is server-paced at 1×
@@ -82,6 +86,9 @@ export interface BattleUiState {
   momentumStacks: number | null;
   /** Endless: Berserker's Rhythm's live attack-speed bonus, or null if unowned. */
   rhythmBonus: number | null;
+  /** The commander's equipped battle spell + charge state (one per battle), or
+   *  null when no spell is equipped (no HUD button). */
+  commanderSpell: { spell: CommanderSpellId; ready: boolean } | null;
 }
 
 /** Live snapshot of one combatant, for the in-battle stat tooltip. */
@@ -156,6 +163,9 @@ export interface UseBattleEngine {
   /** The player's deploy-time marks this floor, to carry to the next floor — or
    *  null if nothing's been fielded. Read at the continue-deeper hand-off. */
   playerFormation: () => FormationMark[] | null;
+  /** Cast the commander's equipped battle spell (one charge per battle; the
+   *  HUD button). A logged input like deployAt — no-op when not ready. */
+  castCommanderSpell: () => void;
 }
 
 export function useBattleEngine(
@@ -188,7 +198,22 @@ export function useBattleEngine(
    *  present, the warband is fielded on these spots and a walk-in cinematic plays
    *  before the countdown. A STABLE object frozen at mount, like unitLevels.
    *  Null/absent = manual placement (floor 1, or non-descent modes). */
-  formation: FormationMark[] | null = null
+  formation: FormationMark[] | null = null,
+  /** Compendium slayer bonuses: enemy defId → damage multiplier, precomputed
+   *  from lifetime monsterKills (meta/slayer.buildSlayerBonusTable). A STABLE
+   *  object frozen at mount, like unitLevels — kills made this match pay out
+   *  from the next one. PvE only: applied in depths/endless, ignored in
+   *  arena (slayer never touches the fair-fight mode). Missing/empty =
+   *  identity. */
+  slayerBonuses?: Record<string, number>,
+  /** The player's resolved commander talents (meta/commander
+   *  resolveCommanderMods over the save's allocation). A STABLE object frozen
+   *  at mount, like unitLevels — a match input in EVERY mode (arena mirrors
+   *  the flat stat talents onto the AI side). Null/absent = identity. */
+  commanderMods?: CommanderMods | null,
+  /** The commander's equipped battle spell (save.equippedSpell), frozen at
+   *  mount. Null/absent = no spell, no HUD button. */
+  commanderSpell?: CommanderSpellId | null
 ): UseBattleEngine {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const controllerRef = useRef<MatchController | null>(null);
@@ -243,6 +268,7 @@ export function useBattleEngine(
       boonsPicked: [],
       momentumStacks: null,
       rhythmBonus: null,
+      commanderSpell: null,
     };
   });
   const [speed, setSpeedState] = useState<number>(initialSpeed);
@@ -275,6 +301,9 @@ export function useBattleEngine(
         tier,
         // Depths floors 2+: field on the previous floor's marks (the march-in).
         formation: formation ?? undefined,
+        slayerBonuses,
+        commanderMods,
+        commanderSpell,
       });
     } else {
       const enemyDeck = generateEnemyDeck(seed);
@@ -282,7 +311,12 @@ export function useBattleEngine(
         seed,
         playerDeck.slice(0, 4),
         enemyDeck,
-        { unitLevels, itemLoadouts }
+        // No slayerBonuses: slayer is a PvE-only system — arena neither earns
+        // kills (battleGrant gates on mode) nor applies the bonus (a tabled
+        // skeleton would otherwise boost hits on Necromancer summons here).
+        // commanderMods DOES apply — the controller stat-mirrors it onto the
+        // AI side, so arena stays a fair fight as the commander levels.
+        { unitLevels, itemLoadouts, commanderMods, commanderSpell }
       );
     }
     themeRef.current =
@@ -412,6 +446,7 @@ export function useBattleEngine(
           boonsPicked: est?.boonsPicked ?? [],
           momentumStacks: est?.momentumStacks ?? null,
           rhythmBonus: est?.rhythmBonus ?? null,
+          commanderSpell: c.commanderSpellStatus(),
         });
       }
 
@@ -595,6 +630,18 @@ export function useBattleEngine(
     return marks.length ? marks : null;
   }, []);
 
+  const castCommanderSpell = useCallback(() => {
+    const c = controllerRef.current;
+    if (!c) return;
+    if (c.castCommanderSpell()) {
+      // Reflect the spent charge immediately (don't wait for the ~6/s sync).
+      setUi((prev) => ({
+        ...prev,
+        commanderSpell: c.commanderSpellStatus(),
+      }));
+    }
+  }, []);
+
   return {
     canvasRef,
     ui,
@@ -615,6 +662,7 @@ export function useBattleEngine(
     outroWalkOff,
     regroup,
     playerFormation,
+    castCommanderSpell,
   };
 }
 

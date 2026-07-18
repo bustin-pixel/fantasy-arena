@@ -70,6 +70,14 @@ import {
   tryConsumeShield,
 } from "./StatusEffectSystem";
 import { stepAnimation } from "./AnimationSystem";
+import {
+  ARCANE_STORM_DAMAGE,
+  BULWARK_SHIELD_FRAC,
+  RALLY_HASTE_MAG,
+  RALLY_SEC,
+  RALLY_SURGE_FRAC,
+  type SpellId as CommanderSpellId,
+} from "@/meta/commander";
 
 /** Team-wide combat multipliers, read at the funnel sites. Identity by default
  *  (all 1s / lifesteal 0) so Arena/Depths are unaffected; Endless mode's boons
@@ -119,6 +127,26 @@ export interface TeamMods {
   rhythmBonus: number;
   /** Thunderclap / Venom Coating on-hit riders. */
   onHitRiders: TeamRider[];
+  /** Compendium slayer bonus: outgoing damage multiplier vs a specific enemy
+   *  defId (missing = 1). Meta-precomputed per match from lifetime kills
+   *  (MatchOptions.slayerBonuses); identity {} keeps slayer-less sims
+   *  byte-identical. */
+  slayerVs: Record<string, number>;
+  // --- commander talent mods (MatchOptions.commanderMods; identity default) ---
+  /** Units this team deploys arrive shielded for this fraction of max HP. */
+  deployShieldFrac: number;
+  /** Ability-cooldown multiplier (<1 = faster casts), the team twin of
+   *  itemMods.cooldownMult (they stack multiplicatively). */
+  abilityCooldownMult: number;
+  /** Spell wind-up multiplier (<1 = shorter cast bars). Commander Swift
+   *  Incantation; read where a cast-time ability begins its cast. */
+  castTimeMult: number;
+  /** Additive summon stat % on top of the summoner's own sigilPct. */
+  summonStatPct: number;
+  /** Outgoing damage multiplier for MAGIC-school sources only. */
+  magicDmgMult: number;
+  /** Chronomancer: this team's abilities begin the battle off cooldown. */
+  abilitiesStartReady: boolean;
 }
 
 export function identityTeamMods(): TeamMods {
@@ -138,6 +166,13 @@ export function identityTeamMods(): TeamMods {
     rangedLifesteal: 0,
     rhythmBonus: 0,
     onHitRiders: [],
+    slayerVs: {},
+    deployShieldFrac: 0,
+    abilityCooldownMult: 1,
+    castTimeMult: 1,
+    summonStatPct: 0,
+    magicDmgMult: 1,
+    abilitiesStartReady: false,
   };
 }
 
@@ -187,6 +222,13 @@ export interface SimState {
    *  Arena/Depths). Read at the damage / attack-speed / movement / lifesteal
    *  funnels. */
   teamMods: { player: TeamMods; enemy: TeamMods };
+  /** The commander's castable, queued by MatchController.castCommanderSpell and
+   *  consumed at the TOP of the next tick — a deterministic seam, so a tap's
+   *  wall-clock arrival inside a frame can never shift the outcome. Null = none. */
+  pendingCommanderSpell: CommanderSpellId | null;
+  /** Rally's remaining surge window (ticks): while > 0, player-side outgoing
+   *  damage is scaled by 1 + RALLY_SURGE_FRAC. 0 = inactive (the identity). */
+  commanderSurgeTicks: number;
 }
 
 export function createSimState(seed: number, clockSec: number): SimState {
@@ -208,6 +250,8 @@ export function createSimState(seed: number, clockSec: number): SimState {
       enemy: MAX_ACTIVE_UNITS_PER_SIDE,
     },
     castGraceTicks: 0,
+    pendingCommanderSpell: null,
+    commanderSurgeTicks: 0,
     damageSpawns: [],
     waveBanner: null,
     teamMods: { player: identityTeamMods(), enemy: identityTeamMods() },
@@ -341,6 +385,21 @@ function makeDamageDealer(
       target.hp / target.maxHp < EXECUTE_THRESHOLD
         ? 1 + srcMods.executeBonus
         : 1;
+    // Compendium slayer: the team's lifetime-kill bonus vs this exact monster.
+    const slayerMult = srcMods.slayerVs[target.defId] ?? 1;
+    // Commander Arcane Infusion: school-gated team damage (identity ×1 unless
+    // the talent is in play AND the source is a magic-school unit).
+    const magicMult =
+      srcMods.magicDmgMult !== 1 &&
+      getUnitDef(source.defId).school === "magic"
+        ? srcMods.magicDmgMult
+        : 1;
+    // Commander Rally: the surge window boosts PLAYER outgoing damage only
+    // (the spell is the player's; identity while the window is closed).
+    const surgeMult =
+      state.commanderSurgeTicks > 0 && source.team === "player"
+        ? 1 + RALLY_SURGE_FRAC
+        : 1;
     // Equipment mods, the per-unit twins: source-side execute / giant slayer /
     // pack tactics, target-side damage reduction / magic reduction / pack
     // tactics. Both stay exactly 1 for unequipped units.
@@ -377,6 +436,9 @@ function makeDamageDealer(
       effAmount *
       srcMods.dmgMult *
       execMult *
+      slayerMult *
+      magicMult *
+      surgeMult *
       itemMult *
       target.damageTakenMult *
       state.teamMods[target.team].damageTakenMult *
@@ -903,13 +965,17 @@ function flushSpawns(
       spawn.level ?? 1,
       spawn.items
     );
-    // Summoner's Sigil: the creator's trinket buffs its summons' stats. Applied
-    // before `init` (like the level bake) so maxHp-derived inits scale. A
-    // self-respawn that reactivated its own gear is not a "summon" — skip it.
-    if (spawn.sigilPct && spawn.sigilPct > 0 && !summoned.itemMods) {
-      summoned.hp = Math.round(summoned.hp * (1 + spawn.sigilPct));
+    // Summoner's Sigil + the commander's Empowered Bindings: additive summon
+    // stat bonus, applied before `init` (like the level bake) so maxHp-derived
+    // inits scale. A self-respawn that reactivated its own gear is not a
+    // "summon" — skip it (both sources).
+    const summonPct = summoned.itemMods
+      ? 0
+      : (spawn.sigilPct ?? 0) + state.teamMods[spawn.team].summonStatPct;
+    if (summonPct > 0) {
+      summoned.hp = Math.round(summoned.hp * (1 + summonPct));
       summoned.maxHp = summoned.hp;
-      summoned.damage = Math.round(summoned.damage * (1 + spawn.sigilPct));
+      summoned.damage = Math.round(summoned.damage * (1 + summonPct));
     }
     spawn.init?.(summoned); // stamp deterministic starting state (blob anchor / rebirth HP)
     state.units.push(summoned);
@@ -979,6 +1045,55 @@ export function stepSimulation(state: SimState): void {
 
   heal = makeHealer(state, makeKitCtx);
   dealDamage = makeDamageDealer(state, makeKitCtx, heal);
+
+  // 0. The commander's castable (one charge per battle). Queued by
+  // MatchController.castCommanderSpell, consumed HERE — the top of the tick —
+  // so the tap's wall-clock arrival within a frame can never shift the sim,
+  // and Arcane Storm's damage rides the one HP funnel like everything else.
+  if (state.commanderSurgeTicks > 0) state.commanderSurgeTicks--;
+  if (state.pendingCommanderSpell) {
+    const spell = state.pendingCommanderSpell;
+    state.pendingCommanderSpell = null;
+    const players = living.filter((u) => u.team === "player");
+    if (spell === "rally") {
+      state.commanderSurgeTicks = secToTicks(RALLY_SEC);
+      for (const u of players) {
+        applyEffect(
+          u,
+          makeEffect("haste", {
+            source: u.uid,
+            durationSec: RALLY_SEC,
+            magnitude: RALLY_HASTE_MAG,
+          })
+        );
+        spawnFloatingText(state, u, "Rally!", "crit");
+      }
+    } else if (spell === "bulwark") {
+      for (const u of players) {
+        u.shieldHp += Math.round(u.maxHp * BULWARK_SHIELD_FRAC);
+        u.shieldHpMax = Math.max(u.shieldHpMax, u.shieldHp);
+        spawnFloatingText(state, u, "Bulwark", "heal");
+      }
+    } else if (players.length > 0) {
+      // Arcane Storm: flat damage to every living enemy, attributed to the
+      // lowest-uid living player unit (the funnel needs a source; deterministic
+      // by the uid ordering rule). No source left standing = a dead cast.
+      const source = [...players].sort((a, b) =>
+        a.uid < b.uid ? -1 : 1
+      )[0];
+      for (const e of living.filter((u) => u.team === "enemy")) {
+        if (e.state === "dead") continue;
+        spawnVfx(state, {
+          kind: "frost",
+          pos: { x: e.pos.x, y: e.pos.y - 4 },
+          life: secToTicks(0.4),
+          maxLife: secToTicks(0.4),
+          color: "#c9a6ff", // arcane violet crackle
+        });
+        dealDamage(e, ARCANE_STORM_DAMAGE, source);
+      }
+    }
+  }
 
   // 1. Status effect timers + DoT / HoT.
   const { dots, hots } = tickEffects(living);
@@ -1199,8 +1314,10 @@ export function stepSimulation(state: SimState): void {
     // reactive kit hooks (shields, on-hit riders, Second Wind) are unaffected.
     // Chrono Amulet legendary ("ability starts the battle ready"): the wearer
     // ignores the opening cast grace — its first cast comes before anyone's.
+    // The commander's Chronomancer keystone is the team-wide twin.
     const inOpeningGrace =
       state.castGraceTicks > 0 &&
+      !state.teamMods[unit.team].abilitiesStartReady &&
       !(unit.itemMods && findItemEffect(unit, "abilityStartsReady"));
     const ownsCast = inOpeningGrace
       ? undefined
@@ -1227,7 +1344,19 @@ export function stepSimulation(state: SimState): void {
         continue;
       }
     } else if (!inOpeningGrace && unit.abilityCooldown <= 0) {
-      const castTime = abilityCastTimeTicks(unit.ability);
+      // Commander Swift Incantation: team-wide shorter wind-ups (×1 default).
+      // Floors at 1 tick so a cast-time ability can never collapse into an
+      // instant (castTime > 0 is the "has a cast bar" discriminator below).
+      const baseCastTime = abilityCastTimeTicks(unit.ability);
+      const castTime =
+        baseCastTime > 0
+          ? Math.max(
+              1,
+              Math.round(
+                baseCastTime * state.teamMods[unit.team].castTimeMult
+              )
+            )
+          : 0;
       if (castTime > 0) {
         // Begin a cast. A stun/silence blocks the start, and some casts (Mend)
         // only begin when they have a reason to — so the Cleric doesn't freeze
@@ -1242,10 +1371,12 @@ export function stepSimulation(state: SimState): void {
           unit.castTicks = castTime;
           unit.castTicksMax = castTime;
           unit.castTargetUid = target ? target.uid : null;
-          // Chrono Amulet: item cooldown reduction (×1 when unequipped).
+          // Chrono Amulet item + commander Keen Focus cooldown reductions
+          // (both ×1 by default; they stack multiplicatively).
           unit.abilityCooldown = Math.round(
             abilityCooldownTicks(unit.ability) *
-              (unit.itemMods?.cooldownMult ?? 1)
+              (unit.itemMods?.cooldownMult ?? 1) *
+              state.teamMods[unit.team].abilityCooldownMult
           );
           transitionTo(unit, "casting");
           continue;
@@ -1260,10 +1391,12 @@ export function stepSimulation(state: SimState): void {
           !isSilenced(unit) &&
           abilityKit.fireAbility(abilityCtx);
         if (fired) {
-          // Chrono Amulet: item cooldown reduction (×1 when unequipped).
+          // Chrono Amulet item + commander Keen Focus cooldown reductions
+          // (both ×1 by default; they stack multiplicatively).
           unit.abilityCooldown = Math.round(
             abilityCooldownTicks(unit.ability) *
-              (unit.itemMods?.cooldownMult ?? 1)
+              (unit.itemMods?.cooldownMult ?? 1) *
+              state.teamMods[unit.team].abilityCooldownMult
           );
         }
       }

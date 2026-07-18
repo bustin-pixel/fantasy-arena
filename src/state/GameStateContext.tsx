@@ -22,6 +22,7 @@ import {
   type PlayerSave,
 } from "./persistence";
 import { isAvatarUnlocked } from "@/meta/avatars";
+import { earnedTitleIds } from "@/meta/bestiaryRewards";
 import { UNLOCK_PRICES } from "@/meta/economy";
 import { canEquip, combineFold } from "@/meta/inventory";
 import {
@@ -62,6 +63,16 @@ import {
   type BattleGrantCtx,
 } from "@/meta/battleGrant";
 import { UNITS, DECKABLE_UNIT_IDS } from "@/data/units";
+import {
+  buyTalent,
+  canBuyTalent,
+  commanderLevelFromXp,
+  pointsSpent,
+  RESPEC_GOLD,
+  spellsUnlocked,
+  talentPointsForLevel,
+  type SpellId,
+} from "@/meta/commander";
 
 /** Local-only playtest cheats, exposed on the context as `dev`. This whole object
  *  is `undefined` in production builds (see the provider — the `import.meta.env.DEV`
@@ -89,10 +100,9 @@ interface GameStateValue {
   /** Change the profile icon. No-op unless the avatar is unlocked. */
   setAvatar: (avatarId: string) => void;
   recordResult: (won: boolean) => void;
-  /** Fold a battle's enemy roster into the Compendium: everything fielded
-   *  against you counts as encountered; everything that died counts as
-   *  defeated. Reveals only ever go forward (no un-discovering). */
-  recordBestiary: (seen: string[], slain: string[]) => void;
+  /** Equip an earned title (or null to wear none). No-op unless the title is
+   *  in the derived earned set — titles are never stored, only the choice is. */
+  setTitle: (titleId: string | null) => void;
   /** Apply an already-computed reward bundle (gold, chest contents, Depths
    *  progress + milestone unlock on a first clear) in ONE atomic save write.
    *  Idempotence is the caller's job (BattleScreen's recordedRef); rolling
@@ -143,6 +153,15 @@ interface GameStateValue {
    *  (rolled in the sheet, RNG-before-fold like battle rewards) in one atomic
    *  write, steps the item-pity counter, and retires the quest. */
   claimQuest: (questId: string, chestContents: ChestContent[]) => void;
+  /** Spend one commander talent point on a talent rank. No-op unless the
+   *  point exists and the talent's tier gate is met — meta/commander. */
+  spendTalentPoint: (talentId: string) => void;
+  /** Refund every spent talent point for RESPEC_GOLD. No-op when nothing is
+   *  spent or gold is short. Clears the equipped spell (nothing stays
+   *  unlocked with zero points in). */
+  respecTalents: () => void;
+  /** Equip a commander spell (or null for none). No-op unless unlocked. */
+  setEquippedSpell: (spellId: SpellId | null) => void;
   /** Local-only playtest cheats — `undefined` in production builds, so the live
    *  site never exposes them (see DevCheats + the DevPanel mount gate). */
   dev?: DevCheats;
@@ -176,20 +195,15 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       wins: s.wins + (won ? 1 : 0),
       losses: s.losses + (won ? 0 : 1),
     }));
-  const recordBestiary = (seen: string[], slain: string[]) =>
-    setSave((s) => {
-      const bestiary = { ...s.bestiary };
-      for (const id of seen) {
-        bestiary[id] = {
-          encountered: true,
-          defeated: bestiary[id]?.defeated ?? false,
-        };
-      }
-      for (const id of slain) {
-        bestiary[id] = { encountered: true, defeated: true };
-      }
-      return { ...s, bestiary };
-    });
+  // Compendium reveals are NOT recorded here — they fold inside
+  // grantBattleRewards, so a reveal and the discovery gold it pays land in one
+  // atomic write (meta/battleGrant).
+  const setTitle = (titleId: string | null) =>
+    setSave((s) =>
+      titleId === null || earnedTitleIds(s.bestiary, s.monsterKills).includes(titleId)
+        ? { ...s, title: titleId }
+        : s
+    );
 
   // One atomic fold per battle: gold + chest gold + unlock drops + Depths
   // progress + milestone all land in a single setSave, so a crash can never
@@ -297,6 +311,26 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
   const claimQuest = (questId: string, chestContents: ChestContent[]) =>
     setSave((s) => applyClaimQuest(s, questId, chestContents));
 
+  // ---- commander — the tree rules live in meta/commander (pure); these
+  // wrappers bind them to setSave. Points are always DERIVED from the level.
+  const spendTalentPoint = (talentId: string) =>
+    setSave((s) => {
+      const points = talentPointsForLevel(commanderLevelFromXp(s.commanderXp));
+      if (!canBuyTalent(s.talents, talentId, points)) return s;
+      return { ...s, talents: buyTalent(s.talents, talentId) };
+    });
+  const respecTalents = () =>
+    setSave((s) => {
+      if (pointsSpent(s.talents) === 0 || s.gold < RESPEC_GOLD) return s;
+      return { ...s, gold: s.gold - RESPEC_GOLD, talents: {}, equippedSpell: null };
+    });
+  const setEquippedSpell = (spellId: SpellId | null) =>
+    setSave((s) =>
+      spellId === null || spellsUnlocked(s.talents).includes(spellId)
+        ? { ...s, equippedSpell: spellId }
+        : s
+    );
+
   // ---- dev cheats (LOCAL ONLY) — the entire object is undefined in production.
   // `import.meta.env.DEV` is statically `false` in `vite build`, so this ternary
   // folds to `undefined`, the closures below are dropped, and DevPanel (mounted
@@ -359,7 +393,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
         setUsername,
         setAvatar,
         recordResult,
-        recordBestiary,
+        setTitle,
         grantBattleRewards,
         purchaseUnit,
         equipItem,
@@ -377,6 +411,9 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
         abandonQuest,
         refreshQuestBoard,
         claimQuest,
+        spendTalentPoint,
+        respecTalents,
+        setEquippedSpell,
         dev,
       }}
     >
