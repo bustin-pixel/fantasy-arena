@@ -137,6 +137,22 @@ describe("commander TeamMods reads (hand-built states)", () => {
     expect(reduced).toBe(Math.round(base * 0.91));
   });
 
+  it("castTimeMult shortens the cast bar a spell winds up with", () => {
+    const castBar = (mult: number) => {
+      const s = battleState(13);
+      s.teamMods.player.castTimeMult = mult;
+      s.castGraceTicks = 0;
+      const mage = place(s, "mage", "player", 100, 100);
+      makeDummy(place(s, "knight", "enemy", 200, 100));
+      let guard = 0;
+      while (mage.castTicksMax <= 0 && guard++ < 200) stepSimulation(s);
+      return mage.castTicksMax;
+    };
+    const base = castBar(1);
+    expect(base).toBeGreaterThan(1);
+    expect(castBar(0.8)).toBe(Math.max(1, Math.round(base * 0.8)));
+  });
+
   it("abilitiesStartReady bypasses the opening cast grace", () => {
     const run = (ready: boolean) => {
       const s = battleState(11);

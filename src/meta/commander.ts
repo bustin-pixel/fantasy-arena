@@ -129,6 +129,7 @@ export type TalentEffect =
   | { kind: "lastBreath" } // once-per-battle cheat death
   | { kind: "bloodlust" } // the Warlord keystone: atk speed + move + lifesteal
   | { kind: "abilityCooldownMult"; perRank: number } // −frac ability cooldowns
+  | { kind: "castTimeMult"; perRank: number } // −frac spell wind-up time
   | { kind: "summonStatPct"; perRank: number } // +frac summon stats (additive)
   | { kind: "magicDmgMult"; perRank: number } // +frac magic-school damage
   | { kind: "rangedLifesteal"; perRank: number } // ranged basics lifesteal
@@ -301,6 +302,15 @@ export const TALENTS: TalentDef[] = [
     effect: { kind: "rangedLifesteal", perRank: 0.02 },
   },
   {
+    id: "swift_incantation",
+    branch: "arcanist",
+    tier: 2,
+    name: "Swift Incantation",
+    description: "Your units' spell wind-ups are 10% shorter per rank.",
+    maxRanks: 2,
+    effect: { kind: "castTimeMult", perRank: 0.1 },
+  },
+  {
     id: "chronomancer",
     branch: "arcanist",
     tier: 3,
@@ -415,6 +425,7 @@ export interface CommanderMods {
   overheal: boolean;
   lastBreath: boolean;
   abilityCooldownMult: number;
+  castTimeMult: number;
   summonStatPct: number;
   magicDmgMult: number;
   rangedLifesteal: number;
@@ -441,6 +452,7 @@ export function resolveCommanderMods(
     overheal: false,
     lastBreath: false,
     abilityCooldownMult: 1,
+    castTimeMult: 1,
     summonStatPct: 0,
     magicDmgMult: 1,
     rangedLifesteal: 0,
@@ -493,6 +505,9 @@ export function resolveCommanderMods(
         break;
       case "abilityCooldownMult":
         mods.abilityCooldownMult *= 1 - e.perRank * ranks;
+        break;
+      case "castTimeMult":
+        mods.castTimeMult *= 1 - e.perRank * ranks;
         break;
       case "summonStatPct":
         mods.summonStatPct += e.perRank * ranks;

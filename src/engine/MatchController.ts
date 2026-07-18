@@ -300,6 +300,7 @@ export class MatchController {
       t.rangedLifesteal += c.rangedLifesteal;
       t.deployShieldFrac += c.deployShieldFrac;
       t.abilityCooldownMult *= c.abilityCooldownMult;
+      t.castTimeMult *= c.castTimeMult;
       t.summonStatPct += c.summonStatPct;
       t.magicDmgMult *= c.magicDmgMult;
       t.abilitiesStartReady = t.abilitiesStartReady || c.abilitiesStartReady;

@@ -168,6 +168,12 @@ describe("resolveCommanderMods", () => {
     // Untouched fields stay identity.
     expect(mods.moveSpeedMult).toBe(1);
     expect(mods.overheal).toBe(false);
+    expect(mods.castTimeMult).toBe(1);
+  });
+
+  it("Swift Incantation shortens spell wind-ups per rank", () => {
+    expect(resolveCommanderMods({ swift_incantation: 2 })!.castTimeMult)
+      .toBeCloseTo(0.8);
   });
 
   it("keystones resolve (Bloodlust's composite lands every field)", () => {

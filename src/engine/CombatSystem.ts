@@ -138,6 +138,9 @@ export interface TeamMods {
   /** Ability-cooldown multiplier (<1 = faster casts), the team twin of
    *  itemMods.cooldownMult (they stack multiplicatively). */
   abilityCooldownMult: number;
+  /** Spell wind-up multiplier (<1 = shorter cast bars). Commander Swift
+   *  Incantation; read where a cast-time ability begins its cast. */
+  castTimeMult: number;
   /** Additive summon stat % on top of the summoner's own sigilPct. */
   summonStatPct: number;
   /** Outgoing damage multiplier for MAGIC-school sources only. */
@@ -166,6 +169,7 @@ export function identityTeamMods(): TeamMods {
     slayerVs: {},
     deployShieldFrac: 0,
     abilityCooldownMult: 1,
+    castTimeMult: 1,
     summonStatPct: 0,
     magicDmgMult: 1,
     abilitiesStartReady: false,
@@ -1340,7 +1344,19 @@ export function stepSimulation(state: SimState): void {
         continue;
       }
     } else if (!inOpeningGrace && unit.abilityCooldown <= 0) {
-      const castTime = abilityCastTimeTicks(unit.ability);
+      // Commander Swift Incantation: team-wide shorter wind-ups (×1 default).
+      // Floors at 1 tick so a cast-time ability can never collapse into an
+      // instant (castTime > 0 is the "has a cast bar" discriminator below).
+      const baseCastTime = abilityCastTimeTicks(unit.ability);
+      const castTime =
+        baseCastTime > 0
+          ? Math.max(
+              1,
+              Math.round(
+                baseCastTime * state.teamMods[unit.team].castTimeMult
+              )
+            )
+          : 0;
       if (castTime > 0) {
         // Begin a cast. A stun/silence blocks the start, and some casts (Mend)
         // only begin when they have a reason to — so the Cleric doesn't freeze
