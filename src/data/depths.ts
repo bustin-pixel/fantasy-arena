@@ -49,6 +49,17 @@ export const BOSS_TELEGRAPH_SEC = 2;
  *  than the pause, so it lingers as the unit walks in. */
 export const BOSS_BANNER_SEC = 2.7;
 
+/** Boss "brace up" beat: when a boss/rare telegraph fires on a cleared field, the
+ *  sim FREEZES and the survivors pull back into a centered row facing the entrance,
+ *  then the fight resumes from that formation. These tune the frozen window (the
+ *  in-battle twin of the descent march-in hold). */
+/** The row's y as a fraction of field height (arena center = 0.5). */
+export const BOSS_BRACE_ROW_Y_FRAC = 0.5;
+/** Failsafe cap on the frozen window (seconds). The client cinematic releases the
+ *  hold the instant the band lands; headless (no cinematic) auto-releases here, so
+ *  the reposition is deterministic either way — frozen ticks change no sim state. */
+export const BOSS_BRACE_FAILSAFE_SEC = 3;
+
 // ---------------------------------------------------------------------------
 // Per-floor stat scaling — the depth pressure dial. Monsters spawn with these
 // linear multipliers so floor 1 matches the bestiary exactly and every floor

@@ -5,6 +5,27 @@ The unit had shipped-in-progress as a **blue** placeholder wearing `drawNecroman
 body; the user asked for red/black and picked **1 — Ember Cowl**, which is what
 `drawWarlock` now draws. The other three are recorded here in case they're wanted later.
 
+## Void Imp hue (2026-07-17, follow-up round)
+
+After the Warlock shipped red/black (PR #66), the `void_imp` was still blue (its old
+matching palette) — a disconnect. Two rounds of hue mockups on `void-imp.html`: first
+four families (violet / ember-black / teal / magenta), then — per the user — four
+**dark reds** (Blood Brick `#991b1b` → Dried Blood `#7f1d1d` → Emberheart `#601414`
+→ Black Cherry `#4c0d16`). The whole point was to read as red like its master WITHOUT
+reading as the Sealed Vault's `imp` (bright `#b91c1c` body / `#fb923c` orange flame),
+which is an ordinary dungeon monster.
+
+**✅ Chosen & built: Emberheart** — `color:"#601414"` / `accent:"#f97316"` (orange
+coal-flame). Dark maroon body — the "coal that's almost out" look, closest to the
+Warlock's own charred-black-and-ember palette. (The user first picked Black Cherry
+`#4c0d16`/`#e11d48`, then switched to Emberheart before shipping.) Verified: the built
+def paints red-dominant `rgb(99,33,23)`, clearly darker than the Vault imp's
+`rgb(177,39,29)`, and stays readable on dark, mid, and light-stone arena floors (the
+orange flame + eyes carry it where the maroon body goes subtle). `drawImp` reads its
+colors from the def, so this is a **pure two-value change** — no art code.
+(Losing dark-reds if ever wanted: Blood Brick 991b1b, Dried Blood 7f1d1d, Black
+Cherry 4c0d16.)
+
 ## ✅ 1 — Ember Cowl (CHOSEN & BUILT)
 
 The Necromancer's robed-summoner silhouette recolored to charred black (`#2b1b1b`) +

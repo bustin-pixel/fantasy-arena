@@ -11,6 +11,7 @@
 
 import type { BattleMode } from "@/hooks/useBattleEngine"; // type-only: erased at runtime
 import { getDungeon, milestoneUnlocksFor } from "@/data/dungeons";
+import type { TierId } from "@/data/tiers";
 import { addXp } from "@/meta/leveling";
 import { tickQuestProgress, type QuestSaveState } from "@/meta/quests";
 import {
@@ -23,7 +24,13 @@ import {
 /** The save slice a battle grant folds into — PlayerSave satisfies it. */
 export interface BattleGrantSlice extends ChestGrantSlice {
   unitXp: Record<string, number>;
-  dungeons: Record<string, { highestClearedFloor: number }>;
+  dungeons: Record<
+    string,
+    {
+      highestClearedFloor: number;
+      clearedTiers?: { hard?: boolean; elite?: boolean };
+    }
+  >;
   questUnlocks: string[];
   endless: { bestWave: number };
   quests: QuestSaveState;
@@ -39,6 +46,10 @@ export interface BattleGrantCtx {
   deck?: readonly string[];
   outcome?: "victory" | "defeat" | "draw";
   slain?: readonly string[];
+  /** Difficulty tier the dungeon run was fought at (default normal) — routes
+   *  the first-clear fold: Normal marks highestClearedFloor + gifts; Hard/
+   *  Elite flip their clearedTiers flag. */
+  tier?: TierId;
 }
 
 export function applyBattleGrant<S extends BattleGrantSlice>(
@@ -84,20 +95,38 @@ export function applyBattleGrant<S extends BattleGrantSlice>(
       ? { bestWave: Math.max(save.endless.bestWave, ctx.wavesSurvived ?? 0) }
       : save.endless;
   let dungeons = save.dungeons;
+  const tier = ctx.tier ?? "normal";
   if (ctx.mode === "depths" && rewards.firstClear) {
-    // First boss kill CLEARS the dungeon (the RNG "hunt for the boss" model:
-    // firstClear fires only on the first boss defeat). Write the dungeon's
-    // floor count as the completion high-water mark — the same >= floors
-    // signal the gate chain and world map already read as "cleared".
-    const floors = getDungeon(ctx.dungeonId).floors;
-    const prev = save.dungeons[ctx.dungeonId]?.highestClearedFloor ?? 0;
-    dungeons = {
-      ...save.dungeons,
-      [ctx.dungeonId]: { highestClearedFloor: Math.max(prev, floors) },
-    };
-    // Clearing a dungeon hands over ALL of its milestone gifts at once.
-    for (const unitId of Object.values(milestoneUnlocksFor(ctx.dungeonId))) {
-      unlocked.add(unitId);
+    const prev = save.dungeons[ctx.dungeonId] ?? { highestClearedFloor: 0 };
+    if (tier === "normal") {
+      // First boss kill CLEARS the dungeon (the RNG "hunt for the boss" model:
+      // firstClear fires only on the first boss defeat). Write the dungeon's
+      // floor count as the completion high-water mark — the same >= floors
+      // signal the gate chain and world map already read as "cleared".
+      const floors = getDungeon(ctx.dungeonId).floors;
+      dungeons = {
+        ...save.dungeons,
+        [ctx.dungeonId]: {
+          ...prev,
+          highestClearedFloor: Math.max(prev.highestClearedFloor, floors),
+        },
+      };
+      // Clearing a dungeon hands over ALL of its milestone gifts at once.
+      for (const unitId of Object.values(milestoneUnlocksFor(ctx.dungeonId))) {
+        unlocked.add(unitId);
+      }
+    } else {
+      // Hard/Elite first boss kill: flip that tier's monotonic cleared flag
+      // (idempotent — a StrictMode double-fold lands the same save). Normal's
+      // floor mark and the milestone gifts stay untouched: the per-dungeon
+      // ladder means Hard/Elite always follow a Normal clear.
+      dungeons = {
+        ...save.dungeons,
+        [ctx.dungeonId]: {
+          ...prev,
+          clearedTiers: { ...prev.clearedTiers, [tier]: true },
+        },
+      };
     }
   }
   // Rare-spawn quest completion → the reward unit(s) become purchasable

@@ -11,8 +11,8 @@
 // ============================================================================
 
 import type { ArenaThemeId } from "@/assets/arenaThemes";
-import { LEVEL_CAP } from "@/meta/leveling"; // leaf constants module — no cycle
 import type { ChestTier } from "@/meta/economy"; // leaf constants module — no cycle
+import { TIER_BANDS, tierMonsterLevel, type TierId } from "./tiers";
 import {
   BOSS_FLOOR_FODDER_SHARE,
   BOSS_FLOOR_INTERVAL,
@@ -45,10 +45,11 @@ export interface Dungeon {
   /** Linear per-floor stat scaling past floor 1 (the difficulty dial). */
   hpPerFloor: number;
   dmgPerFloor: number;
-  /** Every monster here spawns at this unit level (the same +5% HP / +3% dmg
-   *  per-level curve players get — see meta/leveling). Bosses and rare quest
-   *  spawns come in at +ELITE_LEVEL_BONUS. Tuned to the player's expected
-   *  arrival level walking the gate chain in order. */
+  /** NORMAL-tier fodder level (the same +5% HP / +3% dmg per-level curve
+   *  players get — see meta/leveling), spanning 1..NORMAL_BAND_TOP across the
+   *  gate chain. Hard/Elite map this chain position into their own bands
+   *  (tierMonsterLevel, data/tiers.ts). Bosses and rare quest spawns come in
+   *  at +ELITE_LEVEL_BONUS. */
   monsterLevel: number;
   /** The rare-spawn fusion quest hosted here (its `floor` = this dungeon's boss
    *  floor). Absent = no quest. */
@@ -85,13 +86,13 @@ export interface Dungeon {
 // The registry, in gate-chain order (each dungeon requires the previous one's
 // floor 5): Depths → Bonefields → Wilds → Overgrowth → Sealed Vault →
 // Deep Forge → Eclipse Spire, where the chain FORKS: the Fallen Cathedral and
-// the Rogue's Den both open off Eclipse Spire floor 5 (both Lv 10 — the
+// the Rogue's Den both open off Eclipse Spire floor 5 (both Lv 20 — the
 // player picks their path). The Depths wraps the legacy tuning from depths.ts
 // unchanged. The themed dungeons are shorter self-contained trials whose boss
 // floor hosts the legendary rare-spawn quest; their monsterLevel ladder
-// (1/3/5/6/7/8/9, then 10/10 past the fork) tracks the player's expected
-// warband level walking the chain, running one level hot from the Sealed
-// Vault on.
+// (1/4/7/9/11/14/17, then 20/20 past the fork) IS the Normal band — it tracks
+// the player's expected warband level walking the chain toward the Lv-30 cap.
+// Hard/Elite re-band the same chain to 25–30 / 30–40 (data/tiers.ts).
 // ---------------------------------------------------------------------------
 
 /** Fire Mage + Lich = Necromancer: end the rare Lich in The Bonefields with a
@@ -238,7 +239,7 @@ export const DUNGEONS: Record<string, Dungeon> = {
     budgetPerFloor: 2,
     hpPerFloor: DEPTHS_HP_PER_FLOOR,
     dmgPerFloor: DEPTHS_DMG_PER_FLOOR,
-    monsterLevel: 3,
+    monsterLevel: 4,
     quest: BONEFIELDS_QUEST,
     gate: { dungeonId: "depths", floor: 5 },
     entryHint:
@@ -263,7 +264,7 @@ export const DUNGEONS: Record<string, Dungeon> = {
     budgetPerFloor: 2,
     hpPerFloor: DEPTHS_HP_PER_FLOOR,
     dmgPerFloor: DEPTHS_DMG_PER_FLOOR,
-    monsterLevel: 5,
+    monsterLevel: 7,
     quest: WILDS_QUEST,
     gate: { dungeonId: "bonefields", floor: 5 },
     entryHint:
@@ -289,7 +290,7 @@ export const DUNGEONS: Record<string, Dungeon> = {
     budgetPerFloor: 2,
     hpPerFloor: DEPTHS_HP_PER_FLOOR,
     dmgPerFloor: DEPTHS_DMG_PER_FLOOR,
-    monsterLevel: 6,
+    monsterLevel: 9,
     quest: OVERGROWTH_QUEST,
     gate: { dungeonId: "wilds", floor: 5 },
     entryHint:
@@ -314,7 +315,7 @@ export const DUNGEONS: Record<string, Dungeon> = {
     budgetPerFloor: 2,
     hpPerFloor: DEPTHS_HP_PER_FLOOR,
     dmgPerFloor: DEPTHS_DMG_PER_FLOOR,
-    monsterLevel: 7,
+    monsterLevel: 11,
     quest: SEALED_VAULT_QUEST,
     gate: { dungeonId: "overgrowth", floor: 5 },
     entryHint:
@@ -339,7 +340,7 @@ export const DUNGEONS: Record<string, Dungeon> = {
     budgetPerFloor: 2,
     hpPerFloor: DEPTHS_HP_PER_FLOOR,
     dmgPerFloor: DEPTHS_DMG_PER_FLOOR,
-    monsterLevel: 8,
+    monsterLevel: 14,
     quest: DEEP_FORGE_QUEST,
     gate: { dungeonId: "sealed_vault", floor: 5 },
     entryHint:
@@ -366,7 +367,7 @@ export const DUNGEONS: Record<string, Dungeon> = {
     budgetPerFloor: 2,
     hpPerFloor: DEPTHS_HP_PER_FLOOR,
     dmgPerFloor: DEPTHS_DMG_PER_FLOOR,
-    monsterLevel: 9,
+    monsterLevel: 17,
     quest: ECLIPSE_QUEST,
     gate: { dungeonId: "deep_forge", floor: 5 },
     entryHint:
@@ -390,14 +391,14 @@ export const DUNGEONS: Record<string, Dungeon> = {
     bossFloorInterval: 5,
     bossFloorFodderShare: BOSS_FLOOR_FODDER_SHARE,
     // Endgame fork — a true long-term project that expects a leveled,
-    // legendary-geared warband. monsterLevel stays 10 (no perpetual under-level
-    // warning for a capped player); its bosses/rares ride the +1 elite bump to
-    // Lv 11, above the player's Lv-10 cap (MONSTER_LEVEL_CAP). Dials sweep-tuned.
+    // legendary-geared warband. monsterLevel 20 caps the Normal band; at every
+    // tier its bosses/rares ride the +1 elite bump one notch over the band top
+    // (Normal 21, Hard 31, Elite 41 — past the Lv-30 player cap on purpose).
     budgetBase: 20,
     budgetPerFloor: 2,
     hpPerFloor: DEPTHS_HP_PER_FLOOR,
     dmgPerFloor: DEPTHS_DMG_PER_FLOOR,
-    monsterLevel: 10,
+    monsterLevel: 20,
     quest: FALLEN_CATHEDRAL_QUEST,
     gate: { dungeonId: "eclipse_spire", floor: 5 },
     entryHint:
@@ -421,13 +422,13 @@ export const DUNGEONS: Record<string, Dungeon> = {
     ],
     bossFloorInterval: 5,
     bossFloorFodderShare: BOSS_FLOOR_FODDER_SHARE,
-    // Endgame fork (twin of the Cathedral). monsterLevel stays 10; bosses/rares
-    // ride the +1 elite bump to Lv 11. Dials sweep-tuned.
+    // Endgame fork (twin of the Cathedral). monsterLevel 20 caps the Normal
+    // band; bosses/rares ride the +1 elite bump one notch over each band's top.
     budgetBase: 20,
     budgetPerFloor: 2,
     hpPerFloor: DEPTHS_HP_PER_FLOOR,
     dmgPerFloor: DEPTHS_DMG_PER_FLOOR,
-    monsterLevel: 10,
+    monsterLevel: 20,
     quest: ROGUES_DEN_QUEST,
     gate: { dungeonId: "eclipse_spire", floor: 5 },
     entryHint:
@@ -471,28 +472,34 @@ export function milestoneUnlocksFor(dungeonId: string): Record<number, string> {
 }
 
 /** Bosses and telegraphed rare quest catalysts spawn this many levels above the
- *  dungeon's fodder (uniform rule: the Depths Bloater is Lv 2, the Eclipse
- *  Warden Lv 10). Clamped to MONSTER_LEVEL_CAP (below), NOT the player's
- *  LEVEL_CAP — so the endgame fork elites (monsterLevel 10 + 1) reach Lv 11, a
- *  notch above a maxed warband, which is the point of the fork difficulty. */
+ *  tier's fodder (uniform rule: the Depths Bloater is Lv 2 on Normal, the
+ *  Eclipse Warden Lv 18). At every tier the fork bosses land one notch over
+ *  the band's top — Normal 21, Hard 31, Elite 41, that last one 11 levels past
+ *  a maxed Lv-30 warband, which is the point of Elite. */
 export const ELITE_LEVEL_BONUS = 1;
 
-/** Ceiling on a spawned monster's level. Sits ABOVE the player's LEVEL_CAP (10)
- *  on purpose: the fork-dungeon elites are allowed to out-level a maxed warband
- *  (Lv 11) as the endgame difficulty knob. Fodder never approaches it. Defined
- *  relative to LEVEL_CAP so it tracks any future player-cap change. */
-export const MONSTER_LEVEL_CAP = LEVEL_CAP + 2;
+/** Ceiling on a spawned monster's level = the Elite band's top plus the elite
+ *  bonus (the fork Elite bosses at Lv 41). NO LONGER derived from the player's
+ *  LEVEL_CAP — monsters run far past it on purpose (Elite is the over-cap
+ *  challenge band), so a future player-cap change must retune TIER_BANDS, not
+ *  this. levelStatMultipliers is pure math with no clamp: Lv 31–41 spawns
+ *  scale linearly like everything else. */
+export const MONSTER_LEVEL_CAP = TIER_BANDS.elite[1] + ELITE_LEVEL_BONUS;
 
 export type MonsterSpawnKind = "fodder" | "rare" | "boss";
 
-/** The unit level a monster of `kind` spawns at in this dungeon. */
+/** The unit level a monster of `kind` spawns at in this dungeon at `tier`
+ *  (the dungeon's chain position mapped into the tier's band — data/tiers.ts).
+ *  Defaults to Normal so tier-unaware callers keep their exact old levels. */
 export function monsterLevelFor(
   dungeon: Dungeon,
-  kind: MonsterSpawnKind
+  kind: MonsterSpawnKind,
+  tier: TierId = "normal"
 ): number {
   return Math.min(
     MONSTER_LEVEL_CAP,
-    dungeon.monsterLevel + (kind === "fodder" ? 0 : ELITE_LEVEL_BONUS)
+    tierMonsterLevel(dungeon.monsterLevel, tier) +
+      (kind === "fodder" ? 0 : ELITE_LEVEL_BONUS)
   );
 }
 

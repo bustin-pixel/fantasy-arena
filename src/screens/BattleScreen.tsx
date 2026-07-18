@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { ItemLoadouts } from "@/types";
+import type { FormationMark, ItemLoadouts } from "@/types";
 import { useBattleEngine, type BattleMode } from "@/hooks/useBattleEngine";
 import { CHEST_POINT, type OutroDir } from "@/hooks/OutroCinematic";
 import { BattleHud, BattleTopBar } from "@/components/BattleHud";
@@ -20,8 +20,9 @@ import { useGameState } from "@/state/GameStateContext";
 import {
   endlessBestWave,
   highestClearedFloorOf,
-  isDungeonCleared,
+  isTierCleared,
 } from "@/state/persistence";
+import type { TierId } from "@/data/tiers";
 import {
   computeBattleRewards,
   computeTreasureRewards,
@@ -64,11 +65,24 @@ interface Props {
   /** The run already met its fusion-quest rare on a rare-quarry encounter: the
    *  boss floor skips its rare roll, and no further rare quarry is offered. */
   suppressQuestRare?: boolean;
+  /** Difficulty tier this dungeon run is fought at (Normal/Hard/Elite) — a
+   *  match input frozen for the whole run, like the level map. Shifts monster
+   *  levels + grades the rewards. Ignored outside "depths". */
+  tier?: TierId;
+  /** This floor's march-in marks — the previous floor's deploy positions, so
+   *  the warband auto-fields on entry (depths floors 2+). Absent = floor 1 /
+   *  manual placement. Frozen at mount, a match input like unitLevels. */
+  formation?: FormationMark[];
   /** Post-victory "continue deeper" (depths, non-boss floor): the warband
    *  gathers, the player picks an exit archway (its OMEN sets the next floor's
    *  encounter) or enters the lair, the band walks out, and App advances the
-   *  run to the next floor IN PLACE (no atlas). Absent = plain Return to Hub. */
-  onContinueDeeper?: (dungeonId: string, encounter: EncounterKind) => void;
+   *  run to the next floor IN PLACE (no atlas). Absent = plain Return to Hub.
+   *  `formation` is this floor's deploy marks, carried forward for the march-in. */
+  onContinueDeeper?: (
+    dungeonId: string,
+    encounter: EncounterKind,
+    formation: FormationMark[] | null
+  ) => void;
   /** The boss on THIS floor was defeated — the dungeon is cleared. Shown after
    *  the Dungeon-Cleared beat; App ends the run and returns to the atlas. */
   onDungeonCleared?: (dungeonId: string) => void;
@@ -84,6 +98,8 @@ export function BattleScreen({
   isBoss = false,
   nextIsBoss = false,
   suppressQuestRare = false,
+  tier = "normal",
+  formation,
   onContinueDeeper,
   onDungeonCleared,
 }: Props) {
@@ -105,6 +121,11 @@ export function BattleScreen({
     Object.fromEntries(
       deck.filter((id) => save.loadouts[id]).map((id) => [id, save.loadouts[id]])
     )
+  );
+  // The march-in marks for this floor, frozen at mount (a match input like the
+  // levels/items above): null on floor 1, else the previous floor's deploy spots.
+  const [formationAtMount] = useState<FormationMark[] | null>(
+    () => formation ?? null
   );
   // Omens for the three exit arrows — what each path leads to on the NEXT floor.
   // Frozen once (seeded meta stream), so re-renders can't reshuffle them; only
@@ -137,6 +158,8 @@ export function BattleScreen({
     outroChestPoints,
     startOutroCamp,
     outroWalkOff,
+    regroup,
+    playerFormation,
   } = useBattleEngine(
     deck,
     mode,
@@ -147,7 +170,9 @@ export function BattleScreen({
     itemLoadouts,
     encounter,
     isBoss,
-    suppressQuestRare
+    suppressQuestRare,
+    tier,
+    formationAtMount
   );
   const wrapRef = useRef<HTMLDivElement>(null);
   const recordedRef = useRef(false);
@@ -254,7 +279,10 @@ export function BattleScreen({
         } else setShowResult(true);
         break;
       case "handOff":
-        onContinueDeeper?.(dungeonId, fx.encounter);
+        // Carry this floor's deploy marks forward so the next floor's warband
+        // marches in on the same spots. Single advance point → uniform capture
+        // across every path (normal/cursed/vault/rare/treasure/lair).
+        onContinueDeeper?.(dungeonId, fx.encounter, playerFormation());
         break;
     }
   };
@@ -413,10 +441,12 @@ export function BattleScreen({
         itemPity: save.itemPity, // dry-streak insurance — forces the item roll at the threshold
         encounter, // rich encounters bump the end-chest tier
         // RNG "hunt for the boss" model: rewards key off the boss-lair flag +
-        // whether the dungeon is already cleared, not a per-floor high-water
-        // mark (read pre-grant, so the first boss kill reads as uncleared).
+        // whether the dungeon is already cleared AT THIS TIER, not a per-floor
+        // high-water mark (read pre-grant, so the first boss kill at each tier
+        // reads as uncleared).
         isBoss,
-        bossCleared: isDungeonCleared(save, dungeonId),
+        bossCleared: isTierCleared(save, dungeonId, tier),
+        tier,
       });
       grantBattleRewards(bundle, {
         mode,
@@ -427,6 +457,7 @@ export function BattleScreen({
         // Quest-board progress facts (accepted quests tick in the grant fold).
         outcome,
         slain,
+        tier,
       });
       setRewards(bundle);
       rewardsRef.current = bundle;
@@ -454,6 +485,7 @@ export function BattleScreen({
     mode,
     floor,
     dungeonId,
+    tier,
     save,
   ]);
 
@@ -468,6 +500,7 @@ export function BattleScreen({
       chestSeed: generateSeed(),
       unlockedUnits: save.unlockedUnits,
       itemPity: save.itemPity,
+      tier,
     });
     setTreasureChests(bundle.chests);
     // Fold all three chests' contents into ONE grant (+ the floor clear + XP);
@@ -486,7 +519,7 @@ export function BattleScreen({
         // dungeon cleared (completion is the first boss kill only).
         firstClear: false,
       },
-      { mode, floor, dungeonId, deck, outcome: "victory" }
+      { mode, floor, dungeonId, deck, outcome: "victory", tier }
     );
     playSfx("questSting");
     setTreasureBanner(true);
@@ -580,7 +613,13 @@ export function BattleScreen({
           }}
         />
         {!isTreasureRoom && (
-          <BattleHud ui={ui} speed={speed} onSpeed={setSpeed} mode={mode} />
+          <BattleHud
+            ui={ui}
+            speed={speed}
+            onSpeed={setSpeed}
+            mode={mode}
+            onRegroup={regroup}
+          />
         )}
         {treasureBanner && (
           <div className="treasure-banner" role="status">
@@ -738,6 +777,7 @@ export function BattleScreen({
                 floor={floor}
                 mode={mode}
                 dungeonId={dungeonId}
+                tier={tier}
                 // The chest opens ON the arena floor (non-boss continue-deeper
                 // AND the boss's Dungeon-Cleared beat), so suppress the pop-up's
                 // own chest here. Reduced motion keeps it (its only reveal).

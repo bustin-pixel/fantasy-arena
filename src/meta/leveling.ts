@@ -2,12 +2,13 @@
 // Leveling data — every tunable number for unit XP/levels lives here.
 // Pure data + pure math: imports nothing (like economy.ts), so persistence,
 // rewards, the engine, and the UI can all read it without cycles. Levels are
-// the player-side counter-curve to dungeon floor scaling (+8% HP / +5% dmg
-// per floor, see data/dungeons.ts): a level cancels a bit more than half a
-// floor, and a maxed unit slightly out-scales floor-5 enemies.
+// the player-side counter-curve to monster levels + floor scaling (+6% HP /
+// +4% dmg per floor, see data/dungeons.ts). The cap spans the whole difficulty
+// ladder: Normal dungeons band monsters 1–20, Hard 25–30, Elite 30–40 —
+// Elite runs past the player cap on purpose (data/tiers.ts).
 // ============================================================================
 
-export const LEVEL_CAP = 10;
+export const LEVEL_CAP = 30;
 
 /** Per-level stat growth. Mirrors what enemy floor scaling bakes (HP + damage
  *  only — attack/move speed untouched on both sides). */
@@ -15,14 +16,15 @@ export const LEVEL_HP_PER_LEVEL = 0.05;
 export const LEVEL_DMG_PER_LEVEL = 0.03;
 
 /** XP to go from level L to L+1 costs 50×L, so the cumulative total to REACH
- *  level L is 25·(L−1)·L. Thresholds: 50/150/300/500/750/1050/1400/1800/2250.
- *  Early levels come fast (the honeymoon), the cap is a commitment. */
+ *  level L is 25·(L−1)·L. Waypoints: Lv 10 = 2,250, Lv 20 = 9,500, Lv 30
+ *  (the cap) = 21,750. Early levels come fast (the honeymoon), the cap is a
+ *  commitment. */
 export function totalXpForLevel(level: number): number {
   return 25 * (level - 1) * level;
 }
 
 /** Total XP at which a unit is maxed; stored XP is clamped here. */
-export const TOTAL_XP_CAP = totalXpForLevel(LEVEL_CAP); // 2250
+export const TOTAL_XP_CAP = totalXpForLevel(LEVEL_CAP); // 21,750
 
 /** Level for a total-XP amount, clamped to [1, LEVEL_CAP]. */
 export function levelFromXp(totalXp: number): number {

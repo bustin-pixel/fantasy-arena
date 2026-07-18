@@ -1634,6 +1634,23 @@ body.modal-open .pager-nav {
   color: #fca5a5;
   border-color: #7f1d1d;
 }
+/* Descent march-in: a small ghost pill to scrap the auto-line-up. Matches the
+   deploy-bar chrome; centered above the tray so it reads as an escape hatch. */
+.regroup-btn {
+  pointer-events: auto;
+  align-self: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--parchment);
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid var(--brown);
+  border-radius: 999px;
+  padding: 7px 16px;
+}
+.regroup-btn:hover {
+  border-color: var(--gold);
+  color: var(--gold);
+}
 .speed-controls {
   pointer-events: auto;
   display: flex;
@@ -4016,7 +4033,13 @@ body.modal-open .pager-nav {
   align-items: center;
 }
 .smith-scene-wrap {
-  position: relative;
+  /* Pinned to the top: the forge stays put while the inventory scrolls under
+     it (.smith-screen is the scroll container). Sticky is still a positioned
+     value, so it remains the containing block for the absolute header/title,
+     and its opaque background + z-index keep scrolling items behind it. */
+  position: sticky;
+  top: 0;
+  z-index: 3;
   width: 100%;
   max-width: 520px;
   background: #0b0810;
@@ -4883,6 +4906,51 @@ body.modal-open .pager-nav {
 .atlas-enter {
   width: 100%;
   margin-top: 10px;
+}
+
+/* ---- Difficulty tier pills (Normal / Hard / Elite) on the dungeon sheet -- */
+.atlas-tier-pills {
+  display: flex;
+  gap: 6px;
+  margin: 6px 0 2px;
+}
+.atlas-tier-pill {
+  flex: 1;
+  padding: 5px 0;
+  border-radius: 999px;
+  border: 1px solid rgba(201, 178, 107, 0.35);
+  background: rgba(20, 16, 10, 0.55);
+  color: #d8c58a;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.atlas-tier-pill.selected {
+  background: rgba(201, 178, 107, 0.22);
+  border-color: #c9b26b;
+  color: #f4e5b0;
+}
+.atlas-tier-pill.hard.selected {
+  background: rgba(208, 138, 74, 0.18);
+  border-color: #d08a4a;
+  color: #f0c090;
+}
+.atlas-tier-pill.elite.selected {
+  background: rgba(180, 106, 208, 0.18);
+  border-color: #b46ad0;
+  color: #dfb6f2;
+}
+.atlas-tier-pill.locked {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.atlas-tier-pill.cleared:not(.selected) {
+  color: #9fd09f;
+}
+.atlas-tier-mult {
+  color: #d08a4a;
 }
 
 /* ---- Fog of war (uncharted dungeons) --------------------------------------- */

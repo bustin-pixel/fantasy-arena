@@ -8,12 +8,14 @@
 
 import type {
   DeploymentRecord,
+  FormationMark,
   ItemLoadouts,
   MatchPhase,
   ReplayData,
   Team,
   Unit,
   Vec2,
+  WaveBanner,
 } from "@/types";
 import {
   DEPLOY_TIME_SEC,
@@ -21,6 +23,7 @@ import {
   DEPTHS_MATCH_TIME_SEC,
   DEPTHS_PLAYER_ACTIVE,
   ENEMY_ZONE,
+  FIELD_HEIGHT,
   FIELD_WIDTH,
   MATCH_TIME_SEC,
   OPENING_CAST_GRACE_SEC,
@@ -30,6 +33,10 @@ import {
   UNIT_RADIUS,
   secToTicks,
 } from "@/utils/constants";
+import {
+  BOSS_BRACE_FAILSAFE_SEC,
+  BOSS_BRACE_ROW_Y_FRAC,
+} from "@/data/depths";
 import { createUnit, resetUidCounter, type ItemCarry } from "@/entities/createUnit";
 import {
   createSimState,
@@ -55,6 +62,7 @@ import {
   ENDLESS_WAVE_TIME_SEC,
 } from "@/data/endless";
 import type { EncounterKind } from "@/data/encounters";
+import type { TierId } from "@/data/tiers";
 
 /** Match ruleset. Arena is the symmetric 2-concurrent card battle; Depths is the
  *  PvE descent (WaveController trickles a floor's horde in). Endless is the
@@ -86,6 +94,17 @@ export interface MatchOptions {
   /** On the boss floor, skip the fusion-quest rare roll (the run already met its
    *  rare on a rare-quarry encounter floor). */
   suppressQuestRare?: boolean;
+  /** Difficulty tier (Normal/Hard/Elite) — shifts monster LEVELS only, via the
+   *  band map in data/tiers.ts. A deterministic match input like unitLevels
+   *  (never draws RNG). Ignored outside depths. */
+  tier?: TierId;
+  /** The previous floor's deploy-time marks (depths descent only). When present,
+   *  the warband is fielded on these spots at construction behind an intro hold —
+   *  the hook plays a walk-in, then releases the hold to start the countdown.
+   *  Absent = today's manual placement, byte-for-byte (zero drift). A match input
+   *  like the deployments themselves; the resulting deploys are recorded, so the
+   *  replay log fully captures its effect. */
+  formation?: FormationMark[];
 }
 
 /** The match clock for a mode. Endless resets its clock per wave (a stalemate
@@ -134,6 +153,30 @@ export class MatchController {
   private deployTimer = secToTicks(DEPLOY_TIME_SEC);
   /** Ticks an empty player slot waits before the engine auto-deploys a reserve. */
   private autoDeployCountdown = 0;
+  /** Descent march-in: when a formation is applied at construction, the warband
+   *  is already fielded but the deployment tick is held (a no-op) until the hook's
+   *  walk-in cinematic lands them on their marks and calls releaseIntroHold().
+   *  Nothing in the deployment tick touches the clock/RNG, so an arbitrary-length
+   *  hold is provably sim-invisible. False (and unreachable) without a formation. */
+  private introHold = false;
+  /** True once a formation was fielded — gates the Regroup affordance (the player
+   *  can scrap the auto-line-up and place manually while still in deployment). */
+  private formationApplied = false;
+  /** Boss "brace up" beat: when a boss/rare telegraph fires on a cleared field
+   *  the sim FREEZES here (tick early-returns) while survivors pull back into a
+   *  centered row; on release combat resumes from that row. Like the march-in
+   *  hold, the frozen ticks touch no sim state, so the wall-clock length of the
+   *  cinematic can't affect the outcome. */
+  private braceHold = false;
+  /** Failsafe countdown for the frozen window (auto-releases headlessly / if a
+   *  cinematic stalls). The client normally releases earlier via releaseBrace(). */
+  private braceTicks = 0;
+  /** The deterministic row slots (uid → spot) computed when a brace fires; the
+   *  snap-to on release and the client cinematic both read these. */
+  private braceTargets: Map<string, Vec2> | null = null;
+  /** The banner a brace already fired for — dedupes re-triggering across the ticks
+   *  one telegraph spans (a fresh banner object = a fresh brace, e.g. rare → boss). */
+  private lastBracedBanner: WaveBanner | null = null;
   readonly seed: number;
   readonly mode: MatchMode;
   /** This match's encounter flavor (depths only; "normal" elsewhere). */
@@ -206,9 +249,12 @@ export class MatchController {
       if (this.encounter === "treasure_room") {
         // A peaceful loot floor: no horde. Field the whole warband now and
         // freeze the sim — BattleScreen drives the chest cinematic, and tick()
-        // is a no-op, so nothing ever resolves this to a "victory".
+        // is a no-op, so nothing ever resolves this to a "victory". If a
+        // formation carried in, field on the marks (visual continuity, and it
+        // re-records them into `deployments` so the NEXT floor carries them too).
         this.isTreasureRoom = true;
-        this.autoFillPlayerDeployment();
+        if (opts.formation?.length) this.applyFormation(opts.formation);
+        else this.autoFillPlayerDeployment();
         this.state.phase = "battle";
       } else {
         this.wave = new WaveController(
@@ -217,8 +263,16 @@ export class MatchController {
           opts.floor ?? 1,
           this.encounter,
           opts.isBoss,
-          opts.suppressQuestRare
+          opts.suppressQuestRare,
+          opts.tier
         );
+        // Descent march-in: field the warband on the previous floor's marks and
+        // hold the deployment tick until the hook's walk-in cinematic releases it.
+        if (opts.formation?.length) {
+          this.applyFormation(opts.formation);
+          this.introHold = true;
+          this.formationApplied = true;
+        }
       }
     } else if (this.mode === "endless") {
       // Whole warband down, but a SMALLER horde cap than Depths — no reserves
@@ -387,6 +441,8 @@ export class MatchController {
    *  applies (battle started, or the pre-battle countdown has taken over). */
   deploySecLeft(): number | null {
     if (this.state.phase !== "deployment") return null;
+    // The placement timer doesn't run under the march-in hold (nor is it shown).
+    if (this.introHold) return null;
     if (this.startCountdown >= 0) return null;
     return Math.max(0, Math.ceil(this.deployTimer / TICK_RATE));
   }
@@ -406,6 +462,76 @@ export class MatchController {
       if (!card) break;
       this.deploy("player", card, this.pickSpreadPlayerPos(getUnitDef(card)));
     }
+  }
+
+  // -- Descent march-in / Regroup ---------------------------------------------
+
+  /** Field the warband on the previous floor's marks (the descent march-in).
+   *  Marks apply in order (fixing uid assignment); a mark whose defId has no
+   *  undeployed deck card is skipped — deploy() would otherwise field a free
+   *  unit, since it pushes the unit before resolving the consumed index. Any
+   *  card a mark didn't cover (a missing mark) is topped up spread-out, so the
+   *  warband is always whole. RNG is drawn only on that fallback (seeded). */
+  private applyFormation(marks: FormationMark[]): void {
+    for (const mark of marks) {
+      const hasCard = this.playerDeck.some(
+        (d, i) => d === mark.defId && !this.playerUsed.has(i)
+      );
+      if (!hasCard) continue; // stray defId — ignore (ghost-unit guard)
+      this.deploy("player", mark.defId, mark.pos);
+    }
+    // Cover any card a mark didn't place (deck-size oddity), never stranded.
+    this.autoFillPlayerDeployment();
+  }
+
+  /** Release the march-in hold: the walk-in cinematic has landed the band on
+   *  their marks. The next tick sees bothSidesReady() and arms the normal 3s
+   *  countdown. Idempotent (a no-op if no hold is active). */
+  releaseIntroHold(): void {
+    this.introHold = false;
+  }
+
+  /** Whether the floor is frozen under the march-in hold (the walk-in is playing). */
+  isIntroHeld(): boolean {
+    return this.introHold;
+  }
+
+  /** Whether the player may scrap the auto-line-up and place manually — only
+   *  while a fielded formation is still in the deployment phase (never in arena/
+   *  endless/treasure rooms, which don't set formationApplied). */
+  canRegroup(): boolean {
+    return this.formationApplied && this.state.phase === "deployment";
+  }
+
+  /** Scrap the march-in line-up: clear the fielded warband, return every card to
+   *  hand, and re-arm the manual placement timer. The player then deploys from
+   *  scratch. One-shot — clears formationApplied, so the floor falls back to the
+   *  ordinary manual flow. No RNG is consumed (a deployment tick is stateless),
+   *  so regrouping at any moment yields identical state. Returns false if there's
+   *  nothing to regroup. */
+  regroup(): boolean {
+    if (!this.canRegroup()) return false;
+    this.state.units = this.state.units.filter((u) => u.team !== "player");
+    this.playerUsed.clear();
+    this.selectedIndex = null;
+    // Scrub the formation's records so the log stays "the deploys that produced
+    // this battle" — replay-honest, and the next capture reads only real marks.
+    this.deployments = this.deployments.filter((d) => d.team !== "player");
+    this.deployTimer = secToTicks(DEPLOY_TIME_SEC);
+    this.startCountdown = -1;
+    this.autoDeployCountdown = 0;
+    this.introHold = false;
+    this.formationApplied = false;
+    return true;
+  }
+
+  /** The player's deploy-time marks this floor, for carrying to the next floor.
+   *  Reads the deployments log (the marks as the player set them — NOT live unit
+   *  positions, which a post-victory cinematic has since scattered). */
+  getPlayerFormation(): FormationMark[] {
+    return this.deployments
+      .filter((d) => d.team === "player")
+      .map((d) => ({ defId: d.defId, pos: { x: d.pos.x, y: d.pos.y } }));
   }
 
   /** Distance from (x,y) to the nearest living player unit (Infinity if none). */
@@ -506,12 +632,121 @@ export class MatchController {
     this.aiCooldown = secToTicks(REINFORCE_GRACE_SEC);
   }
 
+  // -- Boss brace -------------------------------------------------------------
+  // When a boss (or the rare quest catalyst) telegraphs onto a cleared field, the
+  // sim freezes and the survivors pull back into a centered row to face the
+  // entrance; the fight then resumes FROM that row. The freeze is the in-battle
+  // twin of the descent march-in hold: frozen ticks touch no sim state, and the
+  // engine snaps everyone to a deterministic row on release, so the outcome is
+  // independent of the cinematic's wall-clock length (identical headless).
+
+  /** If a brace freeze is active, advance its failsafe and return true so the
+   *  caller freezes this tick. When the failsafe elapses (headless, or a stalled
+   *  cinematic) it snaps the row and returns false so combat resumes. */
+  private tickBraceHold(): boolean {
+    if (!this.braceHold) return false;
+    if (this.braceTicks > 0) {
+      this.braceTicks--;
+      return true;
+    }
+    this.releaseBrace();
+    return false;
+  }
+
+  /** Fire a brace when a boss/rare telegraph raises its banner on a cleared field
+   *  with at least one living defender. Deduped per banner object (a fresh banner
+   *  = a fresh brace, so a boss floor braces for the rare AND the boss). Returns
+   *  true when it just froze the sim. */
+  private maybeBrace(): boolean {
+    const banner = this.state.waveBanner;
+    if (!banner || (banner.kind !== "boss" && banner.kind !== "rare")) return false;
+    if (banner === this.lastBracedBanner) return false;
+    // Only when the field is clear (the telegraph window) and someone's alive to
+    // hold the line — never mid-swarm.
+    if (this.countActive("enemy") > 0 || this.countActive("player") === 0) return false;
+    this.lastBracedBanner = banner;
+    this.braceHold = true;
+    this.braceTicks = secToTicks(BOSS_BRACE_FAILSAFE_SEC);
+    this.computeBraceRow();
+    return true;
+  }
+
+  /** Compute the deterministic row: living defenders, ordered left-to-right by
+   *  their current x (uid tie-break, so it never depends on iteration order),
+   *  evenly spaced and centered, at the arena's mid-line. Pure — no RNG, no clock. */
+  private computeBraceRow(): void {
+    const living = this.state.units
+      .filter((u) => u.team === "player" && u.state !== "dead")
+      .sort((a, b) =>
+        a.pos.x !== b.pos.x ? a.pos.x - b.pos.x : a.uid < b.uid ? -1 : 1
+      );
+    const targets = new Map<string, Vec2>();
+    const n = living.length;
+    if (n > 0) {
+      const spacing = Math.min(UNIT_RADIUS * 2.4, (FIELD_WIDTH - 80) / Math.max(1, n - 1));
+      const y = FIELD_HEIGHT * BOSS_BRACE_ROW_Y_FRAC;
+      const startX = FIELD_WIDTH / 2 - ((n - 1) * spacing) / 2;
+      living.forEach((u, i) => {
+        const x = Math.max(40, Math.min(FIELD_WIDTH - 40, startX + i * spacing));
+        targets.set(u.uid, { x, y });
+      });
+    }
+    this.braceTargets = targets;
+  }
+
+  /** Snap the survivors onto their row slots (deterministic endpoint — overrides
+   *  wherever a client cinematic's lerp left them), face them toward the entrance
+   *  lane, and idle their pose so combat resumes cleanly. */
+  private applyBraceRow(): void {
+    if (this.braceTargets) {
+      for (const u of this.state.units) {
+        if (u.team !== "player" || u.state === "dead") continue;
+        const t = this.braceTargets.get(u.uid);
+        if (!t) continue;
+        u.pos.x = t.x;
+        u.pos.y = t.y;
+        u.facing = u.pos.x < FIELD_WIDTH / 2 ? 1 : -1;
+        u.state = "idle";
+        u.animState = "idle";
+        u.animTime = 0;
+      }
+    }
+    this.braceTargets = null;
+  }
+
+  /** Is the sim frozen for the brace right now (drives the client cinematic)? */
+  isBraceHeld(): boolean {
+    return this.braceHold;
+  }
+
+  /** The row slots to lerp toward (uid → spot), for the client brace cinematic. */
+  braceRowTargets(): { uid: string; pos: Vec2 }[] {
+    if (!this.braceTargets) return [];
+    return [...this.braceTargets.entries()].map(([uid, pos]) => ({
+      uid,
+      pos: { x: pos.x, y: pos.y },
+    }));
+  }
+
+  /** End the brace freeze: snap the survivors to their exact row and resume combat.
+   *  Called by the client when the cinematic lands; idempotent. */
+  releaseBrace(): void {
+    if (!this.braceHold) return;
+    this.applyBraceRow();
+    this.braceHold = false;
+    this.braceTicks = 0;
+  }
+
   /** Advance one simulation tick (after deployment phase begins). */
   tick(): void {
     // Treasure room: no combat. The warband is already fielded and the outro
     // cinematic (client-side) owns the scene — never step or resolve the sim.
     if (this.isTreasureRoom) return;
     if (this.state.phase === "deployment") {
+      // Descent march-in: the warband is fielded on its marks but the floor is
+      // frozen until the walk-in cinematic lands them and releases the hold.
+      // Nothing below runs, so the clock/RNG/countdown are all untouched.
+      if (this.introHold) return;
       // Arena's AI places its opening hand; the Depths horde only arrives once
       // the battle starts (nothing to do here in depths — its deck is empty).
       this.runAI();
@@ -546,7 +781,9 @@ export class MatchController {
           this.state.enemyReserves = this.endless!.reservesSentinel;
           return;
         }
+        if (this.tickBraceHold()) return; // frozen: survivors bracing for a boss
         this.endless!.step(this.state);
+        if (this.maybeBrace()) return; // boss/rare wave telegraphed → brace up
         // Whole warband is fielded once and deaths are final — no reserves.
         this.state.playerReserves = 0;
         this.state.enemyReserves = this.endless!.reservesSentinel;
@@ -561,11 +798,13 @@ export class MatchController {
         return;
       }
       if (this.mode === "depths") {
+        if (this.tickBraceHold()) return; // frozen: survivors bracing for a boss
         // The horde: the WaveController trickles the floor's queue in from the
         // top edge whenever the enemy side has room. Its queue doubles as the
         // enemy reserve count, so clearing the board only wins once the whole
         // wave is spent.
         this.wave!.step(this.state);
+        if (this.maybeBrace()) return; // boss/rare telegraphed on a cleared field
         this.autoDeployPlayer();
         this.state.playerReserves = this.deckRemaining("player");
         this.state.enemyReserves = this.wave!.remaining;

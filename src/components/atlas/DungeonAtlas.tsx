@@ -34,7 +34,8 @@ import {
 import { DUNGEONS, getDungeon } from "@/data/dungeons";
 import { questUnlockIds } from "@/data/depths";
 import { ATLAS_BIOMES, FOG_GROUND } from "@/data/atlasBiomes";
-import { averageDeckLevel, levelFromXp } from "@/meta/leveling";
+import { averageDeckLevel, LEVEL_CAP, levelFromXp } from "@/meta/leveling";
+import type { TierId } from "@/data/tiers";
 import { highestClearedFloorOf } from "@/state/persistence";
 import { useGameState } from "@/state/GameStateContext";
 import { playSfx } from "@/audio/sfx";
@@ -119,10 +120,11 @@ function slideMarkerAlong(
 }
 
 export interface DungeonAtlasProps {
-  /** Start a fresh RUN in this dungeon (the "Enter Dungeon" button). The RNG
-   *  "hunt for the boss" descent begins at floor 1 and stays in the battle
-   *  screen floor-to-floor — the atlas is no longer visited between floors. */
-  onEnterDungeon: (dungeonId: string) => void;
+  /** Start a fresh RUN in this dungeon at the picked difficulty tier (the
+   *  "Enter Dungeon" button). The RNG "hunt for the boss" descent begins at
+   *  floor 1 and stays in the battle screen floor-to-floor — the atlas is no
+   *  longer visited between floors. */
+  onEnterDungeon: (dungeonId: string, tier: TierId) => void;
   onClose: () => void;
 }
 
@@ -556,7 +558,7 @@ export function DungeonAtlas({
               </button>
               <h3 className="atlas-title">{dungeon.name}</h3>
               <p className="atlas-sub">
-                Recommended: Lv {Math.min(10, dungeon.monsterLevel + 1)}+
+                Recommended: Lv {Math.min(LEVEL_CAP, dungeon.monsterLevel + 1)}+
                 {warbandLv < dungeon.monsterLevel ? " · underleveled ⚠" : ""}
               </p>
               <p className="atlas-hint">{dungeon.entryHint}</p>
@@ -606,7 +608,7 @@ export function DungeonAtlas({
             dungeon={dungeon}
             save={save}
             warbandLv={warbandLv}
-            onEnter={() => onEnterDungeon(dungeon.id)}
+            onEnter={(tier) => onEnterDungeon(dungeon.id, tier)}
             onClose={() => setInfoFloor(null)}
           />
         )}

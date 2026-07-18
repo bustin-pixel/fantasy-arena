@@ -46,6 +46,7 @@ import {
   QUARRY_FODDER_SHARE,
   type EncounterKind,
 } from "@/data/encounters";
+import type { TierId } from "@/data/tiers";
 
 /** Spawn y — nudged to the top edge so monsters visibly creep in from
  *  off-screen (movement clamps them fully on-field on their first step). */
@@ -98,6 +99,9 @@ export class WaveController {
   private readonly suppressQuestRare: boolean;
   /** This floor's encounter flavor (cursed/rare_spawn/… reshape the horde). */
   private readonly encounter: EncounterKind;
+  /** Difficulty tier — shifts monster LEVELS only (the band map inside
+   *  monsterLevelFor); composition, budget, and floor scaling are untouched. */
+  private readonly tier: TierId;
   /** Runs the phased plan (boss floors AND rare-quarry floors) vs the trickle. */
   private isPhased = false;
   /** Whether the phased plan ends in a boss (false for a rare-quarry floor). */
@@ -129,11 +133,14 @@ export class WaveController {
     isBoss?: boolean,
     /** On the boss floor, skip the fusion-quest rare roll (the run already met
      *  its rare on a rare-quarry encounter). Ignored off the boss floor. */
-    suppressQuestRare: boolean = false
+    suppressQuestRare: boolean = false,
+    /** Difficulty tier — Normal keeps every existing caller byte-identical. */
+    tier: TierId = "normal"
   ) {
     this.floor = floor;
     this.dungeon = dungeon;
     this.encounter = encounter;
+    this.tier = tier;
     // Mix the floor into the seed so every floor of one run rolls fresh.
     this.rng = new RNG((seed ^ 0x5eed50a1 ^ Math.imul(floor, 0x9e3779b9)) >>> 0);
     this.isBoss = isBoss ?? isBossFloorIn(dungeon, floor);
@@ -350,10 +357,10 @@ export class WaveController {
     kind: MonsterSpawnKind
   ): void {
     const x = this.rng.float(60, FIELD_WIDTH - 60);
-    // Monsters carry the dungeon's unit level (elites +1) through the same
-    // createUnit bake as player units — level consumes no RNG, so composition
-    // and positions stay byte-identical to the unleveled build.
-    const level = monsterLevelFor(this.dungeon, kind);
+    // Monsters carry the dungeon's tier-banded unit level (elites +1) through
+    // the same createUnit bake as player units — level consumes no RNG, so a
+    // floor's composition and positions are identical at every tier.
+    const level = monsterLevelFor(this.dungeon, kind, this.tier);
     const unit = createUnit(defId, "enemy", { x, y: SPAWN_Y }, level);
     // Depth pressure: monsters (bosses included) spawn pre-scaled by floor,
     // layered ON TOP of the level bake (nested rounding — see NOTES §8).

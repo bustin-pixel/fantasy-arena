@@ -17,6 +17,8 @@
 import { RNG } from "@/utils/rng";
 import type { Dungeon } from "@/data/dungeons";
 import type { EncounterKind } from "@/data/encounters";
+import type { TierId } from "@/data/tiers";
+import type { FormationMark } from "@/types";
 
 /** XOR salt so the boss-depth roll is its own stream, distinct from OMEN_SALT
  *  and every wave/reward stream. */
@@ -80,10 +82,18 @@ export interface DungeonRun {
   runSeed: number;
   bossDepth: number;
   encounter: EncounterKind;
+  /** Difficulty tier picked on the atlas sheet — frozen for the whole run (a
+   *  deterministic match input, like unitLevels; it never draws RNG). */
+  tier: TierId;
   /** Whether this run has already met its fusion-quest rare on a rare-quarry
    *  encounter floor. Once true, the boss floor skips its rare roll (mutual
    *  exclusivity) and no further rare quarry is offered — one rare per run. */
   rareSpawned: boolean;
+  /** The previous floor's deploy-time marks, carried forward so the next floor
+   *  fields the warband automatically (the march-in). Set as the player leaves a
+   *  floor; unset on floor 1 (manual placement). Transient App state — never
+   *  persisted, so it dies with the run. */
+  formation?: FormationMark[];
 }
 
 /** Whether `depth` is this run's boss floor (the lair). */
@@ -96,7 +106,8 @@ export function isBossDepth(run: DungeonRun, depth: number = run.depth): boolean
 export function makeRun(
   dungeonId: string,
   dungeon: Dungeon,
-  runSeed: number
+  runSeed: number,
+  tier: TierId = "normal"
 ): DungeonRun {
   return {
     dungeonId,
@@ -104,6 +115,7 @@ export function makeRun(
     runSeed,
     bossDepth: rollBossDepth(runSeed, dungeon),
     encounter: "normal",
+    tier,
     rareSpawned: false,
   };
 }

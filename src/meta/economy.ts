@@ -6,6 +6,7 @@
 // ============================================================================
 
 import type { Rarity } from "@/types";
+import type { TierId } from "@/data/tiers";
 
 /** Units a brand-new save starts with — four rares, the reference power level,
  *  with room to grow into the epics/legendaries earned along the chain. The old
@@ -91,6 +92,64 @@ export function endlessMilestoneChestTier(
  *  meta/rewards.ts) plus arcane from deep endless milestones. */
 export type ChestTier = "wooden" | "silver" | "gold" | "arcane" | "dragon";
 
+/** Ascending chest ladder — the ONE ordering shared by the reward fold and
+ *  the UI previews (was a rewards.ts local; exported with the tier system so
+ *  chest bumps can't drift between the fold and the atlas sheet). */
+export const CHEST_TIER_ORDER: readonly ChestTier[] = [
+  "wooden",
+  "silver",
+  "gold",
+  "arcane",
+  "dragon",
+];
+
+/** Climb (or descend) the chest ladder by `steps`, clamped at both ends. */
+export function bumpChestTier(tier: ChestTier, steps: number): ChestTier {
+  const i = CHEST_TIER_ORDER.indexOf(tier);
+  return CHEST_TIER_ORDER[
+    Math.min(CHEST_TIER_ORDER.length - 1, Math.max(0, i + steps))
+  ];
+}
+
+/** Difficulty-tier reward dials — data/tiers.ts owns the monster-level BANDS;
+ *  every reward number lives here. xpMult/goldMult multiply the flat depths
+ *  payouts (before the Lucky Coin); chestBump climbs the chest ladder
+ *  (bumpChestTier, clamped at dragon); the shard entries are each tier's
+ *  ONE-TIME boss first-clear payout (capstone = Deep Forge / Eclipse Spire).
+ *  Higher tiers pay a real first clear again — that's the point of the climb. */
+export const TIER_REWARDS: Record<
+  TierId,
+  {
+    xpMult: number;
+    goldMult: number;
+    chestBump: number;
+    shardsBossFirstClear: number;
+    shardsBossFirstClearCapstone: number;
+  }
+> = {
+  normal: {
+    xpMult: 1,
+    goldMult: 1,
+    chestBump: 0,
+    shardsBossFirstClear: 15,
+    shardsBossFirstClearCapstone: 25,
+  },
+  hard: {
+    xpMult: 2,
+    goldMult: 2,
+    chestBump: 1,
+    shardsBossFirstClear: 15,
+    shardsBossFirstClearCapstone: 25,
+  },
+  elite: {
+    xpMult: 3,
+    goldMult: 3,
+    chestBump: 2,
+    shardsBossFirstClear: 25,
+    shardsBossFirstClearCapstone: 40,
+  },
+};
+
 /** Chance a chest contains a unit unlock (rolled from the FULL deckable pool,
  *  so duplicates are possible by design — they convert to gold). */
 export const CHEST_UNIT_CHANCE: Record<ChestTier, number> = {
@@ -164,13 +223,10 @@ export const MERGE_COSTS: Record<
 
 /** Soul Shard grants — every source is a ONE-TIME monotonic signal (first
  *  clears, fresh endless milestones), so the reward fold stays idempotent
- *  without a claims ledger. The repeatable drip lives in SHARD_CHEST_DRIP. */
+ *  without a claims ledger. The repeatable drip lives in SHARD_CHEST_DRIP;
+ *  the per-tier boss first-clear grants live in TIER_REWARDS (one source per
+ *  number — ordinary floors still pay no shards at any tier). */
 export const SHARD_REWARDS = {
-  /** A dungeon's boss lair, first kill — the run model's only clear signal.
-   *  (There is no per-floor rung: ordinary floors pay no shards.) */
-  bossFirstClear: 15,
-  /** The chain capstones (Deep Forge / Eclipse Spire bosses), first clear. */
-  bossFirstClearCapstone: 25,
   /** Per FRESH 5-wave endless milestone crossed in one run. */
   endlessPerMilestone: 8,
 } as const;

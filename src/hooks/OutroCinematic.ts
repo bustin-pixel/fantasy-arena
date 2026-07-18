@@ -10,6 +10,12 @@
 //   2. walkOff — on the player's arrow pick, the band files off-screen in
 //      that direction, each hero keeping their lane.
 //
+// The same lerper also runs two mid-descent beats while the sim is held:
+//   • walkIn — the floor-ENTRY march-in: the warband, fielded on the previous
+//     floor's marks, files in from the bottom edge (the other half of walkOff).
+//   • braceToRow — the boss BRACE: survivors pull back into a centered row to
+//     face an incoming boss, then the fight resumes from that formation.
+//
 // Deliberately NOT MovementSystem: that tick assumes live-combat invariants
 // (targeting, separation, aggro) and would fight a scripted stroll. And
 // determinism is moot here — the outcome is decided and the rewards were
@@ -278,6 +284,45 @@ export class OutroCinematic {
       return { x: FIELD_WIDTH + OFFSCREEN, y: u.pos.y };
     });
     this.begin(slots, onDone);
+  }
+
+  /** Floor-entry march-in (the twin of walkOff): the warband files in from the
+   *  bottom edge onto the marks they ALREADY occupy (fielded at construction).
+   *  The sim is held until this resolves, so moving these live refs is invisible
+   *  to combat; `onDone` releases that hold. Each hero keeps their column
+   *  (target.x = start.x, so dx = 0 and the walk never flips `facing`, which
+   *  four kits read for spawn-side offsets) and is normalized to the player
+   *  default on arrival — battle-start state is byte-identical to a manual
+   *  placement on the same marks. */
+  walkIn(onDone: () => void): void {
+    this.facePoint = null;
+    const marks = this.units.map((u): Vec2 => ({ x: u.pos.x, y: u.pos.y }));
+    // Drop each hero below the field edge (keeping their column), lightly
+    // staggered so they file in rather than pop up in one rigid line.
+    this.units.forEach((u, i) => {
+      u.pos.y = FIELD_HEIGHT + OFFSCREEN + i * 24;
+    });
+    this.begin(marks, () => {
+      for (const u of this.units) {
+        u.facing = -1;
+        setPose(u, "idle", 0);
+      }
+      onDone();
+    });
+  }
+
+  /** Boss brace: the surviving warband pulls back into a centered row to face an
+   *  incoming boss (or rare). Targets are the controller's DETERMINISTIC row slots
+   *  (keyed by uid) — the engine re-snaps to them on release, so this is purely the
+   *  visual lerp. Only the living move; corpses stay where they fell. */
+  braceToRow(targets: { uid: string; pos: Vec2 }[], onDone: () => void): void {
+    this.facePoint = null;
+    const byUid = new Map(targets.map((t) => [t.uid, t.pos]));
+    const movers = this.units.filter(
+      (u) => u.state !== "dead" && byUid.has(u.uid)
+    );
+    const slots = movers.map((u) => byUid.get(u.uid)!);
+    this.begin(slots, onDone, movers);
   }
 
   /** Advance the scene. Called once per rAF frame with real (unscaled) dt. */

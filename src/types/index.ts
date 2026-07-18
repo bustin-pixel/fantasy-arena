@@ -607,6 +607,15 @@ export interface DeploymentRecord {
   pos: Vec2;
 }
 
+/** One player unit's deploy-time mark, carried between floors of a dungeon
+ *  descent so the next floor can field the warband on the same spots (the
+ *  march-in). An ORDERED list (not a map): deploy order fixes uid assignment,
+ *  so it must be preserved, and a deck may run duplicate defIds. */
+export interface FormationMark {
+  defId: string;
+  pos: Vec2;
+}
+
 export interface ReplayData {
   seed: number;
   deployments: DeploymentRecord[];

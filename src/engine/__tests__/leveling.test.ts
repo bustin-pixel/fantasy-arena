@@ -2,7 +2,8 @@
 // seed) baked into hp/damage at createUnit. Covers the bake itself, the two
 // summon-inheritance queue paths (pendingSpawns via the Necromancer's Raise
 // Dead, damageSpawns via the Slime's split), the arena AI level mirror, and
-// dungeon monster levels (fodder at Dungeon.monsterLevel, elites +1).
+// dungeon monster levels (fodder at Dungeon.monsterLevel mapped through the
+// difficulty-tier band, elites +1 — data/tiers.ts).
 import { describe, it, expect } from "vitest";
 import { createSimState, stepSimulation, type SimState } from "@/engine/CombatSystem";
 import { MatchController } from "@/engine/MatchController";
@@ -15,6 +16,7 @@ import {
   monsterLevelFor,
 } from "@/data/dungeons";
 import { averageDeckLevel, levelStatMultipliers } from "@/meta/leveling";
+import { TIER_IDS, type TierId } from "@/data/tiers";
 import { battleState, digest, makeDummy, place } from "./helpers";
 
 const DECK = ["ogre", "archer", "knight", "fire_mage"];
@@ -25,13 +27,15 @@ function runLeveledMatch(
   levels: Record<string, number>,
   mode: "arena" | "depths" = "arena",
   dungeonId = "depths",
-  floor = 1
+  floor = 1,
+  tier?: TierId
 ): MatchController {
   const mc = new MatchController(seed, DECK, mode === "arena" ? DECK : [], {
     mode,
     floor,
     dungeonId,
     unitLevels: levels,
+    tier,
   });
   let guard = 0;
   while (
@@ -147,9 +151,18 @@ describe("dungeon monster levels — fodder at Dungeon.monsterLevel, elites +1",
   function drainFloorSpawns(
     seed: number,
     dungeonId: string,
-    floor: number
+    floor: number,
+    tier: TierId = "normal"
   ): { defId: string; level: number; maxHp: number; damage: number }[] {
-    const wc = new WaveController(seed, getDungeon(dungeonId), floor);
+    const wc = new WaveController(
+      seed,
+      getDungeon(dungeonId),
+      floor,
+      "normal",
+      undefined,
+      false,
+      tier
+    );
     const s: SimState = createSimState(seed, 120);
     s.activeCaps = { player: 4, enemy: 999 };
     const out: { defId: string; level: number; maxHp: number; damage: number }[] =
@@ -188,16 +201,16 @@ describe("dungeon monster levels — fodder at Dungeon.monsterLevel, elites +1",
     for (const p of players) expect(p.level).toBe(10);
   });
 
-  it("Bonefields fodder spawns at the dungeon's monster level (Lv 3)", () => {
+  it("Bonefields fodder spawns at the dungeon's monster level (Lv 4)", () => {
     const bonefields = getDungeon("bonefields");
-    expect(monsterLevelFor(bonefields, "fodder")).toBe(3);
-    // Floor 1: the floor multiplier is identity, so stats are the pure Lv-3 bake.
+    expect(monsterLevelFor(bonefields, "fodder")).toBe(4);
+    // Floor 1: the floor multiplier is identity, so stats are the pure Lv-4 bake.
     const spawns = drainFloorSpawns(31, "bonefields", 1);
     expect(spawns.length).toBeGreaterThan(0);
-    const mult = levelStatMultipliers(3);
+    const mult = levelStatMultipliers(4);
     for (const spawn of spawns) {
       const def = getUnitDef(spawn.defId);
-      expect(spawn.level).toBe(3);
+      expect(spawn.level).toBe(4);
       expect(spawn.maxHp).toBe(Math.round(def.hp * mult.hp));
       expect(spawn.damage).toBe(Math.round(def.damage * mult.dmg));
     }
@@ -209,8 +222,8 @@ describe("dungeon monster levels — fodder at Dungeon.monsterLevel, elites +1",
       (u) => u.defId === "abomination"
     )!;
     expect(boss).toBeDefined();
-    expect(boss.level).toBe(4); // monsterLevel 3 + elite bonus
-    const lvl = levelStatMultipliers(4);
+    expect(boss.level).toBe(5); // monsterLevel 4 + elite bonus
+    const lvl = levelStatMultipliers(5);
     const mult = floorStatMultipliersIn(bonefields, 5);
     const def = getUnitDef("abomination");
     expect(boss.maxHp).toBe(Math.round(Math.round(def.hp * lvl.hp) * mult.hp));
@@ -231,23 +244,75 @@ describe("dungeon monster levels — fodder at Dungeon.monsterLevel, elites +1",
       (u) => u.defId === "lich"
     )!;
     expect(lich).toBeDefined();
-    expect(lich.level).toBe(4);
+    expect(lich.level).toBe(5);
   });
 
-  it("the Eclipse Warden caps the ladder at Lv 10", () => {
+  it("the Eclipse Warden tops the Normal chain's back stretch at Lv 18 (17+1)", () => {
     const spire = getDungeon("eclipse_spire");
-    expect(monsterLevelFor(spire, "boss")).toBe(10);
+    expect(monsterLevelFor(spire, "boss")).toBe(18);
     const warden = drainFloorSpawns(9, "eclipse_spire", 5).find(
       (u) => u.defId === "eclipse_warden"
     )!;
     expect(warden).toBeDefined();
-    expect(warden.level).toBe(10);
+    expect(warden.level).toBe(18);
+  });
+
+  it("Elite re-bands the same fight: Spire fodder Lv 38, Warden Lv 39 — past the player cap, nested under floor scaling", () => {
+    const spire = getDungeon("eclipse_spire");
+    expect(monsterLevelFor(spire, "boss", "elite")).toBe(39);
+    const spawns = drainFloorSpawns(9, "eclipse_spire", 5, "elite");
+    const warden = spawns.find((u) => u.defId === "eclipse_warden")!;
+    expect(warden).toBeDefined();
+    expect(warden.level).toBe(39);
+    const lvl = levelStatMultipliers(39);
+    const mult = floorStatMultipliersIn(spire, 5);
+    const def = getUnitDef("eclipse_warden");
+    expect(warden.maxHp).toBe(Math.round(Math.round(def.hp * lvl.hp) * mult.hp));
+    expect(warden.damage).toBe(
+      Math.round(Math.round(def.damage * lvl.dmg) * mult.dmg)
+    );
+    // Fodder rides the band without the elite bonus.
+    const fodder = spawns.find(
+      (u) => u.defId !== "eclipse_warden" && u.defId !== "eclipse_herald"
+    )!;
+    expect(fodder).toBeDefined();
+    expect(fodder.level).toBe(38);
+  });
+
+  it("tier shifts LEVELS only: same seed spawns the identical boss-floor plan at every tier", () => {
+    const plans = TIER_IDS.map((tier) =>
+      new WaveController(
+        31,
+        getDungeon("bonefields"),
+        5,
+        "normal",
+        undefined,
+        false,
+        tier
+      ).planForTest()
+    );
+    expect(plans[1]).toEqual(plans[0]);
+    expect(plans[2]).toEqual(plans[0]);
   });
 
   it("a leveled dungeon match is deterministic (same seed → same digest)", () => {
     const levels = { ogre: 4, archer: 4, knight: 4, fire_mage: 4 };
     const a = runLeveledMatch(13, levels, "depths", "bonefields", 5);
     const b = runLeveledMatch(13, levels, "depths", "bonefields", 5);
+    expect(digest(a.state)).toBe(digest(b.state));
+  });
+
+  it("a Hard-tier dungeon match is deterministic (same seed + tier → same digest)", () => {
+    const levels = { ogre: 20, archer: 20, knight: 20, fire_mage: 20 };
+    const a = runLeveledMatch(13, levels, "depths", "bonefields", 5, "hard");
+    const b = runLeveledMatch(13, levels, "depths", "bonefields", 5, "hard");
+    expect(digest(a.state)).toBe(digest(b.state));
+  });
+
+  it("passing tier 'normal' is byte-identical to omitting it (regression guard)", () => {
+    const levels = { ogre: 4, archer: 4, knight: 4, fire_mage: 4 };
+    const a = runLeveledMatch(13, levels, "depths", "bonefields", 5);
+    const b = runLeveledMatch(13, levels, "depths", "bonefields", 5, "normal");
     expect(digest(a.state)).toBe(digest(b.state));
   });
 });

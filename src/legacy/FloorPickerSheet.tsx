@@ -24,6 +24,7 @@ import {
   type Dungeon,
 } from "@/data/dungeons";
 import { GOLD_REWARDS, replayGoldFor } from "@/meta/economy";
+import { LEVEL_CAP } from "@/meta/leveling";
 import { playSfx } from "@/audio/sfx";
 
 interface Props {
@@ -81,7 +82,7 @@ export function FloorPickerSheet({
             textAlign: "center",
           }}
         >
-          Recommended warband: Lv {Math.min(10, dungeon.monsterLevel + 1)}+
+          Recommended warband: Lv {Math.min(LEVEL_CAP, dungeon.monsterLevel + 1)}+
         </p>
 
         <ul className="floor-list">
