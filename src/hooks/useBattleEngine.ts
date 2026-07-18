@@ -14,6 +14,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
+  FormationMark,
   ItemLoadouts,
   MatchPhase,
   Rarity,
@@ -31,12 +32,14 @@ import { TREASURE_ROOM_TIERS, type EncounterKind } from "@/data/encounters";
 import { SfxObserver } from "@/audio/sfx";
 import { pickArenaTheme, type ArenaThemeId } from "@/assets/arenaThemes";
 import { getDungeon } from "@/data/dungeons";
+import type { TierId } from "@/data/tiers";
 import { generateEnemyDeck } from "@/engine/AIDeck";
 import { getUnitDef } from "@/data/units";
 import { ABILITIES } from "@/data/abilities";
 import { DEPLOY_TIME_SEC, TICK_MS, TICK_RATE, UNIT_RADIUS } from "@/utils/constants";
 import { generateSeed } from "@/utils/rng";
 import { getSettings } from "@/state/settings";
+import { prefersReducedMotion } from "@/utils/motion";
 
 /** Battle mode. Solo allows client-side fast-forward; PVP is server-paced at 1×
  *  (a real-time match can't let one client run the sim faster than the other).
@@ -64,6 +67,9 @@ export interface BattleUiState {
   startCountdownSec: number | null;
   /** Seconds left to place units in deployment, or null when not applicable. */
   deploySecLeft: number | null;
+  /** Descent march-in: whether the auto-line-up can be scrapped for manual
+   *  placement (the "Regroup" affordance). False outside the depths march-in. */
+  canRegroup: boolean;
   /** Boss-floor telegraph banner (rare catalyst / boss incoming), or null. */
   banner: WaveBanner | null;
   /** Endless: the current wave number, or null outside endless. */
@@ -144,6 +150,12 @@ export interface UseBattleEngine {
   startOutroCamp: (onDone: () => void) => void;
   /** Post-victory outro: file the band off-screen in the chosen direction. */
   outroWalkOff: (dir: OutroDir, onDone: () => void) => void;
+  /** Descent march-in: scrap the auto-line-up and drop back to manual placement
+   *  (clears the fielded warband, returns the hand, re-arms the placement timer). */
+  regroup: () => void;
+  /** The player's deploy-time marks this floor, to carry to the next floor — or
+   *  null if nothing's been fielded. Read at the continue-deeper hand-off. */
+  playerFormation: () => FormationMark[] | null;
 }
 
 export function useBattleEngine(
@@ -168,7 +180,15 @@ export function useBattleEngine(
   isBoss?: boolean,
   /** On the boss floor, skip the fusion-quest rare roll (the run already met its
    *  rare on a rare-quarry encounter). A match input. */
-  suppressQuestRare?: boolean
+  suppressQuestRare?: boolean,
+  /** Difficulty tier (Normal/Hard/Elite — shifts monster levels only). A match
+   *  input, frozen like the seed. Ignored outside "depths" mode. */
+  tier: TierId = "normal",
+  /** The previous floor's deploy-time marks (depths descent, floors 2+). When
+   *  present, the warband is fielded on these spots and a walk-in cinematic plays
+   *  before the countdown. A STABLE object frozen at mount, like unitLevels.
+   *  Null/absent = manual placement (floor 1, or non-descent modes). */
+  formation: FormationMark[] | null = null
 ): UseBattleEngine {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const controllerRef = useRef<MatchController | null>(null);
@@ -187,28 +207,43 @@ export function useBattleEngine(
   // Post-victory walk cinematic. Steps in the rAF loop; the sim tick is a
   // no-op once the match resolves, so the two never fight.
   const outroRef = useRef<OutroCinematic | null>(null);
+  // Floor-ENTRY march-in cinematic (the descent auto-line-up). Kept separate
+  // from outroRef so the victory outro and a next-floor walk-in never collide.
+  const introRef = useRef<OutroCinematic | null>(null);
+  // Boss-BRACE cinematic (survivors pull into a row when a boss telegraphs). Its
+  // own ref — it fires mid-battle, unrelated to the deployment/victory beats.
+  const braceRef = useRef<OutroCinematic | null>(null);
 
-  const [ui, setUi] = useState<BattleUiState>({
-    phase: "deployment",
-    tick: 0,
-    clockSec: 120,
-    playerActive: 0,
-    enemyActive: 0,
-    playerNext: playerDeck[0] ?? null,
-    canDeploy: true,
-    hand: playerDeck.slice(0, 4).map((defId, index) => ({
-      index,
-      defId,
-      selected: index === 0,
-    })),
-    startCountdownSec: null,
-    deploySecLeft: DEPLOY_TIME_SEC,
-    banner: null,
-    waveNumber: mode === "endless" ? 1 : null,
-    intermission: null,
-    boonsPicked: [],
-    momentumStacks: null,
-    rhythmBonus: null,
+  const [ui, setUi] = useState<BattleUiState>(() => {
+    // A march-in floor fields the warband at construction, so the reserve tray
+    // must start EMPTY — otherwise the default (all 4 cards) flashes for one
+    // throttle cycle before the first sync empties it. Regroup returns the cards.
+    const marchIn = !!formation && formation.length > 0;
+    return {
+      phase: "deployment",
+      tick: 0,
+      clockSec: 120,
+      playerActive: marchIn ? Math.min(playerDeck.length, 4) : 0,
+      enemyActive: 0,
+      playerNext: marchIn ? null : playerDeck[0] ?? null,
+      canDeploy: !marchIn,
+      hand: marchIn
+        ? []
+        : playerDeck.slice(0, 4).map((defId, index) => ({
+            index,
+            defId,
+            selected: index === 0,
+          })),
+      startCountdownSec: null,
+      deploySecLeft: marchIn ? null : DEPLOY_TIME_SEC,
+      canRegroup: marchIn,
+      banner: null,
+      waveNumber: mode === "endless" ? 1 : null,
+      intermission: null,
+      boonsPicked: [],
+      momentumStacks: null,
+      rhythmBonus: null,
+    };
   });
   const [speed, setSpeedState] = useState<number>(initialSpeed);
 
@@ -237,6 +272,9 @@ export function useBattleEngine(
         encounter,
         isBoss,
         suppressQuestRare,
+        tier,
+        // Depths floors 2+: field on the previous floor's marks (the march-in).
+        formation: formation ?? undefined,
       });
     } else {
       const enemyDeck = generateEnemyDeck(seed);
@@ -254,6 +292,8 @@ export function useBattleEngine(
       : "grassField";
     sfxRef.current = new SfxObserver();
     outroRef.current = null;
+    introRef.current = null;
+    braceRef.current = null;
     // Treasure room: no fight — stand the hoard up RIGHT HERE, in lockstep with
     // the controller. Doing this in a separate BattleScreen effect raced the
     // init: StrictMode's double-mount re-ran this effect and nulled outroRef
@@ -264,10 +304,28 @@ export function useBattleEngine(
       outro.gatherAtChests([...TREASURE_ROOM_TIERS], () => {});
       outroRef.current = outro;
     }
+    // Descent march-in: the controller fielded the warband on the previous
+    // floor's marks behind a hold (see MatchController.introHold). Play the
+    // walk-in, then release the hold so the normal 3s countdown begins. Set up
+    // here in lockstep with the controller (same StrictMode reasoning as the
+    // treasure-room block above). Reduced motion: skip the stroll, release now.
+    const mc = controllerRef.current;
+    if (mc?.isIntroHeld()) {
+      if (prefersReducedMotion()) {
+        mc.releaseIntroHold();
+      } else {
+        const intro = new OutroCinematic(mc.state);
+        intro.walkIn(() => {
+          mc.releaseIntroHold();
+          introRef.current = null;
+        });
+        introRef.current = intro;
+      }
+    }
     accRef.current = 0;
     lastRef.current = performance.now();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playerDeck.join(","), seedOverride, mode, floor, dungeonId, encounter, isBoss, suppressQuestRare]);
+  }, [playerDeck.join(","), seedOverride, mode, floor, dungeonId, encounter, isBoss, suppressQuestRare, tier]);
 
   // The combined loop.
   useEffect(() => {
@@ -290,8 +348,31 @@ export function useBattleEngine(
         steps++;
       }
 
-      // Post-victory walk cinematic (real dt — presentational, not sim-paced).
+      // Presentational walk cinematics (real dt — not sim-paced): the post-
+      // victory outro, and the floor-entry march-in. At most one is ever active.
       outroRef.current?.step(dt);
+      introRef.current?.step(dt);
+
+      // Boss brace: when the engine freezes for a boss/rare entrance, stand up the
+      // retreat cinematic. Reduced motion releases at once; if the engine's
+      // failsafe released before the lerp finished, drop the stale cinematic.
+      if (c.isBraceHeld()) {
+        if (!braceRef.current) {
+          const cine = new OutroCinematic(c.state);
+          if (prefersReducedMotion()) {
+            c.releaseBrace();
+          } else {
+            cine.braceToRow(c.braceRowTargets(), () => {
+              c.releaseBrace();
+              braceRef.current = null;
+            });
+            braceRef.current = cine;
+          }
+        }
+      } else if (braceRef.current) {
+        braceRef.current = null;
+      }
+      braceRef.current?.step(dt);
 
       // Render + sound. The SfxObserver diffs consecutive snapshots to voice
       // deaths/attacks/casts/deploys — render-side, never touching the sim.
@@ -324,6 +405,7 @@ export function useBattleEngine(
           hand: c.playerHand(),
           startCountdownSec: c.startCountdownSec(),
           deploySecLeft: c.deploySecLeft(),
+          canRegroup: c.canRegroup(),
           banner: snap.waveBanner,
           waveNumber: est ? est.wave : null,
           intermission: est?.intermission ?? null,
@@ -487,6 +569,32 @@ export function useBattleEngine(
     o.walkOff(dir, onDone);
   }, []);
 
+  const regroup = useCallback(() => {
+    const c = controllerRef.current;
+    if (!c) return;
+    // Cancel a walk-in mid-stroll: dropping the ref abandons its pending
+    // releaseIntroHold (regroup() clears the hold itself below).
+    introRef.current = null;
+    if (c.regroup()) {
+      // Surface manual placement at once (don't wait for the ~6/s sync): the
+      // tray returns, the timer re-arms, the countdown + Regroup button clear.
+      setUi((prev) => ({
+        ...prev,
+        playerNext: c.nextCard("player"),
+        canDeploy: c.canDeploy("player"),
+        hand: c.playerHand(),
+        deploySecLeft: c.deploySecLeft(),
+        startCountdownSec: null,
+        canRegroup: false,
+      }));
+    }
+  }, []);
+
+  const playerFormation = useCallback((): FormationMark[] | null => {
+    const marks = controllerRef.current?.getPlayerFormation() ?? [];
+    return marks.length ? marks : null;
+  }, []);
+
   return {
     canvasRef,
     ui,
@@ -505,6 +613,8 @@ export function useBattleEngine(
     outroChestPoints,
     startOutroCamp,
     outroWalkOff,
+    regroup,
+    playerFormation,
   };
 }
 

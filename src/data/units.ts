@@ -503,8 +503,8 @@ export const UNITS: Record<string, UnitDef> = {
     range: FIELD_WIDTH * 0.26, // shorter reach than its master
     ability: "lifesteal", // passive filler — never casts
     school: "magic",
-    color: "#2563eb", // the Warlock's blue, one shade deeper
-    accent: "#93c5fd", // same rift light as its summoner
+    color: "#601414", // emberheart — dark maroon body, distinct from the Sealed
+    accent: "#f97316", // Vault imp's brighter red; orange coal-flame in its hand
   },
   skeleton: {
     id: "skeleton",

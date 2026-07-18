@@ -323,9 +323,12 @@ Aegis Knight's soak is the answer, which a generic sweep deck lacks).
   loop. Rolled on a derived stream `RNG(chestSeed ^ BOSS_REPLAY_CHEST_SALT)` so
   first-clear seeds stay byte-stable (`rewards.ts`). Cathedral/Den first-clears
   bumped to `arcane` so their replay chests are `gold`.
-- **Fork elites out-level the player**: `MONSTER_LEVEL_CAP = LEVEL_CAP + 2` (12) in
-  `dungeons.ts`; `monsterLevelFor` clamps to it, not the player cap — the fork
-  bosses/rares ride the +1 elite bump to **Lv 11**, a notch above a maxed warband.
+- **Fork elites out-level the player at every tier**: `MONSTER_LEVEL_CAP` (41)
+  in `dungeons.ts` is now the ELITE band's ceiling (`TIER_BANDS.elite[1] +
+  ELITE_LEVEL_BONUS`), **no longer derived from the player's LEVEL_CAP** — the
+  fork bosses/rares land one notch over each band's top (Normal 21, Hard 31,
+  Elite **41**, eleven past a maxed Lv-30 warband). A future player-cap change
+  must retune `TIER_BANDS` (data/tiers.ts), not this clamp.
 - **Starter is all-rare** (`STARTER_UNIT_IDS` knight/archer/warrior/mage) and
   **every dungeon gifts a unit on a first clear** (`Dungeon.milestoneUnlocks`,
   `floor → unitId`, read via `milestoneUnlocksFor` — a dungeon owns its own
@@ -455,8 +458,9 @@ sound:
   dungeon that has its own cleared progress (pre-chain saves may hold
   out-of-order clears). Boss-floor first-clear chests grade up the chain via
   `bossChestTierFor` (rewards.ts): Depths silver → themed gold → Deep Forge
-  arcane → Eclipse Spire dragon (the only arcane/dragon drops besides deep
-  endless milestones).
+  arcane → Eclipse Spire dragon — then the difficulty tier bumps that grade up
+  the ladder (`effectiveBossChestTier`: Hard +1, Elite +2, clamped at dragon),
+  so arcane/dragon also drop from Hard/Elite runs and deep endless milestones.
 
 ### 8. Unit levels are a match INPUT; summons inherit via the spawn queue
 
@@ -482,12 +486,13 @@ Rules that keep the system sound:
   choose a level explicitly (endless boon pets deliberately stay level 1 —
   they scale by the wave curve instead).
 - **Dungeon monsters have REAL levels too** (the counter-curve made visible):
-  WaveController spawns everything at `Dungeon.monsterLevel` — bosses and rare
-  quest catalysts at +1 via `monsterLevelFor(dungeon, kind)` — through the same
-  `createUnit` bake, so badges/tooltips render and their summons inherit for
-  free. The ladder (1/3/5/6/7/8/9 along the gate chain, Eclipse Warden Lv 10)
-  tracks the player's expected arrival level; both sides ride the same
-  +5%/+3% curve, so "monster Lv = your Lv" reproduces the pre-leveling tuned
+  WaveController spawns everything at the dungeon's tier-banded level — bosses
+  and rare quest catalysts at +1 via `monsterLevelFor(dungeon, kind, tier)` —
+  through the same `createUnit` bake, so badges/tooltips render and their
+  summons inherit for free. The Normal ladder (1/4/7/9/11/14/17 along the gate
+  chain, then 20/20 at the fork; Eclipse Warden Lv 18) IS the 1–20 band and
+  tracks the player's expected arrival level toward the Lv-30 cap; both sides
+  ride the same +5%/+3% curve, so "monster Lv = your Lv" reproduces the tuned
   difficulty. The per-floor multiplier stays a SEPARATE post-bake layered on
   top (nested rounding: `round(round(def × lvlMult) × floorMult)` — tests
   asserting exact stats must nest, not flatten). The two mechanisms compose
@@ -495,9 +500,28 @@ Rules that keep the system sound:
   compounding wave curve is the difficulty; a leak would double-dip), and the
   **arena mirror** is unchanged: arena AI spawns at the player's average deck
   level (`MatchController.enemyLevel`) so the fair-fight mode stays fair.
+- **The difficulty TIER is the third frozen match input** (save v14): picked on
+  the atlas sheet (`FloorInfoPanel` pills), stamped into `DungeonRun.tier`, and
+  plumbed `MatchOptions.tier → WaveController → monsterLevelFor` exactly like
+  `unitLevels` — it never draws RNG, so one seed spawns the identical
+  composition/positions at every tier (spec-guarded). `data/tiers.ts` owns the
+  BANDS (`tierMonsterLevel` maps a dungeon's chain position into Hard 25–30 /
+  Elite 30–40 — Elite deliberately past the player cap); `TIER_REWARDS`
+  (economy.ts) owns every tier reward number (xp/gold mults ×2/×3, chest bumps
+  +1/+2, per-tier boss first-clear shards). The per-dungeon ladder (clear
+  Normal → its Hard → its Elite) persists as `DungeonProgress.clearedTiers`
+  monotonic flags (`isTierCleared`/`highestUnlockedTier`); Normal's cleared
+  signal stays `highestClearedFloor` — the gate chain, world map, and endless
+  gate never read tiers. Milestone gifts grant on the NORMAL fold branch only;
+  `replayGoldFor` keeps reading the BASE `monsterLevel` (the tier's goldMult
+  layers on top — feeding the banded level would double-dip). `ReplayData` is
+  deliberately NOT extended with tier: depths runs already aren't
+  replay-reconstructable (it omits dungeonId/floor/encounter too).
 - **XP rides the reward fold**: `computeBattleRewards().xp` → whole-deck fold
   in `grantBattleRewards` via `addXp` (the SAME clamp the RewardPanel preview
-  uses — preview must always equal the persisted value).
+  uses — preview must always equal the persisted value). Tier multipliers
+  apply inside `computeBattleRewards` as `round(base × xpMult)` FIRST (identity
+  at Normal), then the loss fraction rounds off that.
 
 ### 9. Items are a match INPUT; the inventory is stack counts
 

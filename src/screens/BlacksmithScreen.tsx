@@ -157,16 +157,17 @@ export function BlacksmithScreen({ onExit }: Props) {
     return () => window.removeEventListener("keydown", onKey);
   }, [confirmForgeAll, commissionOpen, selected, onExit]);
 
-  // Scene sizing: the ShopScreen height-budget — fill the column width when
-  // there's room, shrink so inventory + services fit without scrolling.
+  // Scene sizing: fill the column width, capped to half the viewport height so
+  // the pinned forge (sticky, see .smith-scene-wrap) always leaves at least
+  // half the screen for the scrolling inventory. It deliberately does NOT
+  // shrink to fit the inventory anymore — a full bag used to squeeze the forge
+  // down to a stamp; the screen scrolls under the pinned forge instead.
   const wrapRef = useRef<HTMLDivElement>(null);
-  const bodyRef = useRef<HTMLDivElement>(null);
   const [sceneW, setSceneW] = useState(0);
   const measure = () => {
     const wrapW = wrapRef.current?.clientWidth ?? 0;
-    const bodyH = bodyRef.current?.offsetHeight ?? 0;
-    const availH = Math.max(150, window.innerHeight - bodyH - 6);
-    const target = Math.min(wrapW, Math.floor(availH * SCENE_ASPECT));
+    const maxH = window.innerHeight * 0.5; // forge caps at half the viewport
+    const target = Math.min(wrapW, Math.floor(maxH * SCENE_ASPECT));
     setSceneW((w) => (Math.abs(w - target) > 1 ? target : w));
   };
   useEffect(() => {
@@ -264,7 +265,7 @@ export function BlacksmithScreen({ onExit }: Props) {
         <h1 className="smith-title">The Forge</h1>
       </div>
 
-      <div className="smith-body" ref={bodyRef}>
+      <div className="smith-body">
         <div className="smith-actions">
           <button
             type="button"

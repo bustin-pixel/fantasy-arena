@@ -2,6 +2,8 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_SAVE,
+  highestUnlockedTier,
+  isTierCleared,
   MAX_USERNAME_LENGTH,
   migrateSave,
   sanitizeAvatarId,
@@ -41,7 +43,7 @@ function v2Save(): Partial<PlayerSave> {
 describe("migrateSave", () => {
   it("null (new player) → defaults: starter units, 0 gold, floor 0", () => {
     const save = migrateSave(null);
-    expect(save.version).toBe(13);
+    expect(save.version).toBe(14);
     expect(save.shop).toEqual({ day: -1, rerolls: 0, bought: [] });
     expect(save.quests).toEqual({
       day: -1,
@@ -191,6 +193,61 @@ describe("migrateSave", () => {
     expect(save.unlockedUnits).not.toContain("berserker"); // depths F5 — not yet
     expect(save.unlockedUnits).toContain("holy_knight"); // bonefields F5 — cleared
     expect(save.unlockedUnits).not.toContain("ogre"); // wilds — never played
+  });
+
+  it("v14: clearedTiers absent for older saves; valid flags survive the round-trip", () => {
+    const old = migrateSave({
+      version: 13,
+      dungeons: { depths: { highestClearedFloor: 5 } },
+    });
+    expect(old.dungeons.depths.clearedTiers).toBeUndefined();
+    const kept = migrateSave({
+      version: 14,
+      dungeons: {
+        depths: { highestClearedFloor: 5, clearedTiers: { hard: true } },
+        bonefields: {
+          highestClearedFloor: 5,
+          clearedTiers: { hard: true, elite: true },
+        },
+      },
+    });
+    expect(kept.dungeons.depths.clearedTiers).toEqual({ hard: true });
+    expect(kept.dungeons.bonefields.clearedTiers).toEqual({
+      hard: true,
+      elite: true,
+    });
+  });
+
+  it("v14: sanitizes junk clearedTiers — strict booleans, elite implies hard, empty/garbage drop", () => {
+    const save = migrateSave({
+      version: 14,
+      dungeons: {
+        depths: { highestClearedFloor: 5, clearedTiers: { hard: "yes", elite: 1 } },
+        bonefields: { highestClearedFloor: 5, clearedTiers: { elite: true } },
+        wilds: { highestClearedFloor: 5, clearedTiers: {} },
+        overgrowth: { highestClearedFloor: 5, clearedTiers: "garbage" },
+      } as unknown as PlayerSave["dungeons"],
+    });
+    expect(save.dungeons.depths.clearedTiers).toBeUndefined(); // junk flags drop
+    expect(save.dungeons.bonefields.clearedTiers).toEqual({
+      hard: true,
+      elite: true, // the ladder invariant promotes hard
+    });
+    expect(save.dungeons.wilds.clearedTiers).toBeUndefined(); // empty drops
+    expect(save.dungeons.overgrowth.clearedTiers).toBeUndefined(); // non-object drops
+  });
+
+  it("v14: two migrations never share a clearedTiers reference", () => {
+    const raw = {
+      version: 14,
+      dungeons: {
+        depths: { highestClearedFloor: 5, clearedTiers: { hard: true } },
+      },
+    };
+    const a = migrateSave(structuredClone(raw));
+    const b = migrateSave(structuredClone(raw));
+    a.dungeons.depths.clearedTiers!.elite = true;
+    expect(b.dungeons.depths.clearedTiers).toEqual({ hard: true });
   });
 
   it("drops unknown/non-deckable ids and clamps negative gold", () => {
@@ -363,6 +420,53 @@ describe("migrateSave", () => {
     expect(save.loadouts.archer).toEqual({ weapon: "soldiers_blade:rare:1" });
     expect(save.loadouts.ogre).toBeUndefined();
     expect(save.loadouts.not_a_unit).toBeUndefined();
+  });
+});
+
+describe("tier ladder helpers (isTierCleared / highestUnlockedTier)", () => {
+  const withDungeons = (dungeons: PlayerSave["dungeons"]): PlayerSave => ({
+    ...migrateSave(null),
+    dungeons,
+  });
+
+  it("normal reads the floor signal; hard/elite read the v14 flags", () => {
+    const save = withDungeons({
+      depths: { highestClearedFloor: 5, clearedTiers: { hard: true } },
+    });
+    expect(isTierCleared(save, "depths", "normal")).toBe(true);
+    expect(isTierCleared(save, "depths", "hard")).toBe(true);
+    expect(isTierCleared(save, "depths", "elite")).toBe(false);
+    expect(isTierCleared(save, "bonefields", "normal")).toBe(false);
+    expect(isTierCleared(save, "bonefields", "hard")).toBe(false);
+  });
+
+  it("highestUnlockedTier walks the per-dungeon ladder", () => {
+    expect(highestUnlockedTier(migrateSave(null), "depths")).toBe("normal");
+    expect(
+      highestUnlockedTier(
+        withDungeons({ depths: { highestClearedFloor: 5 } }),
+        "depths"
+      )
+    ).toBe("hard");
+    expect(
+      highestUnlockedTier(
+        withDungeons({
+          depths: { highestClearedFloor: 5, clearedTiers: { hard: true } },
+        }),
+        "depths"
+      )
+    ).toBe("elite");
+    expect(
+      highestUnlockedTier(
+        withDungeons({
+          depths: {
+            highestClearedFloor: 5,
+            clearedTiers: { hard: true, elite: true },
+          },
+        }),
+        "depths"
+      )
+    ).toBe("elite");
   });
 });
 

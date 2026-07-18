@@ -10,14 +10,16 @@ import { QuestBoardSheet } from "@/components/QuestBoardSheet";
 import { DungeonAtlas } from "@/components/atlas/DungeonAtlas";
 import { GoldPill, ShardPill } from "@/components/CurrencyPills";
 import type { BattleMode } from "@/hooks/useBattleEngine";
+import type { TierId } from "@/data/tiers";
 import { playSfx } from "@/audio/sfx";
 
 interface Props {
   /** Launch a non-dungeon battle (Arena / Endless) from a Home mode card.
    *  Dungeon dives go through onEnterDungeon (the atlas), not this. */
   onBattle: (mode: BattleMode) => void;
-  /** Start a fresh dungeon RUN at floor 1 (the atlas "Enter Dungeon" button). */
-  onEnterDungeon: (dungeonId: string) => void;
+  /** Start a fresh dungeon RUN at floor 1, at the picked difficulty tier
+   *  (the atlas "Enter Dungeon" button). */
+  onEnterDungeon: (dungeonId: string, tier: TierId) => void;
   /** Open Grubbins' shop — a full-screen App view, like Battle (not a sheet). */
   onOpenShop: () => void;
   /** Open the Blacksmith's forge — the items home, a full-screen App view. */
@@ -226,9 +228,9 @@ export function AppShell({
       )}
       {atlasOpen && (
         <DungeonAtlas
-          onEnterDungeon={(dungeonId) => {
+          onEnterDungeon={(dungeonId, tier) => {
             closeAtlas();
-            onEnterDungeon(dungeonId);
+            onEnterDungeon(dungeonId, tier);
           }}
           onClose={closeAtlas}
         />

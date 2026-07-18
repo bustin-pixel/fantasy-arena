@@ -20,6 +20,7 @@ import {
   milestoneUnlocksFor,
   QUEST_LOCKED_UNITS,
 } from "@/data/dungeons";
+import { isTierUnlocked, TIER_IDS, type TierId } from "@/data/tiers";
 
 /** Compendium knowledge of one unit/monster. Encountered = faced it in battle
  *  (silhouette + name); defeated = it died to you at least once (full page). */
@@ -33,6 +34,10 @@ export interface BestiaryEntry {
 export interface DungeonProgress {
   /** Highest floor with a recorded victory in this dungeon; 0 = none yet. */
   highestClearedFloor: number;
+  /** Difficulty tiers whose boss has been beaten HERE — monotonic one-way
+   *  flags, absent = neither. Normal's cleared signal stays
+   *  highestClearedFloor (the gate chain / world map read it). (Save v14.) */
+  clearedTiers?: { hard?: boolean; elite?: boolean };
 }
 
 /** A fresh progress map: every known dungeon at floor 0. */
@@ -58,6 +63,34 @@ export function highestClearedFloorOf(
 export function isDungeonCleared(save: PlayerSave, dungeonId: string): boolean {
   const d = DUNGEONS[dungeonId];
   return d != null && highestClearedFloorOf(save, dungeonId) >= d.floors;
+}
+
+/** Whether `dungeonId` is cleared AT `tier`: Normal reads the existing
+ *  highestClearedFloor signal (untouched by the tier system); Hard/Elite read
+ *  the v14 clearedTiers flags. */
+export function isTierCleared(
+  save: PlayerSave,
+  dungeonId: string,
+  tier: TierId
+): boolean {
+  if (tier === "normal") return isDungeonCleared(save, dungeonId);
+  return save.dungeons[dungeonId]?.clearedTiers?.[tier] === true;
+}
+
+/** The highest tier this dungeon's ladder has unlocked (Normal → Hard on a
+ *  Normal clear → Elite on a Hard clear). The atlas sheet's default pill —
+ *  it's also the frontier, the deepest tier worth fighting. */
+export function highestUnlockedTier(
+  save: PlayerSave,
+  dungeonId: string
+): TierId {
+  let best: TierId = "normal";
+  for (const tier of TIER_IDS) {
+    if (isTierUnlocked(tier, (t) => isTierCleared(save, dungeonId, t))) {
+      best = tier;
+    }
+  }
+  return best;
 }
 
 /** Endless survival progress. Just the deepest wave ever reached, for now. */
@@ -131,7 +164,7 @@ export interface PlayerSave {
 const KEY = "fantasy-arena/save/v1";
 
 export const DEFAULT_SAVE: PlayerSave = {
-  version: 13,
+  version: 14,
   username: "Champion",
   avatarId: DEFAULT_AVATAR_ID,
   deck: [...STARTER_UNIT_IDS],
@@ -183,6 +216,19 @@ export function migrateSave(parsed: Partial<PlayerSave> | null): PlayerSave {
       dungeons[id] = {
         highestClearedFloor: Math.max(0, prog?.highestClearedFloor ?? 0),
       };
+      // v14: per-tier clear flags — strict `=== true` booleans only, ladder
+      // invariant enforced generously (elite implies hard, like the v12/v13
+      // retro-grants); junk shapes and empty objects drop the field entirely.
+      const rawTiers = prog?.clearedTiers;
+      if (rawTiers && typeof rawTiers === "object") {
+        const elite = rawTiers.elite === true;
+        const hard = rawTiers.hard === true || elite;
+        if (hard) {
+          dungeons[id].clearedTiers = elite
+            ? { hard: true, elite: true }
+            : { hard: true };
+        }
+      }
     }
   }
   merged.dungeons = dungeons;
@@ -296,7 +342,13 @@ function structuredCloneSave(save: PlayerSave): PlayerSave {
     bestiary: { ...save.bestiary },
     unlockedUnits: [...save.unlockedUnits],
     dungeons: Object.fromEntries(
-      Object.entries(save.dungeons).map(([id, p]) => [id, { ...p }])
+      Object.entries(save.dungeons).map(([id, p]) => [
+        id,
+        {
+          ...p,
+          ...(p.clearedTiers ? { clearedTiers: { ...p.clearedTiers } } : {}),
+        },
+      ])
     ),
     questUnlocks: [...save.questUnlocks],
     endless: { ...save.endless },

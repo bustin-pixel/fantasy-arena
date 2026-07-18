@@ -214,6 +214,49 @@ describe("applyBattleGrant dungeon clears", () => {
     );
     expect(out.dungeons).toEqual({});
   });
+
+  it("a Hard first clear flips clearedTiers.hard — floor mark and gifts untouched", () => {
+    const out = applyBattleGrant(
+      baseSave({ dungeons: { depths: { highestClearedFloor: 5 } } }),
+      noRewards({ firstClear: true }),
+      ctx({ mode: "depths", dungeonId: "depths", tier: "hard" })
+    );
+    expect(out.dungeons.depths.clearedTiers).toEqual({ hard: true });
+    expect(out.dungeons.depths.highestClearedFloor).toBe(5);
+    expect(out.unlockedUnits).toEqual(["knight"]); // no gift re-grant
+  });
+
+  it("an Elite first clear stacks on the hard flag (monotonic + idempotent re-fold)", () => {
+    const save = baseSave({
+      dungeons: {
+        depths: { highestClearedFloor: 5, clearedTiers: { hard: true } },
+      },
+    });
+    const c = ctx({ mode: "depths", dungeonId: "depths", tier: "elite" });
+    const out = applyBattleGrant(save, noRewards({ firstClear: true }), c);
+    expect(out.dungeons.depths.clearedTiers).toEqual({
+      hard: true,
+      elite: true,
+    });
+    // A StrictMode double-fold lands the same save.
+    expect(
+      applyBattleGrant(out, noRewards({ firstClear: true }), c).dungeons
+    ).toEqual(out.dungeons);
+  });
+
+  it("a Normal first clear is unchanged by an explicit tier field (default path)", () => {
+    const a = applyBattleGrant(
+      baseSave(),
+      noRewards({ firstClear: true }),
+      ctx({ mode: "depths", dungeonId: "depths" })
+    );
+    const b = applyBattleGrant(
+      baseSave(),
+      noRewards({ firstClear: true }),
+      ctx({ mode: "depths", dungeonId: "depths", tier: "normal" })
+    );
+    expect(b).toEqual(a);
+  });
 });
 
 describe("applyBattleGrant endless + quest unlocks", () => {

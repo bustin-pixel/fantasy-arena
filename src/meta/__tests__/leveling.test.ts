@@ -25,7 +25,10 @@ describe("level thresholds", () => {
     expect(totalXpForLevel(1)).toBe(0);
     expect(totalXpForLevel(2)).toBe(50);
     expect(totalXpForLevel(5)).toBe(500);
-    expect(totalXpForLevel(10)).toBe(2250);
+    expect(totalXpForLevel(10)).toBe(2250); // the old cap — now a waypoint
+    expect(totalXpForLevel(20)).toBe(9500); // the Normal band's top
+    expect(totalXpForLevel(30)).toBe(21750);
+    expect(LEVEL_CAP).toBe(30);
     expect(TOTAL_XP_CAP).toBe(totalXpForLevel(LEVEL_CAP));
   });
 
@@ -35,7 +38,7 @@ describe("level thresholds", () => {
     expect(levelFromXp(50)).toBe(2);
     expect(levelFromXp(totalXpForLevel(9) - 1)).toBe(8);
     expect(levelFromXp(totalXpForLevel(9))).toBe(9);
-    expect(levelFromXp(TOTAL_XP_CAP - 1)).toBe(9);
+    expect(levelFromXp(TOTAL_XP_CAP - 1)).toBe(LEVEL_CAP - 1);
     expect(levelFromXp(TOTAL_XP_CAP)).toBe(LEVEL_CAP);
     expect(levelFromXp(TOTAL_XP_CAP * 10)).toBe(LEVEL_CAP); // never exceeds cap
   });
@@ -66,13 +69,15 @@ describe("level stat multipliers", () => {
     expect(levelStatMultipliers(1)).toEqual({ hp: 1, dmg: 1 });
   });
 
-  it("grows +5% HP / +3% dmg per level up to +45%/+27% at the cap", () => {
+  it("grows +5% HP / +3% dmg per level up to +145%/+87% at the cap", () => {
     const max = levelStatMultipliers(LEVEL_CAP);
-    expect(max.hp).toBeCloseTo(1.45, 10);
-    expect(max.dmg).toBeCloseTo(1.27, 10);
-    // A maxed unit slightly out-scales floor-5 enemies (+32% HP / +20% dmg).
-    expect(max.hp).toBeGreaterThan(1.32);
-    expect(max.dmg).toBeGreaterThan(1.2);
+    expect(max.hp).toBeCloseTo(2.45, 10);
+    expect(max.dmg).toBeCloseTo(1.87, 10);
+    // Lv 10 — the old cap — is unchanged by the cap raise, so pre-v14 maxed
+    // units keep their exact baked stats.
+    const lv10 = levelStatMultipliers(10);
+    expect(lv10.hp).toBeCloseTo(1.45, 10);
+    expect(lv10.dmg).toBeCloseTo(1.27, 10);
   });
 
   it("is strictly increasing (a level is never a no-op)", () => {
@@ -88,20 +93,37 @@ describe("level stat multipliers", () => {
 });
 
 describe("pacing targets (executable design spec)", () => {
-  it("a flawless Depths clear (floors 1–5) lands at level 3–4", () => {
-    const total = [1, 2, 3, 4, 5].reduce((acc, f) => acc + winXp(f), 0);
-    expect(total).toBe(250);
-    expect(levelFromXp(total)).toBeGreaterThanOrEqual(3);
-    expect(levelFromXp(total)).toBeLessThanOrEqual(4);
+  // The RNG descent: a clearing run fights floors 1..B, with the boss lair at
+  // a run-seeded B ∈ 5–10 (E[B] ≈ 6.5). The spec models a typical run at B=6.
+  // Tier XP multipliers (TIER_REWARDS: Hard ×2, Elite ×3) are inlined here as
+  // literals so a reward retune has to consciously revisit these targets.
+  const MODELED_BOSS_DEPTH = 6;
+  const runXp = (tierMult = 1) => {
+    let total = 0;
+    for (let f = 1; f <= MODELED_BOSS_DEPTH; f++) {
+      total += Math.round(winXp(f) * tierMult);
+    }
+    return total;
+  };
+
+  it("one Normal Depths clearing run lands a fresh unit at level 3–5", () => {
+    const level = levelFromXp(runXp());
+    expect(level).toBeGreaterThanOrEqual(3);
+    expect(level).toBeLessThanOrEqual(5);
   });
 
-  it("clearing all 7 dungeons flat lands at level 8–9 (cap needs endless/replays)", () => {
-    const perDungeon = [1, 2, 3, 4, 5].reduce((acc, f) => acc + winXp(f), 0);
-    const total = perDungeon * 7;
+  it("a flat Normal-chain lap (9 dungeons) lands at level 11–13 — the 1–20 Normal band's on-ramp; replays/quests/endless carry the rest", () => {
+    const level = levelFromXp(runXp() * 9);
+    expect(level).toBeGreaterThanOrEqual(11);
+    expect(level).toBeLessThanOrEqual(13);
+  });
+
+  it("clearing all 27 dungeon-tier combos flat lands short of 30 — the cap is NOT free with content alone", () => {
+    const total = (runXp(1) + runXp(2) + runXp(3)) * 9;
     const level = levelFromXp(total);
-    expect(level).toBeGreaterThanOrEqual(8);
-    expect(level).toBeLessThanOrEqual(9);
-    expect(total).toBeLessThan(TOTAL_XP_CAP); // the cap is NOT free with content alone
+    expect(level).toBeGreaterThanOrEqual(26);
+    expect(level).toBeLessThanOrEqual(28);
+    expect(total).toBeLessThan(TOTAL_XP_CAP);
   });
 
   it("losses pay a meaningful fraction so wall-bumping still progresses", () => {
@@ -115,7 +137,7 @@ describe("averageDeckLevel (arena AI mirror)", () => {
     expect(averageDeckLevel([], {})).toBe(1);
     expect(averageDeckLevel(["a", "b"], {})).toBe(1);
     expect(averageDeckLevel(["a", "b"], { a: 5, b: 2 })).toBe(4); // 3.5 rounds up
-    expect(averageDeckLevel(["a", "b", "c", "d"], { a: 10, b: 10, c: 10, d: 10 })).toBe(10);
+    expect(averageDeckLevel(["a", "b", "c", "d"], { a: 30, b: 30, c: 30, d: 30 })).toBe(30);
     expect(averageDeckLevel(["a", "b", "c"], { a: 4 })).toBe(2);
   });
 });

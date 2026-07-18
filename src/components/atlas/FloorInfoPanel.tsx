@@ -1,27 +1,45 @@
 // ============================================================================
 // FloorInfoPanel — the bottom sheet the atlas opens when you tap into a
 // dungeon's descent trail. In the RNG "hunt for the boss" model there are no
-// individually-entered floors, so this is a DUNGEON overview: who you'll face
-// (small canvas portraits, bestiary silhouettes for the unmet), what clearing
-// it pays, the rare-spawn quest whisper, and the big Enter Dungeon button.
-// Reward copy mirrors the reward fold's own sources (bossChestTierFor /
-// milestoneUnlocksFor) so the preview can't drift from what actually drops.
+// individually-entered floors, so this is a DUNGEON overview: the difficulty
+// pills (Normal / Hard / Elite — the per-dungeon ladder), who you'll face at
+// the picked tier (small canvas portraits, bestiary silhouettes for the
+// unmet), what clearing it pays, the rare-spawn quest whisper, and the big
+// Enter Dungeon button. Reward copy mirrors the reward fold's own sources
+// (effectiveBossChestTier / milestoneUnlocksFor / TIER_REWARDS) so the
+// preview can't drift from what actually drops.
 // ============================================================================
 
-import { useLayoutEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
-  bossChestTierFor,
+  isCapstoneDungeon,
   milestoneUnlocksFor,
   monsterLevelFor,
   tierForFloorIn,
   type Dungeon,
 } from "@/data/dungeons";
+import {
+  isTierUnlocked,
+  prevTier,
+  TIER_IDS,
+  TIER_LABEL,
+  tierMonsterLevel,
+  type TierId,
+} from "@/data/tiers";
 import { questUnlockIds } from "@/data/depths";
 import { getUnitDef } from "@/data/units";
+import { TIER_REWARDS } from "@/meta/economy";
+import { LEVEL_CAP } from "@/meta/leveling";
+import { effectiveBossChestTier } from "@/meta/rewards";
 import { CHEST_LABEL } from "@/components/RewardPanel";
 import { renderPortrait } from "@/engine/Renderer";
 import { playSfx } from "@/audio/sfx";
-import { isDungeonCleared, type PlayerSave } from "@/state/persistence";
+import {
+  highestUnlockedTier,
+  isDungeonCleared,
+  isTierCleared,
+  type PlayerSave,
+} from "@/state/persistence";
 
 const ART = 64;
 
@@ -68,7 +86,7 @@ interface Props {
   save: PlayerSave;
   /** The player's warband level (for the under-level warning). */
   warbandLv: number;
-  onEnter: () => void;
+  onEnter: (tier: TierId) => void;
   onClose: () => void;
 }
 
@@ -79,11 +97,23 @@ export function FloorInfoPanel({
   onEnter,
   onClose,
 }: Props) {
-  const cleared = isDungeonCleared(save, dungeon.id);
-  // The fodder roster + boss are the same across a dungeon's floors (one tier
-  // band); read them off floor 1. The boss lair itself appears at a random
-  // depth during the run.
-  const tier = tierForFloorIn(dungeon, 1);
+  // The per-dungeon difficulty ladder: default to the frontier (the highest
+  // unlocked tier), re-derived if the sheet is retargeted at another dungeon.
+  const [tier, setTier] = useState<TierId>(() =>
+    highestUnlockedTier(save, dungeon.id)
+  );
+  useEffect(() => {
+    setTier(highestUnlockedTier(save, dungeon.id));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dungeon.id]);
+
+  const tierDone = (t: TierId) => isTierCleared(save, dungeon.id, t);
+  const dungeonCleared = isDungeonCleared(save, dungeon.id);
+  const cleared = tierDone(tier);
+  // The fodder roster + boss are the same across a dungeon's floors (one
+  // monster band); read them off floor 1. The boss lair itself appears at a
+  // random depth during the run. (`band` — the difficulty tier is `tier`.)
+  const band = tierForFloorIn(dungeon, 1);
   const quest = dungeon.quest;
   const questDone =
     quest != null &&
@@ -93,16 +123,20 @@ export function FloorInfoPanel({
   const known = (id: string) => save.bestiary[id]?.encountered === true;
 
   // Fodder cheapest-first — the wave's bread before its butter.
-  const fodderIds = Object.keys(tier.monsters).sort(
-    (a, b) => tier.monsters[a] - tier.monsters[b]
+  const fodderIds = Object.keys(band.monsters).sort(
+    (a, b) => band.monsters[a] - band.monsters[b]
   );
 
-  const bossChest = CHEST_LABEL[bossChestTierFor(dungeon.id)];
-  // Gifts the whole dungeon hands over on its first clear.
+  const bossChest = CHEST_LABEL[effectiveBossChestTier(dungeon.id, tier)];
+  // Gifts the whole dungeon hands over on its first (Normal) clear.
   const gifts = Object.values(milestoneUnlocksFor(dungeon.id)).filter(
     (id) => !save.unlockedUnits.includes(id)
   );
-  const underleveled = warbandLv < dungeon.monsterLevel;
+  const fodderLv = tierMonsterLevel(dungeon.monsterLevel, tier);
+  const underleveled = warbandLv < fodderLv;
+  const firstClearShards = isCapstoneDungeon(dungeon.id)
+    ? TIER_REWARDS[tier].shardsBossFirstClearCapstone
+    : TIER_REWARDS[tier].shardsBossFirstClear;
 
   return (
     <div className="atlas-info" role="dialog" aria-label={`${dungeon.name} details`}>
@@ -117,11 +151,52 @@ export function FloorInfoPanel({
         ✕
       </button>
       <h4 className="atlas-info-title">
-        {cleared ? "✓ " : ""}
+        {dungeonCleared ? "✓ " : ""}
         {dungeon.name}
       </h4>
+
+      <div className="atlas-tier-pills" role="group" aria-label="Difficulty">
+        {TIER_IDS.map((t) => {
+          const unlocked = isTierUnlocked(t, tierDone);
+          const done = tierDone(t);
+          const below = prevTier(t);
+          return (
+            <button
+              key={t}
+              type="button"
+              className={[
+                "atlas-tier-pill",
+                t,
+                t === tier ? "selected" : "",
+                unlocked ? "" : "locked",
+                done ? "cleared" : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              aria-pressed={t === tier}
+              title={
+                unlocked || !below
+                  ? undefined
+                  : `Clear ${TIER_LABEL[below]} first`
+              }
+              onClick={() => {
+                if (!unlocked) {
+                  playSfx("uiDeny");
+                  return;
+                }
+                if (t !== tier) playSfx("uiSelect");
+                setTier(t);
+              }}
+            >
+              {done ? "✓ " : !unlocked ? "🔒 " : ""}
+              {TIER_LABEL[t]}
+            </button>
+          );
+        })}
+      </div>
+
       <p className="atlas-info-sub">
-        Recommended: Lv {Math.min(10, dungeon.monsterLevel + 1)}+
+        Recommended: Lv {Math.min(LEVEL_CAP, fodderLv + 1)}+
         {underleveled && (
           <span className="atlas-info-warn"> · your warband is Lv {warbandLv} ⚠</span>
         )}
@@ -133,21 +208,21 @@ export function FloorInfoPanel({
             key={id}
             defId={id}
             known={known(id)}
-            level={monsterLevelFor(dungeon, "fodder")}
+            level={monsterLevelFor(dungeon, "fodder", tier)}
           />
         ))}
         {quest && (
           <EnemyPortrait
             defId={quest.spawnId}
             known={known(quest.spawnId)}
-            level={monsterLevelFor(dungeon, "rare")}
+            level={monsterLevelFor(dungeon, "rare", tier)}
             tag="rare"
           />
         )}
         <EnemyPortrait
-          defId={tier.boss}
-          known={known(tier.boss)}
-          level={monsterLevelFor(dungeon, "boss")}
+          defId={band.boss}
+          known={known(band.boss)}
+          level={monsterLevelFor(dungeon, "boss", tier)}
           tag="boss"
         />
       </div>
@@ -156,9 +231,19 @@ export function FloorInfoPanel({
         {cleared ? (
           <span>✓ Cleared · descend again to farm the boss ({bossChest})</span>
         ) : (
-          <span>Descend and slay the boss for a {bossChest} + recruits</span>
+          <span>
+            Descend and slay the boss for a {bossChest}
+            {tier === "normal" ? " + recruits" : ""}
+          </span>
         )}
-        {gifts.length > 0 && (
+        {tier !== "normal" && (
+          <span className="atlas-tier-mult">
+            ×{TIER_REWARDS[tier].xpMult} XP · ×{TIER_REWARDS[tier].goldMult}{" "}
+            gold
+            {!cleared && ` · +${firstClearShards} ◆ on the first clear`}
+          </span>
+        )}
+        {tier === "normal" && gifts.length > 0 && (
           <span className="atlas-gift">
             {gifts.length === 1 ? "Recruit on clear: " : "Recruits on clear: "}
             {gifts.map((id) => getUnitDef(id).name).join(", ")}
@@ -172,10 +257,14 @@ export function FloorInfoPanel({
         className="btn btn-gold atlas-enter"
         onClick={() => {
           playSfx("uiConfirm");
-          onEnter();
+          onEnter(tier);
         }}
       >
-        {cleared ? "Descend Again" : "Enter Dungeon"}
+        {cleared
+          ? `Descend Again — ${TIER_LABEL[tier]}`
+          : tier === "normal"
+            ? "Enter Dungeon"
+            : `Enter Dungeon — ${TIER_LABEL[tier]}`}
       </button>
     </div>
   );

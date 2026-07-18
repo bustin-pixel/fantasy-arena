@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import type { BattleRewards } from "@/meta/rewards";
 import { type ChestTier } from "@/meta/economy";
 import { milestoneUnlocksFor } from "@/data/dungeons";
+import { TIER_LABEL, type TierId } from "@/data/tiers";
 import {
   LEVEL_CAP,
   levelFromXp,
@@ -40,6 +41,10 @@ interface Props {
   mode: string;
   /** Which dungeon — the gift callout is per-dungeon (defaults to the Depths). */
   dungeonId?: string;
+  /** Difficulty tier the run was fought at. Gifts are announced only for
+   *  Normal clears (Hard/Elite first clears re-run a dungeon whose recruits
+   *  are already owned); the first-clear badge names the tier. */
+  tier?: TierId;
   /** Per-deck-unit XP gains for the bar ceremony (omit to hide the section). */
   xpGains?: XpGain[];
   /** Suppress the pop-up chest + contents (the Depths continue-deeper flow
@@ -58,7 +63,7 @@ export const CHEST_LABEL: Record<ChestTier, string> = {
 /** closed → (tap) → opening (sprite animates) → open (contents revealed). */
 type ChestPhase = "closed" | "opening" | "open";
 
-export function RewardPanel({ rewards, mode, dungeonId = "depths", xpGains, hideChest }: Props) {
+export function RewardPanel({ rewards, mode, dungeonId = "depths", tier = "normal", xpGains, hideChest }: Props) {
   const [chestPhase, setChestPhase] = useState<ChestPhase>("closed");
   const shownGold = useCountUp(rewards.gold, true);
 
@@ -67,7 +72,7 @@ export function RewardPanel({ rewards, mode, dungeonId = "depths", xpGains, hide
   // sits at a random depth, so the callout lists the dungeon's whole gift set
   // rather than keying off the (now meaningless) floor number.
   const milestoneIds =
-    mode === "depths" && rewards.firstClear
+    mode === "depths" && rewards.firstClear && tier === "normal"
       ? Object.values(milestoneUnlocksFor(dungeonId))
       : [];
 
@@ -99,7 +104,11 @@ export function RewardPanel({ rewards, mode, dungeonId = "depths", xpGains, hide
     <div className="reward-panel">
       {rewards.firstClear && (
         <div className="reward-badge">
-          {mode === "endless" ? "New best!" : "First clear!"}
+          {mode === "endless"
+            ? "New best!"
+            : tier === "normal"
+              ? "First clear!"
+              : `First ${TIER_LABEL[tier]} clear!`}
         </div>
       )}
 

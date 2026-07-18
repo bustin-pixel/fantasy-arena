@@ -4,10 +4,12 @@
 import { describe, expect, it } from "vitest";
 import {
   computeBattleRewards,
+  computeTreasureRewards,
   rollChest,
   type ChestContent,
 } from "@/meta/rewards";
 import {
+  bumpChestTier,
   CHEST_GOLD_RANGE,
   CHEST_UNIT_CHANCE,
   DUPLICATE_GOLD,
@@ -19,9 +21,12 @@ import {
   SHARD_CHEST_DRIP,
   SHARD_REWARDS,
   STARTER_UNIT_IDS,
+  TIER_REWARDS,
   UNLOCK_PRICES,
   type ChestTier,
 } from "@/meta/economy";
+import { richChestBump, TREASURE_ROOM_TIERS } from "@/data/encounters";
+import type { TierId } from "@/data/tiers";
 import { ITEM_LINES, signatureLineFor } from "@/data/items";
 import { XP_REWARDS } from "@/meta/leveling";
 import { DECKABLE_UNIT_IDS, getUnitDef } from "@/data/units";
@@ -338,7 +343,7 @@ describe("computeBattleRewards — the reward matrix", () => {
     expect(r.gold).toBe(125);
     expect(r.chest?.tier).toBe("silver");
     expect(r.firstClear).toBe(true);
-    expect(r.shards).toBe(SHARD_REWARDS.bossFirstClear);
+    expect(r.shards).toBe(TIER_REWARDS.normal.shardsBossFirstClear);
   });
 
   it("a capstone's first kill pays the capstone shard rate", () => {
@@ -346,7 +351,7 @@ describe("computeBattleRewards — the reward matrix", () => {
       ...base, mode: "depths", dungeonId: "eclipse_spire", floor: 5,
       outcome: "victory", isBoss: true,
     });
-    expect(r.shards).toBe(SHARD_REWARDS.bossFirstClearCapstone);
+    expect(r.shards).toBe(TIER_REWARDS.normal.shardsBossFirstClearCapstone);
   });
 
   it("ordinary floors pay the same whether or not the dungeon is already cleared", () => {
@@ -734,12 +739,12 @@ describe("computeBattleRewards — Soul Shards", () => {
       ...base, mode: "depths", dungeonId: "bonefields", floor: 5,
       outcome: "victory", isBoss: true,
     });
-    expect(bossClear.shards).toBe(SHARD_REWARDS.bossFirstClear);
+    expect(bossClear.shards).toBe(TIER_REWARDS.normal.shardsBossFirstClear);
     const capstone = computeBattleRewards({
       ...base, mode: "depths", dungeonId: "eclipse_spire", floor: 5,
       outcome: "victory", isBoss: true,
     });
-    expect(capstone.shards).toBe(SHARD_REWARDS.bossFirstClearCapstone);
+    expect(capstone.shards).toBe(TIER_REWARDS.normal.shardsBossFirstClearCapstone);
   });
 
   it("ordinary floors, boss replays, and losses all pay zero (first-time signals only)", () => {
@@ -785,6 +790,152 @@ describe("computeBattleRewards — Soul Shards", () => {
     expect(freshMilestonesCrossed(3, 12)).toBe(2);
     expect(freshMilestonesCrossed(10, 12)).toBe(0);
     expect(freshMilestonesCrossed(15, 30)).toBe(3);
+  });
+});
+
+describe("computeBattleRewards — difficulty tiers", () => {
+  const base = { unlockedUnits: NO_UNITS, chestSeed: 42 };
+
+  it("an explicit tier 'normal' changes nothing (byte-compat default)", () => {
+    const a = computeBattleRewards({
+      ...base, mode: "depths", floor: 3, outcome: "victory", isBoss: false,
+    });
+    const b = computeBattleRewards({
+      ...base, mode: "depths", floor: 3, outcome: "victory", isBoss: false,
+      tier: "normal",
+    });
+    expect(b).toEqual(a);
+  });
+
+  it("hard/elite multiply floor gold and XP: round(base × mult)", () => {
+    const baseGold =
+      GOLD_REWARDS.depthsFirstClearBase +
+      GOLD_REWARDS.depthsFirstClearPerFloor * 3;
+    const baseXp = XP_REWARDS.dungeonWinBase + XP_REWARDS.dungeonWinPerFloor * 3;
+    for (const tier of ["hard", "elite"] as const) {
+      const r = computeBattleRewards({
+        ...base, mode: "depths", floor: 3, outcome: "victory", isBoss: false,
+        tier,
+      });
+      expect(r.gold).toBe(Math.round(baseGold * TIER_REWARDS[tier].goldMult));
+      expect(r.xp).toBe(Math.round(baseXp * TIER_REWARDS[tier].xpMult));
+    }
+  });
+
+  it("floor chests climb the ladder with the tier: wooden → silver (Hard) → gold (Elite)", () => {
+    const chestTier = (tier?: TierId) =>
+      computeBattleRewards({
+        ...base, mode: "depths", floor: 3, outcome: "victory", isBoss: false,
+        tier,
+      }).chest?.tier;
+    expect(chestTier()).toBe("wooden");
+    expect(chestTier("hard")).toBe("silver");
+    expect(chestTier("elite")).toBe("gold");
+  });
+
+  it("a rich encounter's chest bump STACKS with the tier bump, clamped at dragon", () => {
+    const r = computeBattleRewards({
+      ...base, mode: "depths", floor: 3, outcome: "victory", isBoss: false,
+      tier: "elite", encounter: "cursed",
+    });
+    expect(r.chest?.tier).toBe(
+      bumpChestTier("wooden", richChestBump("cursed") + TIER_REWARDS.elite.chestBump)
+    );
+  });
+
+  it("a tier's lair FIRST kill is a real first clear: bumped chest, tier shards, multiplied gold", () => {
+    const r = computeBattleRewards({
+      ...base, mode: "depths", dungeonId: "deep_forge", floor: 5,
+      outcome: "victory", isBoss: true, tier: "elite",
+    });
+    expect(r.firstClear).toBe(true);
+    expect(r.chest?.tier).toBe("dragon"); // arcane +2, the ladder's top
+    expect(r.shards).toBe(TIER_REWARDS.elite.shardsBossFirstClearCapstone);
+    expect(r.gold).toBe(
+      Math.round(
+        (GOLD_REWARDS.depthsFirstClearBase +
+          GOLD_REWARDS.depthsFirstClearPerFloor * 5) *
+          TIER_REWARDS.elite.goldMult
+      )
+    );
+  });
+
+  it("bossCleared is PER-TIER from the caller: a Normal-cleared lair at Hard still pays Hard's first clear", () => {
+    const r = computeBattleRewards({
+      ...base, mode: "depths", dungeonId: "bonefields", floor: 5,
+      outcome: "victory", isBoss: true, bossCleared: false, tier: "hard",
+    });
+    expect(r.firstClear).toBe(true);
+    expect(r.shards).toBe(TIER_REWARDS.hard.shardsBossFirstClear);
+  });
+
+  it("Elite Spire: first clear clamps at dragon; the replay chest is bump-THEN-one-below (arcane)", () => {
+    const first = computeBattleRewards({
+      ...base, mode: "depths", dungeonId: "eclipse_spire", floor: 5,
+      outcome: "victory", isBoss: true, tier: "elite",
+    });
+    expect(first.chest?.tier).toBe("dragon");
+    let chest: ReturnType<typeof computeBattleRewards>["chest"] = null;
+    for (let seed = 1; seed <= 200 && !chest; seed++) {
+      chest = computeBattleRewards({
+        ...base, mode: "depths", dungeonId: "eclipse_spire", floor: 5,
+        outcome: "victory", isBoss: true, bossCleared: true, tier: "elite",
+        chestSeed: seed,
+      }).chest;
+    }
+    expect(chest).not.toBeNull();
+    expect(chest!.tier).toBe("arcane");
+  });
+
+  it("replay gold reads the BASE monsterLevel × goldMult — no tier-level double-dip", () => {
+    const r = computeBattleRewards({
+      ...base, mode: "depths", dungeonId: "bonefields", floor: 5,
+      outcome: "victory", isBoss: true, bossCleared: true, tier: "hard",
+      chestSeed: 7,
+    });
+    expect(r.gold).toBe(
+      Math.round(
+        replayGoldFor(getDungeon("bonefields").monsterLevel) *
+          TIER_REWARDS.hard.goldMult
+      )
+    );
+  });
+
+  it("losses at a tier pay the multiplied consolation + loss fraction of the multiplied win XP", () => {
+    const winXp = Math.round(
+      (XP_REWARDS.dungeonWinBase + XP_REWARDS.dungeonWinPerFloor * 3) *
+        TIER_REWARDS.hard.xpMult
+    );
+    const r = computeBattleRewards({
+      ...base, mode: "depths", floor: 3, outcome: "defeat", tier: "hard",
+    });
+    expect(r.xp).toBe(Math.round(XP_REWARDS.lossFrac * winXp));
+    expect(r.gold).toBe(
+      Math.round(GOLD_REWARDS.depthsLoss * TIER_REWARDS.hard.goldMult)
+    );
+  });
+
+  it("treasure rooms scale too: bumped hoard tiers + multiplied XP token", () => {
+    const normal = computeTreasureRewards({
+      floor: 3, highestClearedFloor: 0, chestSeed: 42, unlockedUnits: NO_UNITS,
+    });
+    const elite = computeTreasureRewards({
+      floor: 3, highestClearedFloor: 0, chestSeed: 42, unlockedUnits: NO_UNITS,
+      tier: "elite",
+    });
+    expect(normal.chests.map((c) => c.tier)).toEqual([...TREASURE_ROOM_TIERS]);
+    expect(elite.chests.map((c) => c.tier)).toEqual(
+      TREASURE_ROOM_TIERS.map((t) =>
+        bumpChestTier(t, TIER_REWARDS.elite.chestBump)
+      )
+    );
+    expect(elite.xp).toBe(
+      Math.round(
+        (XP_REWARDS.dungeonWinBase + XP_REWARDS.dungeonWinPerFloor * 3) *
+          0.4 *
+          TIER_REWARDS.elite.xpMult
+      )
+    );
   });
 });
 

@@ -13,6 +13,13 @@ import {
   MONSTER_LEVEL_CAP,
   monsterLevelFor,
 } from "@/data/dungeons";
+import {
+  isTierUnlocked,
+  NORMAL_BAND_TOP,
+  TIER_IDS,
+  tierMonsterLevel,
+  type TierId,
+} from "@/data/tiers";
 import { LEVEL_CAP } from "@/meta/leveling";
 
 /** clearedFloorOf backed by a plain record (missing id = nothing cleared). */
@@ -85,9 +92,9 @@ describe("dungeon registry — gate chain sanity", () => {
 });
 
 describe("monster-level ladder", () => {
-  it("holds the tuned ladder 1/3/5/6/7/8/9, then 10/10 past the fork", () => {
+  it("holds the Normal band's ladder 1/4/7/9/11/14/17, then 20/20 past the fork", () => {
     expect(DUNGEON_IDS.map((id) => getDungeon(id).monsterLevel)).toEqual([
-      1, 3, 5, 6, 7, 8, 9, 10, 10,
+      1, 4, 7, 9, 11, 14, 17, 20, 20,
     ]);
   });
 
@@ -110,16 +117,96 @@ describe("monster-level ladder", () => {
     expect(monsterLevelFor(d, "boss")).toBe(d.monsterLevel + ELITE_LEVEL_BONUS);
   });
 
-  it("the endgame fork elites out-level a maxed player (Lv 11), capped at MONSTER_LEVEL_CAP", () => {
+  it("the endgame fork caps the Normal band at 20; its elites ride +1 to 21", () => {
     for (const id of ["fallen_cathedral", "rogues_den"]) {
       const d = getDungeon(id);
-      expect(d.monsterLevel).toBe(LEVEL_CAP); // fodder at the player cap (10)
-      // Elites ride the +1 bump ABOVE the player cap — the endgame difficulty knob.
-      expect(monsterLevelFor(d, "boss")).toBe(LEVEL_CAP + ELITE_LEVEL_BONUS); // 11
-      expect(monsterLevelFor(d, "rare")).toBe(LEVEL_CAP + ELITE_LEVEL_BONUS); // 11
-      expect(monsterLevelFor(d, "boss")).toBeGreaterThan(LEVEL_CAP);
+      expect(d.monsterLevel).toBe(NORMAL_BAND_TOP); // 20 — the Normal band's top
+      expect(monsterLevelFor(d, "boss")).toBe(NORMAL_BAND_TOP + ELITE_LEVEL_BONUS); // 21
+      expect(monsterLevelFor(d, "rare")).toBe(NORMAL_BAND_TOP + ELITE_LEVEL_BONUS);
       expect(monsterLevelFor(d, "boss")).toBeLessThanOrEqual(MONSTER_LEVEL_CAP);
     }
+  });
+});
+
+describe("difficulty tiers — the band map", () => {
+  it("re-bands each dungeon's chain position: Hard 25–30, Elite 30–40", () => {
+    const table = DUNGEON_IDS.map((id) => {
+      const d = getDungeon(id);
+      return [
+        d.monsterLevel,
+        tierMonsterLevel(d.monsterLevel, "hard"),
+        tierMonsterLevel(d.monsterLevel, "elite"),
+      ];
+    });
+    expect(table).toEqual([
+      [1, 25, 30], // depths opens each band
+      [4, 26, 32],
+      [7, 27, 33],
+      [9, 27, 34],
+      [11, 28, 35],
+      [14, 28, 37],
+      [17, 29, 38],
+      [20, 30, 40], // the forks cap each band
+      [20, 30, 40],
+    ]);
+  });
+
+  it("normal is the identity band (tier-unaware callers keep exact old levels)", () => {
+    for (const id of DUNGEON_IDS) {
+      const d = getDungeon(id);
+      expect(tierMonsterLevel(d.monsterLevel, "normal")).toBe(d.monsterLevel);
+      expect(monsterLevelFor(d, "fodder", "normal")).toBe(
+        monsterLevelFor(d, "fodder")
+      );
+    }
+  });
+
+  it("bands stay monotonic non-decreasing along the gate chain at every tier", () => {
+    for (const tier of TIER_IDS) {
+      for (const id of DUNGEON_IDS) {
+        const d = getDungeon(id);
+        if (!d.gate) continue;
+        expect(tierMonsterLevel(d.monsterLevel, tier)).toBeGreaterThanOrEqual(
+          tierMonsterLevel(getDungeon(d.gate.dungeonId).monsterLevel, tier)
+        );
+      }
+    }
+  });
+
+  it("every dungeon × tier × kind stays within MONSTER_LEVEL_CAP (41)", () => {
+    expect(MONSTER_LEVEL_CAP).toBe(41);
+    for (const tier of TIER_IDS) {
+      for (const id of DUNGEON_IDS) {
+        const d = getDungeon(id);
+        for (const kind of ["fodder", "rare", "boss"] as const) {
+          expect(monsterLevelFor(d, kind, tier)).toBeLessThanOrEqual(
+            MONSTER_LEVEL_CAP
+          );
+        }
+      }
+    }
+  });
+
+  it("the fork bosses land one notch over each band's top — Elite at 41, past a maxed warband", () => {
+    for (const id of ["fallen_cathedral", "rogues_den"]) {
+      const d = getDungeon(id);
+      expect(monsterLevelFor(d, "boss", "hard")).toBe(31);
+      expect(monsterLevelFor(d, "boss", "elite")).toBe(41);
+      expect(monsterLevelFor(d, "boss", "elite")).toBeGreaterThan(LEVEL_CAP);
+    }
+  });
+
+  it("isTierUnlocked walks the per-dungeon ladder (truth table)", () => {
+    const cleared = (done: TierId[]) => (t: TierId) => done.includes(t);
+    // Nothing cleared: only Normal.
+    expect(isTierUnlocked("normal", cleared([]))).toBe(true);
+    expect(isTierUnlocked("hard", cleared([]))).toBe(false);
+    expect(isTierUnlocked("elite", cleared([]))).toBe(false);
+    // Normal cleared: Hard opens, Elite stays shut.
+    expect(isTierUnlocked("hard", cleared(["normal"]))).toBe(true);
+    expect(isTierUnlocked("elite", cleared(["normal"]))).toBe(false);
+    // Hard cleared too: the whole ladder is open.
+    expect(isTierUnlocked("elite", cleared(["normal", "hard"]))).toBe(true);
   });
 });
 

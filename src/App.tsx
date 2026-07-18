@@ -10,6 +10,7 @@ import { pickDungeonTrack, setMusicTrack } from "@/audio/music";
 import type { BattleMode } from "@/hooks/useBattleEngine";
 import { getDungeon } from "@/data/dungeons";
 import { isBossDepth, makeRun, type DungeonRun } from "@/data/dungeonRun";
+import type { TierId } from "@/data/tiers";
 import { generateSeed } from "@/utils/rng";
 
 function Shell() {
@@ -55,11 +56,12 @@ function Shell() {
     }
   }, [view, battleMode, floor, run?.dungeonId]);
 
-  // Start a fresh dungeon run at floor 1 (the atlas "Enter Dungeon" button).
-  const enterDungeon = (dungeonId: string) => {
+  // Start a fresh dungeon run at floor 1, at the picked difficulty tier (the
+  // atlas "Enter Dungeon" button). The tier is frozen into the run.
+  const enterDungeon = (dungeonId: string, tier: TierId) => {
     setActiveDeck(save.deck.slice(0, 4));
     setBattleMode("depths");
-    setRun(makeRun(dungeonId, getDungeon(dungeonId), generateSeed()));
+    setRun(makeRun(dungeonId, getDungeon(dungeonId), generateSeed(), tier));
     setView("battle");
   };
 
@@ -73,30 +75,36 @@ function Shell() {
       {view === "battle" ? (
         battleMode === "depths" && run ? (
           <BattleScreen
-            // Re-key per floor so React mounts a FRESH sim each descent — the
-            // seamless walk-off → next-arena hand-off, with no atlas in between.
-            key={`${run.dungeonId}:${run.depth}`}
+            // Re-key per floor (and tier, belt-and-braces) so React mounts a
+            // FRESH sim each descent — the seamless walk-off → next-arena
+            // hand-off, with no atlas in between.
+            key={`${run.dungeonId}:${run.tier}:${run.depth}`}
             deck={activeDeck}
             mode="depths"
             floor={run.depth}
             dungeonId={run.dungeonId}
             encounter={run.encounter}
+            tier={run.tier}
             isBoss={isBossDepth(run)}
             nextIsBoss={isBossDepth(run, run.depth + 1)}
             // On the boss floor, skip the fusion-quest rare if the run already
             // met it on a rare-quarry encounter (mutual exclusivity).
             suppressQuestRare={run.rareSpawned}
+            // The previous floor's deploy marks — fields this floor's warband
+            // automatically (the march-in). Undefined on floor 1 (manual).
+            formation={run.formation}
             onExit={leaveBattle}
-            onContinueDeeper={(_dungeonId, encounter) =>
-              // Advance in place — bump the depth + carry the chosen omen; the
-              // key change above remounts the battle on the next floor. Entering
-              // a rare-quarry floor marks the run's rare as met.
+            onContinueDeeper={(_dungeonId, encounter, formation) =>
+              // Advance in place — bump the depth + carry the chosen omen and the
+              // deploy marks; the key change above remounts the battle on the next
+              // floor. Entering a rare-quarry floor marks the run's rare as met.
               setRun((r) =>
                 r
                   ? {
                       ...r,
                       depth: r.depth + 1,
                       encounter,
+                      formation: formation ?? undefined,
                       rareSpawned: r.rareSpawned || encounter === "rare_spawn",
                     }
                   : r

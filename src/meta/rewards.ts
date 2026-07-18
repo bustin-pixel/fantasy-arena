@@ -34,6 +34,7 @@ import {
 import { RNG } from "@/utils/rng";
 import {
   BOSS_REPLAY_CHEST_CHANCE,
+  bumpChestTier,
   CHEST_GOLD_RANGE,
   CHEST_UNIT_CHANCE,
   DUPLICATE_GOLD,
@@ -48,9 +49,11 @@ import {
   SHARD_CHEST_DRIP,
   SHARD_REWARDS,
   SIGNATURE_DROP_CHANCE,
+  TIER_REWARDS,
   type ChestTier,
 } from "./economy";
 import { XP_REWARDS } from "./leveling";
+import type { TierId } from "@/data/tiers";
 
 /** One thing inside a chest. A discriminated union so later slices can add
  *  entries without touching existing code — contents are granted instantly
@@ -197,6 +200,17 @@ const BOSS_REPLAY_CHEST_SALT = 0xb055;
 const TREASURE_SALT_A = 0x77a1;
 const TREASURE_SALT_B = 0x77b2;
 
+/** The boss chest tier a dungeon pays at a difficulty tier: the chain grade
+ *  (bossChestTierFor) bumped up the ladder by the tier's chestBump, clamped at
+ *  dragon. The reward fold and the atlas preview share this one source, so the
+ *  sheet can't promise a chest the fold wouldn't pay. */
+export function effectiveBossChestTier(
+  dungeonId: string,
+  tier: TierId = "normal"
+): ChestTier {
+  return bumpChestTier(bossChestTierFor(dungeonId), TIER_REWARDS[tier].chestBump);
+}
+
 /** The full post-battle reward matrix. Callers pass chestSeed from
  *  generateSeed() at drop time so this stays pure. */
 export function computeBattleRewards(input: {
@@ -230,8 +244,13 @@ export function computeBattleRewards(input: {
    *  pays a first clear. Absent = an ordinary floor. */
   isBoss?: boolean;
   /** RNG run model: whether the dungeon's boss was ALREADY defeated before this
-   *  battle (first boss kill = first clear; a later kill is a replay farm). */
+   *  battle AT THIS TIER (first boss kill per tier = that tier's first clear;
+   *  a later kill is a replay farm). */
   bossCleared?: boolean;
+  /** Difficulty tier the run was fought at — multiplies depths XP/gold, bumps
+   *  chest tiers, and grades the per-tier first-clear shards (TIER_REWARDS).
+   *  Ignored outside depths. */
+  tier?: TierId;
 }): BattleRewards {
   const {
     mode,
@@ -248,6 +267,7 @@ export function computeBattleRewards(input: {
     itemLoadouts,
     itemPity = 0,
     encounter = "normal",
+    tier = "normal",
   } = input;
   const none: BattleRewards = {
     gold: 0,
@@ -263,16 +283,14 @@ export function computeBattleRewards(input: {
   // contents-roll (and every legacy seed) is untouched.
   const coin = luckyCoinBonus(deck, itemLoadouts);
   const boostGold = (g: number) => Math.round(g * (1 + coin.goldPct / 100));
-  const TIER_ORDER: ChestTier[] = ["wooden", "silver", "gold", "arcane", "dragon"];
-  const upgradeTier = (tier: ChestTier): ChestTier => {
-    if (coin.chestUpgradeChance <= 0) return tier;
+  const upgradeTier = (chestTier: ChestTier): ChestTier => {
+    if (coin.chestUpgradeChance <= 0) return chestTier;
     const rng = new RNG(chestSeed ^ 0x5eed);
-    if (rng.next() >= coin.chestUpgradeChance) return tier;
-    const i = TIER_ORDER.indexOf(tier);
-    return TIER_ORDER[Math.min(i + 1, TIER_ORDER.length - 1)];
+    if (rng.next() >= coin.chestUpgradeChance) return chestTier;
+    return bumpChestTier(chestTier, 1);
   };
-  const makeChest = (tier: ChestTier, sigDungeonId?: string): ChestResult => {
-    const t = upgradeTier(tier);
+  const makeChest = (chestTier: ChestTier, sigDungeonId?: string): ChestResult => {
+    const t = upgradeTier(chestTier);
     return {
       tier: t,
       seed: chestSeed,
@@ -329,14 +347,20 @@ export function computeBattleRewards(input: {
     const questUnlock =
       newQuestUnlocks.length > 0 ? newQuestUnlocks : undefined;
 
-    // XP scales with the floor fought, win or lose — replays pay full (unlike
-    // gold) so fighting at your edge is always the best XP.
-    const winXp =
-      XP_REWARDS.dungeonWinBase + XP_REWARDS.dungeonWinPerFloor * floor;
+    // XP scales with the floor fought AND the difficulty tier, win or lose —
+    // replays pay full (unlike gold) so fighting at your edge is always the
+    // best XP; tier multipliers are the leveling fuel past the Normal band.
+    // Rounding order: round(base × xpMult) first (identity at Normal), then
+    // the loss fraction rounds off that — Normal stays byte-identical.
+    const tr = TIER_REWARDS[tier];
+    const winXp = Math.round(
+      (XP_REWARDS.dungeonWinBase + XP_REWARDS.dungeonWinPerFloor * floor) *
+        tr.xpMult
+    );
     if (outcome !== "victory") {
       return {
         ...none,
-        gold: boostGold(GOLD_REWARDS.depthsLoss),
+        gold: boostGold(Math.round(GOLD_REWARDS.depthsLoss * tr.goldMult)),
         xp: Math.round(XP_REWARDS.lossFrac * winXp),
         questUnlocks: questUnlock,
       };
@@ -349,21 +373,25 @@ export function computeBattleRewards(input: {
     const boss = input.isBoss ?? false;
     const bossCleared = input.bossCleared ?? false;
     if (boss && !bossCleared) {
-      // First boss kill = the dungeon's first clear (its big payout; gifts are
-      // granted in the state fold off `firstClear`). Chests are graded by the
-      // dungeon's place in the chain (Depths silver → themed gold → Forge
-      // arcane → Spire dragon) and roll the dungeon's signature item line;
-      // capstones pay the most shards.
+      // First boss kill AT THIS TIER = that tier's first clear (its big
+      // payout; Normal's clear also grants gifts in the state fold off
+      // `firstClear`). Chests are graded by the dungeon's place in the chain
+      // (Depths silver → themed gold → Forge arcane → Spire dragon), bumped
+      // up the ladder by the tier (effectiveBossChestTier), and roll the
+      // dungeon's signature item line; capstones pay the most shards.
       const shards = isCapstoneDungeon(dungeonId)
-        ? SHARD_REWARDS.bossFirstClearCapstone
-        : SHARD_REWARDS.bossFirstClear;
+        ? tr.shardsBossFirstClearCapstone
+        : tr.shardsBossFirstClear;
       return {
         gold: boostGold(
-          GOLD_REWARDS.depthsFirstClearBase +
-            GOLD_REWARDS.depthsFirstClearPerFloor * floor
+          Math.round(
+            (GOLD_REWARDS.depthsFirstClearBase +
+              GOLD_REWARDS.depthsFirstClearPerFloor * floor) *
+              tr.goldMult
+          )
         ),
         xp: winXp,
-        chest: makeChest(bossChestTierFor(dungeonId), dungeonId),
+        chest: makeChest(effectiveBossChestTier(dungeonId, tier), dungeonId),
         shards,
         firstClear: true,
         questUnlocks: questUnlock,
@@ -377,31 +405,40 @@ export function computeBattleRewards(input: {
       let replayChest: ChestResult | null = null;
       const rng = new RNG(chestSeed ^ BOSS_REPLAY_CHEST_SALT);
       if (rng.next() < BOSS_REPLAY_CHEST_CHANCE) {
-        const b = TIER_ORDER.indexOf(bossChestTierFor(dungeonId));
-        replayChest = makeChest(TIER_ORDER[Math.max(0, b - 1)], dungeonId);
+        // Ordering: bump the boss tier for the difficulty FIRST, then step one
+        // below — an Elite Spire replay pays arcane (dragon − 1), not dragon.
+        replayChest = makeChest(
+          bumpChestTier(effectiveBossChestTier(dungeonId, tier), -1),
+          dungeonId
+        );
       }
       return {
         ...none,
-        gold: boostGold(replayGoldFor(dungeon.monsterLevel)),
+        // replayGoldFor reads the BASE monsterLevel — the tier's goldMult is
+        // the only tier layer here (feeding a tier-banded level would double-dip).
+        gold: boostGold(
+          Math.round(replayGoldFor(dungeon.monsterLevel) * tr.goldMult)
+        ),
         xp: winXp,
         chest: replayChest,
         questUnlocks: questUnlock,
       };
     }
     // A non-boss floor within a run: a modest, repeatable clear reward — gold
-    // scaled by depth + a wooden chest (bumped a tier on a rich encounter).
-    const floorTier: ChestTier =
-      TIER_ORDER[
-        Math.min(
-          TIER_ORDER.indexOf("wooden") + richChestBump(encounter),
-          TIER_ORDER.length - 1
-        )
-      ];
+    // scaled by depth + a wooden chest, bumped up the ladder by a rich
+    // encounter AND the difficulty tier (the bumps stack, clamped at dragon).
+    const floorTier: ChestTier = bumpChestTier(
+      "wooden",
+      richChestBump(encounter) + tr.chestBump
+    );
     return {
       ...none,
       gold: boostGold(
-        GOLD_REWARDS.depthsFirstClearBase +
-          GOLD_REWARDS.depthsFirstClearPerFloor * floor
+        Math.round(
+          (GOLD_REWARDS.depthsFirstClearBase +
+            GOLD_REWARDS.depthsFirstClearPerFloor * floor) *
+            tr.goldMult
+        )
       ),
       xp: winXp,
       chest: makeChest(floorTier),
@@ -435,23 +472,36 @@ export function computeTreasureRewards(input: {
   chestSeed: number;
   unlockedUnits: readonly string[];
   itemPity?: number;
+  /** Difficulty tier — bumps each hoard chest up the ladder and multiplies
+   *  the XP token, like the combat floors. */
+  tier?: TierId;
 }): { chests: ChestResult[]; xp: number; firstClear: boolean } {
-  const { floor, highestClearedFloor, chestSeed, unlockedUnits, itemPity = 0 } =
-    input;
+  const {
+    floor,
+    highestClearedFloor,
+    chestSeed,
+    unlockedUnits,
+    itemPity = 0,
+    tier = "normal",
+  } = input;
+  const tr = TIER_REWARDS[tier];
   const salts = [0, TREASURE_SALT_A, TREASURE_SALT_B];
-  const chests: ChestResult[] = TREASURE_ROOM_TIERS.map((tier, i) => {
+  const chests: ChestResult[] = TREASURE_ROOM_TIERS.map((chestTier, i) => {
     const seed = (chestSeed ^ salts[i]) >>> 0;
+    const bumped = bumpChestTier(chestTier, tr.chestBump);
     return {
-      tier,
+      tier: bumped,
       seed,
-      contents: rollChest(seed, tier, unlockedUnits, {
+      contents: rollChest(seed, bumped, unlockedUnits, {
         // Pity insurance rides the first chest only.
         forceItem: i === 0 && itemPity >= ITEM_PITY_THRESHOLD,
       }),
     };
   });
   const xp = Math.round(
-    (XP_REWARDS.dungeonWinBase + XP_REWARDS.dungeonWinPerFloor * floor) * 0.4
+    (XP_REWARDS.dungeonWinBase + XP_REWARDS.dungeonWinPerFloor * floor) *
+      0.4 *
+      tr.xpMult
   );
   return { chests, xp, firstClear: floor > highestClearedFloor };
 }

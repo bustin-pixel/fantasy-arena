@@ -10,6 +10,9 @@ interface Props {
   onSpeed: (s: number) => void;
   mode: BattleMode;
   onExit: () => void;
+  /** Descent march-in: scrap the auto-line-up for manual placement. Absent when
+   *  the affordance doesn't apply (arena/endless, or floor 1). */
+  onRegroup?: () => void;
 }
 
 function fmtClock(sec: number): string {
@@ -73,7 +76,13 @@ export function BattleTopBar({
   );
 }
 
-export function BattleHud({ ui, speed, onSpeed, mode }: Omit<Props, "onExit">) {
+export function BattleHud({
+  ui,
+  speed,
+  onSpeed,
+  mode,
+  onRegroup,
+}: Omit<Props, "onExit">) {
   const next = ui.playerNext ? getUnitDef(ui.playerNext) : null;
 
   // Countdown ticks: the throttled ui snapshot (~6/s) is plenty for a 1s
@@ -138,6 +147,23 @@ export function BattleHud({ ui, speed, onSpeed, mode }: Omit<Props, "onExit">) {
       )}
 
       <div className="hud-bottom">
+        {/* Descent march-in: scrap the auto-line-up and place manually. Shown
+            during both the walk-in and the ensuing countdown. */}
+        {ui.phase === "deployment" && ui.canRegroup && onRegroup && (
+          <button
+            type="button"
+            className="btn regroup-btn"
+            onClick={() => {
+              // A regroup can collapse a live countdown straight to null; reset
+              // the SFX guard so that doesn't voice a false "Fight!".
+              prevCount.current = null;
+              playSfx("uiSelect");
+              onRegroup();
+            }}
+          >
+            ↺ Regroup
+          </button>
+        )}
         {ui.phase === "deployment" && ui.canDeploy && next && (
           <div className="deploy-bar">
             <div className="deploy-hint">

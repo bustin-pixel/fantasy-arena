@@ -18,6 +18,48 @@ the source of truth, so this file deliberately doesn't duplicate it.
 > exceptions to preserve live in the `architecture-refactor-batch` memory if it's
 > ever wanted.
 
+> **BUILT, UNSHIPPED (2026-07-17): level cap 30 + per-dungeon difficulty tiers.**
+> `LEVEL_CAP` 10→30 (same XP curve — 21,750 to max; old capped saves load as
+> Lv 10 of 30), the Normal chain's `monsterLevel` re-spread 1→20 (forks at 20,
+> bosses 21), and a per-dungeon Normal/Hard/Elite ladder picked on the atlas
+> sheet (`FloorInfoPanel` pills; clear a dungeon's Normal → its Hard → its
+> Elite). Tiers re-band monster LEVELS only (`data/tiers.ts`: Hard 25–30,
+> Elite 30–40 — deliberately past the player cap; fork Elite boss Lv **41**),
+> pay ×2/×3 XP+gold, bump chests +1/+2, and each tier's first boss kill is a
+> real first clear (gold + shards, `TIER_REWARDS` in economy.ts). Save **v14**
+> (`DungeonProgress.clearedTiers`). Invariants in NOTES §8. Sweep the tiers
+> with `SWEEP=1 SWEEP_TIER=hard|elite npm test -- winrateSweep`.
+>
+> **Deferred: prestige / cosmetic ascension.** Cap 30 + the tier ladder carry
+> the long game; revisit prestige as its own slice once players saturate Elite.
+
+> **BUILT, UNSHIPPED (2026-07-17): descent march-in + Regroup.** Dungeon floors
+> 2+ auto-field the warband on the *previous floor's deploy-time marks* (a walk-in
+> cinematic — the twin of the walk-off), then the normal 3s countdown runs with a
+> **Regroup** button that drops back to manual placement. Uniform incl. the boss
+> lair; floor 1 stays manual; within-one-run only (`DungeonRun.formation`, never
+> persisted — **no save bump**). Capture reads the `deployments` log (live
+> positions are scattered by the outro by hand-off time); fielded at construction
+> behind an `introHold` that makes the deployment tick a no-op until the walk-in
+> releases it. 712 tests (+11 `formation.test.ts`; F3 = byte-identical to manually
+> placing the same marks). ⚠ walk-in + floor-2 button need a **device eyeball**
+> (preview pane suspends rAF). Memory: `descent-march-in-formation-built`.
+
+> **BUILT, UNSHIPPED (2026-07-17): boss "brace up" cinematic.** The mid-battle
+> sibling of the march-in: when a boss (or the rare quest catalyst) telegraphs onto
+> a cleared field, the sim FREEZES and the survivors pull back into a centered
+> horizontal row at the arena mid-line to face the entrance; the fight then resumes
+> **from that row** (a real, deterministic gameplay change — user-picked over a
+> cosmetic snap-back). Covers **Depths boss + rare AND Endless boss + rare** via one
+> shared trigger (a boss/rare `state.waveBanner` on a clear field — clear in all
+> four cases). The freeze is the in-battle twin of the march-in hold: frozen ticks
+> touch no sim state, the engine snaps survivors to a deterministic row on release
+> (`computeBraceRow`/`applyBraceRow`), and a `BOSS_BRACE_FAILSAFE_SEC` failsafe auto-
+> releases headlessly — so boss floors still resolve AND stay byte-reproducible. 718
+> tests (+6 `brace.test.ts`). Lives entirely in `MatchController` + the hook
+> (`OutroCinematic.braceToRow`, a `braceRef`); no UI/App changes. ⚠ the retreat
+> cinematic needs a **device eyeball**. Memory: `boss-brace-cinematic-built`.
+
 **Current state:** deterministic 4v4 auto-battler, 24 deckable units (engine fully
 kit-based — see `docs/adr/0001-unitkit-seam.md`), a swipeable 3-page app shell
 (Collection / Home / Compendium) over a scrolling dungeon-crypt background,
