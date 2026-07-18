@@ -350,6 +350,42 @@ export const QUEST_CHEST_TIER: Record<QuestDifficulty, ChestTier> = {
   hard: "gold",
 };
 
+// ---------------------------------------------------------------------------
+// Bestiary rewards — the payouts for discovering, mastering, and completing the
+// Compendium. Every source is a ONE-TIME monotonic signal (a false→true reveal
+// flip, a slayer threshold crossing, a book's last defeat), so the reward fold
+// stays idempotent without a claims ledger — the same guarantee the first-clear
+// shard grants rely on. All meta-layer; the sim never learns about any of it.
+// Straw-man numbers — tune here, nowhere else. See meta/bestiaryRewards.ts.
+// ---------------------------------------------------------------------------
+
+/** One-time discovery gold, split by whether the entry is an ordinary monster
+ *  or a dungeon boss. Encountering pays a scouting trickle; the first defeat is
+ *  the real payout. Bosses (rare by nature) pay a premium AND a Soul Shard. */
+export const BESTIARY_REWARDS = {
+  /** First time an ordinary monster is fielded against you (silhouette + name). */
+  encounterGold: 10,
+  /** First time an ordinary monster dies to you (full page). */
+  defeatGold: 25,
+  /** First time a dungeon boss is fielded against you. */
+  bossEncounterGold: 25,
+  /** First time a dungeon boss dies to you. */
+  bossDefeatGold: 100,
+  /** Soul Shards on a boss's first defeat (bosses only). */
+  bossDefeatShards: 1,
+  /** Defeating every monster in one dungeon's Compendium book. */
+  bookCompletionGold: 250,
+  bookCompletionShards: 2,
+} as const;
+
+/** Gold paid for REACHING each slayer level (index level−1, so level 1 → [0]).
+ *  Escalating like the kill thresholds behind them (10/25/50/100/200 kills) —
+ *  the grind's visible punctuation. Level 5 (mastery) also pays a Soul Shard. */
+export const SLAYER_MILESTONE_GOLD = [25, 50, 100, 200, 400] as const;
+
+/** Soul Shards on hitting the slayer cap (level 5) for a monster. */
+export const SLAYER_MASTERY_SHARDS = 1;
+
 /** How many FRESH 5-wave milestones this endless run crossed — the shard twin
  *  of endlessMilestoneChestTier (which pays one chest for the deepest); shards
  *  pay per milestone (a 3→12 run banks the 5 AND 10 marks). */

@@ -11,6 +11,7 @@ import { useEffect, useMemo, useState } from "react";
 import { DECKABLE_UNIT_IDS, getUnitDef } from "@/data/units";
 import { rarityRank } from "@/data/rarities";
 import { MAX_USERNAME_LENGTH } from "@/state/persistence";
+import { earnedTitleIds, titleLabel } from "@/meta/bestiaryRewards";
 import { useGameState } from "@/state/GameStateContext";
 import { AvatarPortrait } from "@/components/ProfilePlate";
 import { playSfx } from "@/audio/sfx";
@@ -20,8 +21,15 @@ interface Props {
 }
 
 export function ProfileSheet({ onClose }: Props) {
-  const { save, setUsername, setAvatar } = useGameState();
+  const { save, setUsername, setAvatar, setTitle } = useGameState();
   const [draft, setDraft] = useState(save.username);
+
+  // Titles are DERIVED (boss first-kills + a complete bestiary), never stored —
+  // only the equipped choice is. Recompute whenever the underlying progress moves.
+  const earnedTitles = useMemo(
+    () => earnedTitleIds(save.bestiary, save.monsterKills),
+    [save.bestiary, save.monsterKills]
+  );
 
   // Every way out funnels through here so the name is never left uncommitted.
   const commitAndClose = () => {
@@ -89,6 +97,37 @@ export function ProfileSheet({ onClose }: Props) {
             placeholder={save.username}
           />
         </label>
+
+        <span className="profile-field-label">Title</span>
+        {earnedTitles.length === 0 ? (
+          <p className="profile-title-empty">
+            No titles yet — fell a dungeon boss to earn your first.
+          </p>
+        ) : (
+          <div className="title-grid" role="listbox" aria-label="Choose a title">
+            <button
+              type="button"
+              role="option"
+              aria-selected={save.title === null}
+              className={`title-cell${save.title === null ? " selected" : ""}`}
+              onClick={() => { playSfx("uiSelect"); setTitle(null); }}
+            >
+              None
+            </button>
+            {earnedTitles.map((id) => (
+              <button
+                key={id}
+                type="button"
+                role="option"
+                aria-selected={save.title === id}
+                className={`title-cell${save.title === id ? " selected" : ""}`}
+                onClick={() => { playSfx("uiSelect"); setTitle(id); }}
+              >
+                {titleLabel(id)}
+              </button>
+            ))}
+          </div>
+        )}
 
         <span className="profile-field-label">Icon</span>
         <div className="avatar-grid" role="listbox" aria-label="Choose an icon">

@@ -22,6 +22,7 @@ import {
   type PlayerSave,
 } from "./persistence";
 import { isAvatarUnlocked } from "@/meta/avatars";
+import { earnedTitleIds } from "@/meta/bestiaryRewards";
 import { UNLOCK_PRICES } from "@/meta/economy";
 import { canEquip, combineFold } from "@/meta/inventory";
 import {
@@ -89,10 +90,9 @@ interface GameStateValue {
   /** Change the profile icon. No-op unless the avatar is unlocked. */
   setAvatar: (avatarId: string) => void;
   recordResult: (won: boolean) => void;
-  /** Fold a battle's enemy roster into the Compendium: everything fielded
-   *  against you counts as encountered; everything that died counts as
-   *  defeated. Reveals only ever go forward (no un-discovering). */
-  recordBestiary: (seen: string[], slain: string[]) => void;
+  /** Equip an earned title (or null to wear none). No-op unless the title is
+   *  in the derived earned set — titles are never stored, only the choice is. */
+  setTitle: (titleId: string | null) => void;
   /** Apply an already-computed reward bundle (gold, chest contents, Depths
    *  progress + milestone unlock on a first clear) in ONE atomic save write.
    *  Idempotence is the caller's job (BattleScreen's recordedRef); rolling
@@ -176,20 +176,15 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
       wins: s.wins + (won ? 1 : 0),
       losses: s.losses + (won ? 0 : 1),
     }));
-  const recordBestiary = (seen: string[], slain: string[]) =>
-    setSave((s) => {
-      const bestiary = { ...s.bestiary };
-      for (const id of seen) {
-        bestiary[id] = {
-          encountered: true,
-          defeated: bestiary[id]?.defeated ?? false,
-        };
-      }
-      for (const id of slain) {
-        bestiary[id] = { encountered: true, defeated: true };
-      }
-      return { ...s, bestiary };
-    });
+  // Compendium reveals are NOT recorded here — they fold inside
+  // grantBattleRewards, so a reveal and the discovery gold it pays land in one
+  // atomic write (meta/battleGrant).
+  const setTitle = (titleId: string | null) =>
+    setSave((s) =>
+      titleId === null || earnedTitleIds(s.bestiary, s.monsterKills).includes(titleId)
+        ? { ...s, title: titleId }
+        : s
+    );
 
   // One atomic fold per battle: gold + chest gold + unlock drops + Depths
   // progress + milestone all land in a single setSave, so a crash can never
@@ -359,7 +354,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
         setUsername,
         setAvatar,
         recordResult,
-        recordBestiary,
+        setTitle,
         grantBattleRewards,
         purchaseUnit,
         equipItem,

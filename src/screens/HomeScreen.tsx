@@ -4,6 +4,7 @@ import { ArenaIcon, EndlessIcon, SwarmIcon } from "@/components/ModeIcons";
 import { ProfilePlate } from "@/components/ProfilePlate";
 import { ProfileSheet } from "@/components/ProfileSheet";
 import { endlessBestWave, highestClearedFloorOf } from "@/state/persistence";
+import { titleLabel } from "@/meta/bestiaryRewards";
 import { dayIndexLocal } from "@/meta/shop";
 import { forgeableStackCount } from "@/meta/blacksmith";
 import type { BattleMode } from "@/hooks/useBattleEngine";
@@ -70,6 +71,7 @@ export function HomeScreen({
         avatarId={save.avatarId}
         wins={save.wins}
         losses={save.losses}
+        title={titleLabel(save.title)}
         onEdit={() => { playSfx("uiOpen"); setEditingProfile(true); }}
       />
 

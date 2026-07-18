@@ -14,7 +14,11 @@ import {
 import { DECKABLE_UNIT_IDS } from "@/data/units";
 import { QUEST_LOCKED_UNITS } from "@/data/dungeons";
 import { DEFAULT_AVATAR_ID } from "@/meta/avatars";
-import { STARTER_UNIT_IDS } from "@/meta/economy";
+import { BESTIARY_REWARDS, STARTER_UNIT_IDS } from "@/meta/economy";
+import {
+  computeRetroBestiaryRewards,
+  earnedTitleIds,
+} from "@/meta/bestiaryRewards";
 import { TOTAL_XP_CAP } from "@/meta/leveling";
 
 /** Legacy (pre-v6) shape: carried a single `depths` high-water mark before the
@@ -43,7 +47,7 @@ function v2Save(): Partial<PlayerSave> {
 describe("migrateSave", () => {
   it("null (new player) → defaults: starter units, 0 gold, floor 0", () => {
     const save = migrateSave(null);
-    expect(save.version).toBe(15);
+    expect(save.version).toBe(16);
     expect(save.shop).toEqual({ day: -1, rerolls: 0, bought: [] });
     expect(save.quests).toEqual({
       day: -1,
@@ -77,7 +81,13 @@ describe("migrateSave", () => {
       expect(save.unlockedUnits).not.toContain(id);
     }
     expect(save.questUnlocks).toEqual([]);
-    expect(save.gold).toBe(0);
+    // Gold is NOT 0: this v2 fixture already had the Bloater (a dungeon boss)
+    // defeated, so the v16 bestiary retro-grant pays that page once — boss
+    // encounter + boss defeat + its shard. See the retro spec below.
+    expect(save.gold).toBe(
+      BESTIARY_REWARDS.bossEncounterGold + BESTIARY_REWARDS.bossDefeatGold
+    );
+    expect(save.soulShards).toBe(BESTIARY_REWARDS.bossDefeatShards);
     expect(save.dungeons.depths.highestClearedFloor).toBe(0);
   });
 
@@ -269,6 +279,59 @@ describe("migrateSave", () => {
     const b = migrateSave(raw);
     a.monsterKills.giant_rat = 999;
     expect(b.monsterKills.giant_rat).toBe(5);
+  });
+
+  // --- v16: the bestiary retro-grant + equipped title -----------------------
+
+  it("v16: retro-grants every already-earned bestiary reward exactly once", () => {
+    // A veteran save: an ordinary monster discovered + defeated, a boss page
+    // complete, and enough kills to have crossed slayer levels I and II.
+    const raw = {
+      version: 15,
+      gold: 1000,
+      soulShards: 10,
+      bestiary: {
+        giant_rat: { encountered: true, defeated: true },
+        bloater: { encountered: true, defeated: true },
+        zombie_shambler: { encountered: true, defeated: false },
+      },
+      monsterKills: { giant_rat: 30 }, // ≥25 ⇒ slayer II
+    };
+    const expected = computeRetroBestiaryRewards(raw.bestiary, raw.monsterKills);
+    // Sanity: the fixture really does earn something on each stream.
+    expect(expected.discoveries.length).toBeGreaterThan(0);
+    expect(expected.milestones.map((m) => m.level)).toEqual([1, 2]);
+
+    const save = migrateSave(raw);
+    expect(save.gold).toBe(1000 + expected.gold);
+    expect(save.soulShards).toBe(10 + expected.shards);
+
+    // Re-migrating the ALREADY-migrated save must not pay a second time —
+    // that's what the version gate buys.
+    const again = migrateSave(save);
+    expect(again.gold).toBe(save.gold);
+    expect(again.soulShards).toBe(save.soulShards);
+  });
+
+  it("v16: a brand-new save gets no retro grant", () => {
+    const save = migrateSave(null);
+    expect(save.gold).toBe(0);
+    expect(save.soulShards).toBe(0);
+    expect(save.title).toBeNull();
+  });
+
+  it("v16: keeps an earned title and clears an unearned/junk one", () => {
+    const bestiary = { bloater: { encountered: true, defeated: true } };
+    const earned = earnedTitleIds(bestiary, {});
+    expect(earned).toContain("slayer:bloater");
+
+    expect(migrateSave({ version: 15, bestiary, title: "slayer:bloater" }).title).toBe(
+      "slayer:bloater"
+    );
+    // Never defeated that boss → the title isn't in the derived set.
+    expect(migrateSave({ version: 15, bestiary, title: "slayer:abomination" }).title)
+      .toBeNull();
+    expect(migrateSave({ version: 15, bestiary, title: "not_a_title" }).title).toBeNull();
   });
 
   it("v14: two migrations never share a clearedTiers reference", () => {

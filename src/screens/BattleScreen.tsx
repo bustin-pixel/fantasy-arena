@@ -104,8 +104,7 @@ export function BattleScreen({
   onContinueDeeper,
   onDungeonCleared,
 }: Props) {
-  const { save, recordResult, recordBestiary, grantBattleRewards } =
-    useGameState();
+  const { save, recordResult, grantBattleRewards } = useGameState();
   // Frozen at mount (useState initializers): the pre-battle XP snapshot and
   // the level map the match runs at. MUST NOT re-derive from live `save` —
   // the post-battle XP grant would change them and re-create the match under
@@ -427,10 +426,11 @@ export function BattleScreen({
         else if (outcome === "defeat") recordResult(false);
       }
       const { seen, slain } = enemyLedger();
-      recordBestiary(seen, slain);
       // Grant-then-reveal: rewards are rolled (drop-time seed) and committed
       // to the save NOW; the overlay's chest ceremony is pure presentation,
-      // so leaving early can't lose anything.
+      // so leaving early can't lose anything. The Compendium reveal rides the
+      // grant fold too (not its own write), so a discovery and the gold it
+      // pays land together.
       const bundle = computeBattleRewards({
         mode,
         floor,
@@ -441,6 +441,11 @@ export function BattleScreen({
         // Rare-spawn quest check: the fielded warband + which enemies died.
         deck,
         slain,
+        // Bestiary payouts: the PRE-battle Compendium snapshots + this
+        // battle's sightings (read pre-grant, so first-time flips register).
+        seen,
+        priorBestiary: save.bestiary,
+        priorKills: save.monsterKills,
         questUnlocks: save.questUnlocks,
         wavesSurvived: survived,
         bestWave: endlessBestWave(save),
@@ -464,6 +469,8 @@ export function BattleScreen({
         // Quest-board progress facts (accepted quests tick in the grant fold).
         outcome,
         slain,
+        // Compendium reveals fold here too (see the grant's bestiary branch).
+        seen,
         tier,
       });
       setRewards(bundle);
@@ -485,7 +492,6 @@ export function BattleScreen({
   }, [
     ui.phase,
     recordResult,
-    recordBestiary,
     enemyLedger,
     grantBattleRewards,
     wavesSurvived,

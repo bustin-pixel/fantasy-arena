@@ -15,6 +15,10 @@ import { sanitizeShop, type ShopState } from "@/meta/shop";
 import { sanitizeQuests, type QuestSaveState } from "@/meta/quests";
 import { DEFAULT_AVATAR_ID, isAvatarUnlocked } from "@/meta/avatars";
 import {
+  computeRetroBestiaryRewards,
+  earnedTitleIds,
+} from "@/meta/bestiaryRewards";
+import {
   DUNGEON_IDS,
   DUNGEONS,
   milestoneUnlocksFor,
@@ -163,6 +167,11 @@ export interface PlayerSave {
    *  meta/slayer.slayerLevelFromKills — never store a level, the unitXp rule.
    *  Missing id = 0 kills. (Save v15.) */
   monsterKills: Record<string, number>;
+  /** The EQUIPPED cosmetic title id, or null for none. The earned SET is always
+   *  derived from bestiary + monsterKills (meta/bestiaryRewards.earnedTitleIds)
+   *  — never stored, the unitXp rule; only the player's choice lives here, and
+   *  it's cleared on load if no longer earned. (Save v16.) */
+  title: string | null;
 }
 
 // The key names the storage SLOT, not the schema — the version lives inside
@@ -170,7 +179,7 @@ export interface PlayerSave {
 const KEY = "fantasy-arena/save/v1";
 
 export const DEFAULT_SAVE: PlayerSave = {
-  version: 15,
+  version: 16,
   username: "Champion",
   avatarId: DEFAULT_AVATAR_ID,
   deck: [...STARTER_UNIT_IDS],
@@ -190,6 +199,7 @@ export const DEFAULT_SAVE: PlayerSave = {
   quests: { day: -1, refreshes: 0, taken: [], active: [] },
   itemPity: 0,
   monsterKills: {},
+  title: null,
 };
 
 export function loadSave(): PlayerSave {
@@ -299,6 +309,25 @@ export function migrateSave(parsed: Partial<PlayerSave> | null): PlayerSave {
     monsterKills[id] = Math.max(0, Math.floor(n));
   }
   merged.monsterKills = monsterKills;
+  // v16: the equipped title — kept only while it's still in the DERIVED earned
+  // set (a title can't be un-earned today, but this stays honest if a boss or
+  // dungeon is ever removed). Runs after bestiary + monsterKills are final.
+  merged.title =
+    typeof parsed.title === "string" &&
+    earnedTitleIds(merged.bestiary, merged.monsterKills).includes(parsed.title)
+      ? parsed.title
+      : null;
+  // v16: one-time bestiary retro-grant. Everything this save already
+  // discovered, every slayer threshold already crossed, and every already-
+  // complete Compendium book pays its reward ONCE, so the feature doesn't
+  // silently skip a veteran's whole back catalog. Version-gated (not
+  // idempotent-by-nature like the v12 gift grant — this one MOVES currency),
+  // so it fires exactly once per save and never on a brand-new account.
+  if ((parsed.version ?? 1) < 16) {
+    const retro = computeRetroBestiaryRewards(merged.bestiary, merged.monsterKills);
+    merged.gold += retro.gold;
+    merged.soulShards += retro.shards;
+  }
 
   // Grandfathering: saves from before the unlock system keep every unit that
   // exists today — EXCEPT quest-locked ones, whose purchase must always be

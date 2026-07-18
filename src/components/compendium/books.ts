@@ -10,6 +10,7 @@
 
 import {
   DUNGEONS,
+  dungeonBestiaryIds,
   getDungeon,
   isDungeonUnlocked,
   type Dungeon,
@@ -195,8 +196,10 @@ function dungeonBook(dungeon: Dungeon, save: PlayerSave): BookDef {
   if (pages.length % 2 === 1) pages.push({ heading: "", entries: [] });
   pages.push(rarePage, bossPage);
 
-  const tracked = [...fodder, ...bosses];
-  if (quest && !tracked.includes(quest.spawnId)) tracked.push(quest.spawnId);
+  // The plaque's completion set is the shared dungeonBestiaryIds walk (fodder +
+  // bosses + rare catalyst) — the same set the book-completion reward reads, so
+  // the plaque hitting done===total and the reward firing can't drift.
+  const tracked = dungeonBestiaryIds(dungeon);
 
   return {
     id: dungeon.id,

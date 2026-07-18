@@ -66,12 +66,23 @@ const MAX_HP = Math.max(...DECK_DEFS.map((d) => d.hp));
 const MAX_DMG = Math.max(...DECK_DEFS.map((d) => d.damage));
 const MIN_ATK = Math.min(...DECK_DEFS.map((d) => d.attackSpeed));
 const MAX_MOVE = Math.max(...DECK_DEFS.map((d) => d.moveSpeed));
-const MAX_RANGE = Math.max(...DECK_DEFS.map((d) => d.range));
 
-function rangeLabel(def: UnitDef): string {
+type RangeTier = "Melee" | "Medium" | "Long";
+
+/** Range shows as three discrete buckets, driving BOTH the readout text and the
+ *  bar fill. Keying the bar off the raw range value made Medium units nearly
+ *  fill the track (their reach sits close to the roster max), so the fill is
+ *  quantized by tier: Melee a quarter, Medium half, Long the full bar. */
+function rangeTier(def: UnitDef): RangeTier {
   if (isMelee(def)) return "Melee";
   return def.range <= FIELD_WIDTH * 0.31 ? "Medium" : "Long";
 }
+
+const RANGE_PCT: Record<RangeTier, number> = {
+  Melee: 25,
+  Medium: 50,
+  Long: 100,
+};
 
 /** The inline "pick an item for this slot" list: every owned stack of the
  *  slot's type with a FREE copy (or the one this unit already wears), plus a
@@ -482,8 +493,8 @@ export function UnitDetail({
             />
             <StatBar
               label="Range"
-              pct={(def.range / MAX_RANGE) * 100}
-              value={rangeLabel(def)}
+              pct={RANGE_PCT[rangeTier(def)]}
+              value={rangeTier(def)}
               fill="#5dcaa5"
             />
           </div>

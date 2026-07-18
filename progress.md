@@ -18,7 +18,7 @@ the source of truth, so this file deliberately doesn't duplicate it.
 > exceptions to preserve live in the `architecture-refactor-batch` memory if it's
 > ever wanted.
 
-> **BUILT, UNSHIPPED (2026-07-17): level cap 30 + per-dungeon difficulty tiers.**
+> **✅ SHIPPED PR #67 (2026-07-17): level cap 30 + per-dungeon difficulty tiers.**
 > `LEVEL_CAP` 10→30 (same XP curve — 21,750 to max; old capped saves load as
 > Lv 10 of 30), the Normal chain's `monsterLevel` re-spread 1→20 (forks at 20,
 > bosses 21), and a per-dungeon Normal/Hard/Elite ladder picked on the atlas
@@ -33,7 +33,7 @@ the source of truth, so this file deliberately doesn't duplicate it.
 > **Deferred: prestige / cosmetic ascension.** Cap 30 + the tier ladder carry
 > the long game; revisit prestige as its own slice once players saturate Elite.
 
-> **BUILT, UNSHIPPED (2026-07-17): descent march-in + Regroup.** Dungeon floors
+> **✅ SHIPPED PR #67 (2026-07-17): descent march-in + Regroup.** Dungeon floors
 > 2+ auto-field the warband on the *previous floor's deploy-time marks* (a walk-in
 > cinematic — the twin of the walk-off), then the normal 3s countdown runs with a
 > **Regroup** button that drops back to manual placement. Uniform incl. the boss
@@ -45,7 +45,7 @@ the source of truth, so this file deliberately doesn't duplicate it.
 > placing the same marks). ⚠ walk-in + floor-2 button need a **device eyeball**
 > (preview pane suspends rAF). Memory: `descent-march-in-formation-built`.
 
-> **BUILT, UNSHIPPED (2026-07-17): boss "brace up" cinematic.** The mid-battle
+> **✅ SHIPPED PR #67 (2026-07-17): boss "brace up" cinematic.** The mid-battle
 > sibling of the march-in: when a boss (or the rare quest catalyst) telegraphs onto
 > a cleared field, the sim FREEZES and the survivors pull back into a centered
 > horizontal row at the arena mid-line to face the entrance; the fight then resumes
@@ -200,13 +200,25 @@ handshake with file anchors + commit sequencing in
    crypt → Gargoyle), 16–20 (the throne → Lich) per the approved monster list
    below; difficulty pass as the curve extends; gold-tier chests on deep bosses.
    Content work — interleaves with slices 3+.
-3. **Bestiary rewards (+ the REMAINING Soul Shard earn ideas):** one-time gold
-   on first encounter/defeat (hook into the `recordBestiary` tier-upgrade
-   write — inherently unfarmable); 3-star floors. NOTE: the Soul Shard
+3. **~~Bestiary rewards~~ — ✅ BUILT (save v16, on `feature/slayer-xp`):**
+   one-time discovery gold (first encounter + first defeat, bosses at a
+   premium band + a Soul Shard), slayer-milestone gold at each of the five
+   kill thresholds (+1 shard at the cap), and per-dungeon book-completion
+   gold+shards. Plus the cosmetic layer: **titles** (a slayer epithet per
+   dungeon boss — "Bloaterbane", "Kingslayer" — plus **Loremaster** for a
+   complete monster bestiary), worn on the profile plate and picked in the
+   ProfileSheet, and a **gilded card** in the Compendium at slayer 5.
+   Every stream keys off a monotonic false→true crossing, so it's
+   unfarmable without a claims ledger. Architecturally this ALSO folded
+   Compendium recording into `applyBattleGrant` — `recordBestiary` is gone,
+   so a reveal and the gold it pays are one atomic write. Numbers in
+   `meta/economy.ts` (`BESTIARY_REWARDS`, `SLAYER_MILESTONE_GOLD`); math in
+   the new pure `meta/bestiaryRewards.ts`. Save **v16** adds `title` and a
+   one-time retro-grant so an existing save's whole back catalog pays out.
+   **Still open from this slice: 3-star floors.** NOTE: the Soul Shard
    currency itself SHIPPED with Items v1 (save v9, not the sketched v4) —
    earned from floor/boss/capstone first clears + fresh endless milestones +
-   an arcane/dragon chest drip; spent on legendary-tier merges. Bestiary
-   shard grants would be additive on top.
+   an arcane/dragon chest drip; spent on legendary-tier merges.
 4. ~~**Items v1**~~ — **✅ BUILT (feat/items-v1, save v9 — bigger than the
    sketch):** 25 item lines (6 weapons / 5 armors / 8 trinkets base + 6
    dungeon-signature relics on themed boss chests), rare→epic→legendary ×
@@ -287,8 +299,9 @@ and the 3-tier reveal (Undiscovered `???` silhouette → Encountered/Sighted nam
 silhouette → Defeated full lore via read-only `UnitDetail`). Two sections:
 Monsters of the Depths (roster derives from `data/depths.ts` tiers, so it grows
 automatically) and Heroes of the Arena (all deckables).
-- Still open: **per-monster kill counters** (v2 idea, parked with the bestiary
-  rewards), and Compendium `lastPage` persistence if it ever gets sub-pages.
+- ~~Per-monster kill counters~~ — shipped as Slayer XP (save v15); the cards
+  now carry a slayer track, and crossing a level pays gold (save v16, above).
+- Still open: Compendium `lastPage` persistence if it ever gets sub-pages.
 - Still open: a **dedicated desktop battle/layout** — the shell is phone-first (gate
   tuned so torches flank on narrow screens; the battle canvas is capped at 480px, safe
   to scale up on desktop since the 480×720 sim is display-independent).

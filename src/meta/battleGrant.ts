@@ -1,7 +1,9 @@
 // ============================================================================
 // Battle grant — the one atomic fold that turns a resolved match into save
 // deltas. Gold + chest contents + unlock drops + deck XP + quest progress +
-// dungeon clears all land together, so a crash can never persist half a grant.
+// dungeon clears + Compendium reveals all land together, so a crash can never
+// persist half a grant (the bestiary reveal and the gold it pays are the same
+// write — that's why recording moved in here from its own setSave pass).
 // Pure: every random roll already happened in computeBattleRewards (RNG before
 // fold, like the quest-claim path), which is what lets a StrictMode double-run
 // — and a spec — call it twice with the same result.
@@ -11,9 +13,13 @@
 
 import type { BattleMode } from "@/hooks/useBattleEngine"; // type-only: erased at runtime
 import { getDungeon, milestoneUnlocksFor } from "@/data/dungeons";
-import { SLAYER_MONSTER_IDS } from "@/data/units";
 import type { TierId } from "@/data/tiers";
 import { addXp } from "@/meta/leveling";
+import {
+  foldBestiarySeen,
+  foldMonsterKills,
+  type BestiaryMap,
+} from "@/meta/bestiaryRewards";
 import { tickQuestProgress, type QuestSaveState } from "@/meta/quests";
 import {
   foldChestContents,
@@ -26,6 +32,7 @@ import {
 export interface BattleGrantSlice extends ChestGrantSlice {
   unitXp: Record<string, number>;
   monsterKills: Record<string, number>;
+  bestiary: BestiaryMap;
   dungeons: Record<
     string,
     {
@@ -48,6 +55,10 @@ export interface BattleGrantCtx {
   deck?: readonly string[];
   outcome?: "victory" | "defeat" | "draw";
   slain?: readonly string[];
+  /** Enemy defIds FIELDED against the player this battle (the ledger's `seen`).
+   *  Folded into the Compendium here — reveals ride the same atomic write as
+   *  the rewards they pay out, so a crash can't record a discovery unpaid. */
+  seen?: readonly string[];
   /** Difficulty tier the dungeon run was fought at (default normal) — routes
    *  the first-clear fold: Normal marks highestClearedFloor + gifts; Hard/
    *  Elite flip their clearedTiers flag. */
@@ -71,23 +82,29 @@ export function applyBattleGrant<S extends BattleGrantSlice>(
   // lifetime kill, PvE ONLY — arena (solo/pvp) grants nothing, which is what
   // lets the skeleton be trackable without arena Necromancer-summon farming.
   // Any PvE outcome counts (pre-wipe kills, like slay bounties).
-  let monsterKills = save.monsterKills;
   const slayerCounts = ctx.mode === "depths" || ctx.mode === "endless";
-  const slainMonsters = slayerCounts
-    ? (ctx.slain ?? []).filter((id) => SLAYER_MONSTER_IDS.has(id))
-    : [];
-  if (slainMonsters.length > 0) {
-    monsterKills = { ...save.monsterKills };
-    for (const id of slainMonsters) {
-      monsterKills[id] = (monsterKills[id] ?? 0) + 1;
-    }
-  }
+  const monsterKills = foldMonsterKills(
+    save.monsterKills,
+    ctx.slain ?? [],
+    slayerCounts
+  );
+  // Compendium reveals ride this same atomic write (rather than a separate
+  // recordBestiary pass): everything fielded counts as encountered, everything
+  // slain as defeated. The bundle's bestiary payouts were computed from the
+  // SAME prior maps + ledgers via the same helpers, so preview ≡ persisted.
+  const bestiary = foldBestiarySeen(
+    save.bestiary,
+    ctx.seen ?? [],
+    ctx.slain ?? []
+  );
   // Chest contents → currency/unlocks/stacks (the fold shared with quest
-  // claims), on top of the flat battle gold/shards.
+  // claims), on top of the flat battle gold/shards and the one-time bestiary
+  // payouts (discoveries + slayer milestones + book completions).
   const folded = foldChestContents(
     {
-      gold: save.gold + rewards.gold,
-      soulShards: save.soulShards + rewards.shards,
+      gold: save.gold + rewards.gold + (rewards.bestiary?.gold ?? 0),
+      soulShards:
+        save.soulShards + rewards.shards + (rewards.bestiary?.shards ?? 0),
       items: save.items,
       unlockedUnits: save.unlockedUnits,
     },
@@ -157,6 +174,7 @@ export function applyBattleGrant<S extends BattleGrantSlice>(
     items: folded.items,
     unitXp,
     monsterKills,
+    bestiary,
     unlockedUnits: [...unlocked],
     dungeons,
     questUnlocks: [...questUnlocks],

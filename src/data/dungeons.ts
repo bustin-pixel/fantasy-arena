@@ -569,6 +569,31 @@ export const ALL_QUESTS: RareSpawnQuest[] = Object.values(DUNGEONS)
   .map((d) => d.quest)
   .filter((q): q is RareSpawnQuest => q != null);
 
+/** Every dungeon-boss defId across all dungeons — the tier bosses (not the rare
+ *  quest catalysts). Bestiary rewards read this to pay a boss's first defeat
+ *  its fatter gold + shard grant and to award its slayer title. Derived from
+ *  the same tier `boss` field the WaveController spawns, so it can't drift. */
+export const BOSS_IDS = new Set<string>(
+  Object.values(DUNGEONS).flatMap((d) => d.tiers.map((t) => t.boss))
+);
+
+/** Every monster/catalyst id whose Compendium page lives in this dungeon's book
+ *  — its fodder, tier bosses, and rare-spawn catalyst, in that walk order. The
+ *  bestiary progress plaque (components/compendium/books) and the book-completion
+ *  reward (meta/bestiaryRewards) share this ONE set so "complete" means the same
+ *  thing in both places. */
+export function dungeonBestiaryIds(dungeon: Dungeon): string[] {
+  const ids: string[] = [];
+  for (const tier of dungeon.tiers) {
+    for (const id of Object.keys(tier.monsters)) if (!ids.includes(id)) ids.push(id);
+  }
+  for (const tier of dungeon.tiers) if (!ids.includes(tier.boss)) ids.push(tier.boss);
+  if (dungeon.quest && !ids.includes(dungeon.quest.spawnId)) {
+    ids.push(dungeon.quest.spawnId);
+  }
+  return ids;
+}
+
 /** Units whose purchase is gated behind a rare-spawn quest (never chest-dropped,
  *  never granted by the grandfather clause, not buyable until the quest is
  *  done). Derived from every dungeon's quest. */

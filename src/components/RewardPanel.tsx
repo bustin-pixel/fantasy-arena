@@ -7,8 +7,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { BattleRewards } from "@/meta/rewards";
+import type { BestiaryRewardResult } from "@/meta/bestiaryRewards";
 import { type ChestTier } from "@/meta/economy";
-import { milestoneUnlocksFor } from "@/data/dungeons";
+import { DUNGEONS, milestoneUnlocksFor } from "@/data/dungeons";
 import { TIER_LABEL, type TierId } from "@/data/tiers";
 import {
   LEVEL_CAP,
@@ -148,6 +149,8 @@ export function RewardPanel({ rewards, mode, dungeonId = "depths", tier = "norma
         </div>
       )}
 
+      {rewards.bestiary && <BestiaryRewards bestiary={rewards.bestiary} />}
+
       {rewards.chest && !hideChest && (
         <button
           className={`reward-chest${chestPhase === "closed" ? "" : " opened"}`}
@@ -219,6 +222,47 @@ export function RewardPanel({ rewards, mode, dungeonId = "depths", tier = "norma
           })}
         </ul>
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Bestiary rewards — the one-time Compendium payouts (new entries, slayer
+// milestones, completed books). Pure presentation: the grant already banked
+// every coin below, and each line's gold/shards are already inside the panel's
+// headline totals — these lines only say WHERE the bonus came from.
+// ---------------------------------------------------------------------------
+
+const SLAYER_LEVEL_ROMAN = ["", "I", "II", "III", "IV", "V"];
+
+function BestiaryRewards({ bestiary }: { bestiary: BestiaryRewardResult }) {
+  return (
+    <div className="reward-bestiary">
+      {bestiary.discoveries.map((d) => (
+        <div
+          className={`reward-milestone reward-discovery${d.boss ? " boss" : ""}`}
+          key={`${d.id}:${d.kind}`}
+        >
+          {d.kind === "defeat" ? "Page complete" : "New sighting"}:{" "}
+          <strong>{getUnitDef(d.id).name}</strong> +{d.gold}g
+          {d.shards > 0 && ` · +${d.shards} ◆`}
+        </div>
+      ))}
+
+      {bestiary.milestones.map((m) => (
+        <div className="reward-milestone reward-slayer" key={`${m.id}:${m.level}`}>
+          Slayer {SLAYER_LEVEL_ROMAN[m.level] ?? m.level}:{" "}
+          <strong>{getUnitDef(m.id).name}</strong> +{m.gold}g
+          {m.shards > 0 && ` · +${m.shards} ◆`}
+        </div>
+      ))}
+
+      {bestiary.completedBooks.map((b) => (
+        <div className="reward-milestone reward-book" key={b.dungeonId}>
+          Bestiary complete: <strong>{DUNGEONS[b.dungeonId]?.name ?? b.dungeonId}</strong>{" "}
+          +{b.gold}g · +{b.shards} ◆
+        </div>
+      ))}
     </div>
   );
 }

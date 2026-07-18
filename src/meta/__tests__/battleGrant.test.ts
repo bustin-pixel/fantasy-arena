@@ -31,6 +31,7 @@ const baseSave = (over: Partial<BattleGrantSlice> = {}): BattleGrantSlice => ({
   quests: { day: -1, refreshes: 0, taken: [], active: [] },
   itemPity: 0,
   monsterKills: {},
+  bestiary: {},
   ...over,
 });
 
@@ -257,6 +258,69 @@ describe("applyBattleGrant dungeon clears", () => {
       ctx({ mode: "depths", dungeonId: "depths", tier: "normal" })
     );
     expect(b).toEqual(a);
+  });
+});
+
+describe("applyBattleGrant bestiary reveals", () => {
+  it("folds seen → encountered and slain → defeated in the SAME write", () => {
+    const out = applyBattleGrant(
+      baseSave(),
+      noRewards(),
+      ctx({ seen: ["giant_rat", "ghoul"], slain: ["ghoul"] })
+    );
+    expect(out.bestiary).toEqual({
+      giant_rat: { encountered: true, defeated: false },
+      ghoul: { encountered: true, defeated: true },
+    });
+  });
+
+  it("reveals only ever go forward — a later sighting can't un-defeat", () => {
+    const out = applyBattleGrant(
+      baseSave({ bestiary: { ghoul: { encountered: true, defeated: true } } }),
+      noRewards(),
+      ctx({ seen: ["ghoul"], slain: [] })
+    );
+    expect(out.bestiary.ghoul).toEqual({ encountered: true, defeated: true });
+  });
+
+  it("adds the bundle's bestiary gold/shards on top of the flat battle pay", () => {
+    const out = applyBattleGrant(
+      baseSave({ gold: 100, soulShards: 5 }),
+      noRewards({
+        gold: 10,
+        shards: 1,
+        bestiary: {
+          discoveries: [],
+          milestones: [],
+          completedBooks: [],
+          gold: 250,
+          shards: 2,
+        },
+      }),
+      ctx({ seen: ["ghoul"], slain: ["ghoul"] })
+    );
+    expect(out.gold).toBe(100 + 10 + 250);
+    expect(out.soulShards).toBe(5 + 1 + 2);
+  });
+
+  it("a bundle with no bestiary slice pays nothing extra", () => {
+    const out = applyBattleGrant(
+      baseSave({ gold: 100, soulShards: 5 }),
+      noRewards({ gold: 10, shards: 1 }),
+      ctx({ seen: ["ghoul"], slain: ["ghoul"] })
+    );
+    expect(out.gold).toBe(110);
+    expect(out.soulShards).toBe(6);
+  });
+
+  it("arena still records the Compendium even though kills don't count", () => {
+    const out = applyBattleGrant(
+      baseSave(),
+      noRewards(),
+      ctx({ mode: "solo", outcome: "victory", seen: ["ghoul"], slain: ["ghoul"] })
+    );
+    expect(out.bestiary.ghoul).toEqual({ encountered: true, defeated: true });
+    expect(out.monsterKills).toEqual({}); // PvE-only gate holds
   });
 });
 

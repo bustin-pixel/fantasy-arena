@@ -14,6 +14,7 @@ import { getUnitDef, SLAYER_MONSTER_IDS } from "@/data/units";
 import {
   SLAYER_DMG_PER_LEVEL,
   SLAYER_LEVEL_CAP,
+  slayerLevelFromKills,
   slayerProgress,
 } from "@/meta/slayer";
 import { RARITIES } from "@/data/rarities";
@@ -161,10 +162,16 @@ function MonsterCard({
   const def = getUnitDef(defId);
   const rarity = RARITIES[def.rarity];
   const revealed = tier === "defeated";
+  // Mastery gilding: a slayer-capped monster's card wears a gold frame — the
+  // visible trophy for 200 kills (trackable monsters only; heroes never gild).
+  const mastered =
+    revealed &&
+    SLAYER_MONSTER_IDS.has(defId) &&
+    slayerLevelFromKills(kills) >= SLAYER_LEVEL_CAP;
   return (
     <button
       type="button"
-      className={`comp-card book-card ${tier}`}
+      className={`comp-card book-card ${tier}${mastered ? " mastered" : ""}`}
       style={{ borderColor: revealed ? rarity.color : "#8a6a3a55" }}
       onClick={revealed ? () => onOpen(defId) : undefined}
       disabled={!revealed}
