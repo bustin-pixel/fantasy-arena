@@ -248,13 +248,19 @@ describe("migrateSave", () => {
         giant_rat: 37,
         ghoul: 12.9, // floats floor
         lich: -3, // negatives clamp to 0
+        skeleton: 8, // summon def BUT a real dungeon denizen → kept
         knight: 50, // hero → dropped
-        skeleton: 50, // summon def → dropped
+        wolf: 50, // summon-only def → dropped
         not_a_unit: 50, // unknown → dropped
         dire_wolf: Number.POSITIVE_INFINITY, // non-finite → dropped
       },
     });
-    expect(save.monsterKills).toEqual({ giant_rat: 37, ghoul: 12, lich: 0 });
+    expect(save.monsterKills).toEqual({
+      giant_rat: 37,
+      ghoul: 12,
+      lich: 0,
+      skeleton: 8,
+    });
   });
 
   it("v15: two migrations never share a monsterKills reference", () => {

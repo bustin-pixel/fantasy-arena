@@ -270,14 +270,35 @@ describe("applyBattleGrant slayer kills", () => {
     expect(out.monsterKills).toEqual({ giant_rat: 7, zombie_shambler: 1 });
   });
 
-  it("filters out heroes (arena mirrors) and enemy summons", () => {
+  it("filters out heroes and summon-only defs — but the skeleton counts", () => {
     const out = applyBattleGrant(
       baseSave(),
       noRewards(),
-      // knight = deckable hero, skeleton = a summon def — neither is tracked.
-      ctx({ mode: "solo", slain: ["knight", "skeleton", "ghoul"] })
+      // knight = deckable hero, wolf = summon-only def — neither is tracked.
+      // skeleton IS: a summon def that doubles as a real dungeon denizen.
+      ctx({ slain: ["knight", "wolf", "skeleton", "ghoul"] })
     );
-    expect(out.monsterKills).toEqual({ ghoul: 1 });
+    expect(out.monsterKills).toEqual({ skeleton: 1, ghoul: 1 });
+  });
+
+  it("grants NOTHING from arena — slayer XP is PvE-only", () => {
+    for (const mode of ["solo", "pvp"] as const) {
+      const out = applyBattleGrant(
+        baseSave({ monsterKills: { ghoul: 3 } }),
+        noRewards(),
+        ctx({ mode, outcome: "victory", slain: ["ghoul", "skeleton"] })
+      );
+      expect(out.monsterKills).toEqual({ ghoul: 3 });
+    }
+  });
+
+  it("counts in endless (the other PvE mode)", () => {
+    const out = applyBattleGrant(
+      baseSave(),
+      noRewards(),
+      ctx({ mode: "endless", wavesSurvived: 3, slain: ["ghoul", "ghoul"] })
+    );
+    expect(out.monsterKills).toEqual({ ghoul: 2 });
   });
 
   it("counts pre-wipe kills on a defeat (like slay bounties)", () => {

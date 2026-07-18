@@ -68,12 +68,14 @@ export function applyBattleGrant<S extends BattleGrantSlice>(
     }
   }
   // Slayer kills: every trackable monster in the slain multiset adds one
-  // lifetime kill (any outcome — pre-wipe kills count, like slay bounties).
-  // Heroes (arena mirrors) and enemy summons are filtered out here.
+  // lifetime kill, PvE ONLY — arena (solo/pvp) grants nothing, which is what
+  // lets the skeleton be trackable without arena Necromancer-summon farming.
+  // Any PvE outcome counts (pre-wipe kills, like slay bounties).
   let monsterKills = save.monsterKills;
-  const slainMonsters = (ctx.slain ?? []).filter((id) =>
-    SLAYER_MONSTER_IDS.has(id)
-  );
+  const slayerCounts = ctx.mode === "depths" || ctx.mode === "endless";
+  const slainMonsters = slayerCounts
+    ? (ctx.slain ?? []).filter((id) => SLAYER_MONSTER_IDS.has(id))
+    : [];
   if (slainMonsters.length > 0) {
     monsterKills = { ...save.monsterKills };
     for (const id of slainMonsters) {

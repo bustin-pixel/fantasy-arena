@@ -158,7 +158,8 @@ export interface PlayerSave {
    *  the next chest is forced to contain one. (Save v11.) */
   itemPity: number;
   /** Lifetime kills per monster defId (SLAYER_MONSTER_IDS only — heroes and
-   *  summons never appear). SLAYER LEVEL IS ALWAYS DERIVED from this via
+   *  summon-only defs never appear; PvE kills only, arena grants nothing).
+   *  SLAYER LEVEL IS ALWAYS DERIVED from this via
    *  meta/slayer.slayerLevelFromKills — never store a level, the unitXp rule.
    *  Missing id = 0 kills. (Save v15.) */
   monsterKills: Record<string, number>;

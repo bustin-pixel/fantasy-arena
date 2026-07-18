@@ -192,7 +192,9 @@ export function useBattleEngine(
   /** Compendium slayer bonuses: enemy defId → damage multiplier, precomputed
    *  from lifetime monsterKills (meta/slayer.buildSlayerBonusTable). A STABLE
    *  object frozen at mount, like unitLevels — kills made this match pay out
-   *  from the next one. Missing/empty = identity. */
+   *  from the next one. PvE only: applied in depths/endless, ignored in
+   *  arena (slayer never touches the fair-fight mode). Missing/empty =
+   *  identity. */
   slayerBonuses?: Record<string, number>
 ): UseBattleEngine {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -288,9 +290,10 @@ export function useBattleEngine(
         seed,
         playerDeck.slice(0, 4),
         enemyDeck,
-        // Slayer bonuses are harmless in arena (hero defIds never match the
-        // table) — passing them keeps the plumbing uniform across modes.
-        { unitLevels, itemLoadouts, slayerBonuses }
+        // No slayerBonuses: slayer is a PvE-only system — arena neither earns
+        // kills (battleGrant gates on mode) nor applies the bonus (a tabled
+        // skeleton would otherwise boost hits on Necromancer summons here).
+        { unitLevels, itemLoadouts }
       );
     }
     themeRef.current =
