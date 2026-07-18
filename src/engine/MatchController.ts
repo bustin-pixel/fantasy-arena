@@ -297,7 +297,6 @@ export class MatchController {
       t.thornsFrac += c.thornsFrac;
       t.overheal = t.overheal || c.overheal;
       t.lastBreath = t.lastBreath || c.lastBreath;
-      if (c.critEveryNth > 0) t.critEveryNth = c.critEveryNth;
       t.rangedLifesteal += c.rangedLifesteal;
       t.deployShieldFrac += c.deployShieldFrac;
       t.abilityCooldownMult *= c.abilityCooldownMult;

@@ -351,15 +351,15 @@ describe("migrateSave", () => {
         sharpened_steel: 3,
         drill_sergeant: 3,
         forced_march: 2,
-        bloodlust: 99, // clamps to maxRanks(2), but the 9-point budget caps it at 1
-        warpath: 1, // keystone needs 8 in-branch and the budget is spent — drops
+        victory_feast: 99, // clamps to maxRanks(2), but the 9-point budget caps it at 1
+        bloodlust: 1, // keystone needs 8 in-branch and the budget is spent — drops
         junk_talent: 5,
       },
     });
     expect(save.commanderXp).toBe(4500);
     expect(save.talents.sharpened_steel).toBe(3);
     expect(save.talents.junk_talent).toBeUndefined();
-    expect(save.talents.warpath).toBeUndefined();
+    expect(save.talents.bloodlust).toBeUndefined();
     expect(pointsSpent(save.talents)).toBe(9);
     // Junk XP resets rather than crashes.
     expect(migrateSave({ version: 17, commanderXp: NaN }).commanderXp).toBe(0);

@@ -5,7 +5,11 @@
 // (magicDmgMult / abilityCooldownMult / summonStatPct / abilitiesStartReady)
 // are exercised through hand-built states.
 import { describe, expect, it } from "vitest";
-import { resolveCommanderMods } from "@/meta/commander";
+import {
+  BLOODLUST_ATK_FRAC,
+  BLOODLUST_LIFESTEAL,
+  resolveCommanderMods,
+} from "@/meta/commander";
 import { MatchController } from "@/engine/MatchController";
 import { stepSimulation } from "@/engine/CombatSystem";
 import { battleState, digest, makeDummy, place, runMatch } from "./helpers";
@@ -35,21 +39,24 @@ describe("commanderMods — the match input", () => {
   it("folds onto teamMods.player and stat-mirrors onto the arena enemy", () => {
     const mods = resolveCommanderMods({
       ...STAT_ALLOC,
-      bloodlust: 2,
-      warpath: 1,
+      victory_feast: 2,
+      bloodlust: 1,
     });
     const mc = new MatchController(1, DECK, DECK, { commanderMods: mods });
     const t = mc.state.teamMods.player;
     expect(t.dmgMult).toBeCloseTo(1.06);
     expect(t.damageTakenMult).toBeCloseTo(0.94);
     expect(t.killHeal).toBe(12);
-    expect(t.critEveryNth).toBe(4);
-    // Arena mirror: flat stats only, never procs.
+    expect(t.atkDelayMult).toBeCloseTo(1 - BLOODLUST_ATK_FRAC);
+    expect(t.lifestealBonus).toBeCloseTo(BLOODLUST_LIFESTEAL);
+    // Arena mirror: flat stats only (Bloodlust's speed components ride it —
+    // that's what keeps the fair fight fair), never procs/lifesteal.
     const e = mc.state.teamMods.enemy;
     expect(e.dmgMult).toBeCloseTo(1.06);
     expect(e.damageTakenMult).toBeCloseTo(0.94);
+    expect(e.atkDelayMult).toBeCloseTo(1 - BLOODLUST_ATK_FRAC);
     expect(e.killHeal).toBe(0);
-    expect(e.critEveryNth).toBe(0);
+    expect(e.lifestealBonus).toBe(0);
   });
 
   it("PvE modes install player mods but never mirror to the horde", () => {

@@ -127,7 +127,7 @@ export type TalentEffect =
   | { kind: "thornsFrac"; perRank: number } // reflect frac of incoming
   | { kind: "overheal" } // overheal banks as shield
   | { kind: "lastBreath" } // once-per-battle cheat death
-  | { kind: "critEveryNth"; n: number } // every Nth attack ×2
+  | { kind: "bloodlust" } // the Warlord keystone: atk speed + move + lifesteal
   | { kind: "abilityCooldownMult"; perRank: number } // −frac ability cooldowns
   | { kind: "summonStatPct"; perRank: number } // +frac summon stats (additive)
   | { kind: "magicDmgMult"; perRank: number } // +frac magic-school damage
@@ -177,10 +177,10 @@ export const TALENTS: TalentDef[] = [
     effect: { kind: "moveSpeedMult", perRank: 0.03 },
   },
   {
-    id: "bloodlust",
+    id: "victory_feast",
     branch: "warlord",
     tier: 1,
-    name: "Bloodlust",
+    name: "Victory Feast",
     description: "Every enemy kill heals your whole warband 6 HP per rank.",
     maxRanks: 2,
     effect: { kind: "killHeal", perRank: 6 },
@@ -195,13 +195,14 @@ export const TALENTS: TalentDef[] = [
     effect: { kind: "executeBonus", perRank: 0.06 },
   },
   {
-    id: "warpath",
+    id: "bloodlust",
     branch: "warlord",
     tier: 3,
-    name: "Warpath",
-    description: "Keystone: every 4th basic attack strikes for double damage.",
+    name: "Bloodlust",
+    description:
+      "Keystone: your warband attacks 40% faster, moves 20% faster, and heals for 20% of the damage it deals.",
     maxRanks: 1,
-    effect: { kind: "critEveryNth", n: 4 },
+    effect: { kind: "bloodlust" },
     keystone: true,
   },
   // --- Guardian ------------------------------------------------------------
@@ -395,6 +396,12 @@ export function sanitizeTalentAllocation(
 // MatchController folds it onto state.teamMods.player at construction.
 // ---------------------------------------------------------------------------
 
+/** Bloodlust (the Warlord keystone): 40% faster attacks, +20% move speed,
+ *  and 20% lifesteal for the whole warband (melee AND ranged basics). */
+export const BLOODLUST_ATK_FRAC = 0.4;
+export const BLOODLUST_MOVE_FRAC = 0.2;
+export const BLOODLUST_LIFESTEAL = 0.2;
+
 export interface CommanderMods {
   dmgMult: number;
   atkDelayMult: number;
@@ -407,7 +414,6 @@ export interface CommanderMods {
   thornsFrac: number;
   overheal: boolean;
   lastBreath: boolean;
-  critEveryNth: number;
   abilityCooldownMult: number;
   summonStatPct: number;
   magicDmgMult: number;
@@ -434,7 +440,6 @@ export function resolveCommanderMods(
     thornsFrac: 0,
     overheal: false,
     lastBreath: false,
-    critEveryNth: 0,
     abilityCooldownMult: 1,
     summonStatPct: 0,
     magicDmgMult: 1,
@@ -480,8 +485,11 @@ export function resolveCommanderMods(
       case "lastBreath":
         mods.lastBreath = true;
         break;
-      case "critEveryNth":
-        mods.critEveryNth = e.n;
+      case "bloodlust":
+        mods.atkDelayMult *= 1 - BLOODLUST_ATK_FRAC;
+        mods.moveSpeedMult *= 1 + BLOODLUST_MOVE_FRAC;
+        mods.lifestealBonus += BLOODLUST_LIFESTEAL;
+        mods.rangedLifesteal += BLOODLUST_LIFESTEAL;
         break;
       case "abilityCooldownMult":
         mods.abilityCooldownMult *= 1 - e.perRank * ranks;

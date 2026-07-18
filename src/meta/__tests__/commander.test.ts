@@ -5,6 +5,9 @@
 import { describe, expect, it } from "vitest";
 import {
   addCommanderXp,
+  BLOODLUST_ATK_FRAC,
+  BLOODLUST_LIFESTEAL,
+  BLOODLUST_MOVE_FRAC,
   BRANCH_IDS,
   BRANCHES,
   buyTalent,
@@ -94,9 +97,9 @@ describe("tier gates + buying", () => {
   it("tier-0 nodes buyable with a point; deeper tiers gated on branch spend", () => {
     expect(canBuyTalent({}, "sharpened_steel", 1)).toBe(true);
     expect(canBuyTalent({}, "forced_march", 5)).toBe(false); // tier 1 needs 2 in-branch
-    expect(canBuyTalent({}, "warpath", 19)).toBe(false); // keystone needs 8
+    expect(canBuyTalent({}, "bloodlust", 19)).toBe(false); // keystone needs 8
     const eight = fillBranch("warlord", 8);
-    expect(canBuyTalent(eight, "warpath", 19)).toBe(true);
+    expect(canBuyTalent(eight, "bloodlust", 19)).toBe(true);
   });
 
   it("cross-branch points do not open another branch's gates", () => {
@@ -116,18 +119,18 @@ describe("tier gates + buying", () => {
 describe("sanitizeTalentAllocation", () => {
   it("drops junk and clamps ranks", () => {
     const out = sanitizeTalentAllocation(
-      { sharpened_steel: 99, nonsense: 3, drill_sergeant: -2, bloodlust: NaN },
+      { sharpened_steel: 99, nonsense: 3, drill_sergeant: -2, victory_feast: NaN },
       19
     );
     expect(out.sharpened_steel).toBe(3);
     expect(out.nonsense).toBeUndefined();
     expect(out.drill_sergeant).toBeUndefined();
-    expect(out.bloodlust).toBeUndefined();
+    expect(out.victory_feast).toBeUndefined();
   });
 
   it("replays gates: a deep node without its branch spend is dropped", () => {
-    const out = sanitizeTalentAllocation({ warpath: 1 }, 19);
-    expect(out.warpath).toBeUndefined();
+    const out = sanitizeTalentAllocation({ bloodlust: 1 }, 19);
+    expect(out.bloodlust).toBeUndefined();
   });
 
   it("caps the sum at totalPoints (XP rollback self-heals)", () => {
@@ -155,7 +158,7 @@ describe("resolveCommanderMods", () => {
     const mods = resolveCommanderMods({
       sharpened_steel: 3,
       tempered_plate: 2,
-      bloodlust: 2,
+      victory_feast: 2,
       keen_focus: 1,
     })!;
     expect(mods.dmgMult).toBeCloseTo(1.06);
@@ -167,15 +170,23 @@ describe("resolveCommanderMods", () => {
     expect(mods.overheal).toBe(false);
   });
 
-  it("keystone flags resolve", () => {
+  it("keystones resolve (Bloodlust's composite lands every field)", () => {
     const mods = resolveCommanderMods({
-      warpath: 1,
+      bloodlust: 1,
       undying_will: 1,
       chronomancer: 1,
     })!;
-    expect(mods.critEveryNth).toBe(4);
+    expect(mods.atkDelayMult).toBeCloseTo(1 - BLOODLUST_ATK_FRAC);
+    expect(mods.moveSpeedMult).toBeCloseTo(1 + BLOODLUST_MOVE_FRAC);
+    expect(mods.lifestealBonus).toBeCloseTo(BLOODLUST_LIFESTEAL);
+    expect(mods.rangedLifesteal).toBeCloseTo(BLOODLUST_LIFESTEAL);
     expect(mods.lastBreath).toBe(true);
     expect(mods.abilitiesStartReady).toBe(true);
+  });
+
+  it("Bloodlust stacks multiplicatively with Drill Sergeant", () => {
+    const mods = resolveCommanderMods({ drill_sergeant: 3, bloodlust: 1 })!;
+    expect(mods.atkDelayMult).toBeCloseTo(0.94 * (1 - BLOODLUST_ATK_FRAC));
   });
 });
 
