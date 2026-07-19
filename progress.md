@@ -60,7 +60,7 @@ the source of truth, so this file deliberately doesn't duplicate it.
 > (`OutroCinematic.braceToRow`, a `braceRef`); no UI/App changes. ⚠ the retreat
 > cinematic needs a **device eyeball**. Memory: `boss-brace-cinematic-built`.
 
-> **✅ The Commander BUILT (2026-07-18, on `feature/commander` — UNSHIPPED).**
+> **✅ The Commander SHIPPED (PR #68, 2026-07-18; built on `feature/commander`).**
 > The meta centerpiece: YOU as a customizable commander above the deck. An
 > account-wide XP pool (fed the same per-battle XP the deck earns, cap Lv 20 →
 > 19 talent points), a 3-branch talent tree (Warlord / Guardian / Arcanist,
@@ -73,7 +73,9 @@ the source of truth, so this file deliberately doesn't duplicate it.
 > all derived-never-stored rules; the sanitizer REPLAYS the tree's gate rules
 > on load, so hand-edited/rolled-back saves self-heal). 814 tests (+37:
 > meta/commander, engine commanderMods + commanderSpell, migration). UI: Home
-> banner under the profile plate → CommanderSheet; results-screen commander
+> banner under the profile plate → CommanderSheet — titled **"The War Table"**
+> (named 2026-07-18; matches the Forge/Athenaeum place-naming voice; the
+> "talent points" currency word deliberately stays); results-screen commander
 > XP bar. Memory: `commander-built`.
 >
 > **Meta decisions recorded (2026-07-18):** a "Hero" tier above Legendary with
@@ -87,7 +89,10 @@ the source of truth, so this file deliberately doesn't duplicate it.
 > with the deferred prestige note).
 >
 > **Still open on the Commander:** a "War Tent" full-screen scene (Forge
-> pattern, `/mockup` round) — the sheet ships plain; spell cast VFX/SFX polish
+> pattern, `/mockup` round) — the sheet ships plain for now, and since the
+> screen is named "The War Table" the scene art should center on the table
+> itself (campaign maps, markers, the three branch banners around it); spell
+> cast VFX/SFX polish
 > + a field-edge commander banner (presentation); a talent-numbers sweep once
 > players saturate the tree; device eyeball of the HUD spell button feel.
 
@@ -405,6 +410,15 @@ and the "adding a unit" checklist in `NOTES.md`.
 - **Warlord** (epic) — War Horn grants allies haste; the first offensive support.
 - **Spellbreaker** (epic) — silences casters; anti-mage.
 - **Phoenix** (legendary) — immolation aura + a once-per-match rebirth.
+
+### Painted image sprites — whole-game visual upgrade (in progress, Phase 0 done)
+Replace procedural unit art with AI-painted stills (ComfyUI Qwen-Edit restyle of the
+game's own renders), animated by the existing `animOffsets` tween; procedural art stays
+as permanent fallback so it ships in waves. Plan:
+`~/.claude/plans/is-there-a-way-curried-tulip.md`; recipe/learnings in the
+`image-sprites-phase0-mockups` memory. **Next: user picks a style at
+`/mockups/image-sprites.html`** (3 candidates × 5 units, animated) → consistency probe →
+Phase 1 pilot (imageSprites registry + `drawUnitSprite` seam + battle-canvas DPR fix).
 
 ### Beginner tutorial / onboarding (planned)
 Resurface first-run guidance (e.g. the in-battle "tap to deploy" hint we removed) only

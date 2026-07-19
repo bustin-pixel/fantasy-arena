@@ -14,6 +14,7 @@ import { useGameState } from "@/state/GameStateContext";
 import { UnitDetail } from "@/components/UnitDetail";
 import { buildBooks, shadeHex, type BookDef } from "@/components/compendium/books";
 import { BookOverlay } from "@/components/compendium/BookOverlay";
+import { GameIcon } from "@/components/icons/GameIcon";
 import { playSfx } from "@/audio/sfx";
 
 /** Spine heights (px) walked in shelf order — an uneven row reads as a real
@@ -54,14 +55,14 @@ function BookSpine({
       }
     >
       <span className="shelf-book-glyph" aria-hidden>
-        {book.glyph}
+        <GameIcon name={book.glyph} />
       </span>
       <span className="shelf-book-title">{book.title}</span>
       {book.locked ? (
         <>
           <span className="shelf-book-chains" aria-hidden />
           <span className="shelf-book-lock" aria-hidden>
-            🔒
+            <GameIcon name="locked" />
           </span>
         </>
       ) : (
@@ -127,7 +128,11 @@ export function CompendiumScreen() {
             <div className="athenaeum-board" />
           </div>
         ))}
-        {gateToast && <div className="gate-toast">🔒 {gateToast}</div>}
+        {gateToast && (
+          <div className="gate-toast">
+            <GameIcon name="locked" /> {gateToast}
+          </div>
+        )}
       </div>
       <p className="athenaeum-hint">
         Face a creature to sight it; slay one to record its lore.

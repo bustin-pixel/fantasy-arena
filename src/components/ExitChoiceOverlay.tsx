@@ -13,6 +13,7 @@
 import { playSfx } from "@/audio/sfx";
 import type { OutroDir } from "@/hooks/OutroCinematic";
 import { OMEN_META, type OmenArrow, type OmenDir } from "@/data/encounters";
+import { GameIcon } from "@/components/icons/GameIcon";
 
 interface Props {
   /** What each arrow shows + leads to (a rare quarry's omen is a disguise). */
@@ -47,7 +48,7 @@ export function ExitChoiceOverlay({ omens, onChoose }: Props) {
           >
             <span className="exit-arrow-chevron" aria-hidden />
             <span className="exit-arrow-omen" aria-hidden>
-              {meta.glyph}
+              <GameIcon name={meta.glyph} />
             </span>
           </button>
         );

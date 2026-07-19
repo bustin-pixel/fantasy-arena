@@ -48,6 +48,7 @@ import {
 import { RewardPanel } from "@/components/RewardPanel";
 import { generateSeed } from "@/utils/rng";
 import { playStinger, setMusicTrack } from "@/audio/music";
+import { GameIcon } from "@/components/icons/GameIcon";
 import { playSfx } from "@/audio/sfx";
 
 interface Props {
@@ -660,7 +661,9 @@ export function BattleScreen({
         {outroStage === "choice" &&
           (nextIsBoss ? (
             <div className="lair-choice" role="dialog" aria-label="The boss lair">
-              <p className="lair-omen">☠ The boss's lair lies just ahead…</p>
+              <p className="lair-omen">
+                <GameIcon name="bossSkull" /> The boss&apos;s lair lies just ahead…
+              </p>
               <button
                 className="btn btn-gold lair-enter"
                 onClick={() => chooseExit("up")}

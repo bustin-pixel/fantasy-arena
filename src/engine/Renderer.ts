@@ -15,6 +15,7 @@ import {
   fieldTransform,
 } from "@/utils/constants";
 import { drawUnitSprite } from "@/assets/sprites";
+import { drawStatusIcon, hasStatusIcon } from "@/assets/statusIcons";
 import { getUnitDef } from "@/data/units";
 import {
   ARENA_THEMES,
@@ -171,34 +172,21 @@ function drawHealthBar(ctx: Ctx, u: Unit): void {
   }
 }
 
+/** Status pips above a unit's head. Drawn icons (assets/statusIcons), not
+ *  glyphs — see that module for why they stay this coarse. */
+const STATUS_ICON_PX = 13;
+const STATUS_ICON_GAP = 14;
+
 function drawStatusIcons(ctx: Ctx, u: Unit): void {
   if (u.effects.length === 0) return;
-  const icons: Record<string, string> = {
-    burn: "🔥",
-    slow: "❄",
-    stun: "✦",
-    shield: "🛡",
-    haste: "»",
-    poison: "☠",
-    curse: "💀",
-    regen: "💚",
-    silence: "∅",
-    stealth: "👁",
-    death_immune: "✝",
-    taunt: "❗",
-    fear: "😱",
-  };
   const bs = bossScaleOf(u);
   const iconY = bs > 1 ? spriteTopY(u) - 22 : u.pos.y - u.radius - 20;
-  let i = 0;
-  ctx.font = "10px sans-serif";
-  ctx.textAlign = "center";
-  for (const e of u.effects) {
-    const icon = icons[e.type];
-    if (!icon) continue;
-    ctx.fillText(icon, u.pos.x - 14 + i * 12, iconY);
-    i++;
-  }
+  const shown = u.effects.filter((e) => hasStatusIcon(e.type));
+  // Centre the row on the unit rather than growing rightward off its shoulder.
+  const startX = u.pos.x - ((shown.length - 1) * STATUS_ICON_GAP) / 2;
+  shown.forEach((e, i) => {
+    drawStatusIcon(ctx, e.type, startX + i * STATUS_ICON_GAP, iconY, STATUS_ICON_PX);
+  });
 }
 
 function drawUnit(ctx: Ctx, u: Unit): void {

@@ -33,6 +33,7 @@ import { LEVEL_CAP } from "@/meta/leveling";
 import { effectiveBossChestTier } from "@/meta/rewards";
 import { CHEST_LABEL } from "@/components/RewardPanel";
 import { renderPortrait } from "@/engine/Renderer";
+import { GameIcon } from "@/components/icons/GameIcon";
 import { playSfx } from "@/audio/sfx";
 import {
   highestUnlockedTier,
@@ -74,7 +75,15 @@ function EnemyPortrait({
       <canvas ref={ref} width={ART} height={ART} />
       <span className="atlas-enemy-name">{name}</span>
       <span className="atlas-enemy-sub">
-        {tag === "boss" ? "☠ Boss · " : tag === "rare" ? "✦ Rare · " : ""}
+        {tag === "boss" ? (
+          <>
+            <GameIcon name="bossSkull" /> Boss ·{" "}
+          </>
+        ) : tag === "rare" ? (
+          "✦ Rare · "
+        ) : (
+          ""
+        )}
         Lv {level}
       </span>
     </div>
@@ -188,7 +197,8 @@ export function FloorInfoPanel({
                 setTier(t);
               }}
             >
-              {done ? "✓ " : !unlocked ? "🔒 " : ""}
+              {done ? "✓ " : !unlocked ? <GameIcon name="locked" /> : ""}
+              {!unlocked && !done ? " " : ""}
               {TIER_LABEL[t]}
             </button>
           );
@@ -198,7 +208,10 @@ export function FloorInfoPanel({
       <p className="atlas-info-sub">
         Recommended: Lv {Math.min(LEVEL_CAP, fodderLv + 1)}+
         {underleveled && (
-          <span className="atlas-info-warn"> · your warband is Lv {warbandLv} ⚠</span>
+          <span className="atlas-info-warn">
+            {" "}
+            · your warband is Lv {warbandLv} <GameIcon name="warning" />
+          </span>
         )}
       </p>
 

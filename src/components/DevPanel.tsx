@@ -5,6 +5,7 @@
 // away and nothing here can touch the live game.
 import { useState, type CSSProperties } from "react";
 import { useGameState } from "@/state/GameStateContext";
+import { GameIcon } from "@/components/icons/GameIcon";
 
 const wrap: CSSProperties = {
   position: "fixed",
@@ -62,10 +63,11 @@ export function DevPanel() {
       {open && (
         <div style={panel}>
           <div style={{ fontWeight: 700, color: "#c4b5fd", letterSpacing: 0.5 }}>
-            🛠 DEV — local only
+            <GameIcon name="dev" /> DEV — local only
           </div>
           <div style={{ opacity: 0.8 }}>
-            {save.gold}g · {save.soulShards}◆ · {save.unlockedUnits.length} units
+            {save.gold}g · {save.soulShards}
+            <GameIcon name="shard" /> · {save.unlockedUnits.length} units
             · {Object.keys(save.items).length} items
           </div>
           <button style={btn} onClick={dev.unlockAllUnits}>
@@ -101,7 +103,13 @@ export function DevPanel() {
         </div>
       )}
       <button style={fab} onClick={() => setOpen((o) => !o)}>
-        {open ? "✕ dev" : "🛠 dev"}
+        {open ? (
+          "✕ dev"
+        ) : (
+          <>
+            <GameIcon name="dev" /> dev
+          </>
+        )}
       </button>
     </div>
   );

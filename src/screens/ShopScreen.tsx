@@ -27,6 +27,7 @@ import {
   SHOP_REROLL_COST,
   SHOP_REROLLS_PER_DAY,
 } from "@/meta/economy";
+import { GameIcon } from "@/components/icons/GameIcon";
 import { playSfx, type SfxKey } from "@/audio/sfx";
 
 interface Props {
@@ -253,7 +254,7 @@ export function ShopScreen({ onExit }: Props) {
             onClick={reroll}
             title={rerollNote}
           >
-            ⟳ Reroll · ● {SHOP_REROLL_COST}
+            ⟳ Reroll · <GameIcon name="gold" /> {SHOP_REROLL_COST}
           </button>
         </div>
         <p className="shop-note">{rerollNote} New stock at midnight.</p>
@@ -286,7 +287,7 @@ export function ShopScreen({ onExit }: Props) {
                   {offer.quality} {offer.slot}
                 </span>
                 <span className={`shop-card-price${cant ? " cant" : ""}`}>
-                  ● {offer.price}
+                  <GameIcon name="gold" /> {offer.price}
                 </span>
                 {sold && <span className="shop-sold-stamp">SOLD</span>}
               </button>
@@ -366,7 +367,13 @@ export function ShopScreen({ onExit }: Props) {
                       disabled={sold}
                       onClick={() => buy(offer.slotIdx)}
                     >
-                      {sold ? "SOLD" : `Buy — ● ${offer.price}`}
+                      {sold ? (
+                        "SOLD"
+                      ) : (
+                        <>
+                          Buy — <GameIcon name="gold" /> {offer.price}
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>
@@ -393,7 +400,7 @@ export function ShopScreen({ onExit }: Props) {
                 }`}
                 aria-hidden
               >
-                {pack.kind === "shards" ? "◆" : "●"}
+                <GameIcon name={pack.kind === "shards" ? "shard" : "gold"} />
               </span>
               <span className="shop-card-name">{pack.label}</span>
               <span className="shop-card-sub">

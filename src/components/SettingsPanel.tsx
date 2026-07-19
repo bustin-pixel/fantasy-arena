@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { getSettings, updateSettings, type GameSettings } from "@/state/settings";
 import { resetSave } from "@/state/persistence";
+import { GameIcon } from "@/components/icons/GameIcon";
 import { playSfx } from "@/audio/sfx";
 
 /** The settings modal — same ironwork frame as the unit detail panel. Opened
@@ -27,7 +28,9 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
           ✕
         </button>
         <div className="settings-body">
-          <h2 className="settings-title">⚙ Settings</h2>
+          <h2 className="settings-title">
+            <GameIcon name="settings" /> Settings
+          </h2>
 
           <div className="settings-section">Audio</div>
           <label className="settings-row">

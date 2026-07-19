@@ -6067,3 +6067,87 @@ body.modal-open .pager-nav {
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
 }
 
+
+/* ==========================================================================
+   Drawn UI icons — components/icons/GameIcon
+   These replaced the game's emoji. A GameIcon defaults to width/height 1em,
+   so it inherits the font-size of whatever holder it sits in exactly the way
+   the emoji did — which is why most holder rules below needed no size change.
+   Two things DID need fixing per-holder:
+     1. baseline. An <svg> is a replaced inline box that sits ON the baseline,
+        so next to text it rides high. The nudge below re-centres it.
+     2. glow. Holders lit the old glyph with text-shadow, which has no effect
+        on an SVG — those become drop-shadow filters.
+   ========================================================================== */
+.game-icon {
+  display: inline-block;
+  vertical-align: -0.15em;
+  /* Most holders are flex rows; without this an icon gets squeezed to 0. */
+  flex: none;
+}
+
+/* The currency marks carried a glow as ● and ◆. Re-express it for SVG, and
+   size up from the old glyph sizes — a drawn coin has a mint-mark and a
+   drawn shard has facets, and both died below ~14px. */
+.gold-pill .coin,
+.reward-gold .coin,
+.floor-loot-gold .coin {
+  font-size: 1rem;
+  filter: drop-shadow(0 0 4px rgba(245, 179, 1, 0.85));
+}
+.shard-gem,
+.reward-shards .shard-gem,
+.floor-loot-shards .shard-gem {
+  font-size: 1rem;
+  filter: drop-shadow(0 0 4px rgba(192, 132, 252, 0.85));
+}
+
+/* Book spines: the glyph box is narrow, so the icon drives its own size. */
+.shelf-book-glyph {
+  font-size: 18px;
+}
+
+/* Atlas nodes sit on parchment; the ink outline already reads, so the icons
+   only need to fill the node circle. */
+.atlas-node-glyph .game-icon {
+  width: 1.15em;
+  height: 1.15em;
+}
+
+/* Two holders set a font-size tuned for TEXT, which left their icon too small
+   to read: the locked-card button sizes for its price string, and the settings
+   button had no icon before. Size those icons directly rather than disturbing
+   the text around them. */
+.card-add .game-icon {
+  width: 1.35em;
+  height: 1.35em;
+}
+.settings-btn .game-icon {
+  width: 20px;
+  height: 20px;
+}
+
+/* Shop: these holders size for small display type (0.76–0.82rem), which left
+   the coin's mint-mark unreadable. Give the icon a floor without touching the
+   price text beside it. The currency-pack card icon is the tile's hero mark,
+   so it gets a proper size rather than a text-derived one. */
+.shop-reroll .game-icon,
+.shop-card-price .game-icon {
+  width: 1.3em;
+  height: 1.3em;
+}
+.shop-pack-icon .game-icon {
+  width: 26px;
+  height: 26px;
+}
+
+/* Forge: the service buttons pack a lot of label into a small type size, so
+   their hammer and coin need a floor to stay legible. */
+.smith-service .game-icon,
+.smith-forge-btn .game-icon,
+.smith-salvage-btn .game-icon,
+.smith-warning .game-icon,
+.smith-panel-note .game-icon {
+  width: 1.35em;
+  height: 1.35em;
+}

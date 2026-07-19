@@ -22,6 +22,7 @@ import {
 import { TENDENCIES } from "@/data/tendencies";
 import { availableCount } from "@/meta/inventory";
 import { ItemIcon } from "@/components/ItemIcon";
+import { GameIcon } from "@/components/icons/GameIcon";
 import { playSfx } from "@/audio/sfx";
 import type { ItemLoadouts, ItemSlot, UnitDef } from "@/types";
 
@@ -357,7 +358,15 @@ export function UnitDetail({
                     <ItemIcon itemKey={key} size={38} />
                   ) : (
                     <span className="art-slot-glyph" aria-hidden>
-                      {slot === "weapon" ? "⚔" : slot === "armor" ? "🛡" : "◈"}
+                      {slot === "weapon" ? (
+                        <GameIcon name="weapon" />
+                      ) : slot === "armor" ? (
+                        <GameIcon name="armor" />
+                      ) : (
+                        // The trinket slot keeps its lozenge — there's no one
+                        // object a trinket IS, so a drawn icon would mislead.
+                        "◈"
+                      )}
                     </span>
                   )}
                 </button>
@@ -548,7 +557,9 @@ export function UnitDetail({
             Close
           </button>
           {!readonly && locked && lockHint && (
-            <span className="detail-lockhint">🔒 {lockHint}</span>
+            <span className="detail-lockhint">
+              <GameIcon name="locked" /> {lockHint}
+            </span>
           )}
           {!readonly && locked && !lockHint && (
             <button

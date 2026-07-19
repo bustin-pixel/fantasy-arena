@@ -3,6 +3,7 @@ import type { BattleMode, BattleUiState } from "@/hooks/useBattleEngine";
 import { getUnitDef } from "@/data/units";
 import { SPELLS } from "@/meta/commander";
 import { getSettings, updateSettings } from "@/state/settings";
+import { GameIcon } from "@/components/icons/GameIcon";
 import { playSfx } from "@/audio/sfx";
 
 interface Props {
@@ -42,7 +43,7 @@ function MuteButton() {
         playSfx("uiSelect");
       }}
     >
-      {muted ? "🔇" : "🔊"}
+      <GameIcon name={muted ? "soundOff" : "soundOn"} />
     </button>
   );
 }
@@ -139,7 +140,14 @@ export function BattleHud({
       {ui.phase === "battle" && ui.banner && (
         <div className={`wave-banner wave-banner-${ui.banner.kind}`} role="alert">
           <div className="wave-banner-headline">
-            {ui.banner.kind === "boss" ? "☠ Boss Incoming ☠" : ui.banner.name}
+            {ui.banner.kind === "boss" ? (
+              <>
+                <GameIcon name="bossSkull" /> Boss Incoming{" "}
+                <GameIcon name="bossSkull" />
+              </>
+            ) : (
+              ui.banner.name
+            )}
           </div>
           <div className="wave-banner-tag">
             {ui.banner.kind === "boss"
@@ -217,7 +225,9 @@ export function BattleHud({
                   onCastSpell();
                 }}
               >
-                <span aria-hidden="true">⚜</span>{" "}
+                <span aria-hidden="true">
+                  <GameIcon name="commander" />
+                </span>{" "}
                 {SPELLS[ui.commanderSpell.spell].name}
               </button>
             )}
