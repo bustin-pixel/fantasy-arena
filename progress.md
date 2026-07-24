@@ -411,14 +411,31 @@ and the "adding a unit" checklist in `NOTES.md`.
 - **Spellbreaker** (epic) — silences casters; anti-mage.
 - **Phoenix** (legendary) — immolation aura + a once-per-match rebirth.
 
-### Painted image sprites — whole-game visual upgrade (in progress, Phase 0 done)
-Replace procedural unit art with AI-painted stills (ComfyUI Qwen-Edit restyle of the
-game's own renders), animated by the existing `animOffsets` tween; procedural art stays
-as permanent fallback so it ships in waves. Plan:
-`~/.claude/plans/is-there-a-way-curried-tulip.md`; recipe/learnings in the
-`image-sprites-phase0-mockups` memory. **Next: user picks a style at
-`/mockups/image-sprites.html`** (3 candidates × 5 units, animated) → consistency probe →
-Phase 1 pilot (imageSprites registry + `drawUnitSprite` seam + battle-canvas DPR fix).
+### Hi-bit PIXEL sprites — whole-game visual upgrade (IN PROGRESS, round 4)
+Replace procedural unit art with hi-bit **diagonal-4** pixel sprites (80px cell,
+idle/walk/attack/death/corpse), generated in ComfyUI and run through a deterministic
+pixelizer (locked palette, anchor, height rule). Integration is DONE and permanent:
+`imageSprites` registry + `drawImage`/pixel-frame seam in `drawUnitSprite`, 8-facing
+snap via `nearestFacingWithArt`, procedural art is the permanent fallback. Adding a
+unit = run `export_to_game.py`, no game code.
+
+**State 2026-07-23:** 13 of 39 bodies converted + integrated (the original 12 +
+aegis_knight). The **round-4 batch** (this session's mandate) is converting the
+**22 remaining deckable units + summons** (bear form, turret, void imp, mirror image,
+slime clone) and gave **every legendary a themed engine-drawn aura** (all 8 built +
+verified). ~24 units' clip generation remains — a multi-hour serial-GPU grind.
+
+- **Legendary auras: ALL 8 BUILT** (`AURA_BY_ID`+`drawAura` in `Renderer.ts`,
+  presentation-only, defId-keyed, verified 21/21 in `/mockups/aura-verify.html`).
+- **Owed before ship:** the ranged advance-fire winrate sweep (ranged units advance
+  while firing now — a user-approved gameplay change, no sweep run yet).
+- **Recipe of record: `docs/pixel-sprite-style.md`; live handoff:
+  `docs/pixel-next-unit-handoff.md`; per-unit picks/FAILs:
+  `docs/pixel-batch-review-notes.md`.** Tooling in `comfyui-2d-character-pipeline/tools/`.
+  Review vehicle = the "diagonal-4 roster" artifact (republished per unit).
+
+*(The earlier 8-direction and PAINTED-sprite directions are both superseded. Their
+mockups/scripts remain on disk; learnings in the memories.)*
 
 ### Beginner tutorial / onboarding (planned)
 Resurface first-run guidance (e.g. the in-battle "tap to deploy" hint we removed) only

@@ -17,6 +17,16 @@ export interface GameSettings {
   defaultSpeed: 1 | 2 | 3;
   /** Ambient battlefield animation (embers, fireflies, glyphs). */
   ambientFx: boolean;
+  /** Draw units from the generated PIXEL sprites (default) or from the
+   *  ORIGINAL hand-coded procedural art.
+   *
+   *  ⚠ The procedural `draw*` functions in `assets/sprites.ts` are the game's
+   *  original look and its permanent fallback — they are NOT dead code. This
+   *  flag makes them reachable on demand so the pre-pixel art can always be
+   *  seen and compared. Turning it off costs nothing: `drawUnitSprite` simply
+   *  skips the pixel lookup and falls through to the same switch that any
+   *  unconverted unit already uses. */
+  pixelArt: boolean;
 }
 
 const DEFAULTS: GameSettings = {
@@ -25,6 +35,7 @@ const DEFAULTS: GameSettings = {
   muted: false,
   defaultSpeed: 1,
   ambientFx: true,
+  pixelArt: true,
 };
 
 const KEY = "fantasy-arena/settings/v1";
@@ -52,6 +63,7 @@ function load(): GameSettings {
     muted: typeof loaded.muted === "boolean" ? loaded.muted : DEFAULTS.muted,
     defaultSpeed: loaded.defaultSpeed === 2 || loaded.defaultSpeed === 3 ? loaded.defaultSpeed : 1,
     ambientFx: typeof loaded.ambientFx === "boolean" ? loaded.ambientFx : DEFAULTS.ambientFx,
+    pixelArt: typeof loaded.pixelArt === "boolean" ? loaded.pixelArt : DEFAULTS.pixelArt,
   };
   return settings;
 }

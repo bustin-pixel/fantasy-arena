@@ -92,6 +92,16 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
               onChange={(e) => { playSfx("uiSelect"); set({ ambientFx: e.target.checked }); }}
             />
           </label>
+          <label className="settings-row">
+            <span className="settings-label">
+              Pixel sprites <small>(off = original hand-drawn art)</small>
+            </span>
+            <input
+              type="checkbox"
+              checked={s.pixelArt}
+              onChange={(e) => { playSfx("uiSelect"); set({ pixelArt: e.target.checked }); }}
+            />
+          </label>
 
           <div className="settings-section danger">Danger</div>
           <button

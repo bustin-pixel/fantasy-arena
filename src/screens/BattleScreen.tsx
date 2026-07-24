@@ -392,9 +392,22 @@ export function BattleScreen({
 
   // Size the render buffer to the field box's ASPECT (not a fixed 480×720), so
   // the arena fills it edge-to-edge instead of leaving black letterbox bars.
-  // Height stays FIELD_HEIGHT (constant vertical resolution); width tracks the
-  // box. The renderer re-centers the 480×720 world inside this wider buffer,
-  // and handleTap/BattleUnitTip invert the same transform. See fieldTransform.
+  // The renderer re-centers the 480×720 world inside this buffer, and
+  // handleTap/BattleUnitTip invert the same transform. See fieldTransform.
+  //
+  // The buffer is sized in DEVICE pixels, not a fixed 720-tall one. It used to
+  // be fixed, which meant the browser resampled the whole arena by an arbitrary
+  // fractional factor on its way to the screen — survivable for vector art,
+  // fatal for pixel sprites, whose 1px outlines average into grey. Matching
+  // device pixels makes that resample 1:1 and lets blitPixelFrame land sprites
+  // on whole pixels at a whole scale.
+  //
+  // This does NOT change the layout: the on-screen size of a world unit works
+  // out to min(r.width/480, r.height/720) either way. Only resolution moves.
+  //
+  // DPR is floored (integer scales only) and capped at 2: a 3x phone would mean
+  // ~8x the pixels of the old buffer every frame, and the arena is drawn
+  // procedurally, so that cost lands straight on the frame budget.
   useEffect(() => {
     const wrap = wrapRef.current;
     const canvas = canvasRef.current;
@@ -402,11 +415,13 @@ export function BattleScreen({
     const apply = () => {
       const r = wrap.getBoundingClientRect();
       if (r.width <= 0 || r.height <= 0) return;
-      const w = Math.max(1, Math.round(FIELD_HEIGHT * (r.width / r.height)));
+      const dpr = Math.min(2, Math.max(1, Math.floor(window.devicePixelRatio || 1)));
+      const w = Math.max(1, Math.round(r.width * dpr));
+      const h = Math.max(1, Math.round(r.height * dpr));
       // Assigning canvas.width clears the canvas, so only touch it on a real
       // change (the rAF loop repaints every frame regardless).
       if (canvas.width !== w) canvas.width = w;
-      if (canvas.height !== FIELD_HEIGHT) canvas.height = FIELD_HEIGHT;
+      if (canvas.height !== h) canvas.height = h;
     };
     apply();
     const ro = new ResizeObserver(apply);
