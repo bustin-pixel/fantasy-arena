@@ -231,7 +231,7 @@
       40,
       72
     ],
-    "version": 1784875207,
+    "version": 1784879477,
     "keep": 8,
     "dirs": [
       "s",
@@ -336,7 +336,8 @@
       "ne": "orc_corpse_ne.png",
       "sw": "orc_corpse_sw.png",
       "nw": "orc_corpse_nw.png"
-    }
+    },
+    "react": {}
   },
   "skeleton": {
     "cell": 80,
@@ -4416,7 +4417,7 @@
       80,
       144
     ],
-    "version": 1784875671,
+    "version": 1784880301,
     "keep": 8,
     "dirs": [
       "s",

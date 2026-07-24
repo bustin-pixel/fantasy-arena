@@ -12,6 +12,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useGameState } from "@/state/GameStateContext";
 import { GrubbinsScene, SCENE_ASPECT } from "@/components/GrubbinsScene";
+import { GrubbinsPixelScene } from "@/components/GrubbinsPixelScene";
+import { getSettings, subscribeSettings } from "@/state/settings";
 import { GoldPill, ShardPill } from "@/components/CurrencyPills";
 import { ItemIcon } from "@/components/ItemIcon";
 import { describeItemKey, ITEM_LINES, makeItemKey } from "@/data/items";
@@ -92,6 +94,16 @@ export function ShopScreen({ onExit }: Props) {
   // Grubbins' speech bubble + pleased reaction.
   const [bark, setBark] = useState<{ text: string; nonce: number } | null>(null);
   const [reactNonce, setReactNonce] = useState(0);
+
+  // Which Grubbins. The SAME Settings → Visuals → "Pixel sprites" flag that
+  // swaps the unit roster swaps the shopkeeper, so the original hand-built
+  // PixiJS scene stays reachable instead of being replaced. Both components
+  // take the same props and share SCENE_ASPECT, so the sizing below is
+  // untouched either way. (This one screen can't use `useSpriteEpoch` — that
+  // counter also fires on sprite DECODE, which would remount the scene mid-
+  // animation; here only the flag itself matters.)
+  const [pixelArt, setPixelArt] = useState(() => getSettings().pixelArt);
+  useEffect(() => subscribeSettings((s) => setPixelArt(s.pixelArt)), []);
   const barkCounts = useRef<Partial<Record<BarkKind, number>>>({});
   const barkTimer = useRef<number | null>(null);
   const say = (kind: BarkKind) => {
@@ -219,9 +231,12 @@ export function ShopScreen({ onExit }: Props) {
   return (
     <div className="shop-screen">
       <div className="shop-scene-wrap" ref={wrapRef}>
-        {sceneW > 0 && (
-          <GrubbinsScene width={sceneW} reactNonce={reactNonce} />
-        )}
+        {sceneW > 0 &&
+          (pixelArt ? (
+            <GrubbinsPixelScene width={sceneW} reactNonce={reactNonce} />
+          ) : (
+            <GrubbinsScene width={sceneW} reactNonce={reactNonce} />
+          ))}
         <div className="shop-header">
           <button
             type="button"
