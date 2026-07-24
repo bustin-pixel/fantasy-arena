@@ -29,6 +29,7 @@ import { RARITIES } from "@/data/rarities";
 import { ITEM_LINES } from "@/data/items";
 import { ChestSprite } from "@/components/ChestSprite";
 import { renderPortrait } from "@/engine/Renderer";
+import { useSpriteEpoch } from "@/hooks/useSpriteEpoch";
 import { GameIcon } from "@/components/icons/GameIcon";
 import { useCountUp } from "@/hooks/useCountUp";
 import { playStinger } from "@/audio/music";
@@ -321,10 +322,11 @@ function XpRow({ gain, shownXp }: { gain: XpGain; shownXp: number }) {
   const leveled = finalLevel > startLevel;
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const spriteEpoch = useSpriteEpoch();
   useEffect(() => {
     const ctx = canvasRef.current?.getContext("2d");
     if (ctx) renderPortrait(ctx, gain.defId, 36);
-  }, [gain.defId]);
+  }, [gain.defId, spriteEpoch]);
 
   return (
     <div className={`xp-row${leveled && settled ? " leveled" : ""}`}>

@@ -3,6 +3,7 @@ import { DECKABLE_UNIT_IDS, getUnitDef, isMelee } from "@/data/units";
 import { RARITIES } from "@/data/rarities";
 import { ABILITIES } from "@/data/abilities";
 import { renderPortrait } from "@/engine/Renderer";
+import { useSpriteEpoch } from "@/hooks/useSpriteEpoch";
 import { FIELD_WIDTH, MAX_DECK } from "@/utils/constants";
 import { UNLOCK_PRICES } from "@/meta/economy";
 import {
@@ -251,6 +252,7 @@ export function UnitDetail({
   );
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  const spriteEpoch = useSpriteEpoch();
   useEffect(() => {
     const ctx = canvasRef.current?.getContext("2d");
     if (!ctx) return;
@@ -282,7 +284,7 @@ export function UnitDetail({
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [defId]);
+  }, [defId, spriteEpoch]);
 
   // Close on Escape.
   useEffect(() => {

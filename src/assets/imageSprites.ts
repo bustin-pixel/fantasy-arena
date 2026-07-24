@@ -242,9 +242,37 @@ async function loadUnit(defId: string, m: UnitManifest): Promise<void> {
     // has art (diagonal-4 units ship only se/ne/sw/nw), so a partial set can
     // no longer flip a unit back to the procedural style as it turns.
     loaded.set(defId, Object.keys(out.still).length > 0 ? out : null);
+    notifyLoad();
   } catch {
     loaded.set(defId, null);
+    notifyLoad();
   }
+}
+
+// ---------------------------------------------------------------------------
+// Load notifications.
+//
+// ⚠ WHY: art decodes ASYNCHRONOUSLY. `getPixelFrame` returns null until a
+// unit's strips are in, so anything that paints a canvas ONCE — the collection
+// cards, the deck strip, the reward panel — can paint the procedural fallback
+// and then keep it forever, because nothing tells React the art has arrived.
+// The battle canvas never showed this: it repaints every rAF, so it picks the
+// art up on the next frame regardless.
+//
+// Listeners fire when a unit finishes loading (successfully or not). Combined
+// with the `pixelArt` setting in `useSpriteEpoch`, this is what lets a
+// one-shot canvas know it must repaint.
+// ---------------------------------------------------------------------------
+const loadListeners = new Set<() => void>();
+
+function notifyLoad(): void {
+  for (const cb of loadListeners) cb();
+}
+
+/** Subscribe to "a unit's pixel art finished loading". Returns an unsubscribe. */
+export function subscribeSpriteLoad(cb: () => void): () => void {
+  loadListeners.add(cb);
+  return () => loadListeners.delete(cb);
 }
 
 function loadImage(src: string): Promise<HTMLImageElement> {

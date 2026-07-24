@@ -29,6 +29,7 @@ import { useEffect, useLayoutEffect, useRef } from "react";
 import type React from "react";
 import { hash01, trailPath, type NodeState, type TrailNode } from "@/data/atlasLayout";
 import { renderPortrait } from "@/engine/Renderer";
+import { useSpriteEpoch } from "@/hooks/useSpriteEpoch";
 import { prefersReducedMotion } from "@/utils/motion";
 import { GameIcon, type IconName } from "@/components/icons/GameIcon";
 import { BiomeLayer } from "./BiomeLayer";
@@ -134,11 +135,12 @@ function nodeText(node: TrailNode, state: NodeState): string {
 /** The deck-lead's face in a little gold ring — "you" on the map. */
 function MarkerBadge({ defId }: { defId: string }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const spriteEpoch = useSpriteEpoch();
   useLayoutEffect(() => {
     const ctx = ref.current?.getContext("2d");
     if (!ctx) return;
     renderPortrait(ctx, defId, 48, { transparent: true });
-  }, [defId]);
+  }, [defId, spriteEpoch]);
   return <canvas ref={ref} width={48} height={48} className="atlas-marker-face" />;
 }
 

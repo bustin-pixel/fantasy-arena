@@ -231,7 +231,7 @@
       40,
       72
     ],
-    "version": 1784821655,
+    "version": 1784875207,
     "keep": 8,
     "dirs": [
       "s",
@@ -4411,12 +4411,12 @@
     }
   },
   "grubbins": {
-    "cell": 80,
+    "cell": 160,
     "anchor": [
-      40,
-      72
+      80,
+      144
     ],
-    "version": 1784874379,
+    "version": 1784875671,
     "keep": 8,
     "dirs": [
       "s",
@@ -4448,6 +4448,12 @@
     "attack": {},
     "walk_attack": {},
     "death": {},
-    "corpse": {}
+    "corpse": {},
+    "react": {
+      "s": {
+        "file": "grubbins_s_react.png",
+        "frames": 8
+      }
+    }
   }
 }

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { renderPortrait } from "@/engine/Renderer";
+import { useSpriteEpoch } from "@/hooks/useSpriteEpoch";
 import { getUnitDef } from "@/data/units";
 import { RARITIES } from "@/data/rarities";
 import { UNLOCK_PRICES } from "@/meta/economy";
@@ -61,12 +62,15 @@ export function CardPortrait({
     ? lockLabel ?? `${UNLOCK_PRICES[def.rarity]}g`
     : ADD_LABEL[addState];
 
+  // `spriteEpoch` repaints when the pixel-art setting flips or a unit's art
+  // finishes decoding — without it this canvas keeps whatever it drew at mount.
+  const spriteEpoch = useSpriteEpoch();
   useEffect(() => {
     const canvas = ref.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (ctx) renderPortrait(ctx, defId, size);
-  }, [defId, size]);
+  }, [defId, size, spriteEpoch]);
 
   return (
     <div

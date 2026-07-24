@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { HandCard } from "@/hooks/useBattleEngine";
 import { renderPortrait } from "@/engine/Renderer";
+import { useSpriteEpoch } from "@/hooks/useSpriteEpoch";
 import { getUnitDef } from "@/data/units";
 import { RARITIES } from "@/data/rarities";
 
@@ -26,12 +27,13 @@ function TrayCard({
   const def = getUnitDef(card.defId);
   const rarity = RARITIES[def.rarity];
 
+  const spriteEpoch = useSpriteEpoch();
   useEffect(() => {
     const canvas = ref.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (ctx) renderPortrait(ctx, card.defId, TRAY_PORTRAIT);
-  }, [card.defId]);
+  }, [card.defId, spriteEpoch]);
 
   return (
     <button
