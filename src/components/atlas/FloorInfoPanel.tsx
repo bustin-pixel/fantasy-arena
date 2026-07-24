@@ -33,6 +33,8 @@ import { LEVEL_CAP } from "@/meta/leveling";
 import { effectiveBossChestTier } from "@/meta/rewards";
 import { CHEST_LABEL } from "@/components/RewardPanel";
 import { renderPortrait } from "@/engine/Renderer";
+import { useSpriteEpoch } from "@/hooks/useSpriteEpoch";
+import { GameIcon } from "@/components/icons/GameIcon";
 import { playSfx } from "@/audio/sfx";
 import {
   highestUnlockedTier,
@@ -56,6 +58,7 @@ function EnemyPortrait({
   tag?: string;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const spriteEpoch = useSpriteEpoch();
   // Layout effect so the sheet never flashes blank canvases as it slides up
   // (same reason the compendium paints its cards pre-frame).
   useLayoutEffect(() => {
@@ -67,14 +70,22 @@ function EnemyPortrait({
       ART,
       known ? undefined : { silhouette: "#0d0b08" }
     );
-  }, [defId, known]);
+  }, [defId, known, spriteEpoch]);
   const name = known ? getUnitDef(defId).name : "???";
   return (
     <div className={`atlas-enemy${tag ? ` ${tag}` : ""}`}>
       <canvas ref={ref} width={ART} height={ART} />
       <span className="atlas-enemy-name">{name}</span>
       <span className="atlas-enemy-sub">
-        {tag === "boss" ? "☠ Boss · " : tag === "rare" ? "✦ Rare · " : ""}
+        {tag === "boss" ? (
+          <>
+            <GameIcon name="bossSkull" /> Boss ·{" "}
+          </>
+        ) : tag === "rare" ? (
+          "✦ Rare · "
+        ) : (
+          ""
+        )}
         Lv {level}
       </span>
     </div>
@@ -188,7 +199,8 @@ export function FloorInfoPanel({
                 setTier(t);
               }}
             >
-              {done ? "✓ " : !unlocked ? "🔒 " : ""}
+              {done ? "✓ " : !unlocked ? <GameIcon name="locked" /> : ""}
+              {!unlocked && !done ? " " : ""}
               {TIER_LABEL[t]}
             </button>
           );
@@ -198,7 +210,10 @@ export function FloorInfoPanel({
       <p className="atlas-info-sub">
         Recommended: Lv {Math.min(LEVEL_CAP, fodderLv + 1)}+
         {underleveled && (
-          <span className="atlas-info-warn"> · your warband is Lv {warbandLv} ⚠</span>
+          <span className="atlas-info-warn">
+            {" "}
+            · your warband is Lv {warbandLv} <GameIcon name="warning" />
+          </span>
         )}
       </p>
 

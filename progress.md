@@ -60,7 +60,7 @@ the source of truth, so this file deliberately doesn't duplicate it.
 > (`OutroCinematic.braceToRow`, a `braceRef`); no UI/App changes. ⚠ the retreat
 > cinematic needs a **device eyeball**. Memory: `boss-brace-cinematic-built`.
 
-> **✅ The Commander BUILT (2026-07-18, on `feature/commander` — UNSHIPPED).**
+> **✅ The Commander SHIPPED (PR #68, 2026-07-18; built on `feature/commander`).**
 > The meta centerpiece: YOU as a customizable commander above the deck. An
 > account-wide XP pool (fed the same per-battle XP the deck earns, cap Lv 20 →
 > 19 talent points), a 3-branch talent tree (Warlord / Guardian / Arcanist,
@@ -73,7 +73,9 @@ the source of truth, so this file deliberately doesn't duplicate it.
 > all derived-never-stored rules; the sanitizer REPLAYS the tree's gate rules
 > on load, so hand-edited/rolled-back saves self-heal). 814 tests (+37:
 > meta/commander, engine commanderMods + commanderSpell, migration). UI: Home
-> banner under the profile plate → CommanderSheet; results-screen commander
+> banner under the profile plate → CommanderSheet — titled **"The War Table"**
+> (named 2026-07-18; matches the Forge/Athenaeum place-naming voice; the
+> "talent points" currency word deliberately stays); results-screen commander
 > XP bar. Memory: `commander-built`.
 >
 > **Meta decisions recorded (2026-07-18):** a "Hero" tier above Legendary with
@@ -87,7 +89,10 @@ the source of truth, so this file deliberately doesn't duplicate it.
 > with the deferred prestige note).
 >
 > **Still open on the Commander:** a "War Tent" full-screen scene (Forge
-> pattern, `/mockup` round) — the sheet ships plain; spell cast VFX/SFX polish
+> pattern, `/mockup` round) — the sheet ships plain for now, and since the
+> screen is named "The War Table" the scene art should center on the table
+> itself (campaign maps, markers, the three branch banners around it); spell
+> cast VFX/SFX polish
 > + a field-edge commander banner (presentation); a talent-numbers sweep once
 > players saturate the tree; device eyeball of the HUD spell button feel.
 
@@ -405,6 +410,32 @@ and the "adding a unit" checklist in `NOTES.md`.
 - **Warlord** (epic) — War Horn grants allies haste; the first offensive support.
 - **Spellbreaker** (epic) — silences casters; anti-mage.
 - **Phoenix** (legendary) — immolation aura + a once-per-match rebirth.
+
+### Hi-bit PIXEL sprites — whole-game visual upgrade (IN PROGRESS, round 4)
+Replace procedural unit art with hi-bit **diagonal-4** pixel sprites (80px cell,
+idle/walk/attack/death/corpse), generated in ComfyUI and run through a deterministic
+pixelizer (locked palette, anchor, height rule). Integration is DONE and permanent:
+`imageSprites` registry + `drawImage`/pixel-frame seam in `drawUnitSprite`, 8-facing
+snap via `nearestFacingWithArt`, procedural art is the permanent fallback. Adding a
+unit = run `export_to_game.py`, no game code.
+
+**State 2026-07-23:** 13 of 39 bodies converted + integrated (the original 12 +
+aegis_knight). The **round-4 batch** (this session's mandate) is converting the
+**22 remaining deckable units + summons** (bear form, turret, void imp, mirror image,
+slime clone) and gave **every legendary a themed engine-drawn aura** (all 8 built +
+verified). ~24 units' clip generation remains — a multi-hour serial-GPU grind.
+
+- **Legendary auras: ALL 8 BUILT** (`AURA_BY_ID`+`drawAura` in `Renderer.ts`,
+  presentation-only, defId-keyed, verified 21/21 in `/mockups/aura-verify.html`).
+- **Owed before ship:** the ranged advance-fire winrate sweep (ranged units advance
+  while firing now — a user-approved gameplay change, no sweep run yet).
+- **Recipe of record: `docs/pixel-sprite-style.md`; live handoff:
+  `docs/pixel-next-unit-handoff.md`; per-unit picks/FAILs:
+  `docs/pixel-batch-review-notes.md`.** Tooling in `comfyui-2d-character-pipeline/tools/`.
+  Review vehicle = the "diagonal-4 roster" artifact (republished per unit).
+
+*(The earlier 8-direction and PAINTED-sprite directions are both superseded. Their
+mockups/scripts remain on disk; learnings in the memories.)*
 
 ### Beginner tutorial / onboarding (planned)
 Resurface first-run guidance (e.g. the in-battle "tap to deploy" hint we removed) only

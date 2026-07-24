@@ -257,10 +257,17 @@ export function stepMovement(ctx: MovementContext): void {
       }
     }
 
-    // Advance toward target only when actively in the moving state. (A ranged
-    // unit in the attacking state reaches here only when not threatened, and
-    // should hold position rather than walk into melee.)
-    if (unit.state === "moving" && d > desiredStop) {
+    // Advance toward the target in the moving state — and, for RANGED units,
+    // also while attacking: they close from the edge of reach to their stop
+    // distance without breaking fire (round-2 user request, 2026-07-22).
+    // Melee stays moving-only: a melee unit advancing mid-swing would shove
+    // through the surround ring. Deterministic — same inputs, same path;
+    // digests change because positions do (advance-fire IS a gameplay
+    // change; a balance sweep is on the follow-up list).
+    if (
+      (unit.state === "moving" || (ranged && unit.state === "attacking")) &&
+      d > desiredStop
+    ) {
       const v = dir(unit.pos, target.pos);
       unit.pos.x += v.x * speed;
       unit.pos.y += v.y * speed;

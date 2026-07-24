@@ -14,6 +14,7 @@ import { titleLabel } from "@/meta/bestiaryRewards";
 import { dayIndexLocal } from "@/meta/shop";
 import { forgeableStackCount } from "@/meta/blacksmith";
 import type { BattleMode } from "@/hooks/useBattleEngine";
+import { GameIcon } from "@/components/icons/GameIcon";
 import { playSfx } from "@/audio/sfx";
 
 /** Endless unlocks once the player has cleared the fifth Depths floor — the same
@@ -86,14 +87,18 @@ export function HomeScreen({
         onEdit={() => { playSfx("uiOpen"); setEditingProfile(true); }}
       />
 
-      {/* The Commander — the account-wide talent tree (meta/commander). */}
+      {/* The Commander — opens The War Table, the account-wide talent tree
+          (meta/commander). The banner keeps the Commander's name/level; the
+          sheet is the place. */}
       <button
         type="button"
         className="commander-banner"
         onClick={() => { playSfx("uiOpen"); setShowCommander(true); }}
         aria-label={`Commander, level ${commanderLevel}`}
       >
-        <span className="commander-crest" aria-hidden="true">⚜</span>
+        <span className="commander-crest" aria-hidden="true">
+          <GameIcon name="commander" />
+        </span>
         <span className="commander-banner-main">
           <span className="commander-banner-title">Commander</span>
           <span className="commander-banner-sub">Level {commanderLevel}</span>
@@ -166,7 +171,7 @@ export function HomeScreen({
         onClick={() => { playSfx("uiOpen"); onOpenBlacksmith(); }}
       >
         <span className="home-forge-emoji" aria-hidden>
-          ⚒️
+          <GameIcon name="forge" />
         </span>
         <span className="home-forge-text">Forge</span>
         {forgeable > 0 && <span className="home-forge-count">{forgeable}</span>}
@@ -180,7 +185,7 @@ export function HomeScreen({
         onClick={() => { playSfx("uiOpen"); onOpenShop(); }}
       >
         <span className="home-shop-emoji" aria-hidden>
-          💰
+          <GameIcon name="shop" />
         </span>
         <span className="home-shop-text">Shop</span>
         {newStock && <span className="home-shop-dot" />}

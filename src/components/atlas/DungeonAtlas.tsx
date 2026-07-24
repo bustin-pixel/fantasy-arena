@@ -45,6 +45,7 @@ import {
   pendingUnlocks,
   readAtlasSeen,
 } from "./atlasSeen";
+import { GameIcon } from "@/components/icons/GameIcon";
 import { AtlasTrail, type TrailNote } from "./AtlasTrail";
 import { FloorInfoPanel } from "./FloorInfoPanel";
 
@@ -559,7 +560,14 @@ export function DungeonAtlas({
               <h3 className="atlas-title">{dungeon.name}</h3>
               <p className="atlas-sub">
                 Recommended: Lv {Math.min(LEVEL_CAP, dungeon.monsterLevel + 1)}+
-                {warbandLv < dungeon.monsterLevel ? " · underleveled ⚠" : ""}
+                {warbandLv < dungeon.monsterLevel ? (
+                  <>
+                    {" · underleveled "}
+                    <GameIcon name="warning" />
+                  </>
+                ) : (
+                  ""
+                )}
               </p>
               <p className="atlas-hint">{dungeon.entryHint}</p>
             </>

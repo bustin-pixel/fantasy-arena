@@ -11,7 +11,7 @@
 // only routes taps, plays sounds, and makes the smith swing.
 // ============================================================================
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { ItemSlot } from "@/types";
 import { useGameState } from "@/state/GameStateContext";
 import {
@@ -24,6 +24,7 @@ import {
   type SmithAct,
 } from "@/components/BlacksmithScene";
 import { GoldPill, ShardPill } from "@/components/CurrencyPills";
+import { GameIcon } from "@/components/icons/GameIcon";
 import { ItemIcon } from "@/components/ItemIcon";
 import {
   BASE_LINES_BY_SLOT,
@@ -278,10 +279,11 @@ export function BlacksmithScreen({ onExit }: Props) {
             title={
               plan.steps.length === 0
                 ? "Nothing gold-mergeable right now — shard-fee work stays manual."
-                : `${plan.steps.length} merges, ● ${plan.totalGold} total`
+                : `${plan.steps.length} merges, ${plan.totalGold} gold total`
             }
           >
-            ⚒ Forge All ×{plan.steps.length} — ● {plan.totalGold.toLocaleString()}
+            <GameIcon name="forge" /> Forge All ×{plan.steps.length} —{" "}
+            <GameIcon name="gold" /> {plan.totalGold.toLocaleString()}
           </button>
           <button
             type="button"
@@ -293,7 +295,7 @@ export function BlacksmithScreen({ onExit }: Props) {
               setCommissionOpen(true);
             }}
           >
-            Commission… — ● {COMMISSION_PRICE}
+            Commission… — <GameIcon name="gold" /> {COMMISSION_PRICE}
           </button>
         </div>
 
@@ -479,7 +481,8 @@ export function BlacksmithScreen({ onExit }: Props) {
                   }
                   onClick={commitCommission}
                 >
-                  Commission{commissionQty > 1 ? ` ×${commissionQty}` : ""} — ●{" "}
+                  Commission{commissionQty > 1 ? ` ×${commissionQty}` : ""} —{" "}
+                  <GameIcon name="gold" />{" "}
                   {(COMMISSION_PRICE * commissionQty).toLocaleString()}
                 </button>
               </div>
@@ -501,14 +504,14 @@ export function BlacksmithScreen({ onExit }: Props) {
           >
             <h3 className="smith-panel-title">Forge everything?</h3>
             <p className="smith-panel-note">
-              {plan.steps.length} merge{plan.steps.length === 1 ? "" : "s"} for ●{" "}
-              {plan.totalGold.toLocaleString()}. Shard-fee work (legendary tier)
+              {plan.steps.length} merge{plan.steps.length === 1 ? "" : "s"} for{" "}
+              <GameIcon name="gold" /> {plan.totalGold.toLocaleString()}. Shard-fee work (legendary tier)
               is left for your own hand.
             </p>
             {plan.touchesEquipped && (
               <p className="smith-warning">
-                ⚠ Uses gear your units are wearing — upgrades stay equipped
-                where possible.
+                <GameIcon name="warning" /> Uses gear your units are wearing —
+                upgrades stay equipped where possible.
               </p>
             )}
             <div className="smith-detail-actions">
@@ -520,7 +523,7 @@ export function BlacksmithScreen({ onExit }: Props) {
                 Cancel
               </button>
               <button type="button" className="btn btn-gold" onClick={commitForgeAll}>
-                ⚒ Forge All
+                <GameIcon name="forge" /> Forge All
               </button>
             </div>
           </div>
@@ -573,19 +576,31 @@ function SmithDetail({
     })
     .sort();
 
-  const costLabel = cost
-    ? cost.shards > 0
-      ? `◆ ${cost.shards} shards`
-      : `● ${cost.gold}g`
-    : "";
-  const blockLabel = check.ok
+  const costLabel: ReactNode = cost ? (
+    cost.shards > 0 ? (
+      <>
+        <GameIcon name="shard" /> {cost.shards} shards
+      </>
+    ) : (
+      <>
+        <GameIcon name="gold" /> {cost.gold}g
+      </>
+    )
+  ) : (
+    ""
+  );
+  const blockLabel: ReactNode = check.ok
     ? null
     : check.reason === "copies"
       ? "Need 2 copies"
       : check.reason === "gold"
         ? `Need ${cost?.gold}g`
         : check.reason === "shards"
-          ? `Need ◆ ${cost?.shards} shards`
+          ? (
+            <>
+              Need <GameIcon name="shard" /> {cost?.shards} shards
+            </>
+          )
           : check.reason === "capped"
             ? "Fully upgraded"
             : null;
@@ -650,12 +665,18 @@ function SmithDetail({
               disabled={!check.ok}
               onClick={onForge}
             >
-              {check.ok ? `⚒ Forge 2 → 1 (${costLabel})` : blockLabel ?? "Forge"}
+              {check.ok ? (
+                <>
+                  <GameIcon name="forge" /> Forge 2 → 1 ({costLabel})
+                </>
+              ) : (
+                blockLabel ?? "Forge"
+              )}
             </button>
           )}
           {check.ok && losing.length > 0 && (
             <span className="smith-warning">
-              ⚠ Uses gear equipped on{" "}
+              <GameIcon name="warning" /> Uses gear equipped on{" "}
               {losing.map((id) => getUnitDef(id).name).join(", ")} —{" "}
               {getUnitDef(losing[0]).name} keeps the upgraded item
             </span>
@@ -667,7 +688,11 @@ function SmithDetail({
             onClick={onSalvage}
           >
             {melt.ok
-              ? `Salvage 1 — +● ${meltValue}`
+              ? (
+                <>
+                  Salvage 1 — +<GameIcon name="gold" /> {meltValue}
+                </>
+              )
               : melt.ok === false && melt.reason === "equipped"
                 ? "All copies equipped — unequip first"
                 : "Salvage"}

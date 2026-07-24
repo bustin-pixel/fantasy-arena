@@ -29,6 +29,8 @@ import { RARITIES } from "@/data/rarities";
 import { ITEM_LINES } from "@/data/items";
 import { ChestSprite } from "@/components/ChestSprite";
 import { renderPortrait } from "@/engine/Renderer";
+import { useSpriteEpoch } from "@/hooks/useSpriteEpoch";
+import { GameIcon } from "@/components/icons/GameIcon";
 import { useCountUp } from "@/hooks/useCountUp";
 import { playStinger } from "@/audio/music";
 import { playSfx } from "@/audio/sfx";
@@ -124,7 +126,7 @@ export function RewardPanel({ rewards, mode, dungeonId = "depths", tier = "norma
 
       <div className="reward-gold">
         <span className="coin" aria-hidden>
-          ●
+          <GameIcon name="gold" />
         </span>
         +{shownGold} gold
       </div>
@@ -132,7 +134,7 @@ export function RewardPanel({ rewards, mode, dungeonId = "depths", tier = "norma
       {rewards.shards > 0 && (
         <div className="reward-gold reward-shards">
           <span className="shard-gem" aria-hidden>
-            ◆
+            <GameIcon name="shard" />
           </span>
           +{rewards.shards} Soul Shards
         </div>
@@ -258,7 +260,12 @@ function BestiaryRewards({ bestiary }: { bestiary: BestiaryRewardResult }) {
         >
           {d.kind === "defeat" ? "Page complete" : "New sighting"}:{" "}
           <strong>{getUnitDef(d.id).name}</strong> +{d.gold}g
-          {d.shards > 0 && ` · +${d.shards} ◆`}
+          {d.shards > 0 && (
+            <>
+              {" · +"}
+              {d.shards} <GameIcon name="shard" />
+            </>
+          )}
         </div>
       ))}
 
@@ -266,14 +273,19 @@ function BestiaryRewards({ bestiary }: { bestiary: BestiaryRewardResult }) {
         <div className="reward-milestone reward-slayer" key={`${m.id}:${m.level}`}>
           Slayer {SLAYER_LEVEL_ROMAN[m.level] ?? m.level}:{" "}
           <strong>{getUnitDef(m.id).name}</strong> +{m.gold}g
-          {m.shards > 0 && ` · +${m.shards} ◆`}
+          {m.shards > 0 && (
+            <>
+              {" · +"}
+              {m.shards} <GameIcon name="shard" />
+            </>
+          )}
         </div>
       ))}
 
       {bestiary.completedBooks.map((b) => (
         <div className="reward-milestone reward-book" key={b.dungeonId}>
           Bestiary complete: <strong>{DUNGEONS[b.dungeonId]?.name ?? b.dungeonId}</strong>{" "}
-          +{b.gold}g · +{b.shards} ◆
+          +{b.gold}g · +{b.shards} <GameIcon name="shard" />
         </div>
       ))}
     </div>
@@ -310,10 +322,11 @@ function XpRow({ gain, shownXp }: { gain: XpGain; shownXp: number }) {
   const leveled = finalLevel > startLevel;
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const spriteEpoch = useSpriteEpoch();
   useEffect(() => {
     const ctx = canvasRef.current?.getContext("2d");
     if (ctx) renderPortrait(ctx, gain.defId, 36);
-  }, [gain.defId]);
+  }, [gain.defId, spriteEpoch]);
 
   return (
     <div className={`xp-row${leveled && settled ? " leveled" : ""}`}>
@@ -419,7 +432,9 @@ function CommanderXpRow({ gain }: { gain: { before: number; after: number } }) {
   const frac = need === null ? 1 : commanderXpIntoLevel(shown) / need;
   return (
     <div className={`xp-row cmd-xp-row${leveled ? " leveled" : ""}`}>
-      <span className="cmd-xp-crest" aria-hidden="true">⚜</span>
+      <span className="cmd-xp-crest" aria-hidden="true">
+        <GameIcon name="commander" />
+      </span>
       <div className="xp-body">
         <div className="xp-name-line">
           <span className="xp-name">Commander</span>

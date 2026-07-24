@@ -22,6 +22,7 @@ import { ITEM_LINES, makeItemKey } from "@/data/items";
 import { BOONS } from "@/data/boons";
 import { rarityColor } from "@/components/BoonPickOverlay";
 import { renderPortrait } from "@/engine/Renderer";
+import { useSpriteEpoch } from "@/hooks/useSpriteEpoch";
 import { ItemIcon } from "@/components/ItemIcon";
 import { playSfx } from "@/audio/sfx";
 import type { BestiaryEntry, PlayerSave } from "@/state/persistence";
@@ -70,6 +71,7 @@ function Portrait({
   size: number;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const spriteEpoch = useSpriteEpoch();
   // Paint BEFORE the browser shows the frame (not useEffect, which runs after):
   // a page turn mounts fresh card canvases as the leaf lands, and a one-frame
   // blank canvas reads as a flicker of the cards on mobile.
@@ -82,7 +84,7 @@ function Portrait({
       size,
       tier === "defeated" ? undefined : { silhouette: SILHOUETTE[tier] }
     );
-  }, [defId, tier, size]);
+  }, [defId, tier, size, spriteEpoch]);
   return <canvas ref={ref} width={size} height={size} className="card-canvas" />;
 }
 

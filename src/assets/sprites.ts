@@ -17,6 +17,14 @@
 
 import type { Unit } from "@/types";
 import { getUnitDef } from "@/data/units";
+import {
+  ANCHOR_X,
+  ANCHOR_Y,
+  CELL,
+  getPixelFrame,
+  type PixelFrame,
+} from "@/assets/imageSprites";
+import { getSettings } from "@/state/settings";
 
 type Ctx = CanvasRenderingContext2D;
 const PI2 = Math.PI * 2;
@@ -47,10 +55,17 @@ function nowSeconds(): number {
 /** A small stable phase from a unit's uid so identical units don't pulse in
  *  lockstep. Portraits pass a stub with no uid → phase 0 (a clean frozen frame). */
 function phaseOf(uid: string | undefined): number {
+  return uidPhase01(uid) * PI2;
+}
+
+/** `phaseOf` as a fraction of one cycle rather than radians, for callers that
+ *  index a frame strip instead of feeding a sine (the Renderer's idle breath).
+ *  Same hash, so a unit's procedural and pixel animations stay in agreement. */
+export function uidPhase01(uid: string | undefined): number {
   if (!uid) return 0;
   let h = 0;
   for (let i = 0; i < uid.length; i++) h = (h * 31 + uid.charCodeAt(i)) % 1009;
-  return (h / 1009) * PI2;
+  return h / 1009;
 }
 
 /** Deterministic 0/1 body-variant pick from a unit's uid, so horde units don't
@@ -190,6 +205,21 @@ interface DrawOpts {
   /** Battlefield draw: apply the unit's `def.battleScale` boss enlargement.
    *  Portraits omit this so bosses keep their normal card size. */
   battle?: boolean;
+  /** Which of the 8 pixel-sprite facings to draw (index into `DIRS`), for units
+   *  that have generated art. Derived in the Renderer from the unit's position
+   *  and its target's — deliberately NOT read off `Unit.facing`, which is 1-bit
+   *  sim state covered by the determinism digest and must not be widened.
+   *  Omitted (portraits, procedural units) means south. */
+  dir8?: number;
+  /** 0..1 through the current pixel animation. The Renderer owns the timing so
+   *  the registry stays a pure lookup. */
+  animPhase?: number;
+  /** True when the unit is physically sliding this frame (Renderer-derived
+   *  from snapshot positions — the sim's single-state machine can't express
+   *  "attacking AND moving", but ranged kiting/advancing does exactly that).
+   *  Selects the walk_attack strip during an attack; units without that art
+   *  fall back to the plain attack strip inside getPixelFrame. */
+  displacing?: boolean;
 }
 
 /** Ground-shadow ellipse at the humanoid foot line — the default for most units. */
@@ -217,6 +247,60 @@ const SHADOW_BY_ID: Record<string, typeof DEFAULT_SHADOW> = {
 };
 
 /**
+ * Blit one pixel-sprite cell so it lands on whole device pixels at a whole
+ * multiple of its authored size.
+ *
+ * Pixel art survives integer upscaling and nothing else: a fractional scale
+ * makes some source pixels two screen pixels wide and others three, which
+ * shimmers as a unit walks, and smoothing turns the 1px outline into grey mush.
+ * So this ignores the caller's transform for the DRAW and uses it only to
+ * locate the target — it reads the composite matrix, projects the sprite's foot
+ * anchor into device space, rounds, then blits axis-aligned under identity.
+ *
+ * Working off the composite matrix (rather than the caller's logical
+ * coordinates) is what keeps the bob, the attack lunge, the boss enlargement
+ * and the field transform all applied — they are already baked into it.
+ *
+ * `footY` is the ground line in the caller's local space; the sprite's authored
+ * anchor is pinned there, so a pixel unit's feet land exactly where its
+ * procedural shadow ellipse was drawn.
+ *
+ * Scale is clamped at 1x: below that we would be downscaling, which destroys
+ * more than the slight size mismatch against neighbouring vector units costs.
+ */
+function blitPixelFrame(ctx: Ctx, frame: PixelFrame, footY: number): void {
+  const m = ctx.getTransform();
+  // Local (0, footY) through [a c e; b d f].
+  const anchorDX = m.c * footY + m.e;
+  const anchorDY = m.d * footY + m.f;
+  // Vertical axis magnitude: the horizontal one carries the facing flip's sign,
+  // and the 8 facings are pre-rendered, so we never want that mirror here.
+  const k = Math.max(1, Math.round(Math.hypot(m.b, m.d)));
+
+  ctx.save();
+  // save/restore covers the transform AND imageSmoothingEnabled; globalAlpha is
+  // untouched, so the death fade and stealth ghosting still apply.
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.imageSmoothingEnabled = false;
+  // Geometry comes off the FRAME, not the module constants — the manifest is
+  // the source of truth for how big a cell is and where its foot anchor sits,
+  // so widening the cell needs no change here and two units may differ.
+  const { cell, ax, ay } = frame;
+  ctx.drawImage(
+    frame.img,
+    frame.sx,
+    0,
+    cell,
+    cell,
+    Math.round(anchorDX - ax * k),
+    Math.round(anchorDY - ay * k),
+    cell * k,
+    cell * k
+  );
+  ctx.restore();
+}
+
+/**
  * Draw a unit centered at (cx, cy) in the current canvas. The shape per archetype
  * keeps each unit recognizable: ogre = bulky, knight = shielded blocky, archer =
  * slim with bow, mages = robed with orb.
@@ -236,9 +320,71 @@ export function drawUnitSprite(
   const bossScale = opts.battle ? def.battleScale ?? 1 : 1;
   const scale = (opts.scale ?? 1) * bossScale;
   const live = !opts.staticPose;
-  const { bob, lunge, cast } = live
-    ? animOffsets(unit)
-    : { bob: 0, lunge: 0, cast: 0 };
+
+  // A polymorphed unit always draws as a sheep, procedurally, whatever art it
+  // has. The Druid's Bear Form and the Archmage's Mirror Image, by contrast,
+  // draw from ANOTHER body's pixel strips when that art exists (and fall back
+  // to their procedural bodies when it doesn't):
+  //   - Bear Form has its own generated body under the id `summoner_bear`.
+  //   - Mirror Image is a translucent 0.95× copy of the Archmage, so it borrows
+  //     the Archmage's strips (see the mirror handling at the blit below).
+  // Resolved here because the pixel-frame lookup needs the borrowed id.
+  const polymorphed = !!unit.effects?.some((e) => e.type === "polymorph");
+  const bearForm = def.id === "summoner" && unit.transformed;
+  const pixelArtId = bearForm
+    ? "summoner_bear"
+    : def.id === "mirror_image"
+      ? "archmage"
+      : def.id;
+
+  // ⚠ Resolved BEFORE the transform, because a real animated clip has to
+  // SUPPRESS the procedural bob/lunge below — the transform bakes them in and
+  // the blit inherits them.
+  //
+  // Those offsets exist to fake life in art that cannot move on its own. A clip
+  // already carries its own motion, so running both means the ogre breathes and
+  // bobs at once, and on pixel art the bob is worse than redundant: blitPixel-
+  // Frame rounds the foot anchor to whole device pixels, so a 1.2px sine turns
+  // into an integer judder instead of a smooth rise.
+  //
+  // UnitState is idle/moving/attacking/casting/stunned/dead. A cast is an
+  // attack as far as the art is concerned; stunned holds the idle pose.
+  const pixelState =
+    unit.state === "dead"
+      ? "dead"
+      : unit.animState === "attacking" || unit.animState === "casting"
+        ? opts.displacing
+          ? "walk_attack"
+          : "attack"
+        : unit.animState === "moving"
+          ? "walk"
+          : "idle";
+  // ⚠ THE PROCEDURAL ART BELOW IS NOT DEAD CODE. Every `draw*` function in
+  // this file is the game's ORIGINAL hand-coded look and its permanent
+  // fallback: a unit with no generated art, art still decoding, a failed
+  // manifest fetch, or the `pixelArt` setting turned off all render through
+  // the switch further down. Do NOT delete the procedural functions when a
+  // unit gains pixel art — the settings toggle exists so the pre-pixel art
+  // stays reachable and comparable forever.
+  const frame =
+    polymorphed || !getSettings().pixelArt
+      ? null
+      : getPixelFrame(pixelArtId, opts.dir8 ?? 0, pixelState, opts.animPhase ?? 0);
+
+  // An animated clip carries its own motion, so the procedural bob and lunge
+  // are switched off for it — running both reads as a double-bounce, and on
+  // pixel art the bob is worse than redundant: blitPixelFrame rounds the foot
+  // anchor to whole device pixels, so a 1.2px sine becomes an integer judder
+  // rather than a smooth rise.
+  //
+  // ⚠ The lunge was briefly kept here, on the reasoning that the clips are all
+  // prompted body-centred so nothing else drives a strike forward. Reviewer
+  // rejected it: "I do not like the lunge". Do not reintroduce it without
+  // asking — the argument for it is sound and will look tempting again.
+  const { bob, lunge, cast } =
+    live && !frame?.animated
+      ? animOffsets(unit)
+      : { bob: 0, lunge: 0, cast: 0 };
 
   // Presentation clock, offset per-unit so identical units desync.
   const t = (live ? nowSeconds() : 0) + phaseOf(unit.uid);
@@ -286,9 +432,29 @@ export function drawUnitSprite(
     return;
   }
 
-  // Druid in bear form draws as a bear regardless of its def id.
-  if (def.id === "summoner" && unit.transformed) {
+  // Druid in bear form draws as a bear — from the generated `summoner_bear`
+  // strips if they exist (frame is looked up under that id above), otherwise
+  // the procedural bear. The frame case falls through to the shared blit below.
+  if (bearForm && !frame) {
     drawBear(ctx, "#6b4a2a", "#3f2c18", "#8a6240", accent, A);
+    ctx.restore();
+    return;
+  }
+
+  // Generated pixel art, if this unit has any (resolved at the top of the
+  // function — see the note there on why it has to precede the transform).
+  // Sits below the polymorph/bear returns because those override the unit's
+  // identity, and above the switch so it pre-empts the procedural drawing
+  // entirely. A unit with no art (or art still decoding) falls through.
+  if (frame) {
+    // The Mirror Image borrows the Archmage's strips but must still read as an
+    // illusion — the procedural path drew it at 0.95× and 0.65 alpha, so the
+    // pixel path matches (the 0.95 keeps it visibly smaller than the real one).
+    if (def.id === "mirror_image") {
+      ctx.globalAlpha *= 0.65;
+      ctx.scale(0.95, 0.95);
+    }
+    blitPixelFrame(ctx, frame, sh.y);
     ctx.restore();
     return;
   }
@@ -3345,73 +3511,121 @@ function drawBigAxe(ctx: Ctx, hx: number, hy: number, side: number) {
 
 /** The berserker's variant of the big axe: leather-wrapped haft, a notch
  *  bitten out of the crescent, and a cutting edge lit by the rage accent. */
-function drawRageAxe(ctx: Ctx, hx: number, hy: number, side: number, accent: string, A: SpriteAnim) {
-  ctx.save();
-  ctx.translate(hx, hy);
-  ctx.scale(side, 1);
-  // wooden haft with leather wraps
+/** The Berserker's greataxe — a long wooden haft under a heavy angular wedge head
+ *  with a rear spike. Authored in local space: haft on x=0 running y -18..26, head
+ *  centred at y -19; position it with translate/rotate at the call site.
+ *
+ *  The dark silhouette outline and the darkened steel body are deliberate. Light
+ *  steel on a light-steel gradient blobs into an unreadable smear at the ~44px
+ *  game scale, so the shape is carried by the outline and the bright cutting edge. */
+function drawChampionAxe(ctx: Ctx, accent: string, A: SpriteAnim) {
+  // wooden haft with leather wraps and a steel butt cap
   ctx.strokeStyle = "#5a3a1f";
-  ctx.lineWidth = 3.5;
+  ctx.lineWidth = 3.4;
   ctx.lineCap = "round";
   ctx.beginPath();
-  ctx.moveTo(-1, -15);
-  ctx.lineTo(2, 18);
+  ctx.moveTo(0, -18);
+  ctx.lineTo(0, 26);
   ctx.stroke();
-  ctx.strokeStyle = "rgba(255,255,255,0.15)";
+  ctx.strokeStyle = "rgba(255,255,255,0.16)";
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(-1.5, -13);
-  ctx.lineTo(1.5, 16);
+  ctx.moveTo(-0.75, -16.5);
+  ctx.lineTo(-0.75, 24.5);
   ctx.stroke();
   ctx.lineCap = "butt";
   ctx.strokeStyle = "#7c4a24";
   ctx.lineWidth = 1.4;
-  ctx.beginPath();
-  ctx.moveTo(-2.2, 6);
-  ctx.lineTo(2.8, 8);
-  ctx.moveTo(-1.8, 10);
-  ctx.lineTo(3.2, 12);
-  ctx.stroke();
-  // notched crescent blade
-  const g = ctx.createLinearGradient(0, -17, 12, -6);
-  g.addColorStop(0, "#e9edf2");
-  g.addColorStop(1, "#9aa0a8");
-  ctx.fillStyle = g;
-  ctx.beginPath();
-  ctx.moveTo(-1, -15);
-  ctx.bezierCurveTo(14, -17, 17, -10, 15, -6);
-  ctx.lineTo(12.5, -4.5);
-  ctx.lineTo(15.5, -3.5);
-  ctx.bezierCurveTo(16, -1, 12, 2, -1, 1);
-  ctx.closePath();
-  ctx.fill();
-  // darker steel near the haft (the poll/eye)
+  for (let i = 1; i <= 3; i++) {
+    const y = 4 + i * 5.3;
+    ctx.beginPath();
+    ctx.moveTo(-2.1, y);
+    ctx.lineTo(2.1, y + 0.8);
+    ctx.stroke();
+  }
   ctx.fillStyle = "#8a9099";
   ctx.beginPath();
-  ctx.moveTo(-1, -13);
-  ctx.lineTo(6, -11);
-  ctx.lineTo(6, -2);
-  ctx.lineTo(-1, -1);
+  ctx.arc(0, 26, 2, 0, PI2);
+  ctx.fill();
+  ctx.save();
+  ctx.translate(0, -19);
+  // langets clamping the head to the haft
+  ctx.fillStyle = "#6f757e";
+  ctx.fillRect(-2.3, 6, 1.1, 9);
+  ctx.fillRect(1.2, 6, 1.1, 9);
+  ctx.fillStyle = "#c9ced4";
+  ctx.fillRect(-2.3, 6, 0.4, 9);
+  const head = () => {
+    ctx.beginPath();
+    ctx.moveTo(1.6, -9);
+    ctx.lineTo(11, -8.6);
+    ctx.lineTo(16.5, -1.5);
+    ctx.lineTo(13.5, 8.5);
+    ctx.lineTo(7, 10);
+    ctx.lineTo(7.4, 5);
+    ctx.lineTo(1.6, 4.6);
+    ctx.closePath();
+  };
+  // rear spike, behind the head
+  ctx.fillStyle = "#4e555d";
+  ctx.beginPath();
+  ctx.moveTo(-2.2, -5.6);
+  ctx.lineTo(-10, -2);
+  ctx.lineTo(-2.2, 1.4);
   ctx.closePath();
   ctx.fill();
+  ctx.strokeStyle = "#20252b";
+  ctx.lineWidth = 1.4;
+  ctx.lineJoin = "round";
+  ctx.stroke();
+  // head silhouette, then the steel over it
+  head();
+  ctx.strokeStyle = "#20252b";
+  ctx.lineWidth = 2.2;
+  ctx.stroke();
+  const g = ctx.createLinearGradient(1, -9, 16, 9);
+  g.addColorStop(0, "#5c636b");
+  g.addColorStop(0.4, "#c9d0d8");
+  g.addColorStop(1, "#7a828b");
+  ctx.fillStyle = g;
+  head();
+  ctx.fill();
+  ctx.fillStyle = "rgba(28,33,40,0.45)";
+  ctx.beginPath();
+  ctx.moveTo(3.2, -5.8);
+  ctx.lineTo(10.4, -5.2);
+  ctx.lineTo(13, 0.4);
+  ctx.lineTo(3.2, 1.4);
+  ctx.closePath();
+  ctx.fill();
+  // eye block, where the haft passes through
+  ctx.fillStyle = "#565d65";
+  ctx.fillRect(-2.6, -8.6, 5.4, 14);
+  ctx.strokeStyle = "#20252b";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(-2.6, -8.6, 5.4, 14);
+  ctx.fillStyle = "rgba(255,255,255,0.25)";
+  ctx.fillRect(-2.6, -8.6, 5.4, 1);
   // cutting edge, rage-lit on the glow pulse
+  const edge = () => {
+    ctx.beginPath();
+    ctx.moveTo(11, -8.6);
+    ctx.lineTo(16.5, -1.5);
+    ctx.lineTo(13.5, 8.5);
+    ctx.lineTo(7, 10);
+    ctx.stroke();
+  };
   ctx.save();
   ctx.strokeStyle = accent;
-  ctx.globalAlpha = 0.55 + A.glow * 0.35;
+  ctx.globalAlpha = 0.5 + A.glow * 0.35;
   ctx.shadowColor = accent;
   ctx.shadowBlur = 3 + A.glow * 6;
-  ctx.lineWidth = 1.6;
-  ctx.beginPath();
-  ctx.moveTo(15, -6);
-  ctx.bezierCurveTo(17, -10, 14, -17, -1, -15);
-  ctx.stroke();
+  ctx.lineWidth = 2;
+  edge();
   ctx.restore();
-  ctx.strokeStyle = "rgba(255,255,255,0.8)";
-  ctx.lineWidth = 0.9;
-  ctx.beginPath();
-  ctx.moveTo(15, -6);
-  ctx.bezierCurveTo(17, -10, 14, -17, -1, -15);
-  ctx.stroke();
+  ctx.strokeStyle = "rgba(255,255,255,0.85)";
+  ctx.lineWidth = 1;
+  edge();
   ctx.restore();
 }
 
@@ -4494,7 +4708,25 @@ function drawBear(ctx: Ctx, body: string, dark: string, light: string, accent: s
 }
 
 function drawBerserker(ctx: Ctx, body: string, dark: string, light: string, accent: string, A: SpriteAnim) {
-  // hulking, hunched, dual axes — rage is the signature emitter
+  // "Ashen Champion" (2026-07-19 mockup pick 4; the three losing variants are
+  // archived in docs/berserker-mockups.md). A tall, vertical silhouette: horned
+  // full helm with a furnace visor, squared plate pauldrons over a banded cuirass,
+  // and a long-hafted wedge axe held upright at the lead side. Rage stays the
+  // signature emitter — ember seam, visor glow, rising motes.
+  const fist = (x: number, y: number, r: number) => {
+    const ag = ctx.createLinearGradient(x - r, y - r, x + r, y + r);
+    ag.addColorStop(0, withShade(body, 25));
+    ag.addColorStop(1, withShade(body, -20));
+    ctx.fillStyle = ag;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, PI2);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.18)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(x, y, r, Math.PI * 0.9, Math.PI * 1.5);
+    ctx.stroke();
+  };
   // pulsing blood-red backlight
   ctx.save();
   ctx.globalAlpha = 0.14 + A.glow * 0.08;
@@ -4506,168 +4738,201 @@ function drawBerserker(ctx: Ctx, body: string, dark: string, light: string, acce
   ctx.arc(0, 0, 26, 0, PI2);
   ctx.fill();
   ctx.restore();
-  // rage fissures underfoot
-  ctx.save();
-  ctx.strokeStyle = accent;
-  ctx.globalAlpha = 0.25 + A.glow * 0.3;
-  ctx.shadowColor = accent;
-  ctx.shadowBlur = 5;
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(-4, 24);
-  ctx.lineTo(-9, 26.5);
-  ctx.lineTo(-15, 25.5);
-  ctx.moveTo(3, 24.5);
-  ctx.lineTo(9, 27);
-  ctx.lineTo(13, 25.5);
-  ctx.moveTo(-1, 25);
-  ctx.lineTo(1, 28);
-  ctx.stroke();
-  ctx.restore();
-  // hunched torso — wide shoulders tapering to the hips, with rim light
-  const tg = ctx.createLinearGradient(0, -6, 0, 22);
+  // torso — taller and narrower than a bruiser's, with a cinched waist
+  const tg = ctx.createLinearGradient(0, -10, 0, 20);
   tg.addColorStop(0, light);
   tg.addColorStop(0.5, body);
   tg.addColorStop(1, dark);
   ctx.fillStyle = tg;
   ctx.beginPath();
-  ctx.moveTo(-16, -2);
-  ctx.quadraticCurveTo(-14, -8, 0, -8);
-  ctx.quadraticCurveTo(14, -8, 16, -2);
-  ctx.quadraticCurveTo(15, 12, 10, 20);
-  ctx.lineTo(-10, 20);
-  ctx.quadraticCurveTo(-15, 12, -16, -2);
+  ctx.moveTo(-12.5, -8);
+  ctx.quadraticCurveTo(-11, -12, 0, -12);
+  ctx.quadraticCurveTo(11, -12, 12.5, -8);
+  ctx.quadraticCurveTo(11, 6, 7.5, 20);
+  ctx.lineTo(-7.5, 20);
+  ctx.quadraticCurveTo(-11, 6, -12.5, -8);
   ctx.closePath();
   ctx.fill();
   ctx.strokeStyle = "rgba(255,255,255,0.22)";
   ctx.lineWidth = 1.2;
   ctx.beginPath();
-  ctx.moveTo(-15.2, 0);
-  ctx.quadraticCurveTo(-14.6, 10, -10.5, 18.5);
+  ctx.moveTo(-11.8, -6);
+  ctx.quadraticCurveTo(-10.4, 6, -8, 18.5);
   ctx.stroke();
-  // fur pelt mantle across the shoulders
-  ctx.fillStyle = "#3a2417";
-  ctx.beginPath();
-  ctx.moveTo(-17, -3);
-  const tufts: [number, number][] = [
-    [-13, -1], [-11, -6], [-8, -2], [-5, -7], [-2, -3], [2, -7], [5, -2], [8, -7], [11, -2], [13, -6], [17, -3],
-  ];
-  for (const [tx, ty] of tufts) ctx.lineTo(tx, ty);
-  ctx.lineTo(17, -8);
-  ctx.quadraticCurveTo(0, -13, -17, -8);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = "rgba(255,255,255,0.12)";
-  ctx.beginPath();
-  ctx.moveTo(-17, -8);
-  ctx.quadraticCurveTo(0, -13, 17, -8);
-  ctx.lineTo(15, -6.5);
-  ctx.quadraticCurveTo(0, -11.2, -15, -6.5);
-  ctx.closePath();
-  ctx.fill();
-  // war-paint chevrons, faintly rage-lit
+  // ash-scale cuirass banding
+  ctx.save();
+  ctx.strokeStyle = "rgba(20,16,16,0.5)";
+  ctx.lineWidth = 1.4;
+  for (let i = 0; i < 4; i++) {
+    const y = -4 + i * 4.6;
+    ctx.beginPath();
+    ctx.moveTo(-10 + i * 0.5, y);
+    ctx.quadraticCurveTo(0, y + 2.4, 10 - i * 0.5, y);
+    ctx.stroke();
+  }
+  ctx.restore();
+  // ember seam glowing down the centre line
   ctx.save();
   ctx.strokeStyle = accent;
-  ctx.globalAlpha = 0.65;
+  ctx.globalAlpha = 0.4 + A.glow * 0.35;
   ctx.shadowColor = accent;
-  ctx.shadowBlur = 2 + A.glow * 3;
-  ctx.lineWidth = 1.6;
+  ctx.shadowBlur = 4 + A.glow * 5;
+  ctx.lineWidth = 1.4;
   ctx.beginPath();
-  ctx.moveTo(-8, 2);
-  ctx.lineTo(-2, 7);
-  ctx.moveTo(8, 2);
-  ctx.lineTo(2, 7);
-  ctx.moveTo(-7, 7);
-  ctx.lineTo(-2, 11);
-  ctx.moveTo(7, 7);
-  ctx.lineTo(2, 11);
+  ctx.moveTo(0, -6);
+  ctx.lineTo(0, 12);
   ctx.stroke();
   ctx.restore();
   // belt with a skull buckle
   ctx.fillStyle = dark;
-  ctx.fillRect(-12, 14, 24, 6);
+  ctx.fillRect(-10, 15, 20, 6);
   ctx.fillStyle = "#e7e5e4";
   ctx.beginPath();
-  ctx.arc(0, 17, 2.6, 0, PI2);
+  ctx.arc(0, 18, 2.6, 0, PI2);
   ctx.fill();
   ctx.fillStyle = "#1c1917";
-  ctx.fillRect(-1.8, 16.2, 1.2, 1.2);
-  ctx.fillRect(0.7, 16.2, 1.2, 1.2);
-  // fists gripping the hafts, veins pulsing with bloodrage
+  ctx.fillRect(-1.8, 17.2, 1.2, 1.2);
+  ctx.fillRect(0.7, 17.2, 1.2, 1.2);
+  // heavy plate pauldrons — squared and layered, they carry the silhouette
   for (const s of [-1, 1]) {
     ctx.save();
     ctx.scale(s, 1);
-    const ag = ctx.createLinearGradient(10, -2, 18, 6);
-    ag.addColorStop(0, withShade(body, 25));
-    ag.addColorStop(1, withShade(body, -20));
-    ctx.fillStyle = ag;
+    const pg = ctx.createLinearGradient(10, -14, 20, -2);
+    pg.addColorStop(0, "#585f68");
+    pg.addColorStop(0.5, "#8f969f");
+    pg.addColorStop(1, "#4a5058");
+    ctx.fillStyle = pg;
     ctx.beginPath();
-    ctx.arc(14.5, 2, 4.6, 0, PI2);
+    ctx.moveTo(9, -11.5);
+    ctx.lineTo(19, -9.5);
+    ctx.lineTo(20, -3);
+    ctx.lineTo(16.5, 1);
+    ctx.lineTo(9, -1);
+    ctx.closePath();
     ctx.fill();
-    ctx.strokeStyle = "rgba(255,255,255,0.18)";
-    ctx.lineWidth = 1;
+    ctx.fillStyle = "rgba(255,255,255,0.3)";
     ctx.beginPath();
-    ctx.arc(14.5, 2, 4.6, Math.PI * 0.9, Math.PI * 1.5);
-    ctx.stroke();
-    ctx.strokeStyle = accent;
-    ctx.globalAlpha = 0.3 + A.glow * 0.3;
-    ctx.lineWidth = 1;
+    ctx.moveTo(9, -11.5);
+    ctx.lineTo(19, -9.5);
+    ctx.lineTo(18.6, -7.8);
+    ctx.lineTo(9, -9.8);
+    ctx.closePath();
+    ctx.fill();
+    // short outward spike, kept low so it doesn't fight the helm horns
+    ctx.fillStyle = "#3d444c";
     ctx.beginPath();
-    ctx.moveTo(11, 0);
-    ctx.quadraticCurveTo(13.5, 2, 12.5, 5);
-    ctx.stroke();
+    ctx.moveTo(16.6, -9.6);
+    ctx.lineTo(22.5, -8.4);
+    ctx.lineTo(17.2, -5.4);
+    ctx.closePath();
+    ctx.fill();
     ctx.restore();
   }
-  // head with a war-paint band across the face
-  ctx.fillStyle = light;
-  ctx.beginPath();
-  ctx.arc(0, -13, 8.5, 0, PI2);
-  ctx.fill();
-  ctx.fillStyle = withShade(body, -15);
-  ctx.beginPath();
-  ctx.arc(0, -13, 8.5, 0.15 * Math.PI, 0.85 * Math.PI);
-  ctx.fill();
+  fist(-15, 4, 4.4);
+  // the greataxe is drawn AFTER the pauldron so haft and head sit over the plate,
+  // then the lead fist closes back over the haft (otherwise the wood reads as
+  // passing through his hand)
+  // Held at x=13.5 with only a slight lean: the hub portrait clips to +-35 sprite
+  // units (renderPortrait's size/70 scale), and a further-out, more-tilted axe put
+  // the blade past that edge at every card size.
   ctx.save();
-  ctx.strokeStyle = accent;
-  ctx.globalAlpha = 0.55;
-  ctx.lineWidth = 2.4;
-  ctx.beginPath();
-  ctx.moveTo(-7.5, -16);
-  ctx.lineTo(7.5, -12);
-  ctx.stroke();
+  ctx.translate(13.5, 0);
+  ctx.rotate(0.06 + Math.sin(A.t * 0.9) * 0.015);
+  drawChampionAxe(ctx, accent, A);
   ctx.restore();
-  // topknot, swaying on the presentation clock
-  ctx.fillStyle = "#2a1810";
+  fist(15, 4, 4.4);
+  // horned full helm — no face, just a burning visor slit
+  ctx.save();
+  const hg = ctx.createLinearGradient(0, -24, 0, -8);
+  hg.addColorStop(0, "#8b929b");
+  hg.addColorStop(1, "#454b53");
+  ctx.fillStyle = hg;
   ctx.beginPath();
-  ctx.arc(0, -20.5, 3.4, Math.PI, 0);
+  ctx.moveTo(-7.5, -12);
+  ctx.quadraticCurveTo(-8.5, -23, 0, -23.5);
+  ctx.quadraticCurveTo(8.5, -23, 7.5, -12);
+  ctx.quadraticCurveTo(0, -9, -7.5, -12);
   ctx.closePath();
   ctx.fill();
-  ctx.strokeStyle = "#2a1810";
-  ctx.lineWidth = 2;
-  ctx.lineCap = "round";
+  ctx.fillStyle = "rgba(255,255,255,0.25)";
   ctx.beginPath();
-  ctx.moveTo(0, -21.5);
-  ctx.quadraticCurveTo(3 + Math.sin(A.t * 2.4), -26, 1.5 + Math.sin(A.t * 2.4) * 1.6, -28.5);
-  ctx.stroke();
-  ctx.lineCap = "butt";
-  // rage eyes (glow) with rising ember flecks
+  ctx.moveTo(-7.2, -14);
+  ctx.quadraticCurveTo(-8.2, -22.4, -1, -23.2);
+  ctx.lineTo(-1, -21.6);
+  ctx.quadraticCurveTo(-6.6, -20.8, -5.6, -14);
+  ctx.closePath();
+  ctx.fill();
+  // visor slit
+  ctx.fillStyle = "#14100f";
+  ctx.beginPath();
+  ctx.moveTo(-6.4, -17);
+  ctx.lineTo(6.4, -17);
+  ctx.lineTo(5.6, -13.6);
+  ctx.lineTo(-5.6, -13.6);
+  ctx.closePath();
+  ctx.fill();
+  // curved horns, socketed into the SIDES of the helm. The inward nudge matters:
+  // the dome narrows as it rises, so lifting them clear of the visor without it
+  // would float the bases off the plate edge.
+  for (const s of [-1, 1]) {
+    ctx.save();
+    ctx.scale(s, 1);
+    ctx.translate(-0.6, -2.2);
+    ctx.fillStyle = "#2f353c";
+    ctx.beginPath();
+    ctx.ellipse(5, -18.6, 2.4, 3.4, 0.3, 0, PI2);
+    ctx.fill();
+    const horn = () => {
+      ctx.beginPath();
+      ctx.moveTo(4.2, -20.8);
+      ctx.bezierCurveTo(9, -24, 13.5, -27, 15.2, -31.5);
+      ctx.bezierCurveTo(13.2, -26.5, 10.5, -22, 6.4, -16.6);
+      ctx.closePath();
+    };
+    horn();
+    ctx.fillStyle = "#d6cdb8";
+    ctx.fill();
+    ctx.strokeStyle = "rgba(58,50,38,0.55)";
+    ctx.lineWidth = 0.8;
+    ctx.lineJoin = "round";
+    ctx.stroke();
+    ctx.save();
+    horn();
+    ctx.clip();
+    ctx.fillStyle = "rgba(72,61,46,0.3)";
+    ctx.beginPath();
+    ctx.moveTo(15.2, -31.5);
+    ctx.bezierCurveTo(13.2, -26.5, 10.5, -22, 6.4, -16.6);
+    ctx.lineTo(9.2, -17.8);
+    ctx.lineTo(16.8, -29);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = "rgba(92,79,60,0.45)";
+    ctx.lineWidth = 0.7;
+    for (const [x1, y1, x2, y2] of [
+      [6, -20, 7.4, -17.6],
+      [9.5, -23.5, 11, -21],
+      [12.6, -26.6, 13.8, -24.4],
+    ]) {
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+    }
+    ctx.restore();
+    ctx.restore();
+  }
+  ctx.restore();
+  // furnace glow behind the visor
   ctx.save();
   ctx.fillStyle = accent;
   ctx.shadowColor = accent;
-  ctx.shadowBlur = 5 + A.glow * 7;
-  ctx.fillRect(-5.5, -15, 3.4, 2);
-  ctx.fillRect(2.1, -15, 3.4, 2);
-  if (A.live) {
-    ctx.globalAlpha = 0.4 + A.glow * 0.3;
-    ctx.fillRect(-4.6, -18 - A.glow * 1.5, 1.4, 1.4);
-    ctx.fillRect(3.2, -18.5 - A.glow * 1.2, 1.4, 1.4);
-  }
+  ctx.shadowBlur = 6 + A.glow * 8;
+  ctx.fillRect(-5, -16.2, 4.2, 2.2);
+  ctx.fillRect(1, -16.2, 4.2, 2.2);
   ctx.restore();
-  // twin notched axes with rage-lit edges
-  drawRageAxe(ctx, 15, -1, 1, accent, A);
-  drawRageAxe(ctx, -15, -1, -1, accent, A);
   // rising rage motes + the odd bright spark
-  rising(ctx, 0, 13, 16, 30, accent, A, 6);
+  rising(ctx, 0, 12, 16, 30, accent, A, 6);
   if (A.live) {
     ctx.save();
     ctx.strokeStyle = "#ffd9b0";

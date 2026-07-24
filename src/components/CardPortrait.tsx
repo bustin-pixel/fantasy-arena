@@ -1,8 +1,10 @@
 import { useEffect, useRef } from "react";
 import { renderPortrait } from "@/engine/Renderer";
+import { useSpriteEpoch } from "@/hooks/useSpriteEpoch";
 import { getUnitDef } from "@/data/units";
 import { RARITIES } from "@/data/rarities";
 import { UNLOCK_PRICES } from "@/meta/economy";
+import { GameIcon } from "@/components/icons/GameIcon";
 
 /** State of the quick-add button, computed by the hub from the current deck.
  *  "locked" = the player doesn't own the unit yet — the button shows the
@@ -33,7 +35,7 @@ const ADD_LABEL: Record<CardAddState, string> = {
   add: "+ Add",
   "in-deck": "✓",
   "deck-full": "Deck full",
-  "legendary-max": "🔒",
+  "legendary-max": "", // padlock icon only
   locked: "", // computed per-unit (shows the price)
 };
 
@@ -53,16 +55,22 @@ export function CardPortrait({
   const selected = addState === "in-deck";
   const unowned = addState === "locked";
   const disabled = addState === "deck-full" || addState === "legendary-max";
+  // The padlock is drawn, so the label carries only its TEXT half. Callers
+  // pass a bare price ("250g") or "" — never the lock glyph itself.
+  const showsLock = unowned || addState === "legendary-max";
   const label = unowned
-    ? lockLabel ?? `🔒 ${UNLOCK_PRICES[def.rarity]}g`
+    ? lockLabel ?? `${UNLOCK_PRICES[def.rarity]}g`
     : ADD_LABEL[addState];
 
+  // `spriteEpoch` repaints when the pixel-art setting flips or a unit's art
+  // finishes decoding — without it this canvas keeps whatever it drew at mount.
+  const spriteEpoch = useSpriteEpoch();
   useEffect(() => {
     const canvas = ref.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (ctx) renderPortrait(ctx, defId, size);
-  }, [defId, size]);
+  }, [defId, size, spriteEpoch]);
 
   return (
     <div
@@ -99,7 +107,10 @@ export function CardPortrait({
           onClick={unowned ? onInfo : onToggle}
           disabled={disabled}
           aria-pressed={selected}
+          aria-label={showsLock ? `Locked${label ? ` — ${label}` : ""}` : undefined}
         >
+          {showsLock && <GameIcon name="locked" />}
+          {showsLock && label ? " " : null}
           {label}
         </button>
         <button

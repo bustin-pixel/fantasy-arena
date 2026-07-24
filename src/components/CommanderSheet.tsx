@@ -1,7 +1,7 @@
 // ============================================================================
-// CommanderSheet — the Commander's talent tree. Opens from the Home banner
-// under the profile plate (the detail-overlay modal pattern, like the
-// ProfileSheet). Three archetype branches; tapping a node SELECTS it (its
+// CommanderSheet — "The War Table", the Commander's talent tree. Opens from
+// the Home banner under the profile plate (the detail-overlay modal pattern,
+// like the ProfileSheet). Three archetype branches; tapping a node SELECTS it (its
 // description and Buy button land in the footer — mobile has no hover), a
 // second tap on Buy spends the point via GameStateContext (the tree rules
 // live in meta/commander). Respec is a two-tap confirm that costs gold.
@@ -101,13 +101,13 @@ export function CommanderSheet({ onClose }: Props) {
       <div
         className="detail-modal commander-sheet"
         role="dialog"
-        aria-label="Commander talents"
+        aria-label="The War Table — Commander talents"
         onClick={(e) => e.stopPropagation()}
       >
         <button className="detail-close" onClick={close} aria-label="Close">
           ✕
         </button>
-        <h3 className="profile-sheet-title">Commander</h3>
+        <h3 className="profile-sheet-title">The War Table</h3>
 
         {/* Level + XP into the current level (every battle feeds the pool). */}
         <div className="cmd-head">

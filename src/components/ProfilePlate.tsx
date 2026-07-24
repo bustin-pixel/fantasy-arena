@@ -8,6 +8,7 @@
 
 import { useEffect, useRef } from "react";
 import { renderPortrait } from "@/engine/Renderer";
+import { useSpriteEpoch } from "@/hooks/useSpriteEpoch";
 import { DEFAULT_AVATAR_ID, getAvatar } from "@/meta/avatars";
 
 /** Round canvas-rendered profile icon. Unknown ids fall back to the default
@@ -23,10 +24,11 @@ export function AvatarPortrait({
   const ref = useRef<HTMLCanvasElement>(null);
   const avatar = getAvatar(avatarId) ?? getAvatar(DEFAULT_AVATAR_ID)!;
 
+  const spriteEpoch = useSpriteEpoch();
   useEffect(() => {
     const ctx = ref.current?.getContext("2d");
     if (ctx) renderPortrait(ctx, avatar.portraitDefId, size);
-  }, [avatar.portraitDefId, size]);
+  }, [avatar.portraitDefId, size, spriteEpoch]);
 
   return (
     <span

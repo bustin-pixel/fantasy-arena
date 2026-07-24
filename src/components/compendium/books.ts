@@ -18,6 +18,7 @@ import {
 import { questUnlockIds } from "@/data/depths";
 import { DECKABLE_UNIT_IDS, UNIT_IDS, getUnitDef } from "@/data/units";
 import { TENDENCIES, type TendencyId } from "@/data/tendencies";
+import type { IconName } from "@/components/icons/GameIcon";
 import { ALL_BOON_IDS, BOONS, type BoonRarity } from "@/data/boons";
 import { rarityRank } from "@/data/rarities";
 import { ITEM_LINES, ITEM_SLOTS } from "@/data/items";
@@ -77,8 +78,8 @@ export interface BookSpread {
 export interface BookDef {
   id: string;
   title: string;
-  /** Spine motif glyph. */
-  glyph: string;
+  /** Spine motif — a drawn icon, keyed by name in the GameIcon registry. */
+  glyph: IconName;
   /** Leather base + embossing accent (Grand Athenaeum palette). */
   leather: string;
   accent: string;
@@ -96,20 +97,20 @@ export interface BookDef {
 // Spine palette + motifs (mockup variant 1 — Grand Athenaeum)
 // ---------------------------------------------------------------------------
 
-const SPINES: Record<string, { leather: string; accent: string; glyph: string }> = {
-  depths: { leather: "#2e4239", accent: "#9fd4bb", glyph: "🐀" },
-  bonefields: { leather: "#4a4438", accent: "#e3d9b8", glyph: "💀" },
-  wilds: { leather: "#4d3a22", accent: "#e0b573", glyph: "🐾" },
-  overgrowth: { leather: "#2f4a26", accent: "#a8e07f", glyph: "🍃" },
-  sealed_vault: { leather: "#2b3350", accent: "#ffd873", glyph: "✦" },
-  deep_forge: { leather: "#402420", accent: "#ff9d4d", glyph: "⚙" },
-  eclipse_spire: { leather: "#241a38", accent: "#c4aeff", glyph: "◐" },
-  fallen_cathedral: { leather: "#3d3244", accent: "#ffd76a", glyph: "⚜" },
-  rogues_den: { leather: "#33261a", accent: "#e8b04b", glyph: "🗡" },
-  heroes: { leather: "#243a5e", accent: "#f5b301", glyph: "⚔" },
-  tendencies: { leather: "#4a2e1f", accent: "#e09c5f", glyph: "◎" },
-  boons: { leather: "#31214d", accent: "#c9a2ff", glyph: "∞" },
-  items: { leather: "#571f1f", accent: "#e8c06a", glyph: "◆" },
+const SPINES: Record<string, { leather: string; accent: string; glyph: IconName }> = {
+  depths: { leather: "#2e4239", accent: "#9fd4bb", glyph: "bookDepths" },
+  bonefields: { leather: "#4a4438", accent: "#e3d9b8", glyph: "bookBonefields" },
+  wilds: { leather: "#4d3a22", accent: "#e0b573", glyph: "bookWilds" },
+  overgrowth: { leather: "#2f4a26", accent: "#a8e07f", glyph: "bookOvergrowth" },
+  sealed_vault: { leather: "#2b3350", accent: "#ffd873", glyph: "bookSealedVault" },
+  deep_forge: { leather: "#402420", accent: "#ff9d4d", glyph: "bookDeepForge" },
+  eclipse_spire: { leather: "#241a38", accent: "#c4aeff", glyph: "bookEclipseSpire" },
+  fallen_cathedral: { leather: "#3d3244", accent: "#ffd76a", glyph: "bookCathedral" },
+  rogues_den: { leather: "#33261a", accent: "#e8b04b", glyph: "bookRoguesDen" },
+  heroes: { leather: "#243a5e", accent: "#f5b301", glyph: "bookHeroes" },
+  tendencies: { leather: "#4a2e1f", accent: "#e09c5f", glyph: "bookTendencies" },
+  boons: { leather: "#31214d", accent: "#c9a2ff", glyph: "bookBoons" },
+  items: { leather: "#571f1f", accent: "#e8c06a", glyph: "bookItems" },
 };
 
 /** Shade a #rrggbb hex by `amt` (matches assets/sprites' shade helper). */

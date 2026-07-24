@@ -34,6 +34,7 @@ import { ITEM_LINES } from "@/data/items";
 import { RARITIES } from "@/data/rarities";
 import { ChestSprite } from "@/components/ChestSprite";
 import { CHEST_LABEL } from "@/components/RewardPanel";
+import { GameIcon } from "@/components/icons/GameIcon";
 import { playSfx } from "@/audio/sfx";
 
 interface Props {
@@ -145,7 +146,9 @@ export function QuestBoardSheet({ onClose }: Props) {
         </button>
         <div className="quest-board-head">
           <span className="quest-board-title">Bulletin Board</span>
-          <span className="quest-board-gold">● {save.gold.toLocaleString()}</span>
+          <span className="quest-board-gold">
+            <GameIcon name="gold" /> {save.gold.toLocaleString()}
+          </span>
         </div>
 
         <div className="quest-board-body">
@@ -246,7 +249,14 @@ export function QuestBoardSheet({ onClose }: Props) {
                 onClick={refresh}
                 title="Replace the pinned notices"
               >
-                Refresh {cost > 0 ? `(● ${cost})` : "(Free)"}
+                Refresh{" "}
+                {cost > 0 ? (
+                  <>
+                    (<GameIcon name="gold" /> {cost})
+                  </>
+                ) : (
+                  "(Free)"
+                )}
               </button>
             </div>
             {offers.length === 0 && (
@@ -295,7 +305,9 @@ export function QuestBoardSheet({ onClose }: Props) {
 function RewardLine({ notice }: { notice: QuestNotice }) {
   return (
     <div className="quest-reward-line">
-      <span className="quest-reward-gold">● {notice.gold}</span>
+      <span className="quest-reward-gold">
+        <GameIcon name="gold" /> {notice.gold}
+      </span>
       <span className={`quest-reward-chest tier-${notice.chestTier}`}>
         {CHEST_LABEL[notice.chestTier]}
       </span>

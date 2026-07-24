@@ -11,6 +11,7 @@
 
 import { RNG } from "@/utils/rng";
 import { isBossFloorIn, type Dungeon } from "@/data/dungeons";
+import type { IconName } from "@/components/icons/GameIcon";
 
 export type EncounterKind =
   | "normal" // a standard floor (the default everywhere)
@@ -52,10 +53,10 @@ export function omenFor(kind: EncounterKind): Omen {
   }
 }
 
-export const OMEN_META: Record<Omen, { glyph: string; label: string }> = {
-  safe: { glyph: "🌿", label: "The safe road" },
-  ominous: { glyph: "☠", label: "An ominous path" },
-  treasure: { glyph: "💰", label: "Glinting treasure" },
+export const OMEN_META: Record<Omen, { glyph: IconName; label: string }> = {
+  safe: { glyph: "omenSafe", label: "The safe road" },
+  ominous: { glyph: "omenOminous", label: "An ominous path" },
+  treasure: { glyph: "omenTreasure", label: "Glinting treasure" },
 };
 
 /** Chance a RARE QUARRY (the fusion-quest rare) lurks behind ONE of the three

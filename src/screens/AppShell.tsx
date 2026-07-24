@@ -11,6 +11,7 @@ import { DungeonAtlas } from "@/components/atlas/DungeonAtlas";
 import { GoldPill, ShardPill } from "@/components/CurrencyPills";
 import type { BattleMode } from "@/hooks/useBattleEngine";
 import type { TierId } from "@/data/tiers";
+import { GameIcon } from "@/components/icons/GameIcon";
 import { playSfx } from "@/audio/sfx";
 
 interface Props {
@@ -219,7 +220,7 @@ export function AppShell({
           aria-label="Settings"
           onClick={() => { playSfx("uiOpen"); setSettingsOpen(true); }}
         >
-          ⚙️
+          <GameIcon name="settings" />
         </button>
       </div>
       {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}

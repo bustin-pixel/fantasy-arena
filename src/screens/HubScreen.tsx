@@ -183,7 +183,8 @@ export function HubScreen() {
             if (addState === "locked") {
               const q = questForUnlock(id);
               if (q) {
-                lockLabel = save.questUnlocks.includes(id) ? `🔒 ${q.price}g` : "🔒";
+                // Text half only — CardPortrait draws the padlock itself.
+                lockLabel = save.questUnlocks.includes(id) ? `${q.price}g` : "";
               }
             }
             return (

@@ -14,6 +14,7 @@ import { MAX_USERNAME_LENGTH } from "@/state/persistence";
 import { earnedTitleIds, titleLabel } from "@/meta/bestiaryRewards";
 import { useGameState } from "@/state/GameStateContext";
 import { AvatarPortrait } from "@/components/ProfilePlate";
+import { GameIcon } from "@/components/icons/GameIcon";
 import { playSfx } from "@/audio/sfx";
 
 interface Props {
@@ -152,7 +153,7 @@ export function ProfileSheet({ onClose }: Props) {
                 <AvatarPortrait avatarId={id} size={56} />
                 {locked && (
                   <span className="avatar-lock" aria-hidden="true">
-                    🔒
+                    <GameIcon name="locked" />
                   </span>
                 )}
               </button>

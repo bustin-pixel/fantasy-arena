@@ -1,0 +1,4460 @@
+{
+  "ogre": {
+    "cell": 80,
+    "anchor": [
+      40,
+      72
+    ],
+    "version": 1784821751,
+    "keep": 8,
+    "dirs": [
+      "s",
+      "se",
+      "e",
+      "ne",
+      "n",
+      "sw",
+      "w",
+      "nw"
+    ],
+    "mirrored": [
+      "sw",
+      "w",
+      "nw"
+    ],
+    "still": {
+      "se": "ogre_se.png",
+      "ne": "ogre_ne.png",
+      "sw": "ogre_sw.png",
+      "nw": "ogre_nw.png"
+    },
+    "idle": {
+      "se": {
+        "file": "ogre_se_idle.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "ogre_ne_idle.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "ogre_sw_idle.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "ogre_nw_idle.png",
+        "frames": 8
+      }
+    },
+    "walk": {
+      "se": {
+        "file": "ogre_se_walk.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "ogre_ne_walk.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "ogre_sw_walk.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "ogre_nw_walk.png",
+        "frames": 8
+      }
+    },
+    "attack": {
+      "se": {
+        "file": "ogre_se_attack.png",
+        "frames": 8,
+        "hit": 4
+      },
+      "ne": {
+        "file": "ogre_ne_attack.png",
+        "frames": 8,
+        "hit": 4
+      },
+      "sw": {
+        "file": "ogre_sw_attack.png",
+        "frames": 8,
+        "hit": 4
+      },
+      "nw": {
+        "file": "ogre_nw_attack.png",
+        "frames": 8,
+        "hit": 4
+      }
+    },
+    "walk_attack": {},
+    "death": {
+      "se": {
+        "file": "ogre_se_death.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "ogre_ne_death.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "ogre_sw_death.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "ogre_nw_death.png",
+        "frames": 8
+      }
+    },
+    "corpse": {
+      "se": "ogre_corpse_se.png",
+      "ne": "ogre_corpse_ne.png",
+      "sw": "ogre_corpse_sw.png",
+      "nw": "ogre_corpse_nw.png"
+    }
+  },
+  "knight": {
+    "cell": 80,
+    "anchor": [
+      40,
+      72
+    ],
+    "version": 1784821728,
+    "keep": 8,
+    "dirs": [
+      "s",
+      "se",
+      "e",
+      "ne",
+      "n",
+      "sw",
+      "w",
+      "nw"
+    ],
+    "mirrored": [
+      "sw",
+      "w",
+      "nw"
+    ],
+    "still": {
+      "se": "knight_se.png",
+      "ne": "knight_ne.png",
+      "sw": "knight_sw.png",
+      "nw": "knight_nw.png"
+    },
+    "idle": {
+      "se": {
+        "file": "knight_se_idle.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "knight_ne_idle.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "knight_sw_idle.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "knight_nw_idle.png",
+        "frames": 8
+      }
+    },
+    "walk": {
+      "se": {
+        "file": "knight_se_walk.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "knight_ne_walk.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "knight_sw_walk.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "knight_nw_walk.png",
+        "frames": 8
+      }
+    },
+    "attack": {
+      "se": {
+        "file": "knight_se_attack.png",
+        "frames": 8,
+        "hit": 4
+      },
+      "ne": {
+        "file": "knight_ne_attack.png",
+        "frames": 8,
+        "hit": 2
+      },
+      "sw": {
+        "file": "knight_sw_attack.png",
+        "frames": 8,
+        "hit": 4
+      },
+      "nw": {
+        "file": "knight_nw_attack.png",
+        "frames": 8,
+        "hit": 2
+      }
+    },
+    "walk_attack": {},
+    "death": {
+      "se": {
+        "file": "knight_se_death.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "knight_ne_death.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "knight_sw_death.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "knight_nw_death.png",
+        "frames": 8
+      }
+    },
+    "corpse": {
+      "se": "knight_corpse_se.png",
+      "ne": "knight_corpse_ne.png",
+      "sw": "knight_corpse_sw.png",
+      "nw": "knight_corpse_nw.png"
+    }
+  },
+  "orc": {
+    "cell": 80,
+    "anchor": [
+      40,
+      72
+    ],
+    "version": 1784879477,
+    "keep": 8,
+    "dirs": [
+      "s",
+      "se",
+      "e",
+      "ne",
+      "n",
+      "sw",
+      "w",
+      "nw"
+    ],
+    "mirrored": [
+      "sw",
+      "w",
+      "nw"
+    ],
+    "still": {
+      "se": "orc_se.png",
+      "ne": "orc_ne.png",
+      "sw": "orc_sw.png",
+      "nw": "orc_nw.png"
+    },
+    "idle": {
+      "se": {
+        "file": "orc_se_idle.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "orc_ne_idle.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "orc_sw_idle.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "orc_nw_idle.png",
+        "frames": 8
+      }
+    },
+    "walk": {
+      "se": {
+        "file": "orc_se_walk.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "orc_ne_walk.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "orc_sw_walk.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "orc_nw_walk.png",
+        "frames": 8
+      }
+    },
+    "attack": {
+      "se": {
+        "file": "orc_se_attack.png",
+        "frames": 8,
+        "hit": 2
+      },
+      "ne": {
+        "file": "orc_ne_attack.png",
+        "frames": 8,
+        "hit": 4
+      },
+      "sw": {
+        "file": "orc_sw_attack.png",
+        "frames": 8,
+        "hit": 2
+      },
+      "nw": {
+        "file": "orc_nw_attack.png",
+        "frames": 8,
+        "hit": 4
+      }
+    },
+    "walk_attack": {},
+    "death": {
+      "se": {
+        "file": "orc_se_death.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "orc_ne_death.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "orc_sw_death.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "orc_nw_death.png",
+        "frames": 8
+      }
+    },
+    "corpse": {
+      "se": "orc_corpse_se.png",
+      "ne": "orc_corpse_ne.png",
+      "sw": "orc_corpse_sw.png",
+      "nw": "orc_corpse_nw.png"
+    },
+    "react": {}
+  },
+  "skeleton": {
+    "cell": 80,
+    "anchor": [
+      40,
+      72
+    ],
+    "version": 1784821644,
+    "keep": 8,
+    "dirs": [
+      "s",
+      "se",
+      "e",
+      "ne",
+      "n",
+      "sw",
+      "w",
+      "nw"
+    ],
+    "mirrored": [
+      "sw",
+      "w",
+      "nw"
+    ],
+    "still": {
+      "se": "skeleton_se.png",
+      "ne": "skeleton_ne.png",
+      "sw": "skeleton_sw.png",
+      "nw": "skeleton_nw.png"
+    },
+    "idle": {
+      "se": {
+        "file": "skeleton_se_idle.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "skeleton_ne_idle.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "skeleton_sw_idle.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "skeleton_nw_idle.png",
+        "frames": 8
+      }
+    },
+    "walk": {
+      "se": {
+        "file": "skeleton_se_walk.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "skeleton_ne_walk.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "skeleton_sw_walk.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "skeleton_nw_walk.png",
+        "frames": 8
+      }
+    },
+    "attack": {
+      "se": {
+        "file": "skeleton_se_attack.png",
+        "frames": 8,
+        "hit": 3
+      },
+      "ne": {
+        "file": "skeleton_ne_attack.png",
+        "frames": 8,
+        "hit": 3
+      },
+      "sw": {
+        "file": "skeleton_sw_attack.png",
+        "frames": 8,
+        "hit": 3
+      },
+      "nw": {
+        "file": "skeleton_nw_attack.png",
+        "frames": 8,
+        "hit": 3
+      }
+    },
+    "walk_attack": {},
+    "death": {
+      "se": {
+        "file": "skeleton_se_death.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "skeleton_ne_death.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "skeleton_sw_death.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "skeleton_nw_death.png",
+        "frames": 8
+      }
+    },
+    "corpse": {
+      "se": "skeleton_corpse_se.png",
+      "ne": "skeleton_corpse_ne.png",
+      "sw": "skeleton_corpse_sw.png",
+      "nw": "skeleton_corpse_nw.png"
+    }
+  },
+  "archer": {
+    "cell": 80,
+    "anchor": [
+      40,
+      72
+    ],
+    "version": 1784821739,
+    "keep": 8,
+    "dirs": [
+      "s",
+      "se",
+      "e",
+      "ne",
+      "n",
+      "sw",
+      "w",
+      "nw"
+    ],
+    "mirrored": [
+      "sw",
+      "w",
+      "nw"
+    ],
+    "still": {
+      "se": "archer_se.png",
+      "ne": "archer_ne.png",
+      "sw": "archer_sw.png",
+      "nw": "archer_nw.png"
+    },
+    "idle": {
+      "se": {
+        "file": "archer_se_idle.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "archer_ne_idle.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "archer_sw_idle.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "archer_nw_idle.png",
+        "frames": 8
+      }
+    },
+    "walk": {
+      "se": {
+        "file": "archer_se_walk.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "archer_ne_walk.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "archer_sw_walk.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "archer_nw_walk.png",
+        "frames": 8
+      }
+    },
+    "attack": {
+      "se": {
+        "file": "archer_se_attack.png",
+        "frames": 8,
+        "hit": 5
+      },
+      "ne": {
+        "file": "archer_ne_attack.png",
+        "frames": 8,
+        "hit": 3
+      },
+      "sw": {
+        "file": "archer_sw_attack.png",
+        "frames": 8,
+        "hit": 5
+      },
+      "nw": {
+        "file": "archer_nw_attack.png",
+        "frames": 8,
+        "hit": 3
+      }
+    },
+    "walk_attack": {
+      "se": {
+        "file": "archer_se_walk_attack.png",
+        "frames": 8,
+        "hit": 7
+      },
+      "ne": {
+        "file": "archer_ne_walk_attack.png",
+        "frames": 8,
+        "hit": 2
+      },
+      "sw": {
+        "file": "archer_sw_walk_attack.png",
+        "frames": 8,
+        "hit": 7
+      },
+      "nw": {
+        "file": "archer_nw_walk_attack.png",
+        "frames": 8,
+        "hit": 2
+      }
+    },
+    "death": {
+      "se": {
+        "file": "archer_se_death.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "archer_ne_death.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "archer_sw_death.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "archer_nw_death.png",
+        "frames": 8
+      }
+    },
+    "corpse": {
+      "se": "archer_corpse_se.png",
+      "ne": "archer_corpse_ne.png",
+      "sw": "archer_corpse_sw.png",
+      "nw": "archer_corpse_nw.png"
+    }
+  },
+  "lich": {
+    "cell": 80,
+    "anchor": [
+      40,
+      72
+    ],
+    "version": 1784821716,
+    "keep": 8,
+    "dirs": [
+      "s",
+      "se",
+      "e",
+      "ne",
+      "n",
+      "sw",
+      "w",
+      "nw"
+    ],
+    "mirrored": [
+      "sw",
+      "w",
+      "nw"
+    ],
+    "still": {
+      "se": "lich_se.png",
+      "ne": "lich_ne.png",
+      "sw": "lich_sw.png",
+      "nw": "lich_nw.png"
+    },
+    "idle": {
+      "se": {
+        "file": "lich_se_idle.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "lich_ne_idle.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "lich_sw_idle.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "lich_nw_idle.png",
+        "frames": 8
+      }
+    },
+    "walk": {
+      "se": {
+        "file": "lich_se_walk.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "lich_ne_walk.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "lich_sw_walk.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "lich_nw_walk.png",
+        "frames": 8
+      }
+    },
+    "attack": {
+      "se": {
+        "file": "lich_se_attack.png",
+        "frames": 8,
+        "hit": 3
+      },
+      "ne": {
+        "file": "lich_ne_attack.png",
+        "frames": 8,
+        "hit": 3
+      },
+      "sw": {
+        "file": "lich_sw_attack.png",
+        "frames": 8,
+        "hit": 3
+      },
+      "nw": {
+        "file": "lich_nw_attack.png",
+        "frames": 8,
+        "hit": 3
+      }
+    },
+    "walk_attack": {},
+    "death": {
+      "se": {
+        "file": "lich_se_death.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "lich_ne_death.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "lich_sw_death.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "lich_nw_death.png",
+        "frames": 8
+      }
+    },
+    "corpse": {
+      "se": "lich_corpse_se.png",
+      "ne": "lich_corpse_ne.png",
+      "sw": "lich_corpse_sw.png",
+      "nw": "lich_corpse_nw.png"
+    }
+  },
+  "necromancer": {
+    "cell": 80,
+    "anchor": [
+      40,
+      72
+    ],
+    "version": 1784823327,
+    "keep": 8,
+    "dirs": [
+      "s",
+      "se",
+      "e",
+      "ne",
+      "n",
+      "sw",
+      "w",
+      "nw"
+    ],
+    "mirrored": [
+      "sw",
+      "w",
+      "nw"
+    ],
+    "still": {
+      "se": "necromancer_se.png",
+      "ne": "necromancer_ne.png",
+      "sw": "necromancer_sw.png",
+      "nw": "necromancer_nw.png"
+    },
+    "idle": {
+      "se": {
+        "file": "necromancer_se_idle.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "necromancer_ne_idle.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "necromancer_sw_idle.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "necromancer_nw_idle.png",
+        "frames": 8
+      }
+    },
+    "walk": {
+      "se": {
+        "file": "necromancer_se_walk.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "necromancer_ne_walk.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "necromancer_sw_walk.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "necromancer_nw_walk.png",
+        "frames": 8
+      }
+    },
+    "attack": {
+      "se": {
+        "file": "necromancer_se_attack.png",
+        "frames": 8,
+        "hit": 3
+      },
+      "ne": {
+        "file": "necromancer_ne_attack.png",
+        "frames": 8,
+        "hit": 3
+      },
+      "sw": {
+        "file": "necromancer_sw_attack.png",
+        "frames": 8,
+        "hit": 3
+      },
+      "nw": {
+        "file": "necromancer_nw_attack.png",
+        "frames": 8,
+        "hit": 3
+      }
+    },
+    "walk_attack": {},
+    "death": {
+      "se": {
+        "file": "necromancer_se_death.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "necromancer_ne_death.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "necromancer_sw_death.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "necromancer_nw_death.png",
+        "frames": 8
+      }
+    },
+    "corpse": {
+      "se": "necromancer_corpse_se.png",
+      "ne": "necromancer_corpse_ne.png",
+      "sw": "necromancer_corpse_sw.png",
+      "nw": "necromancer_corpse_nw.png"
+    }
+  },
+  "fire_mage": {
+    "cell": 80,
+    "anchor": [
+      40,
+      72
+    ],
+    "version": 1784821634,
+    "keep": 8,
+    "dirs": [
+      "s",
+      "se",
+      "e",
+      "ne",
+      "n",
+      "sw",
+      "w",
+      "nw"
+    ],
+    "mirrored": [
+      "sw",
+      "w",
+      "nw"
+    ],
+    "still": {
+      "se": "fire_mage_se.png",
+      "ne": "fire_mage_ne.png",
+      "sw": "fire_mage_sw.png",
+      "nw": "fire_mage_nw.png"
+    },
+    "idle": {
+      "se": {
+        "file": "fire_mage_se_idle.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "fire_mage_ne_idle.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "fire_mage_sw_idle.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "fire_mage_nw_idle.png",
+        "frames": 8
+      }
+    },
+    "walk": {
+      "se": {
+        "file": "fire_mage_se_walk.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "fire_mage_ne_walk.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "fire_mage_sw_walk.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "fire_mage_nw_walk.png",
+        "frames": 8
+      }
+    },
+    "attack": {
+      "se": {
+        "file": "fire_mage_se_attack.png",
+        "frames": 8,
+        "hit": 3
+      },
+      "ne": {
+        "file": "fire_mage_ne_attack.png",
+        "frames": 8,
+        "hit": 3
+      },
+      "sw": {
+        "file": "fire_mage_sw_attack.png",
+        "frames": 8,
+        "hit": 3
+      },
+      "nw": {
+        "file": "fire_mage_nw_attack.png",
+        "frames": 8,
+        "hit": 3
+      }
+    },
+    "walk_attack": {},
+    "death": {
+      "se": {
+        "file": "fire_mage_se_death.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "fire_mage_ne_death.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "fire_mage_sw_death.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "fire_mage_nw_death.png",
+        "frames": 8
+      }
+    },
+    "corpse": {
+      "se": "fire_mage_corpse_se.png",
+      "ne": "fire_mage_corpse_ne.png",
+      "sw": "fire_mage_corpse_sw.png",
+      "nw": "fire_mage_corpse_nw.png"
+    }
+  },
+  "seraph": {
+    "cell": 80,
+    "anchor": [
+      40,
+      72
+    ],
+    "version": 1784821694,
+    "keep": 8,
+    "dirs": [
+      "s",
+      "se",
+      "e",
+      "ne",
+      "n",
+      "sw",
+      "w",
+      "nw"
+    ],
+    "mirrored": [
+      "sw",
+      "w",
+      "nw"
+    ],
+    "still": {
+      "se": "seraph_se.png",
+      "ne": "seraph_ne.png",
+      "sw": "seraph_sw.png",
+      "nw": "seraph_nw.png"
+    },
+    "idle": {
+      "se": {
+        "file": "seraph_se_idle.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "seraph_ne_idle.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "seraph_sw_idle.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "seraph_nw_idle.png",
+        "frames": 8
+      }
+    },
+    "walk": {
+      "se": {
+        "file": "seraph_se_walk.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "seraph_ne_walk.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "seraph_sw_walk.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "seraph_nw_walk.png",
+        "frames": 8
+      }
+    },
+    "attack": {
+      "se": {
+        "file": "seraph_se_attack.png",
+        "frames": 8,
+        "hit": 3
+      },
+      "ne": {
+        "file": "seraph_ne_attack.png",
+        "frames": 8,
+        "hit": 3
+      },
+      "sw": {
+        "file": "seraph_sw_attack.png",
+        "frames": 8,
+        "hit": 3
+      },
+      "nw": {
+        "file": "seraph_nw_attack.png",
+        "frames": 8,
+        "hit": 3
+      }
+    },
+    "walk_attack": {},
+    "death": {
+      "se": {
+        "file": "seraph_se_death.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "seraph_ne_death.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "seraph_sw_death.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "seraph_nw_death.png",
+        "frames": 8
+      }
+    },
+    "corpse": {
+      "se": "seraph_corpse_se.png",
+      "ne": "seraph_corpse_ne.png",
+      "sw": "seraph_corpse_sw.png",
+      "nw": "seraph_corpse_nw.png"
+    }
+  },
+  "wolf": {
+    "cell": 80,
+    "anchor": [
+      40,
+      72
+    ],
+    "version": 1784821704,
+    "keep": 8,
+    "dirs": [
+      "s",
+      "se",
+      "e",
+      "ne",
+      "n",
+      "sw",
+      "w",
+      "nw"
+    ],
+    "mirrored": [
+      "sw",
+      "w",
+      "nw"
+    ],
+    "still": {
+      "se": "wolf_se.png",
+      "ne": "wolf_ne.png",
+      "sw": "wolf_sw.png",
+      "nw": "wolf_nw.png"
+    },
+    "idle": {
+      "se": {
+        "file": "wolf_se_idle.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "wolf_ne_idle.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "wolf_sw_idle.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "wolf_nw_idle.png",
+        "frames": 8
+      }
+    },
+    "walk": {
+      "se": {
+        "file": "wolf_se_walk.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "wolf_ne_walk.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "wolf_sw_walk.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "wolf_nw_walk.png",
+        "frames": 8
+      }
+    },
+    "attack": {
+      "se": {
+        "file": "wolf_se_attack.png",
+        "frames": 8,
+        "hit": 3
+      },
+      "ne": {
+        "file": "wolf_ne_attack.png",
+        "frames": 8,
+        "hit": 6
+      },
+      "sw": {
+        "file": "wolf_sw_attack.png",
+        "frames": 8,
+        "hit": 3
+      },
+      "nw": {
+        "file": "wolf_nw_attack.png",
+        "frames": 8,
+        "hit": 6
+      }
+    },
+    "walk_attack": {},
+    "death": {
+      "se": {
+        "file": "wolf_se_death.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "wolf_ne_death.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "wolf_sw_death.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "wolf_nw_death.png",
+        "frames": 8
+      }
+    },
+    "corpse": {
+      "se": "wolf_corpse_se.png",
+      "ne": "wolf_corpse_ne.png",
+      "sw": "wolf_corpse_sw.png",
+      "nw": "wolf_corpse_nw.png"
+    }
+  },
+  "slime": {
+    "cell": 80,
+    "anchor": [
+      40,
+      72
+    ],
+    "version": 1784821666,
+    "keep": 8,
+    "dirs": [
+      "s",
+      "se",
+      "e",
+      "ne",
+      "n",
+      "sw",
+      "w",
+      "nw"
+    ],
+    "mirrored": [
+      "sw",
+      "w",
+      "nw"
+    ],
+    "still": {
+      "se": "slime_se.png",
+      "ne": "slime_ne.png",
+      "sw": "slime_sw.png",
+      "nw": "slime_nw.png"
+    },
+    "idle": {
+      "se": {
+        "file": "slime_se_idle.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "slime_ne_idle.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "slime_sw_idle.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "slime_nw_idle.png",
+        "frames": 8
+      }
+    },
+    "walk": {
+      "se": {
+        "file": "slime_se_walk.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "slime_ne_walk.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "slime_sw_walk.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "slime_nw_walk.png",
+        "frames": 8
+      }
+    },
+    "attack": {
+      "se": {
+        "file": "slime_se_attack.png",
+        "frames": 8,
+        "hit": 2
+      },
+      "ne": {
+        "file": "slime_ne_attack.png",
+        "frames": 8,
+        "hit": 2
+      },
+      "sw": {
+        "file": "slime_sw_attack.png",
+        "frames": 8,
+        "hit": 2
+      },
+      "nw": {
+        "file": "slime_nw_attack.png",
+        "frames": 8,
+        "hit": 2
+      }
+    },
+    "walk_attack": {},
+    "death": {
+      "se": {
+        "file": "slime_se_death.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "slime_ne_death.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "slime_sw_death.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "slime_nw_death.png",
+        "frames": 8
+      }
+    },
+    "corpse": {
+      "se": "slime_corpse_se.png",
+      "ne": "slime_corpse_ne.png",
+      "sw": "slime_corpse_sw.png",
+      "nw": "slime_corpse_nw.png"
+    }
+  },
+  "rune_golem": {
+    "cell": 80,
+    "anchor": [
+      40,
+      72
+    ],
+    "version": 1784821680,
+    "keep": 8,
+    "dirs": [
+      "s",
+      "se",
+      "e",
+      "ne",
+      "n",
+      "sw",
+      "w",
+      "nw"
+    ],
+    "mirrored": [
+      "sw",
+      "w",
+      "nw"
+    ],
+    "still": {
+      "se": "rune_golem_se.png",
+      "ne": "rune_golem_ne.png",
+      "sw": "rune_golem_sw.png",
+      "nw": "rune_golem_nw.png"
+    },
+    "idle": {
+      "se": {
+        "file": "rune_golem_se_idle.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "rune_golem_ne_idle.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "rune_golem_sw_idle.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "rune_golem_nw_idle.png",
+        "frames": 8
+      }
+    },
+    "walk": {
+      "se": {
+        "file": "rune_golem_se_walk.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "rune_golem_ne_walk.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "rune_golem_sw_walk.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "rune_golem_nw_walk.png",
+        "frames": 8
+      }
+    },
+    "attack": {
+      "se": {
+        "file": "rune_golem_se_attack.png",
+        "frames": 8,
+        "hit": 2
+      },
+      "ne": {
+        "file": "rune_golem_ne_attack.png",
+        "frames": 8,
+        "hit": 5
+      },
+      "sw": {
+        "file": "rune_golem_sw_attack.png",
+        "frames": 8,
+        "hit": 2
+      },
+      "nw": {
+        "file": "rune_golem_nw_attack.png",
+        "frames": 8,
+        "hit": 5
+      }
+    },
+    "walk_attack": {},
+    "death": {
+      "se": {
+        "file": "rune_golem_se_death.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "rune_golem_ne_death.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "rune_golem_sw_death.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "rune_golem_nw_death.png",
+        "frames": 8
+      }
+    },
+    "corpse": {
+      "se": "rune_golem_corpse_se.png",
+      "ne": "rune_golem_corpse_ne.png",
+      "sw": "rune_golem_corpse_sw.png",
+      "nw": "rune_golem_corpse_nw.png"
+    }
+  },
+  "aegis_knight": {
+    "cell": 80,
+    "anchor": [
+      40,
+      72
+    ],
+    "version": 1784828206,
+    "keep": 8,
+    "dirs": [
+      "s",
+      "se",
+      "e",
+      "ne",
+      "n",
+      "sw",
+      "w",
+      "nw"
+    ],
+    "mirrored": [
+      "sw",
+      "w",
+      "nw"
+    ],
+    "still": {
+      "se": "aegis_knight_se.png",
+      "ne": "aegis_knight_ne.png",
+      "sw": "aegis_knight_sw.png",
+      "nw": "aegis_knight_nw.png"
+    },
+    "idle": {
+      "se": {
+        "file": "aegis_knight_se_idle.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "aegis_knight_ne_idle.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "aegis_knight_sw_idle.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "aegis_knight_nw_idle.png",
+        "frames": 8
+      }
+    },
+    "walk": {
+      "se": {
+        "file": "aegis_knight_se_walk.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "aegis_knight_ne_walk.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "aegis_knight_sw_walk.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "aegis_knight_nw_walk.png",
+        "frames": 8
+      }
+    },
+    "attack": {
+      "se": {
+        "file": "aegis_knight_se_attack.png",
+        "frames": 8,
+        "hit": 4
+      },
+      "ne": {
+        "file": "aegis_knight_ne_attack.png",
+        "frames": 8,
+        "hit": 5
+      },
+      "sw": {
+        "file": "aegis_knight_sw_attack.png",
+        "frames": 8,
+        "hit": 4
+      },
+      "nw": {
+        "file": "aegis_knight_nw_attack.png",
+        "frames": 8,
+        "hit": 5
+      }
+    },
+    "walk_attack": {},
+    "death": {
+      "se": {
+        "file": "aegis_knight_se_death.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "aegis_knight_ne_death.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "aegis_knight_sw_death.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "aegis_knight_nw_death.png",
+        "frames": 8
+      }
+    },
+    "corpse": {
+      "se": "aegis_knight_corpse_se.png",
+      "ne": "aegis_knight_corpse_ne.png",
+      "sw": "aegis_knight_corpse_sw.png",
+      "nw": "aegis_knight_corpse_nw.png"
+    }
+  },
+  "archmage": {
+    "cell": 80,
+    "anchor": [
+      40,
+      72
+    ],
+    "version": 1784831229,
+    "keep": 8,
+    "dirs": [
+      "s",
+      "se",
+      "e",
+      "ne",
+      "n",
+      "sw",
+      "w",
+      "nw"
+    ],
+    "mirrored": [
+      "sw",
+      "w",
+      "nw"
+    ],
+    "still": {
+      "se": "archmage_se.png",
+      "ne": "archmage_ne.png",
+      "sw": "archmage_sw.png",
+      "nw": "archmage_nw.png"
+    },
+    "idle": {
+      "se": {
+        "file": "archmage_se_idle.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "archmage_ne_idle.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "archmage_sw_idle.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "archmage_nw_idle.png",
+        "frames": 8
+      }
+    },
+    "walk": {
+      "se": {
+        "file": "archmage_se_walk.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "archmage_ne_walk.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "archmage_sw_walk.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "archmage_nw_walk.png",
+        "frames": 8
+      }
+    },
+    "attack": {
+      "se": {
+        "file": "archmage_se_attack.png",
+        "frames": 8,
+        "hit": 3
+      },
+      "ne": {
+        "file": "archmage_ne_attack.png",
+        "frames": 8,
+        "hit": 2
+      },
+      "sw": {
+        "file": "archmage_sw_attack.png",
+        "frames": 8,
+        "hit": 3
+      },
+      "nw": {
+        "file": "archmage_nw_attack.png",
+        "frames": 8,
+        "hit": 2
+      }
+    },
+    "walk_attack": {},
+    "death": {
+      "se": {
+        "file": "archmage_se_death.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "archmage_ne_death.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "archmage_sw_death.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "archmage_nw_death.png",
+        "frames": 8
+      }
+    },
+    "corpse": {
+      "se": "archmage_corpse_se.png",
+      "ne": "archmage_corpse_ne.png",
+      "sw": "archmage_corpse_sw.png",
+      "nw": "archmage_corpse_nw.png"
+    }
+  },
+  "engineer": {
+    "cell": 80,
+    "anchor": [
+      40,
+      72
+    ],
+    "version": 1784831245,
+    "keep": 8,
+    "dirs": [
+      "s",
+      "se",
+      "e",
+      "ne",
+      "n",
+      "sw",
+      "w",
+      "nw"
+    ],
+    "mirrored": [
+      "sw",
+      "w",
+      "nw"
+    ],
+    "still": {
+      "se": "engineer_se.png",
+      "ne": "engineer_ne.png",
+      "sw": "engineer_sw.png",
+      "nw": "engineer_nw.png"
+    },
+    "idle": {
+      "se": {
+        "file": "engineer_se_idle.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "engineer_ne_idle.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "engineer_sw_idle.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "engineer_nw_idle.png",
+        "frames": 8
+      }
+    },
+    "walk": {
+      "se": {
+        "file": "engineer_se_walk.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "engineer_ne_walk.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "engineer_sw_walk.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "engineer_nw_walk.png",
+        "frames": 8
+      }
+    },
+    "attack": {
+      "se": {
+        "file": "engineer_se_attack.png",
+        "frames": 8,
+        "hit": 2
+      },
+      "ne": {
+        "file": "engineer_ne_attack.png",
+        "frames": 8,
+        "hit": 2
+      },
+      "sw": {
+        "file": "engineer_sw_attack.png",
+        "frames": 8,
+        "hit": 2
+      },
+      "nw": {
+        "file": "engineer_nw_attack.png",
+        "frames": 8,
+        "hit": 2
+      }
+    },
+    "walk_attack": {},
+    "death": {
+      "se": {
+        "file": "engineer_se_death.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "engineer_ne_death.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "engineer_sw_death.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "engineer_nw_death.png",
+        "frames": 8
+      }
+    },
+    "corpse": {
+      "se": "engineer_corpse_se.png",
+      "ne": "engineer_corpse_ne.png",
+      "sw": "engineer_corpse_sw.png",
+      "nw": "engineer_corpse_nw.png"
+    }
+  },
+  "outlaw": {
+    "cell": 80,
+    "anchor": [
+      40,
+      72
+    ],
+    "version": 1784840405,
+    "keep": 8,
+    "dirs": [
+      "s",
+      "se",
+      "e",
+      "ne",
+      "n",
+      "sw",
+      "w",
+      "nw"
+    ],
+    "mirrored": [
+      "sw",
+      "w",
+      "nw"
+    ],
+    "still": {
+      "se": "outlaw_se.png",
+      "ne": "outlaw_ne.png",
+      "sw": "outlaw_sw.png",
+      "nw": "outlaw_nw.png"
+    },
+    "idle": {
+      "se": {
+        "file": "outlaw_se_idle.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "outlaw_ne_idle.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "outlaw_sw_idle.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "outlaw_nw_idle.png",
+        "frames": 8
+      }
+    },
+    "walk": {
+      "se": {
+        "file": "outlaw_se_walk.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "outlaw_ne_walk.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "outlaw_sw_walk.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "outlaw_nw_walk.png",
+        "frames": 8
+      }
+    },
+    "attack": {
+      "se": {
+        "file": "outlaw_se_attack.png",
+        "frames": 8,
+        "hit": 4
+      },
+      "ne": {
+        "file": "outlaw_ne_attack.png",
+        "frames": 8,
+        "hit": 4
+      },
+      "sw": {
+        "file": "outlaw_sw_attack.png",
+        "frames": 8,
+        "hit": 4
+      },
+      "nw": {
+        "file": "outlaw_nw_attack.png",
+        "frames": 8,
+        "hit": 4
+      }
+    },
+    "walk_attack": {},
+    "death": {
+      "se": {
+        "file": "outlaw_se_death.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "outlaw_ne_death.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "outlaw_sw_death.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "outlaw_nw_death.png",
+        "frames": 8
+      }
+    },
+    "corpse": {
+      "se": "outlaw_corpse_se.png",
+      "ne": "outlaw_corpse_ne.png",
+      "sw": "outlaw_corpse_sw.png",
+      "nw": "outlaw_corpse_nw.png"
+    }
+  },
+  "slime_knight": {
+    "cell": 80,
+    "anchor": [
+      40,
+      72
+    ],
+    "version": 1784831275,
+    "keep": 8,
+    "dirs": [
+      "s",
+      "se",
+      "e",
+      "ne",
+      "n",
+      "sw",
+      "w",
+      "nw"
+    ],
+    "mirrored": [
+      "sw",
+      "w",
+      "nw"
+    ],
+    "still": {
+      "se": "slime_knight_se.png",
+      "ne": "slime_knight_ne.png",
+      "sw": "slime_knight_sw.png",
+      "nw": "slime_knight_nw.png"
+    },
+    "idle": {
+      "se": {
+        "file": "slime_knight_se_idle.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "slime_knight_ne_idle.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "slime_knight_sw_idle.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "slime_knight_nw_idle.png",
+        "frames": 8
+      }
+    },
+    "walk": {
+      "se": {
+        "file": "slime_knight_se_walk.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "slime_knight_ne_walk.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "slime_knight_sw_walk.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "slime_knight_nw_walk.png",
+        "frames": 8
+      }
+    },
+    "attack": {
+      "se": {
+        "file": "slime_knight_se_attack.png",
+        "frames": 8,
+        "hit": 4
+      },
+      "ne": {
+        "file": "slime_knight_ne_attack.png",
+        "frames": 8,
+        "hit": 2
+      },
+      "sw": {
+        "file": "slime_knight_sw_attack.png",
+        "frames": 8,
+        "hit": 4
+      },
+      "nw": {
+        "file": "slime_knight_nw_attack.png",
+        "frames": 8,
+        "hit": 2
+      }
+    },
+    "walk_attack": {},
+    "death": {
+      "se": {
+        "file": "slime_knight_se_death.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "slime_knight_ne_death.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "slime_knight_sw_death.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "slime_knight_nw_death.png",
+        "frames": 8
+      }
+    },
+    "corpse": {
+      "se": "slime_knight_corpse_se.png",
+      "ne": "slime_knight_corpse_ne.png",
+      "sw": "slime_knight_corpse_sw.png",
+      "nw": "slime_knight_corpse_nw.png"
+    }
+  },
+  "hunter": {
+    "cell": 80,
+    "anchor": [
+      40,
+      72
+    ],
+    "version": 1784839795,
+    "keep": 8,
+    "dirs": [
+      "s",
+      "se",
+      "e",
+      "ne",
+      "n",
+      "sw",
+      "w",
+      "nw"
+    ],
+    "mirrored": [
+      "sw",
+      "w",
+      "nw"
+    ],
+    "still": {
+      "se": "hunter_se.png",
+      "ne": "hunter_ne.png",
+      "sw": "hunter_sw.png",
+      "nw": "hunter_nw.png"
+    },
+    "idle": {
+      "se": {
+        "file": "hunter_se_idle.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "hunter_ne_idle.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "hunter_sw_idle.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "hunter_nw_idle.png",
+        "frames": 8
+      }
+    },
+    "walk": {
+      "se": {
+        "file": "hunter_se_walk.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "hunter_ne_walk.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "hunter_sw_walk.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "hunter_nw_walk.png",
+        "frames": 8
+      }
+    },
+    "attack": {
+      "se": {
+        "file": "hunter_se_attack.png",
+        "frames": 8,
+        "hit": 7
+      },
+      "ne": {
+        "file": "hunter_ne_attack.png",
+        "frames": 8,
+        "hit": 7
+      },
+      "sw": {
+        "file": "hunter_sw_attack.png",
+        "frames": 8,
+        "hit": 7
+      },
+      "nw": {
+        "file": "hunter_nw_attack.png",
+        "frames": 8,
+        "hit": 7
+      }
+    },
+    "walk_attack": {},
+    "death": {
+      "se": {
+        "file": "hunter_se_death.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "hunter_ne_death.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "hunter_sw_death.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "hunter_nw_death.png",
+        "frames": 8
+      }
+    },
+    "corpse": {
+      "se": "hunter_corpse_se.png",
+      "ne": "hunter_corpse_ne.png",
+      "sw": "hunter_corpse_sw.png",
+      "nw": "hunter_corpse_nw.png"
+    }
+  },
+  "mystic_archer": {
+    "cell": 80,
+    "anchor": [
+      40,
+      72
+    ],
+    "version": 1784839811,
+    "keep": 8,
+    "dirs": [
+      "s",
+      "se",
+      "e",
+      "ne",
+      "n",
+      "sw",
+      "w",
+      "nw"
+    ],
+    "mirrored": [
+      "sw",
+      "w",
+      "nw"
+    ],
+    "still": {
+      "se": "mystic_archer_se.png",
+      "ne": "mystic_archer_ne.png",
+      "sw": "mystic_archer_sw.png",
+      "nw": "mystic_archer_nw.png"
+    },
+    "idle": {
+      "se": {
+        "file": "mystic_archer_se_idle.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "mystic_archer_ne_idle.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "mystic_archer_sw_idle.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "mystic_archer_nw_idle.png",
+        "frames": 8
+      }
+    },
+    "walk": {
+      "se": {
+        "file": "mystic_archer_se_walk.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "mystic_archer_ne_walk.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "mystic_archer_sw_walk.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "mystic_archer_nw_walk.png",
+        "frames": 8
+      }
+    },
+    "attack": {
+      "se": {
+        "file": "mystic_archer_se_attack.png",
+        "frames": 8,
+        "hit": 5
+      },
+      "ne": {
+        "file": "mystic_archer_ne_attack.png",
+        "frames": 8,
+        "hit": 5
+      },
+      "sw": {
+        "file": "mystic_archer_sw_attack.png",
+        "frames": 8,
+        "hit": 5
+      },
+      "nw": {
+        "file": "mystic_archer_nw_attack.png",
+        "frames": 8,
+        "hit": 5
+      }
+    },
+    "walk_attack": {},
+    "death": {
+      "se": {
+        "file": "mystic_archer_se_death.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "mystic_archer_ne_death.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "mystic_archer_sw_death.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "mystic_archer_nw_death.png",
+        "frames": 8
+      }
+    },
+    "corpse": {
+      "se": "mystic_archer_corpse_se.png",
+      "ne": "mystic_archer_corpse_ne.png",
+      "sw": "mystic_archer_corpse_sw.png",
+      "nw": "mystic_archer_corpse_nw.png"
+    }
+  },
+  "summoner": {
+    "cell": 80,
+    "anchor": [
+      40,
+      72
+    ],
+    "version": 1784839827,
+    "keep": 8,
+    "dirs": [
+      "s",
+      "se",
+      "e",
+      "ne",
+      "n",
+      "sw",
+      "w",
+      "nw"
+    ],
+    "mirrored": [
+      "sw",
+      "w",
+      "nw"
+    ],
+    "still": {
+      "se": "summoner_se.png",
+      "ne": "summoner_ne.png",
+      "sw": "summoner_sw.png",
+      "nw": "summoner_nw.png"
+    },
+    "idle": {
+      "se": {
+        "file": "summoner_se_idle.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "summoner_ne_idle.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "summoner_sw_idle.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "summoner_nw_idle.png",
+        "frames": 8
+      }
+    },
+    "walk": {
+      "se": {
+        "file": "summoner_se_walk.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "summoner_ne_walk.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "summoner_sw_walk.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "summoner_nw_walk.png",
+        "frames": 8
+      }
+    },
+    "attack": {
+      "se": {
+        "file": "summoner_se_attack.png",
+        "frames": 8,
+        "hit": 3
+      },
+      "ne": {
+        "file": "summoner_ne_attack.png",
+        "frames": 8,
+        "hit": 2
+      },
+      "sw": {
+        "file": "summoner_sw_attack.png",
+        "frames": 8,
+        "hit": 3
+      },
+      "nw": {
+        "file": "summoner_nw_attack.png",
+        "frames": 8,
+        "hit": 2
+      }
+    },
+    "walk_attack": {},
+    "death": {
+      "se": {
+        "file": "summoner_se_death.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "summoner_ne_death.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "summoner_sw_death.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "summoner_nw_death.png",
+        "frames": 8
+      }
+    },
+    "corpse": {
+      "se": "summoner_corpse_se.png",
+      "ne": "summoner_corpse_ne.png",
+      "sw": "summoner_corpse_sw.png",
+      "nw": "summoner_corpse_nw.png"
+    }
+  },
+  "summoner_bear": {
+    "cell": 80,
+    "anchor": [
+      40,
+      72
+    ],
+    "version": 1784841458,
+    "keep": 8,
+    "dirs": [
+      "s",
+      "se",
+      "e",
+      "ne",
+      "n",
+      "sw",
+      "w",
+      "nw"
+    ],
+    "mirrored": [
+      "sw",
+      "w",
+      "nw"
+    ],
+    "still": {
+      "se": "summoner_bear_se.png",
+      "ne": "summoner_bear_ne.png",
+      "sw": "summoner_bear_sw.png",
+      "nw": "summoner_bear_nw.png"
+    },
+    "idle": {
+      "se": {
+        "file": "summoner_bear_se_idle.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "summoner_bear_ne_idle.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "summoner_bear_sw_idle.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "summoner_bear_nw_idle.png",
+        "frames": 8
+      }
+    },
+    "walk": {
+      "se": {
+        "file": "summoner_bear_se_walk.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "summoner_bear_ne_walk.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "summoner_bear_sw_walk.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "summoner_bear_nw_walk.png",
+        "frames": 8
+      }
+    },
+    "attack": {
+      "se": {
+        "file": "summoner_bear_se_attack.png",
+        "frames": 8,
+        "hit": 3
+      },
+      "ne": {
+        "file": "summoner_bear_ne_attack.png",
+        "frames": 8,
+        "hit": 4
+      },
+      "sw": {
+        "file": "summoner_bear_sw_attack.png",
+        "frames": 8,
+        "hit": 3
+      },
+      "nw": {
+        "file": "summoner_bear_nw_attack.png",
+        "frames": 8,
+        "hit": 4
+      }
+    },
+    "walk_attack": {},
+    "death": {
+      "se": {
+        "file": "summoner_bear_se_death.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "summoner_bear_ne_death.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "summoner_bear_sw_death.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "summoner_bear_nw_death.png",
+        "frames": 8
+      }
+    },
+    "corpse": {
+      "se": "summoner_bear_corpse_se.png",
+      "ne": "summoner_bear_corpse_ne.png",
+      "sw": "summoner_bear_corpse_sw.png",
+      "nw": "summoner_bear_corpse_nw.png"
+    }
+  },
+  "arcane_mage": {
+    "cell": 80,
+    "anchor": [
+      40,
+      72
+    ],
+    "version": 1784839859,
+    "keep": 8,
+    "dirs": [
+      "s",
+      "se",
+      "e",
+      "ne",
+      "n",
+      "sw",
+      "w",
+      "nw"
+    ],
+    "mirrored": [
+      "sw",
+      "w",
+      "nw"
+    ],
+    "still": {
+      "se": "arcane_mage_se.png",
+      "ne": "arcane_mage_ne.png",
+      "sw": "arcane_mage_sw.png",
+      "nw": "arcane_mage_nw.png"
+    },
+    "idle": {
+      "se": {
+        "file": "arcane_mage_se_idle.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "arcane_mage_ne_idle.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "arcane_mage_sw_idle.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "arcane_mage_nw_idle.png",
+        "frames": 8
+      }
+    },
+    "walk": {
+      "se": {
+        "file": "arcane_mage_se_walk.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "arcane_mage_ne_walk.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "arcane_mage_sw_walk.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "arcane_mage_nw_walk.png",
+        "frames": 8
+      }
+    },
+    "attack": {
+      "se": {
+        "file": "arcane_mage_se_attack.png",
+        "frames": 8,
+        "hit": 1
+      },
+      "ne": {
+        "file": "arcane_mage_ne_attack.png",
+        "frames": 8,
+        "hit": 2
+      },
+      "sw": {
+        "file": "arcane_mage_sw_attack.png",
+        "frames": 8,
+        "hit": 1
+      },
+      "nw": {
+        "file": "arcane_mage_nw_attack.png",
+        "frames": 8,
+        "hit": 2
+      }
+    },
+    "walk_attack": {},
+    "death": {
+      "se": {
+        "file": "arcane_mage_se_death.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "arcane_mage_ne_death.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "arcane_mage_sw_death.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "arcane_mage_nw_death.png",
+        "frames": 8
+      }
+    },
+    "corpse": {
+      "se": "arcane_mage_corpse_se.png",
+      "ne": "arcane_mage_corpse_ne.png",
+      "sw": "arcane_mage_corpse_sw.png",
+      "nw": "arcane_mage_corpse_nw.png"
+    }
+  },
+  "assassin": {
+    "cell": 80,
+    "anchor": [
+      40,
+      72
+    ],
+    "version": 1784840937,
+    "keep": 8,
+    "dirs": [
+      "s",
+      "se",
+      "e",
+      "ne",
+      "n",
+      "sw",
+      "w",
+      "nw"
+    ],
+    "mirrored": [
+      "sw",
+      "w",
+      "nw"
+    ],
+    "still": {
+      "se": "assassin_se.png",
+      "ne": "assassin_ne.png",
+      "sw": "assassin_sw.png",
+      "nw": "assassin_nw.png"
+    },
+    "idle": {
+      "se": {
+        "file": "assassin_se_idle.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "assassin_ne_idle.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "assassin_sw_idle.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "assassin_nw_idle.png",
+        "frames": 8
+      }
+    },
+    "walk": {
+      "se": {
+        "file": "assassin_se_walk.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "assassin_ne_walk.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "assassin_sw_walk.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "assassin_nw_walk.png",
+        "frames": 8
+      }
+    },
+    "attack": {
+      "se": {
+        "file": "assassin_se_attack.png",
+        "frames": 8,
+        "hit": 2
+      },
+      "ne": {
+        "file": "assassin_ne_attack.png",
+        "frames": 8,
+        "hit": 2
+      },
+      "sw": {
+        "file": "assassin_sw_attack.png",
+        "frames": 8,
+        "hit": 2
+      },
+      "nw": {
+        "file": "assassin_nw_attack.png",
+        "frames": 8,
+        "hit": 2
+      }
+    },
+    "walk_attack": {},
+    "death": {
+      "se": {
+        "file": "assassin_se_death.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "assassin_ne_death.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "assassin_sw_death.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "assassin_nw_death.png",
+        "frames": 8
+      }
+    },
+    "corpse": {
+      "se": "assassin_corpse_se.png",
+      "ne": "assassin_corpse_ne.png",
+      "sw": "assassin_corpse_sw.png",
+      "nw": "assassin_corpse_nw.png"
+    }
+  },
+  "berserker": {
+    "cell": 80,
+    "anchor": [
+      40,
+      72
+    ],
+    "version": 1784839886,
+    "keep": 8,
+    "dirs": [
+      "s",
+      "se",
+      "e",
+      "ne",
+      "n",
+      "sw",
+      "w",
+      "nw"
+    ],
+    "mirrored": [
+      "sw",
+      "w",
+      "nw"
+    ],
+    "still": {
+      "se": "berserker_se.png",
+      "ne": "berserker_ne.png",
+      "sw": "berserker_sw.png",
+      "nw": "berserker_nw.png"
+    },
+    "idle": {
+      "se": {
+        "file": "berserker_se_idle.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "berserker_ne_idle.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "berserker_sw_idle.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "berserker_nw_idle.png",
+        "frames": 8
+      }
+    },
+    "walk": {
+      "se": {
+        "file": "berserker_se_walk.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "berserker_ne_walk.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "berserker_sw_walk.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "berserker_nw_walk.png",
+        "frames": 8
+      }
+    },
+    "attack": {
+      "se": {
+        "file": "berserker_se_attack.png",
+        "frames": 8,
+        "hit": 3
+      },
+      "ne": {
+        "file": "berserker_ne_attack.png",
+        "frames": 8,
+        "hit": 3
+      },
+      "sw": {
+        "file": "berserker_sw_attack.png",
+        "frames": 8,
+        "hit": 3
+      },
+      "nw": {
+        "file": "berserker_nw_attack.png",
+        "frames": 8,
+        "hit": 3
+      }
+    },
+    "walk_attack": {},
+    "death": {
+      "se": {
+        "file": "berserker_se_death.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "berserker_ne_death.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "berserker_sw_death.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "berserker_nw_death.png",
+        "frames": 8
+      }
+    },
+    "corpse": {
+      "se": "berserker_corpse_se.png",
+      "ne": "berserker_corpse_ne.png",
+      "sw": "berserker_corpse_sw.png",
+      "nw": "berserker_corpse_nw.png"
+    }
+  },
+  "electric_mage": {
+    "cell": 80,
+    "anchor": [
+      40,
+      72
+    ],
+    "version": 1784839900,
+    "keep": 8,
+    "dirs": [
+      "s",
+      "se",
+      "e",
+      "ne",
+      "n",
+      "sw",
+      "w",
+      "nw"
+    ],
+    "mirrored": [
+      "sw",
+      "w",
+      "nw"
+    ],
+    "still": {
+      "se": "electric_mage_se.png",
+      "ne": "electric_mage_ne.png",
+      "sw": "electric_mage_sw.png",
+      "nw": "electric_mage_nw.png"
+    },
+    "idle": {
+      "se": {
+        "file": "electric_mage_se_idle.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "electric_mage_ne_idle.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "electric_mage_sw_idle.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "electric_mage_nw_idle.png",
+        "frames": 8
+      }
+    },
+    "walk": {
+      "se": {
+        "file": "electric_mage_se_walk.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "electric_mage_ne_walk.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "electric_mage_sw_walk.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "electric_mage_nw_walk.png",
+        "frames": 8
+      }
+    },
+    "attack": {
+      "se": {
+        "file": "electric_mage_se_attack.png",
+        "frames": 8,
+        "hit": 1
+      },
+      "ne": {
+        "file": "electric_mage_ne_attack.png",
+        "frames": 8,
+        "hit": 2
+      },
+      "sw": {
+        "file": "electric_mage_sw_attack.png",
+        "frames": 8,
+        "hit": 1
+      },
+      "nw": {
+        "file": "electric_mage_nw_attack.png",
+        "frames": 8,
+        "hit": 2
+      }
+    },
+    "walk_attack": {},
+    "death": {
+      "se": {
+        "file": "electric_mage_se_death.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "electric_mage_ne_death.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "electric_mage_sw_death.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "electric_mage_nw_death.png",
+        "frames": 8
+      }
+    },
+    "corpse": {
+      "se": "electric_mage_corpse_se.png",
+      "ne": "electric_mage_corpse_ne.png",
+      "sw": "electric_mage_corpse_sw.png",
+      "nw": "electric_mage_corpse_nw.png"
+    }
+  },
+  "holy_knight": {
+    "cell": 80,
+    "anchor": [
+      40,
+      72
+    ],
+    "version": 1784839915,
+    "keep": 8,
+    "dirs": [
+      "s",
+      "se",
+      "e",
+      "ne",
+      "n",
+      "sw",
+      "w",
+      "nw"
+    ],
+    "mirrored": [
+      "sw",
+      "w",
+      "nw"
+    ],
+    "still": {
+      "se": "holy_knight_se.png",
+      "ne": "holy_knight_ne.png",
+      "sw": "holy_knight_sw.png",
+      "nw": "holy_knight_nw.png"
+    },
+    "idle": {
+      "se": {
+        "file": "holy_knight_se_idle.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "holy_knight_ne_idle.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "holy_knight_sw_idle.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "holy_knight_nw_idle.png",
+        "frames": 8
+      }
+    },
+    "walk": {
+      "se": {
+        "file": "holy_knight_se_walk.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "holy_knight_ne_walk.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "holy_knight_sw_walk.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "holy_knight_nw_walk.png",
+        "frames": 8
+      }
+    },
+    "attack": {
+      "se": {
+        "file": "holy_knight_se_attack.png",
+        "frames": 8,
+        "hit": 4
+      },
+      "ne": {
+        "file": "holy_knight_ne_attack.png",
+        "frames": 8,
+        "hit": 4
+      },
+      "sw": {
+        "file": "holy_knight_sw_attack.png",
+        "frames": 8,
+        "hit": 4
+      },
+      "nw": {
+        "file": "holy_knight_nw_attack.png",
+        "frames": 8,
+        "hit": 4
+      }
+    },
+    "walk_attack": {},
+    "death": {
+      "se": {
+        "file": "holy_knight_se_death.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "holy_knight_ne_death.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "holy_knight_sw_death.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "holy_knight_nw_death.png",
+        "frames": 8
+      }
+    },
+    "corpse": {
+      "se": "holy_knight_corpse_se.png",
+      "ne": "holy_knight_corpse_ne.png",
+      "sw": "holy_knight_corpse_sw.png",
+      "nw": "holy_knight_corpse_nw.png"
+    }
+  },
+  "ice_mage": {
+    "cell": 80,
+    "anchor": [
+      40,
+      72
+    ],
+    "version": 1784839928,
+    "keep": 8,
+    "dirs": [
+      "s",
+      "se",
+      "e",
+      "ne",
+      "n",
+      "sw",
+      "w",
+      "nw"
+    ],
+    "mirrored": [
+      "sw",
+      "w",
+      "nw"
+    ],
+    "still": {
+      "se": "ice_mage_se.png",
+      "ne": "ice_mage_ne.png",
+      "sw": "ice_mage_sw.png",
+      "nw": "ice_mage_nw.png"
+    },
+    "idle": {
+      "se": {
+        "file": "ice_mage_se_idle.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "ice_mage_ne_idle.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "ice_mage_sw_idle.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "ice_mage_nw_idle.png",
+        "frames": 8
+      }
+    },
+    "walk": {
+      "se": {
+        "file": "ice_mage_se_walk.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "ice_mage_ne_walk.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "ice_mage_sw_walk.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "ice_mage_nw_walk.png",
+        "frames": 8
+      }
+    },
+    "attack": {
+      "se": {
+        "file": "ice_mage_se_attack.png",
+        "frames": 8,
+        "hit": 1
+      },
+      "ne": {
+        "file": "ice_mage_ne_attack.png",
+        "frames": 8,
+        "hit": 3
+      },
+      "sw": {
+        "file": "ice_mage_sw_attack.png",
+        "frames": 8,
+        "hit": 1
+      },
+      "nw": {
+        "file": "ice_mage_nw_attack.png",
+        "frames": 8,
+        "hit": 3
+      }
+    },
+    "walk_attack": {},
+    "death": {
+      "se": {
+        "file": "ice_mage_se_death.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "ice_mage_ne_death.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "ice_mage_sw_death.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "ice_mage_nw_death.png",
+        "frames": 8
+      }
+    },
+    "corpse": {
+      "se": "ice_mage_corpse_se.png",
+      "ne": "ice_mage_corpse_ne.png",
+      "sw": "ice_mage_corpse_sw.png",
+      "nw": "ice_mage_corpse_nw.png"
+    }
+  },
+  "priest": {
+    "cell": 80,
+    "anchor": [
+      40,
+      72
+    ],
+    "version": 1784839943,
+    "keep": 8,
+    "dirs": [
+      "s",
+      "se",
+      "e",
+      "ne",
+      "n",
+      "sw",
+      "w",
+      "nw"
+    ],
+    "mirrored": [
+      "sw",
+      "w",
+      "nw"
+    ],
+    "still": {
+      "se": "priest_se.png",
+      "ne": "priest_ne.png",
+      "sw": "priest_sw.png",
+      "nw": "priest_nw.png"
+    },
+    "idle": {
+      "se": {
+        "file": "priest_se_idle.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "priest_ne_idle.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "priest_sw_idle.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "priest_nw_idle.png",
+        "frames": 8
+      }
+    },
+    "walk": {
+      "se": {
+        "file": "priest_se_walk.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "priest_ne_walk.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "priest_sw_walk.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "priest_nw_walk.png",
+        "frames": 8
+      }
+    },
+    "attack": {
+      "se": {
+        "file": "priest_se_attack.png",
+        "frames": 8,
+        "hit": 2
+      },
+      "ne": {
+        "file": "priest_ne_attack.png",
+        "frames": 8,
+        "hit": 2
+      },
+      "sw": {
+        "file": "priest_sw_attack.png",
+        "frames": 8,
+        "hit": 2
+      },
+      "nw": {
+        "file": "priest_nw_attack.png",
+        "frames": 8,
+        "hit": 2
+      }
+    },
+    "walk_attack": {},
+    "death": {
+      "se": {
+        "file": "priest_se_death.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "priest_ne_death.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "priest_sw_death.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "priest_nw_death.png",
+        "frames": 8
+      }
+    },
+    "corpse": {
+      "se": "priest_corpse_se.png",
+      "ne": "priest_corpse_ne.png",
+      "sw": "priest_corpse_sw.png",
+      "nw": "priest_corpse_nw.png"
+    }
+  },
+  "rogue": {
+    "cell": 80,
+    "anchor": [
+      40,
+      72
+    ],
+    "version": 1784839958,
+    "keep": 8,
+    "dirs": [
+      "s",
+      "se",
+      "e",
+      "ne",
+      "n",
+      "sw",
+      "w",
+      "nw"
+    ],
+    "mirrored": [
+      "sw",
+      "w",
+      "nw"
+    ],
+    "still": {
+      "se": "rogue_se.png",
+      "ne": "rogue_ne.png",
+      "sw": "rogue_sw.png",
+      "nw": "rogue_nw.png"
+    },
+    "idle": {
+      "se": {
+        "file": "rogue_se_idle.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "rogue_ne_idle.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "rogue_sw_idle.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "rogue_nw_idle.png",
+        "frames": 8
+      }
+    },
+    "walk": {
+      "se": {
+        "file": "rogue_se_walk.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "rogue_ne_walk.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "rogue_sw_walk.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "rogue_nw_walk.png",
+        "frames": 8
+      }
+    },
+    "attack": {
+      "se": {
+        "file": "rogue_se_attack.png",
+        "frames": 8,
+        "hit": 4
+      },
+      "ne": {
+        "file": "rogue_ne_attack.png",
+        "frames": 8,
+        "hit": 2
+      },
+      "sw": {
+        "file": "rogue_sw_attack.png",
+        "frames": 8,
+        "hit": 4
+      },
+      "nw": {
+        "file": "rogue_nw_attack.png",
+        "frames": 8,
+        "hit": 2
+      }
+    },
+    "walk_attack": {},
+    "death": {
+      "se": {
+        "file": "rogue_se_death.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "rogue_ne_death.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "rogue_sw_death.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "rogue_nw_death.png",
+        "frames": 8
+      }
+    },
+    "corpse": {
+      "se": "rogue_corpse_se.png",
+      "ne": "rogue_corpse_ne.png",
+      "sw": "rogue_corpse_sw.png",
+      "nw": "rogue_corpse_nw.png"
+    }
+  },
+  "trickster": {
+    "cell": 80,
+    "anchor": [
+      40,
+      72
+    ],
+    "version": 1784839973,
+    "keep": 8,
+    "dirs": [
+      "s",
+      "se",
+      "e",
+      "ne",
+      "n",
+      "sw",
+      "w",
+      "nw"
+    ],
+    "mirrored": [
+      "sw",
+      "w",
+      "nw"
+    ],
+    "still": {
+      "se": "trickster_se.png",
+      "ne": "trickster_ne.png",
+      "sw": "trickster_sw.png",
+      "nw": "trickster_nw.png"
+    },
+    "idle": {
+      "se": {
+        "file": "trickster_se_idle.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "trickster_ne_idle.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "trickster_sw_idle.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "trickster_nw_idle.png",
+        "frames": 8
+      }
+    },
+    "walk": {
+      "se": {
+        "file": "trickster_se_walk.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "trickster_ne_walk.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "trickster_sw_walk.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "trickster_nw_walk.png",
+        "frames": 8
+      }
+    },
+    "attack": {
+      "se": {
+        "file": "trickster_se_attack.png",
+        "frames": 8,
+        "hit": 6
+      },
+      "ne": {
+        "file": "trickster_ne_attack.png",
+        "frames": 8,
+        "hit": 2
+      },
+      "sw": {
+        "file": "trickster_sw_attack.png",
+        "frames": 8,
+        "hit": 6
+      },
+      "nw": {
+        "file": "trickster_nw_attack.png",
+        "frames": 8,
+        "hit": 2
+      }
+    },
+    "walk_attack": {},
+    "death": {
+      "se": {
+        "file": "trickster_se_death.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "trickster_ne_death.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "trickster_sw_death.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "trickster_nw_death.png",
+        "frames": 8
+      }
+    },
+    "corpse": {
+      "se": "trickster_corpse_se.png",
+      "ne": "trickster_corpse_ne.png",
+      "sw": "trickster_corpse_sw.png",
+      "nw": "trickster_corpse_nw.png"
+    }
+  },
+  "healer": {
+    "cell": 80,
+    "anchor": [
+      40,
+      72
+    ],
+    "version": 1784839988,
+    "keep": 8,
+    "dirs": [
+      "s",
+      "se",
+      "e",
+      "ne",
+      "n",
+      "sw",
+      "w",
+      "nw"
+    ],
+    "mirrored": [
+      "sw",
+      "w",
+      "nw"
+    ],
+    "still": {
+      "se": "healer_se.png",
+      "ne": "healer_ne.png",
+      "sw": "healer_sw.png",
+      "nw": "healer_nw.png"
+    },
+    "idle": {
+      "se": {
+        "file": "healer_se_idle.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "healer_ne_idle.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "healer_sw_idle.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "healer_nw_idle.png",
+        "frames": 8
+      }
+    },
+    "walk": {
+      "se": {
+        "file": "healer_se_walk.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "healer_ne_walk.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "healer_sw_walk.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "healer_nw_walk.png",
+        "frames": 8
+      }
+    },
+    "attack": {
+      "se": {
+        "file": "healer_se_attack.png",
+        "frames": 8,
+        "hit": 2
+      },
+      "ne": {
+        "file": "healer_ne_attack.png",
+        "frames": 8,
+        "hit": 3
+      },
+      "sw": {
+        "file": "healer_sw_attack.png",
+        "frames": 8,
+        "hit": 2
+      },
+      "nw": {
+        "file": "healer_nw_attack.png",
+        "frames": 8,
+        "hit": 3
+      }
+    },
+    "walk_attack": {},
+    "death": {
+      "se": {
+        "file": "healer_se_death.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "healer_ne_death.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "healer_sw_death.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "healer_nw_death.png",
+        "frames": 8
+      }
+    },
+    "corpse": {
+      "se": "healer_corpse_se.png",
+      "ne": "healer_corpse_ne.png",
+      "sw": "healer_corpse_sw.png",
+      "nw": "healer_corpse_nw.png"
+    }
+  },
+  "mage": {
+    "cell": 80,
+    "anchor": [
+      40,
+      72
+    ],
+    "version": 1784840003,
+    "keep": 8,
+    "dirs": [
+      "s",
+      "se",
+      "e",
+      "ne",
+      "n",
+      "sw",
+      "w",
+      "nw"
+    ],
+    "mirrored": [
+      "sw",
+      "w",
+      "nw"
+    ],
+    "still": {
+      "se": "mage_se.png",
+      "ne": "mage_ne.png",
+      "sw": "mage_sw.png",
+      "nw": "mage_nw.png"
+    },
+    "idle": {
+      "se": {
+        "file": "mage_se_idle.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "mage_ne_idle.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "mage_sw_idle.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "mage_nw_idle.png",
+        "frames": 8
+      }
+    },
+    "walk": {
+      "se": {
+        "file": "mage_se_walk.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "mage_ne_walk.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "mage_sw_walk.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "mage_nw_walk.png",
+        "frames": 8
+      }
+    },
+    "attack": {
+      "se": {
+        "file": "mage_se_attack.png",
+        "frames": 8,
+        "hit": 2
+      },
+      "ne": {
+        "file": "mage_ne_attack.png",
+        "frames": 8,
+        "hit": 2
+      },
+      "sw": {
+        "file": "mage_sw_attack.png",
+        "frames": 8,
+        "hit": 2
+      },
+      "nw": {
+        "file": "mage_nw_attack.png",
+        "frames": 8,
+        "hit": 2
+      }
+    },
+    "walk_attack": {},
+    "death": {
+      "se": {
+        "file": "mage_se_death.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "mage_ne_death.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "mage_sw_death.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "mage_nw_death.png",
+        "frames": 8
+      }
+    },
+    "corpse": {
+      "se": "mage_corpse_se.png",
+      "ne": "mage_corpse_ne.png",
+      "sw": "mage_corpse_sw.png",
+      "nw": "mage_corpse_nw.png"
+    }
+  },
+  "ranger": {
+    "cell": 80,
+    "anchor": [
+      40,
+      72
+    ],
+    "version": 1784840020,
+    "keep": 8,
+    "dirs": [
+      "s",
+      "se",
+      "e",
+      "ne",
+      "n",
+      "sw",
+      "w",
+      "nw"
+    ],
+    "mirrored": [
+      "sw",
+      "w",
+      "nw"
+    ],
+    "still": {
+      "se": "ranger_se.png",
+      "ne": "ranger_ne.png",
+      "sw": "ranger_sw.png",
+      "nw": "ranger_nw.png"
+    },
+    "idle": {
+      "se": {
+        "file": "ranger_se_idle.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "ranger_ne_idle.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "ranger_sw_idle.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "ranger_nw_idle.png",
+        "frames": 8
+      }
+    },
+    "walk": {
+      "se": {
+        "file": "ranger_se_walk.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "ranger_ne_walk.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "ranger_sw_walk.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "ranger_nw_walk.png",
+        "frames": 8
+      }
+    },
+    "attack": {
+      "se": {
+        "file": "ranger_se_attack.png",
+        "frames": 8,
+        "hit": 2
+      },
+      "ne": {
+        "file": "ranger_ne_attack.png",
+        "frames": 8,
+        "hit": 2
+      },
+      "sw": {
+        "file": "ranger_sw_attack.png",
+        "frames": 8,
+        "hit": 2
+      },
+      "nw": {
+        "file": "ranger_nw_attack.png",
+        "frames": 8,
+        "hit": 2
+      }
+    },
+    "walk_attack": {},
+    "death": {
+      "se": {
+        "file": "ranger_se_death.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "ranger_ne_death.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "ranger_sw_death.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "ranger_nw_death.png",
+        "frames": 8
+      }
+    },
+    "corpse": {
+      "se": "ranger_corpse_se.png",
+      "ne": "ranger_corpse_ne.png",
+      "sw": "ranger_corpse_sw.png",
+      "nw": "ranger_corpse_nw.png"
+    }
+  },
+  "warlock": {
+    "cell": 80,
+    "anchor": [
+      40,
+      72
+    ],
+    "version": 1784840036,
+    "keep": 8,
+    "dirs": [
+      "s",
+      "se",
+      "e",
+      "ne",
+      "n",
+      "sw",
+      "w",
+      "nw"
+    ],
+    "mirrored": [
+      "sw",
+      "w",
+      "nw"
+    ],
+    "still": {
+      "se": "warlock_se.png",
+      "ne": "warlock_ne.png",
+      "sw": "warlock_sw.png",
+      "nw": "warlock_nw.png"
+    },
+    "idle": {
+      "se": {
+        "file": "warlock_se_idle.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "warlock_ne_idle.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "warlock_sw_idle.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "warlock_nw_idle.png",
+        "frames": 8
+      }
+    },
+    "walk": {
+      "se": {
+        "file": "warlock_se_walk.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "warlock_ne_walk.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "warlock_sw_walk.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "warlock_nw_walk.png",
+        "frames": 8
+      }
+    },
+    "attack": {
+      "se": {
+        "file": "warlock_se_attack.png",
+        "frames": 8,
+        "hit": 2
+      },
+      "ne": {
+        "file": "warlock_ne_attack.png",
+        "frames": 8,
+        "hit": 2
+      },
+      "sw": {
+        "file": "warlock_sw_attack.png",
+        "frames": 8,
+        "hit": 2
+      },
+      "nw": {
+        "file": "warlock_nw_attack.png",
+        "frames": 8,
+        "hit": 2
+      }
+    },
+    "walk_attack": {},
+    "death": {
+      "se": {
+        "file": "warlock_se_death.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "warlock_ne_death.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "warlock_sw_death.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "warlock_nw_death.png",
+        "frames": 8
+      }
+    },
+    "corpse": {
+      "se": "warlock_corpse_se.png",
+      "ne": "warlock_corpse_ne.png",
+      "sw": "warlock_corpse_sw.png",
+      "nw": "warlock_corpse_nw.png"
+    }
+  },
+  "warrior": {
+    "cell": 80,
+    "anchor": [
+      40,
+      72
+    ],
+    "version": 1784840051,
+    "keep": 8,
+    "dirs": [
+      "s",
+      "se",
+      "e",
+      "ne",
+      "n",
+      "sw",
+      "w",
+      "nw"
+    ],
+    "mirrored": [
+      "sw",
+      "w",
+      "nw"
+    ],
+    "still": {
+      "se": "warrior_se.png",
+      "ne": "warrior_ne.png",
+      "sw": "warrior_sw.png",
+      "nw": "warrior_nw.png"
+    },
+    "idle": {
+      "se": {
+        "file": "warrior_se_idle.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "warrior_ne_idle.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "warrior_sw_idle.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "warrior_nw_idle.png",
+        "frames": 8
+      }
+    },
+    "walk": {
+      "se": {
+        "file": "warrior_se_walk.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "warrior_ne_walk.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "warrior_sw_walk.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "warrior_nw_walk.png",
+        "frames": 8
+      }
+    },
+    "attack": {
+      "se": {
+        "file": "warrior_se_attack.png",
+        "frames": 8,
+        "hit": 1
+      },
+      "ne": {
+        "file": "warrior_ne_attack.png",
+        "frames": 8,
+        "hit": 1
+      },
+      "sw": {
+        "file": "warrior_sw_attack.png",
+        "frames": 8,
+        "hit": 1
+      },
+      "nw": {
+        "file": "warrior_nw_attack.png",
+        "frames": 8,
+        "hit": 1
+      }
+    },
+    "walk_attack": {},
+    "death": {
+      "se": {
+        "file": "warrior_se_death.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "warrior_ne_death.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "warrior_sw_death.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "warrior_nw_death.png",
+        "frames": 8
+      }
+    },
+    "corpse": {
+      "se": "warrior_corpse_se.png",
+      "ne": "warrior_corpse_ne.png",
+      "sw": "warrior_corpse_sw.png",
+      "nw": "warrior_corpse_nw.png"
+    }
+  },
+  "void_imp": {
+    "cell": 80,
+    "anchor": [
+      40,
+      72
+    ],
+    "version": 1784840067,
+    "keep": 8,
+    "dirs": [
+      "s",
+      "se",
+      "e",
+      "ne",
+      "n",
+      "sw",
+      "w",
+      "nw"
+    ],
+    "mirrored": [
+      "sw",
+      "w",
+      "nw"
+    ],
+    "still": {
+      "se": "void_imp_se.png",
+      "ne": "void_imp_ne.png",
+      "sw": "void_imp_sw.png",
+      "nw": "void_imp_nw.png"
+    },
+    "idle": {
+      "se": {
+        "file": "void_imp_se_idle.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "void_imp_ne_idle.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "void_imp_sw_idle.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "void_imp_nw_idle.png",
+        "frames": 8
+      }
+    },
+    "walk": {
+      "se": {
+        "file": "void_imp_se_walk.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "void_imp_ne_walk.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "void_imp_sw_walk.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "void_imp_nw_walk.png",
+        "frames": 8
+      }
+    },
+    "attack": {
+      "se": {
+        "file": "void_imp_se_attack.png",
+        "frames": 8,
+        "hit": 3
+      },
+      "ne": {
+        "file": "void_imp_ne_attack.png",
+        "frames": 8,
+        "hit": 2
+      },
+      "sw": {
+        "file": "void_imp_sw_attack.png",
+        "frames": 8,
+        "hit": 3
+      },
+      "nw": {
+        "file": "void_imp_nw_attack.png",
+        "frames": 8,
+        "hit": 2
+      }
+    },
+    "walk_attack": {},
+    "death": {
+      "se": {
+        "file": "void_imp_se_death.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "void_imp_ne_death.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "void_imp_sw_death.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "void_imp_nw_death.png",
+        "frames": 8
+      }
+    },
+    "corpse": {
+      "se": "void_imp_corpse_se.png",
+      "ne": "void_imp_corpse_ne.png",
+      "sw": "void_imp_corpse_sw.png",
+      "nw": "void_imp_corpse_nw.png"
+    }
+  },
+  "slime_clone": {
+    "cell": 80,
+    "anchor": [
+      40,
+      72
+    ],
+    "version": 1784840084,
+    "keep": 8,
+    "dirs": [
+      "s",
+      "se",
+      "e",
+      "ne",
+      "n",
+      "sw",
+      "w",
+      "nw"
+    ],
+    "mirrored": [
+      "sw",
+      "w",
+      "nw"
+    ],
+    "still": {
+      "se": "slime_clone_se.png",
+      "ne": "slime_clone_ne.png",
+      "sw": "slime_clone_sw.png",
+      "nw": "slime_clone_nw.png"
+    },
+    "idle": {
+      "se": {
+        "file": "slime_clone_se_idle.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "slime_clone_ne_idle.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "slime_clone_sw_idle.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "slime_clone_nw_idle.png",
+        "frames": 8
+      }
+    },
+    "walk": {
+      "se": {
+        "file": "slime_clone_se_walk.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "slime_clone_ne_walk.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "slime_clone_sw_walk.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "slime_clone_nw_walk.png",
+        "frames": 8
+      }
+    },
+    "attack": {
+      "se": {
+        "file": "slime_clone_se_attack.png",
+        "frames": 8,
+        "hit": 3
+      },
+      "ne": {
+        "file": "slime_clone_ne_attack.png",
+        "frames": 8,
+        "hit": 1
+      },
+      "sw": {
+        "file": "slime_clone_sw_attack.png",
+        "frames": 8,
+        "hit": 3
+      },
+      "nw": {
+        "file": "slime_clone_nw_attack.png",
+        "frames": 8,
+        "hit": 1
+      }
+    },
+    "walk_attack": {},
+    "death": {
+      "se": {
+        "file": "slime_clone_se_death.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "slime_clone_ne_death.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "slime_clone_sw_death.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "slime_clone_nw_death.png",
+        "frames": 8
+      }
+    },
+    "corpse": {
+      "se": "slime_clone_corpse_se.png",
+      "ne": "slime_clone_corpse_ne.png",
+      "sw": "slime_clone_corpse_sw.png",
+      "nw": "slime_clone_corpse_nw.png"
+    }
+  },
+  "turret": {
+    "cell": 80,
+    "anchor": [
+      40,
+      72
+    ],
+    "version": 1784840390,
+    "keep": 8,
+    "dirs": [
+      "s",
+      "se",
+      "e",
+      "ne",
+      "n",
+      "sw",
+      "w",
+      "nw"
+    ],
+    "mirrored": [
+      "sw",
+      "w",
+      "nw"
+    ],
+    "still": {
+      "se": "turret_se.png",
+      "ne": "turret_ne.png",
+      "sw": "turret_sw.png",
+      "nw": "turret_nw.png"
+    },
+    "idle": {
+      "se": {
+        "file": "turret_se_idle.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "turret_ne_idle.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "turret_sw_idle.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "turret_nw_idle.png",
+        "frames": 8
+      }
+    },
+    "walk": {},
+    "attack": {
+      "se": {
+        "file": "turret_se_attack.png",
+        "frames": 8,
+        "hit": 7
+      },
+      "ne": {
+        "file": "turret_ne_attack.png",
+        "frames": 8,
+        "hit": 6
+      },
+      "sw": {
+        "file": "turret_sw_attack.png",
+        "frames": 8,
+        "hit": 7
+      },
+      "nw": {
+        "file": "turret_nw_attack.png",
+        "frames": 8,
+        "hit": 6
+      }
+    },
+    "walk_attack": {},
+    "death": {
+      "se": {
+        "file": "turret_se_death.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "turret_ne_death.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "turret_sw_death.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "turret_nw_death.png",
+        "frames": 8
+      }
+    },
+    "corpse": {
+      "se": "turret_corpse_se.png",
+      "ne": "turret_corpse_ne.png",
+      "sw": "turret_corpse_sw.png",
+      "nw": "turret_corpse_nw.png"
+    }
+  },
+  "imp": {
+    "cell": 80,
+    "anchor": [
+      40,
+      72
+    ],
+    "version": 1784871444,
+    "keep": 8,
+    "dirs": [
+      "s",
+      "se",
+      "e",
+      "ne",
+      "n",
+      "sw",
+      "w",
+      "nw"
+    ],
+    "mirrored": [
+      "sw",
+      "w",
+      "nw"
+    ],
+    "still": {
+      "se": "imp_se.png",
+      "ne": "imp_ne.png",
+      "sw": "imp_sw.png",
+      "nw": "imp_nw.png"
+    },
+    "idle": {
+      "se": {
+        "file": "imp_se_idle.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "imp_ne_idle.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "imp_sw_idle.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "imp_nw_idle.png",
+        "frames": 8
+      }
+    },
+    "walk": {
+      "se": {
+        "file": "imp_se_walk.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "imp_ne_walk.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "imp_sw_walk.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "imp_nw_walk.png",
+        "frames": 8
+      }
+    },
+    "attack": {
+      "se": {
+        "file": "imp_se_attack.png",
+        "frames": 8,
+        "hit": 3
+      },
+      "ne": {
+        "file": "imp_ne_attack.png",
+        "frames": 8,
+        "hit": 2
+      },
+      "sw": {
+        "file": "imp_sw_attack.png",
+        "frames": 8,
+        "hit": 3
+      },
+      "nw": {
+        "file": "imp_nw_attack.png",
+        "frames": 8,
+        "hit": 2
+      }
+    },
+    "walk_attack": {},
+    "death": {
+      "se": {
+        "file": "imp_se_death.png",
+        "frames": 8
+      },
+      "ne": {
+        "file": "imp_ne_death.png",
+        "frames": 8
+      },
+      "sw": {
+        "file": "imp_sw_death.png",
+        "frames": 8
+      },
+      "nw": {
+        "file": "imp_nw_death.png",
+        "frames": 8
+      }
+    },
+    "corpse": {
+      "se": "imp_corpse_se.png",
+      "ne": "imp_corpse_ne.png",
+      "sw": "imp_corpse_sw.png",
+      "nw": "imp_corpse_nw.png"
+    }
+  },
+  "grubbins": {
+    "cell": 160,
+    "anchor": [
+      80,
+      144
+    ],
+    "version": 1784880301,
+    "keep": 8,
+    "dirs": [
+      "s",
+      "se",
+      "e",
+      "ne",
+      "n",
+      "sw",
+      "w",
+      "nw"
+    ],
+    "mirrored": [
+      "sw",
+      "w",
+      "nw"
+    ],
+    "still": {
+      "s": "grubbins_s.png",
+      "se": "grubbins_se.png",
+      "sw": "grubbins_sw.png"
+    },
+    "idle": {
+      "s": {
+        "file": "grubbins_s_idle.png",
+        "frames": 8
+      }
+    },
+    "walk": {},
+    "attack": {},
+    "walk_attack": {},
+    "death": {},
+    "corpse": {},
+    "react": {
+      "s": {
+        "file": "grubbins_s_react.png",
+        "frames": 8
+      }
+    }
+  }
+}

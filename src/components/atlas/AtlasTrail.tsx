@@ -29,29 +29,31 @@ import { useEffect, useLayoutEffect, useRef } from "react";
 import type React from "react";
 import { hash01, trailPath, type NodeState, type TrailNode } from "@/data/atlasLayout";
 import { renderPortrait } from "@/engine/Renderer";
+import { useSpriteEpoch } from "@/hooks/useSpriteEpoch";
 import { prefersReducedMotion } from "@/utils/motion";
+import { GameIcon, type IconName } from "@/components/icons/GameIcon";
 import { BiomeLayer } from "./BiomeLayer";
 
 /** id-safe key for SVG mask ids (floor node ids contain ":"). */
 const cssSafe = (id: string) => id.replace(/[^a-zA-Z0-9_-]/g, "-");
 
-/** Per-dungeon vignette glyphs for unlocked world nodes. */
-const WORLD_ICONS: Record<string, string> = {
-  depths: "🕯️",
-  bonefields: "💀",
-  wilds: "🐺",
-  overgrowth: "🌿",
-  sealed_vault: "🔮",
-  deep_forge: "⚒️",
-  eclipse_spire: "🌗",
-  fallen_cathedral: "⛪",
-  rogues_den: "🗡️",
+/** Per-dungeon vignette icons for unlocked world nodes. */
+const WORLD_ICONS: Record<string, IconName> = {
+  depths: "depths",
+  bonefields: "bonefields",
+  wilds: "wilds",
+  overgrowth: "overgrowth",
+  sealed_vault: "sealedVault",
+  deep_forge: "deepForge",
+  eclipse_spire: "eclipseSpire",
+  fallen_cathedral: "fallenCathedral",
+  rogues_den: "roguesDen",
 };
 
 /** Faction banners planted on a conquered endgame-fork dungeon. */
-const BANNERS: Record<string, string> = {
-  fallen_cathedral: "🕊️",
-  rogues_den: "🏴",
+const BANNERS: Record<string, IconName> = {
+  fallen_cathedral: "bannerCathedral",
+  rogues_den: "bannerRoguesDen",
 };
 
 /** A margin note pinned near a node (hand-written entryHint lore). */
@@ -102,30 +104,43 @@ function displayState(node: TrailNode, concealed: boolean): NodeState {
   return concealed ? "locked" : node.state;
 }
 
-/** The glyph inside a node's circle. Floor nodes are an ABSTRACT descent now
- *  (the RNG "hunt for the boss" model hides floor numbers): a plain dot, the
- *  boss lair's ☠ (💀 once the dungeon is cleared), or a ✓ on a cleared step.
- *  World nodes wear their dungeon's vignette (🔒 when locked); fog shows
- *  nothing at all. */
-function nodeGlyph(node: TrailNode, state: NodeState): string {
-  if (node.uncharted) return "";
+/** The drawn icon inside a node's circle. Floor nodes are an ABSTRACT descent
+ *  now (the RNG "hunt for the boss" model hides floor numbers): nothing, or
+ *  the boss lair's skull — gilded once the dungeon is cleared. World nodes
+ *  wear their dungeon's vignette (a padlock when locked); fog shows nothing.
+ *  Returns null when the node's mark is plain type (the cleared ✓) or absent. */
+function nodeIcon(node: TrailNode, state: NodeState): IconName | null {
+  if (node.uncharted) return null;
   const isFloor = node.id.includes(":");
   if (isFloor) {
-    if (node.boss) return state === "completed" ? "💀" : "☠";
-    return state === "completed" ? "✓" : "";
+    if (node.boss) return state === "completed" ? "bossCleared" : "bossSkull";
+    return null;
   }
-  if (state === "locked") return "🔒";
-  return WORLD_ICONS[node.id] ?? "◆";
+  if (state === "locked") return "locked";
+  return WORLD_ICONS[node.id] ?? null;
+}
+
+/** The part of a node's mark that stays plain type rather than a drawn icon. */
+function nodeText(node: TrailNode, state: NodeState): string {
+  if (node.uncharted) return "";
+  if (node.id.includes(":")) {
+    return !node.boss && state === "completed" ? "✓" : "";
+  }
+  // An unlocked world node with no registered vignette — i.e. a dungeon added
+  // without a WORLD_ICONS entry. Keep the old lozenge so it degrades visibly
+  // instead of rendering an empty circle.
+  return state !== "locked" && !WORLD_ICONS[node.id] ? "◆" : "";
 }
 
 /** The deck-lead's face in a little gold ring — "you" on the map. */
 function MarkerBadge({ defId }: { defId: string }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const spriteEpoch = useSpriteEpoch();
   useLayoutEffect(() => {
     const ctx = ref.current?.getContext("2d");
     if (!ctx) return;
     renderPortrait(ctx, defId, 48, { transparent: true });
-  }, [defId]);
+  }, [defId, spriteEpoch]);
   return <canvas ref={ref} width={48} height={48} className="atlas-marker-face" />;
 }
 
@@ -433,7 +448,12 @@ export function AtlasTrail({
             onPointerEnter={onNodeHover ? () => onNodeHover(node) : undefined}
           >
             <span className="atlas-node-circle" aria-hidden>
-              <span className="atlas-node-glyph">{nodeGlyph(node, state)}</span>
+              <span className="atlas-node-glyph">
+                {(() => {
+                  const icon = nodeIcon(node, state);
+                  return icon ? <GameIcon name={icon} /> : nodeText(node, state);
+                })()}
+              </span>
               {isWorld && state === "completed" && (
                 <span className="atlas-node-check">✓</span>
               )}
@@ -450,7 +470,7 @@ export function AtlasTrail({
             )}
             {state === "completed" && BANNERS[node.id] && (
               <span className="atlas-banner" aria-hidden>
-                {BANNERS[node.id]}
+                <GameIcon name={BANNERS[node.id]} />
               </span>
             )}
             {pinnedIds?.has(node.id) && !node.uncharted && (
@@ -461,11 +481,15 @@ export function AtlasTrail({
             <span className="atlas-node-label" aria-hidden>
               {/* World nodes keep their dungeon name; floor numbers are hidden
                   (abstract descent), with only the boss lair labelled. */}
-              {isWorld
-                ? node.label
-                : node.boss && state !== "locked"
-                  ? "☠ The Lair"
-                  : ""}
+              {isWorld ? (
+                node.label
+              ) : node.boss && state !== "locked" ? (
+                <>
+                  <GameIcon name="bossSkull" /> The Lair
+                </>
+              ) : (
+                ""
+              )}
             </span>
           </button>
         );

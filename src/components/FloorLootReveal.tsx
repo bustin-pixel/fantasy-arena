@@ -14,6 +14,7 @@ import { ITEM_LINES, makeItemKey } from "@/data/items";
 import { RARITIES } from "@/data/rarities";
 import { getUnitDef } from "@/data/units";
 import { ItemIcon } from "@/components/ItemIcon";
+import { GameIcon } from "@/components/icons/GameIcon";
 import { useCountUp } from "@/hooks/useCountUp";
 
 interface Props {
@@ -96,7 +97,7 @@ export function FloorLootReveal({ contents, anchor, bufW, bufH, onDismiss }: Pro
       {gold > 0 && (
         <div className="floor-loot-gold">
           <span className="coin" aria-hidden>
-            ●
+            <GameIcon name="gold" />
           </span>{" "}
           +{shownGold} gold
         </div>
@@ -105,7 +106,7 @@ export function FloorLootReveal({ contents, anchor, bufW, bufH, onDismiss }: Pro
       {shards > 0 && (
         <div className="floor-loot-shards">
           <span className="shard-gem" aria-hidden>
-            ◆
+            <GameIcon name="shard" />
           </span>{" "}
           +{shards} Soul Shards
         </div>

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { getUnitDef } from "@/data/units";
 import { RARITIES } from "@/data/rarities";
 import { renderPortrait } from "@/engine/Renderer";
+import { useSpriteEpoch } from "@/hooks/useSpriteEpoch";
 import { MAX_DECK } from "@/utils/constants";
 
 const DECK_ART = 46;
@@ -11,10 +12,11 @@ const DRAG_THRESHOLD = 6;
 /** The small unit sprite shown inside a filled deck slot. */
 function DeckSlotArt({ defId }: { defId: string }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const spriteEpoch = useSpriteEpoch();
   useEffect(() => {
     const ctx = ref.current?.getContext("2d");
     if (ctx) renderPortrait(ctx, defId, DECK_ART);
-  }, [defId]);
+  }, [defId, spriteEpoch]);
   return (
     <canvas ref={ref} width={DECK_ART} height={DECK_ART} className="deck-slot-canvas" />
   );
