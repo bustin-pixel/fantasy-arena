@@ -2936,9 +2936,12 @@ body.modal-open .pager-nav {
   background: rgba(14, 10, 6, 0.75);
 }
 
-/* Item detail panel — tap a shelf card to inspect before buying. Centered on
-   the screen. */
-.shop-detail-overlay {
+/* Item inspect sheet — tap an item, read it, then commit. ONE look, two mount
+   points: the Shop's shelf card (buy) and the unit panel's equip picker
+   (equip). The .equip-detail twins ride along on every rule so the two never
+   drift; only the z-index differs (the hub copy must clear .detail-overlay). */
+.shop-detail-overlay,
+.equip-detail-overlay {
   position: fixed;
   inset: 0;
   z-index: 40;
@@ -2949,7 +2952,11 @@ body.modal-open .pager-nav {
   background: rgba(8, 6, 4, 0.55);
   animation: fade 0.18s ease;
 }
-.shop-detail {
+.equip-detail-overlay {
+  z-index: 60; /* above the unit detail overlay (50) it mounts inside */
+}
+.shop-detail,
+.equip-detail {
   width: 100%;
   max-width: 380px;
   padding: 14px 16px;
@@ -2959,59 +2966,85 @@ body.modal-open .pager-nav {
   box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.6);
   text-align: left;
 }
-.shop-detail-head {
+.equip-detail {
+  /* Match .detail-modal so the sheet nests inside the panel it opened from
+     instead of hanging over its edges. Must follow the shared rule above. */
+  max-width: 340px;
+}
+.shop-detail-head,
+.equip-detail-head {
   display: flex;
   align-items: center;
   gap: 12px;
 }
-.shop-detail-title {
+.shop-detail-title,
+.equip-detail-title {
   display: flex;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
 }
-.shop-detail-name {
+.shop-detail-name,
+.equip-detail-name {
   font-family: var(--font-display);
   font-size: 1.15rem;
   font-weight: 700;
   line-height: 1.1;
 }
-.shop-detail-tier {
+.shop-detail-tier,
+.equip-detail-tier {
   font-size: 0.72rem;
   font-weight: 700;
   text-transform: capitalize;
   color: var(--stone);
 }
-.shop-detail-owned {
+.shop-detail-owned,
+.equip-detail-owned {
   font-size: 0.72rem;
   color: var(--stone-dark);
 }
-.shop-detail-desc {
+.shop-detail-desc,
+.equip-detail-desc {
   margin: 10px 0 6px;
   font-size: 0.82rem;
   font-style: italic;
   color: var(--stone);
   line-height: 1.35;
 }
-.shop-detail-effects {
+.shop-detail-effects,
+.equip-detail-effects {
   margin: 0 0 12px;
   padding-left: 18px;
   font-size: 0.85rem;
   color: #86efac;
   line-height: 1.5;
 }
-.shop-detail-actions {
+/* What the equip would displace / that it's already worn — read as a caution,
+   not as another perk, so it sits apart from the green effect list. */
+.equip-detail-note {
+  margin: -6px 0 12px;
+  font-size: 0.74rem;
+  color: var(--gold-soft);
+}
+.shop-detail-actions,
+.equip-detail-actions {
   display: flex;
   gap: 10px;
   justify-content: flex-end;
 }
-.shop-detail-close {
+.shop-detail-close,
+.equip-detail-cancel {
   padding: 8px 14px;
   font-size: 0.85rem;
 }
-.shop-detail-buy {
+.shop-detail-buy,
+.equip-detail-go {
   padding: 8px 18px;
   font-size: 0.85rem;
+}
+.equip-detail-go.remove {
+  background: #7f1d1d;
+  color: var(--parchment);
 }
 .shop-detail-buy.cant {
   filter: saturate(0.4) brightness(0.8);
@@ -3123,6 +3156,12 @@ body.modal-open .pager-nav {
   cursor: pointer;
   text-align: left;
   width: 100%;
+  /* <button> doesn't inherit color/font — without these the item description
+     and the "Empty the slot" row render in the UA's black button text on the
+     dark panel. Only the name (inline rarity colour) and the action word set
+     their own. */
+  color: var(--parchment);
+  font-family: inherit;
 }
 .equip-option.current {
   border-color: #86efac;

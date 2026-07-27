@@ -46,6 +46,7 @@ export const mysticArcherKit: UnitKit = {
       ability: "mystic_shift", // resolved specially on impact
       color: unit.mysticForm === "light" ? "#fcd34d" : "#7c3aed",
       angle: 0,
+      basic: true, // still a basic attack — ranged lifesteal rides it
     });
     return true;
   },

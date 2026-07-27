@@ -49,6 +49,7 @@ export const rangerKit: UnitKit = {
         ability: "lifesteal", // sentinel: basic shot, no on-hit status
         color: def.accent,
         angle: 0,
+        basic: true, // a replaced swing still lifesteals
       });
     }
     return true;

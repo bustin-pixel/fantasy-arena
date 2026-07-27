@@ -13,11 +13,11 @@ import {
   xpIntoLevel,
 } from "@/meta/leveling";
 import {
+  describeItemKey,
   describeItemMods,
   describeLuckyCoin,
   ITEM_SLOTS,
   parseItemKey,
-  resolveItemMods,
   resolveLoadoutMods,
 } from "@/data/items";
 import { TENDENCIES } from "@/data/tendencies";
@@ -86,22 +86,123 @@ const RANGE_PCT: Record<RangeTier, number> = {
   Long: 100,
 };
 
-/** The inline "pick an item for this slot" list: every owned stack of the
- *  slot's type with a FREE copy (or the one this unit already wears), plus a
- *  Remove row. Fungible stacks — equipping just points the loadout at a key. */
-function EquipPicker({
+/** The inspect-before-you-equip sheet. Tapping a picker row opens THIS rather
+ *  than equipping outright, so a player reads exactly what a piece does — and
+ *  what it would displace — before committing. Same shape as the Shop's shelf
+ *  sheet (they share the .shop-detail / .equip-detail styles): the game already
+ *  teaches "tap an item, read it, then commit". */
+function EquipItemSheet({
+  itemKey,
   slot,
   defId,
   items,
   loadouts,
   onEquip,
   onUnequip,
+  onClose,
+}: {
+  itemKey: string;
+  slot: ItemSlot;
+  defId: string;
+  items: Record<string, number>;
+  loadouts: ItemLoadouts;
+  onEquip: () => void;
+  onUnequip: () => void;
+  onClose: () => void;
+}) {
+  const p = parseItemKey(itemKey);
+  if (!p) return null;
+  const rarity = RARITIES[p.quality];
+  const current = loadouts[defId]?.[slot];
+  const worn = current === itemKey;
+  // What this equip would displace — an occupied slot swaps silently otherwise.
+  const replaced = !worn && current ? parseItemKey(current) : null;
+  const owned = items[itemKey] ?? 0;
+  // Other units wearing this exact key: fungible stacks, so "worn by Knight"
+  // is the difference between a spare copy and stealing one off a teammate.
+  const holders = Object.keys(loadouts).filter((id) => {
+    if (id === defId) return false;
+    const l = loadouts[id];
+    return l.weapon === itemKey || l.armor === itemKey || l.trinket === itemKey;
+  });
+  return (
+    <div className="equip-detail-overlay" onClick={onClose}>
+      <div
+        className="equip-detail"
+        role="dialog"
+        aria-label={`${p.line.name} details`}
+        style={{ borderColor: rarity.color }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="equip-detail-head">
+          <ItemIcon itemKey={itemKey} size={56} hideStars />
+          <div className="equip-detail-title">
+            <span className="equip-detail-name" style={{ color: rarity.color }}>
+              {p.line.name} {"★".repeat(p.star)}
+            </span>
+            <span className="equip-detail-tier">
+              {rarity.label} {slot}
+              {p.line.dungeonId && " · dungeon relic"}
+            </span>
+            <span className="equip-detail-owned">
+              {owned > 0 ? `Owned ×${owned}` : "Not owned"}
+              {holders.length > 0 &&
+                ` · worn by ${holders
+                  .map((id) => getUnitDef(id).name)
+                  .join(", ")}`}
+            </span>
+          </div>
+        </div>
+        <p className="equip-detail-desc">{p.line.desc}</p>
+        <ul className="equip-detail-effects">
+          {describeItemKey(itemKey).map((l) => (
+            <li key={l}>{l}</li>
+          ))}
+        </ul>
+        {worn && (
+          <p className="equip-detail-note">
+            Already in this unit&rsquo;s {slot} slot.
+          </p>
+        )}
+        {replaced && (
+          <p className="equip-detail-note">
+            Replaces {replaced.line.name} {"★".repeat(replaced.star)}.
+          </p>
+        )}
+        <div className="equip-detail-actions">
+          <button type="button" className="btn equip-detail-cancel" onClick={onClose}>
+            Close
+          </button>
+          <button
+            type="button"
+            className={`btn equip-detail-go${worn ? " remove" : " btn-gold"}`}
+            onClick={worn ? onUnequip : onEquip}
+          >
+            {worn ? "Unequip" : "Equip"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** The inline "pick an item for this slot" list: every owned stack of the
+ *  slot's type with a FREE copy (or the one this unit already wears), plus a
+ *  Remove row. Fungible stacks — equipping just points the loadout at a key.
+ *  A row opens the sheet above; only the explicit Remove row acts outright. */
+function EquipPicker({
+  slot,
+  defId,
+  items,
+  loadouts,
+  onInspect,
+  onUnequip,
 }: {
   slot: ItemSlot;
   defId: string;
   items: Record<string, number>;
   loadouts: ItemLoadouts;
-  onEquip: (key: string) => void;
+  onInspect: (key: string) => void;
   onUnequip: () => void;
 }) {
   const current = loadouts[defId]?.[slot];
@@ -121,16 +222,12 @@ function EquipPicker({
       )}
       {options.map((key) => {
         const p = parseItemKey(key)!;
-        const lines =
-          p.lineId === "lucky_coin"
-            ? describeLuckyCoin(p.quality, p.star)
-            : describeItemMods(resolveItemMods(key));
         return (
           <button
             key={key}
             type="button"
             className={`equip-option${key === current ? " current" : ""}`}
-            onClick={() => (key === current ? onUnequip() : onEquip(key))}
+            onClick={() => onInspect(key)}
           >
             <ItemIcon itemKey={key} size={40} />
             <span className="equip-option-body">
@@ -140,10 +237,12 @@ function EquipPicker({
               >
                 {p.line.name} {"★".repeat(p.star)}
               </span>
-              <span className="equip-option-desc">{lines.join(" · ")}</span>
+              <span className="equip-option-desc">
+                {describeItemKey(key).join(" · ")}
+              </span>
             </span>
             <span className="equip-option-action">
-              {key === current ? "Remove" : "Equip"}
+              {key === current ? "Equipped" : "View"}
             </span>
           </button>
         );
@@ -212,8 +311,10 @@ export function UnitDetail({
   const def = getUnitDef(defId);
   const price = unlockPrice ?? UNLOCK_PRICES[def.rarity];
   const rarity = RARITIES[def.rarity];
-  // Equipment (hub-owned units only). Which slot's picker is open.
+  // Equipment (hub-owned units only). Which slot's picker is open, and which
+  // item from it the player is currently reading (null = no sheet).
   const [pickerSlot, setPickerSlot] = useState<ItemSlot | null>(null);
+  const [inspectKey, setInspectKey] = useState<string | null>(null);
   const equipEnabled =
     !readonly && !locked && items != null && loadouts != null && !!onEquip && !!onUnequip;
   const loadout = equipEnabled ? loadouts[defId] : undefined;
@@ -352,6 +453,7 @@ export function UnitDetail({
                   onClick={() => {
                     playSfx("uiTap");
                     setPickerSlot(pickerSlot === slot ? null : slot);
+                    setInspectKey(null); // never carry one slot's sheet into another
                   }}
                   aria-label={`${slot} slot`}
                   title={p ? p.line.name : slot[0].toUpperCase() + slot.slice(1)}
@@ -393,10 +495,9 @@ export function UnitDetail({
                 defId={defId}
                 items={items!}
                 loadouts={loadouts!}
-                onEquip={(key) => {
-                  playSfx("uiEquip");
-                  onEquip!(key);
-                  setPickerSlot(null);
+                onInspect={(key) => {
+                  playSfx("uiTap");
+                  setInspectKey(key);
                 }}
                 onUnequip={() => {
                   playSfx("uiUnequip");
@@ -412,6 +513,35 @@ export function UnitDetail({
               </ul>
             )}
           </div>
+        )}
+
+        {/* Read-then-commit sheet for the tapped row. Mounted INSIDE the modal
+            so its clicks stop at the modal's handler and never reach the unit
+            overlay's close-on-backdrop. */}
+        {equipEnabled && pickerSlot !== null && inspectKey !== null && (
+          <EquipItemSheet
+            itemKey={inspectKey}
+            slot={pickerSlot}
+            defId={defId}
+            items={items!}
+            loadouts={loadouts!}
+            onEquip={() => {
+              playSfx("uiEquip");
+              onEquip!(inspectKey);
+              setInspectKey(null);
+              setPickerSlot(null);
+            }}
+            onUnequip={() => {
+              playSfx("uiUnequip");
+              onUnequip!(pickerSlot);
+              setInspectKey(null);
+              setPickerSlot(null);
+            }}
+            onClose={() => {
+              playSfx("uiClose");
+              setInspectKey(null);
+            }}
+          />
         )}
 
         <div className="detail-body">

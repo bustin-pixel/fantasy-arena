@@ -1622,6 +1622,7 @@ function performBasicAttack(
       ability: "lifesteal", // sentinel: "basic"; on-hit rider carried in `rider`
       color: rider ? rider.color : def.accent,
       angle: 0,
+      basic: true,
       rider,
       itemRider: itemRiderEff?.rider,
     });
@@ -1675,6 +1676,27 @@ function performBasicAttack(
 // onProjectileHit — Light single-target mark/detonate + Dark radius chain + form
 // flip + Momentum stack, dispatched from stepProjectiles via the source's kit.)
 
+/** Ranged lifesteal — the projectile-impact half of `applyLifesteal` (which is
+ *  the melee half, applied at the swing). Same three sources as melee: the
+ *  unit's innate `UnitDef.lifesteal`, the team fraction (Marksman's Focus boon /
+ *  Marksman's Guile talent / the Warlord's Bloodlust keystone) and item lifesteal
+ *  (Bloodletter Axe / Gravewhisper Blade). Gated on `proj.basic`, NOT on the
+ *  ability tag, so a kit that fires its own basic shot heals exactly like the
+ *  default arrow. No-op at 0, so lifesteal-free sims stay byte-identical. */
+function applyRangedLifesteal(
+  state: SimState,
+  source: Unit,
+  proj: Projectile,
+  heal: (u: Unit, amt: number) => void
+): void {
+  if (!proj.basic) return;
+  const frac =
+    (getUnitDef(source.defId).lifesteal ?? 0) +
+    state.teamMods[source.team].rangedLifesteal +
+    (source.itemMods?.lifesteal ?? 0);
+  if (frac > 0) heal(source, Math.round(proj.damage * frac));
+}
+
 function stepProjectiles(
   state: SimState,
   byUid: Map<string, Unit>,
@@ -1712,16 +1734,14 @@ function stepProjectiles(
               proj,
               makeKitCtx(source, true)
             );
+            // A kit-resolved swing is still a basic attack — same lifesteal as
+            // the default arrow below (the kit owns the damage, not the heal).
+            applyRangedLifesteal(state, source, proj, heal);
           }
         } else if (isBasic) {
           if (source) {
             dealDamage(target, proj.damage, source);
-            // Marksman's Focus (Endless) + Bloodletter (item): ranged basics
-            // lifesteal. No-op at 0.
-            const rl =
-              state.teamMods[source.team].rangedLifesteal +
-              (source.itemMods?.lifesteal ?? 0);
-            if (rl > 0) heal(source, Math.round(proj.damage * rl));
+            applyRangedLifesteal(state, source, proj, heal);
           }
           // On-hit rider (Ice freeze / Fire burn) — applied generically from the
           // shot's data-descriptor (UnitDef.basicShotRider → proj.rider), so no

@@ -155,6 +155,38 @@ describe("items — damage funnel effects", () => {
     expect(wearer.hp - before).toBe(Math.round(wearer.damage * 0.2));
   });
 
+  it("lifesteal on a RANGED wearer heals on projectile impact", () => {
+    // Both the default arrow AND a shot a kit fires in place of the swing.
+    // Regression: the Mystic Archer healed 0, because the impact branch keyed
+    // lifesteal off the "lifesteal" ability sentinel and its form shot carries
+    // its own tag ("mystic_shift"). Projectile.basic answers this now.
+    for (const defId of ["archer", "mystic_archer"]) {
+      const s = battleState(12);
+      const def = getUnitDef(defId);
+      const wearer = place(s, defId, "player", 200, 260, 1, carry(defId, {
+        weapon: "bloodletter_axe:legendary:3", // 20% lifesteal
+      }));
+      wearer.moveSpeed = 0;
+      const dummy = makeDummy(
+        place(s, "skeleton", "enemy", 200, 260 + def.range - 10)
+      );
+      dummy.hp = dummy.maxHp = 100000; // outlives the shot
+      wearer.hp = 10; // wounded, so the heal is fully observable
+      // Freeze the ability channel (the Archer's kiting leap would reposition it)
+      // and, after the first shot, the attack channel — one arrow, measured.
+      for (let i = 0; i < 600 && wearer.attackCount < 1; i++) {
+        wearer.abilityCooldown = 99999;
+        stepSimulation(s);
+      }
+      for (let i = 0; i < 80; i++) {
+        wearer.attackCooldown = 99999;
+        wearer.abilityCooldown = 99999;
+        stepSimulation(s);
+      }
+      expect(wearer.hp - 10).toBe(Math.round(wearer.damage * 0.2));
+    }
+  });
+
   it("thorns (Squire's Plate legendary): reflects a fraction at the attacker", () => {
     const s = battleState(6);
     const attacker = place(s, "skeleton", "player", 100, 100);
