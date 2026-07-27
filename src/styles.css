@@ -895,7 +895,11 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  background: linear-gradient(180deg, #2c2118, #1a140d);
+  /* Solid plate under the gradient: card text is near-white, and these cards
+     sit on a light parchment page, so a state class that overrides
+     background-image must never be able to leave the card see-through. */
+  background-color: #1a140d;
+  background-image: linear-gradient(180deg, #2c2118, #1a140d);
   border: 2px solid;
   border-radius: 12px;
   padding: 6px 6px 8px;
@@ -2936,12 +2940,9 @@ body.modal-open .pager-nav {
   background: rgba(14, 10, 6, 0.75);
 }
 
-/* Item inspect sheet — tap an item, read it, then commit. ONE look, two mount
-   points: the Shop's shelf card (buy) and the unit panel's equip picker
-   (equip). The .equip-detail twins ride along on every rule so the two never
-   drift; only the z-index differs (the hub copy must clear .detail-overlay). */
-.shop-detail-overlay,
-.equip-detail-overlay {
+/* Item detail panel — tap a shelf card to inspect before buying. Centered on
+   the screen. */
+.shop-detail-overlay {
   position: fixed;
   inset: 0;
   z-index: 40;
@@ -2952,11 +2953,7 @@ body.modal-open .pager-nav {
   background: rgba(8, 6, 4, 0.55);
   animation: fade 0.18s ease;
 }
-.equip-detail-overlay {
-  z-index: 60; /* above the unit detail overlay (50) it mounts inside */
-}
-.shop-detail,
-.equip-detail {
+.shop-detail {
   width: 100%;
   max-width: 380px;
   padding: 14px 16px;
@@ -2966,85 +2963,59 @@ body.modal-open .pager-nav {
   box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.6);
   text-align: left;
 }
-.equip-detail {
-  /* Match .detail-modal so the sheet nests inside the panel it opened from
-     instead of hanging over its edges. Must follow the shared rule above. */
-  max-width: 340px;
-}
-.shop-detail-head,
-.equip-detail-head {
+.shop-detail-head {
   display: flex;
   align-items: center;
   gap: 12px;
 }
-.shop-detail-title,
-.equip-detail-title {
+.shop-detail-title {
   display: flex;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
 }
-.shop-detail-name,
-.equip-detail-name {
+.shop-detail-name {
   font-family: var(--font-display);
   font-size: 1.15rem;
   font-weight: 700;
   line-height: 1.1;
 }
-.shop-detail-tier,
-.equip-detail-tier {
+.shop-detail-tier {
   font-size: 0.72rem;
   font-weight: 700;
   text-transform: capitalize;
   color: var(--stone);
 }
-.shop-detail-owned,
-.equip-detail-owned {
+.shop-detail-owned {
   font-size: 0.72rem;
   color: var(--stone-dark);
 }
-.shop-detail-desc,
-.equip-detail-desc {
+.shop-detail-desc {
   margin: 10px 0 6px;
   font-size: 0.82rem;
   font-style: italic;
   color: var(--stone);
   line-height: 1.35;
 }
-.shop-detail-effects,
-.equip-detail-effects {
+.shop-detail-effects {
   margin: 0 0 12px;
   padding-left: 18px;
   font-size: 0.85rem;
   color: #86efac;
   line-height: 1.5;
 }
-/* What the equip would displace / that it's already worn — read as a caution,
-   not as another perk, so it sits apart from the green effect list. */
-.equip-detail-note {
-  margin: -6px 0 12px;
-  font-size: 0.74rem;
-  color: var(--gold-soft);
-}
-.shop-detail-actions,
-.equip-detail-actions {
+.shop-detail-actions {
   display: flex;
   gap: 10px;
   justify-content: flex-end;
 }
-.shop-detail-close,
-.equip-detail-cancel {
+.shop-detail-close {
   padding: 8px 14px;
   font-size: 0.85rem;
 }
-.shop-detail-buy,
-.equip-detail-go {
+.shop-detail-buy {
   padding: 8px 18px;
   font-size: 0.85rem;
-}
-.equip-detail-go.remove {
-  background: #7f1d1d;
-  color: var(--parchment);
 }
 .shop-detail-buy.cant {
   filter: saturate(0.4) brightness(0.8);
@@ -3156,12 +3127,6 @@ body.modal-open .pager-nav {
   cursor: pointer;
   text-align: left;
   width: 100%;
-  /* <button> doesn't inherit color/font — without these the item description
-     and the "Empty the slot" row render in the UA's black button text on the
-     dark panel. Only the name (inline rarity colour) and the action word set
-     their own. */
-  color: var(--parchment);
-  font-family: inherit;
 }
 .equip-option.current {
   border-color: #86efac;
@@ -3620,11 +3585,16 @@ body.modal-open .pager-nav {
   box-shadow:
     0 0 0 1px var(--gold),
     0 0 10px rgba(233, 192, 106, 0.35);
+  /* Stack the gild ON TOP of the card plate — .comp-card paints its dark plate
+     through the `background` shorthand's IMAGE slot, so overriding
+     background-image here without restating it left the card transparent over
+     the parchment page and its near-white name unreadable (~1.03:1). */
   background-image: linear-gradient(
-    180deg,
-    rgba(233, 192, 106, 0.14),
-    transparent 60%
-  );
+      180deg,
+      rgba(233, 192, 106, 0.14),
+      transparent 60%
+    ),
+    linear-gradient(180deg, #2c2118, #1a140d);
 }
 .book-card.mastered .book-slayer-fill {
   background: linear-gradient(90deg, #e9c06a, #fff0c4);
@@ -4067,6 +4037,15 @@ body.modal-open .pager-nav {
   font-size: 0.92rem;
   font-weight: 700;
   line-height: 1.3;
+}
+/* Where to hunt a slay bounty's quarry — a quiet second line under the ask,
+   subordinate to it (the ask is the job; this is the directions). Faded BROWN,
+   not --stone: these notices are light parchment, and the grey inks are for
+   dark surfaces (--stone here lands at ~1.6:1, all but invisible). */
+.quest-card-where {
+  margin-top: 2px;
+  font-size: 0.72rem;
+  color: #6b5836;
 }
 .quest-progress {
   display: flex;

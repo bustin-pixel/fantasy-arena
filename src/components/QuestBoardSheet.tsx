@@ -15,6 +15,7 @@ import { useGameState } from "@/state/GameStateContext";
 import {
   boardCtx,
   describeQuest,
+  questLocation,
   normalizeQuestBoard,
   refreshCost,
   rollDailyBoard,
@@ -174,6 +175,7 @@ export function QuestBoardSheet({ onClose }: Props) {
                       </span>
                     </div>
                     <div className="quest-card-ask">{describeQuest(q)}</div>
+                    <WhereLine notice={q} />
                     <div className="quest-progress">
                       <div className="quest-progress-bar">
                         <div
@@ -273,6 +275,7 @@ export function QuestBoardSheet({ onClose }: Props) {
                   </span>
                 </div>
                 <div className="quest-card-ask">{describeQuest(n)}</div>
+                <WhereLine notice={n} />
                 <RewardLine notice={n} />
                 <div className="quest-card-actions">
                   <button
@@ -302,6 +305,16 @@ export function QuestBoardSheet({ onClose }: Props) {
 }
 
 /** The pay line on a card: flat gold + the chest tier it awards. */
+/** "Found in …" under a slay bounty's ask. A bounty names a monster, so the
+ *  card should also say where to hunt it — otherwise the only way to find out
+ *  is to guess a dungeon. Renders nothing for the kinds that name a mode
+ *  rather than a monster. */
+function WhereLine({ notice }: { notice: QuestNotice }) {
+  const where = questLocation(notice);
+  if (!where) return null;
+  return <div className="quest-card-where">Found in {where}</div>;
+}
+
 function RewardLine({ notice }: { notice: QuestNotice }) {
   return (
     <div className="quest-reward-line">

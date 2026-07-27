@@ -13,6 +13,7 @@ import {
   applyClaimQuest,
   boardCtx,
   normalizeQuestBoard,
+  questLocation,
   rollDailyBoard,
   sanitizeQuests,
   tickQuestProgress,
@@ -20,6 +21,7 @@ import {
   SLAY_FALLBACK,
   type ActiveQuest,
   type QuestBoardCtx,
+  type QuestNotice,
 } from "@/meta/quests";
 import {
   QUEST_ACTIVE_MAX,
@@ -153,6 +155,48 @@ describe("slay bounty targets are real, spawnable enemies", () => {
       expect(SPAWNED_FODDER.has(id)).toBe(true); // actually spawned, so it can be slain
     }
   );
+});
+
+describe("questLocation — where to hunt a bounty's quarry", () => {
+  /** A minimal notice; only kind + targetId matter to questLocation. */
+  const notice = (kind: QuestNotice["kind"], targetId?: string): QuestNotice =>
+    ({
+      id: "q",
+      kind,
+      difficulty: "easy",
+      goal: 1,
+      gold: 10,
+      chestTier: "wooden",
+      ...(targetId ? { targetId } : {}),
+    }) as QuestNotice;
+
+  // The whole point of the line: every bounty the board can actually roll has
+  // somewhere to send you. A candidate with no dungeon would print no hint.
+  it.each([...SLAY_CANDIDATES, ...SLAY_FALLBACK])(
+    "%s names at least one dungeon",
+    (id) => {
+      expect(questLocation(notice("slay", id))).toBeTruthy();
+    }
+  );
+
+  it("names every dungeon that spawns the target, not just the first", () => {
+    // The skeleton walks both the Depths and the Bonefields.
+    const where = questLocation(notice("slay", "skeleton"));
+    expect(where).toContain(DUNGEONS.depths.name);
+    expect(where).toContain(DUNGEONS.bonefields.name);
+  });
+
+  it("is null for the kinds that name a mode rather than a monster", () => {
+    expect(questLocation(notice("arena_wins"))).toBeNull();
+    expect(questLocation(notice("depths_clears"))).toBeNull();
+    expect(questLocation(notice("endless_wave"))).toBeNull();
+    expect(questLocation(notice("unit_wins", "knight"))).toBeNull();
+  });
+
+  it("is null for a slay notice whose target nothing spawns", () => {
+    expect(questLocation(notice("slay"))).toBeNull();
+    expect(questLocation(notice("slay", "knight"))).toBeNull(); // a hero, never fodder
+  });
 });
 
 describe("tickQuestProgress", () => {
