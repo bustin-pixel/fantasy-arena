@@ -426,6 +426,13 @@ export interface Projectile {
    *  Charm's burn). Separate from `rider` so an item never displaces a unit's
    *  innate shot rider — both apply on impact. */
   itemRider?: ShotRider;
+  /** This shot IS a basic attack (not an ability cast), so ranged lifesteal
+   *  rides it on impact. Set at every basic-shot spawn site — the default
+   *  arrow, the Twinfang extra shot, and kit-fired basics (Ranger multishot,
+   *  Mystic Archer form shot) — because a kit that replaces the swing must
+   *  still lifesteal exactly like the default arrow. The `ability` field can't
+   *  answer this: kit shots carry their own tag ("mystic_shift"). */
+  basic?: boolean;
 }
 
 // ---------------------------------------------------------------------------

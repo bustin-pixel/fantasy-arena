@@ -10,6 +10,7 @@
 
 import type { BattleMode } from "@/hooks/useBattleEngine"; // type-only: erased at runtime
 import { getUnitDef, UNITS } from "@/data/units";
+import { dungeonsWithMonster } from "@/data/dungeons";
 import { RNG } from "@/utils/rng";
 import {
   foldChestContents,
@@ -404,6 +405,16 @@ export function describeQuest(q: QuestNotice): string {
 
 function targetName(q: QuestNotice): string {
   return q.targetId && UNITS[q.targetId] ? getUnitDef(q.targetId).name : "???";
+}
+
+/** Where a bounty's quarry can be hunted, for the line under the ask. Only
+ *  `slay` has a place to send you — every other kind names a mode, not a
+ *  monster. Null when there's nothing honest to say (no target, or a target no
+ *  dungeon roster spawns), so the caller can just skip the line. */
+export function questLocation(q: QuestNotice): string | null {
+  if (q.kind !== "slay" || !q.targetId) return null;
+  const names = dungeonsWithMonster(q.targetId).map((d) => d.name);
+  return names.length > 0 ? names.join(" · ") : null;
 }
 
 // ---------------------------------------------------------------------------

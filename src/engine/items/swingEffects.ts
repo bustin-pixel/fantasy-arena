@@ -96,6 +96,7 @@ const twinfang: SwingEffect<"doubleStrikeNth"> = {
         ability: "lifesteal",
         color: a.accent,
         angle: 0,
+        basic: true, // the twin shot lifesteals like the melee twin below
       });
     } else {
       ctx.dealDamage(target, unit.damage * critMult, unit);

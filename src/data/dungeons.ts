@@ -594,6 +594,18 @@ export function dungeonBestiaryIds(dungeon: Dungeon): string[] {
   return ids;
 }
 
+/** Every dungeon that can spawn `defId` — in a tier's fodder roster or as a
+ *  tier boss — in registry order. The "where do I hunt this?" answer a slay
+ *  bounty needs; a monster in two rosters (skeletons walk both the Depths and
+ *  the Bonefields) returns both. Rare-spawn catalysts are deliberately absent:
+ *  they appear on one quest floor under their own conditions, so naming their
+ *  dungeon as a hunting ground would mislead. Empty for anything unspawnable. */
+export function dungeonsWithMonster(defId: string): Dungeon[] {
+  return Object.values(DUNGEONS).filter((d) =>
+    d.tiers.some((t) => t.boss === defId || t.monsters[defId] != null)
+  );
+}
+
 /** Units whose purchase is gated behind a rare-spawn quest (never chest-dropped,
  *  never granted by the grandfather clause, not buyable until the quest is
  *  done). Derived from every dungeon's quest. */
