@@ -23,6 +23,7 @@ import {
   isTierCleared,
 } from "@/state/persistence";
 import type { TierId } from "@/data/tiers";
+import { ENDLESS_FINAL_WAVE } from "@/data/endless";
 import {
   computeBattleRewards,
   computeTreasureRewards,
@@ -171,7 +172,10 @@ export function BattleScreen({
     inspectUnit,
     enemyLedger,
     pickBoon,
+    rerollBoons,
+    skipBoon,
     retireEndless,
+    finishEndless,
     wavesSurvived,
     startOutroChest,
     openOutroChestAt,
@@ -208,6 +212,10 @@ export function BattleScreen({
   const [rewards, setRewards] = useState<BattleRewards | null>(null);
   // Endless: waves cleared this run, captured for the results screen.
   const [endlessWaves, setEndlessWaves] = useState(0);
+  /** Endless: did this run take the capstone? Derived from the wave count, not
+   *  the phase — someone who claimed at 100 and someone who pressed on and fell
+   *  at 137 both conquered it. */
+  const endlessConquered = endlessWaves >= ENDLESS_FINAL_WAVE;
   // Endless: the pre-run best, frozen at mount — the post-battle grant updates
   // the save, so reading it live would always show this run as the best.
   const [bestAtStart] = useState(() => endlessBestWave(save));
@@ -748,6 +756,17 @@ export function BattleScreen({
           offers={ui.intermission.offers}
           boonsPicked={ui.boonsPicked}
           onPick={(i) => { playSfx("boonPick"); pickBoon(i); }}
+          rerollsLeft={ui.rerollsLeft}
+          onReroll={rerollBoons}
+          onSkip={() => { playSfx("boonPick"); skipBoon(); }}
+          atFinalWaveChoice={ui.atFinalWaveChoice}
+          onFinish={() => {
+            // A completion, not a retirement — the results card reads the
+            // difference off endlessWaves, so nothing else needs flagging.
+            retiredRef.current = true;
+            setRetired(true);
+            finishEndless();
+          }}
           onRetire={() => {
             playSfx("retireBank");
             retiredRef.current = true;
@@ -761,14 +780,39 @@ export function BattleScreen({
         <div className="result-overlay">
           <div
             className={`result-card ${
-              mode === "endless" ? (retired ? "victory" : "defeat") : ui.phase
+              mode === "endless"
+                ? endlessConquered
+                  ? "victory conquest"
+                  : retired
+                    ? "victory"
+                    : "defeat"
+                : ui.phase
             }`}
           >
             {mode === "endless" ? (
               <>
-                <h2>{retired ? "Run Complete" : "Run Over"}</h2>
+                {/* Three endings now, not two: conquered the capstone, retired
+                    early, or fell. Conquest is read off the WAVE COUNT rather
+                    than the phase, so a player who pressed on past 100 and died
+                    at 137 is still, correctly, someone who conquered it. */}
+                <h2>
+                  {endlessConquered
+                    ? "Endless Conquered"
+                    : retired
+                      ? "Run Complete"
+                      : "Run Over"}
+                </h2>
                 <p>
-                  {retired ? (
+                  {endlessConquered ? (
+                    <>
+                      Your warband reached the summit at wave{" "}
+                      <strong>{ENDLESS_FINAL_WAVE}</strong>
+                      {endlessWaves > ENDLESS_FINAL_WAVE ? (
+                        <> and pressed on to <strong>{endlessWaves}</strong></>
+                      ) : null}
+                      . The Legendary Reliquary is yours.
+                    </>
+                  ) : retired ? (
                     <>
                       You banked your winnings after{" "}
                       <strong>{endlessWaves}</strong>{" "}

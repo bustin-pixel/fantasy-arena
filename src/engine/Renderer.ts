@@ -852,6 +852,10 @@ export interface FloorChest {
   opening: boolean;
   /** Reveal-burst sparkles, spawned once by the outro at the open beat. */
   sparkles: Sparkle[];
+  /** Free-running clock for idle aura motion — rises whether or not the chest
+   *  has been tapped (see drawChest's `ambientMs`). Only the legendary tier
+   *  reads it; the outro advances it every frame. */
+  clock: number;
 }
 
 /** How wide the chest's 120-unit draw box maps to, in world px. */
@@ -884,7 +888,7 @@ function drawFloorChestBody(ctx: Ctx, c: FloorChest): void {
   ctx.translate(c.x, c.y);
   ctx.scale(s, s);
   ctx.translate(-60, -96);
-  drawChest(ctx, c.tier, c.opening ? c.t : 0, c.sparkles);
+  drawChest(ctx, c.tier, c.opening ? c.t : 0, c.sparkles, c.clock);
   ctx.restore();
 }
 

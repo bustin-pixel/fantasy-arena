@@ -32,6 +32,7 @@ import { TREASURE_ROOM_TIERS, type EncounterKind } from "@/data/encounters";
 import { SfxObserver } from "@/audio/sfx";
 import { pickArenaTheme, type ArenaThemeId } from "@/assets/arenaThemes";
 import { getDungeon } from "@/data/dungeons";
+import { ENDLESS_REROLLS_START } from "@/data/endless";
 import type { TierId } from "@/data/tiers";
 import { generateEnemyDeck } from "@/engine/AIDeck";
 import { getUnitDef } from "@/data/units";
@@ -86,6 +87,12 @@ export interface BattleUiState {
   momentumStacks: number | null;
   /** Endless: Berserker's Rhythm's live attack-speed bonus, or null if unowned. */
   rhythmBonus: number | null;
+  /** Endless: boon rerolls still banked this run. */
+  rerollsLeft: number;
+  /** Endless: the capstone wave has been cleared (latches for the run). */
+  endlessCompleted: boolean;
+  /** Endless: this is the one intermission where claim-or-continue is offered. */
+  atFinalWaveChoice: boolean;
   /** The commander's equipped battle spell + charge state (one per battle), or
    *  null when no spell is equipped (no HUD button). */
   commanderSpell: { spell: CommanderSpellId; ready: boolean } | null;
@@ -129,8 +136,14 @@ export interface UseBattleEngine {
   enemyLedger: () => { seen: string[]; slain: string[] };
   /** Endless: apply the boon at `offerIndex` from the current intermission. */
   pickBoon: (offerIndex: number) => void;
+  /** Endless: spend a banked reroll on a fresh set of offers. */
+  rerollBoons: () => void;
+  /** Endless: decline the offers for extra healing instead. */
+  skipBoon: () => void;
   /** Endless: retire at an intermission, banking the cleared waves' rewards. */
   retireEndless: () => void;
+  /** Endless: bank the run as a COMPLETION (legal only past the capstone wave). */
+  finishEndless: () => void;
   /** Endless: waves fully cleared this run (0 outside endless). */
   wavesSurvived: () => number;
   /** Post-victory outro: materialize the reward chest up-field and gather the
@@ -268,6 +281,9 @@ export function useBattleEngine(
       boonsPicked: [],
       momentumStacks: null,
       rhythmBonus: null,
+      rerollsLeft: ENDLESS_REROLLS_START,
+      endlessCompleted: false,
+      atFinalWaveChoice: false,
       commanderSpell: null,
     };
   });
@@ -446,6 +462,9 @@ export function useBattleEngine(
           boonsPicked: est?.boonsPicked ?? [],
           momentumStacks: est?.momentumStacks ?? null,
           rhythmBonus: est?.rhythmBonus ?? null,
+          rerollsLeft: est?.rerollsLeft ?? 0,
+          endlessCompleted: est?.completedFinalWave ?? false,
+          atFinalWaveChoice: est?.atFinalWaveChoice ?? false,
           commanderSpell: c.commanderSpellStatus(),
         });
       }
@@ -533,19 +552,49 @@ export function useBattleEngine(
     return c ? battleEnemyLedger(c.state.units) : { seen: [], slain: [] };
   }, []);
 
-  const pickBoon = useCallback((offerIndex: number) => {
+  /** Push the controller's post-action endless state into the UI immediately,
+   *  rather than waiting for the throttled sync — the overlay has to close (or
+   *  re-render new offers) on the same tap that caused it. */
+  const syncEndless = useCallback(() => {
     const c = controllerRef.current;
     if (!c) return;
-    c.pickBoon(offerIndex);
-    // Reflect the pick immediately (close the overlay, start the next wave)
-    // rather than waiting for the throttled sync.
     const est = c.endlessStatus();
     setUi((prev) => ({
       ...prev,
       waveNumber: est ? est.wave : prev.waveNumber,
       intermission: est?.intermission ?? null,
       boonsPicked: est?.boonsPicked ?? prev.boonsPicked,
+      rerollsLeft: est?.rerollsLeft ?? prev.rerollsLeft,
+      endlessCompleted: est?.completedFinalWave ?? prev.endlessCompleted,
+      atFinalWaveChoice: est?.atFinalWaveChoice ?? false,
     }));
+  }, []);
+
+  const pickBoon = useCallback(
+    (offerIndex: number) => {
+      controllerRef.current?.pickBoon(offerIndex);
+      syncEndless();
+    },
+    [syncEndless]
+  );
+
+  const rerollBoons = useCallback(() => {
+    controllerRef.current?.rerollBoons();
+    syncEndless();
+  }, [syncEndless]);
+
+  const skipBoon = useCallback(() => {
+    controllerRef.current?.skipBoon();
+    syncEndless();
+  }, [syncEndless]);
+
+  /** Bank the run as a COMPLETION (wave-100 capstone only). */
+  const finishEndless = useCallback(() => {
+    const c = controllerRef.current;
+    if (!c) return;
+    if (c.finishEndless()) {
+      setUi((prev) => ({ ...prev, phase: "victory", intermission: null }));
+    }
   }, []);
 
   const retireEndless = useCallback(() => {
@@ -653,7 +702,10 @@ export function useBattleEngine(
     inspectUnit,
     enemyLedger,
     pickBoon,
+    rerollBoons,
+    skipBoon,
     retireEndless,
+    finishEndless,
     wavesSurvived,
     startOutroChest,
     openOutroChestAt,

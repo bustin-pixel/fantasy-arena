@@ -324,6 +324,8 @@ const BOON_CHAPTER: Record<BoonRarity, string> = {
   common: "Common Boons",
   rare: "Rare Boons",
   epic: "Epic Boons",
+  legendary: "Legendary Boons",
+  mythic: "Mythic Boons",
 };
 
 /** The Book of Boons — the full Endless-mode boon catalog, chaptered by
@@ -338,11 +340,18 @@ function boonsBook(): BookDef {
       entries: [],
       art: "boons",
       note:
-        "Every wave survived in the Endless deep, the horde pauses and three boons are offered — take one, and it blesses the whole warband for the rest of the run. Boons stack, and the deeper you descend the rarer the offers. Marked boons come only once; a fallen ally calls forth a Second Chance.",
+        "Every wave survived in the Endless deep, the horde pauses and three boons are offered — take one, and it blesses the whole warband for the rest of the run. Boons stack, and the deeper you descend the rarer the offers: the legendary and mythic blessings will not show themselves at all until the horde has taken your measure. Spend a reroll if the offer displeases you, or decline it entirely and let your warband bind its wounds instead. Marked boons come only once; a fallen ally calls forth a Second Chance.",
     },
   ];
-  for (const rarity of ["common", "rare", "epic"] as BoonRarity[]) {
+  // Derived from BOON_CHAPTER, NOT a literal list. This loop used to be
+  // hardcoded to ["common", "rare", "epic"], so adding the legendary and mythic
+  // tiers left seven boons with chapter headings written but no chapter ever
+  // built — invisible in the book, with nothing to fail at compile time. Keying
+  // off the Record means a new rarity is a type error in BOON_CHAPTER (which is
+  // exhaustive) and appears here automatically.
+  for (const rarity of Object.keys(BOON_CHAPTER) as BoonRarity[]) {
     const ids = ALL_BOON_IDS.filter((id) => BOONS[id].rarity === rarity);
+    if (ids.length === 0) continue;
     pages.push(
       ...headed(
         BOON_CHAPTER[rarity],

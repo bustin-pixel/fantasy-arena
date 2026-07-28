@@ -58,7 +58,28 @@ export const PALETTES: Record<ChestTier, Palette> = {
     band: "#d97b29", bandLight: "#f2a548", latch: "#ffd24d",
     glow: "#ff9440", sparkles: ["#ffb347", "#ff6b35", "#ffe08a", "#ff9440"],
   },
+  // The capstone. Ivory and gold rather than another saturated hue — every other
+  // tier is "a colour", so the legendary reads as light itself. Its sparkles are
+  // deliberately PRISMATIC (the only tier whose motes aren't a single family),
+  // which is what sells the aura as refracted rather than merely bright.
+  legendary: {
+    body: "#f6edd6", bodyDark: "#b89b5e", bodyLight: "#fffdf5",
+    band: "#c9a227", bandLight: "#ffe9a0", latch: "#fff8dc",
+    glow: "#fff0b4",
+    sparkles: [
+      "#ffffff", "#fff2b0", "#ffd76e",
+      "#a8e6ff", "#ffb3f0", "#c8ffd8",
+    ],
+  },
 };
+
+/** Waves reached before the legendary aura is at full strength on a closed
+ *  chest, and the tiers that smoulder while shut. */
+const IDLE_AURA_TIERS: ReadonlySet<ChestTier> = new Set<ChestTier>([
+  "arcane",
+  "dragon",
+  "legendary",
+]);
 
 export interface Sparkle {
   x: number; y: number; vx: number; vy: number;
@@ -67,17 +88,20 @@ export interface Sparkle {
 
 export function spawnSparkles(tier: ChestTier, born: number): Sparkle[] {
   const p = PALETTES[tier];
-  const count = tier === "wooden" ? 12 : tier === "silver" ? 14 : 18;
+  const leg = tier === "legendary";
+  const count = leg ? 40 : tier === "wooden" ? 12 : tier === "silver" ? 14 : 18;
   const out: Sparkle[] = [];
   for (let i = 0; i < count; i++) {
     out.push({
-      x: 60 + (Math.random() - 0.5) * 52,
+      // The legendary burst throws wider, higher, longer-lived and bigger — the
+      // same particle system, dialled to "eruption".
+      x: 60 + (Math.random() - 0.5) * (leg ? 72 : 52),
       y: HINGE_Y + 2 + Math.random() * 6,
-      vx: (Math.random() - 0.5) * 0.022,
-      vy: -(0.03 + Math.random() * 0.05),
-      born: born + Math.random() * 250,
-      life: 550 + Math.random() * 700,
-      size: 1.2 + Math.random() * 2,
+      vx: (Math.random() - 0.5) * (leg ? 0.05 : 0.022),
+      vy: -(leg ? 0.05 + Math.random() * 0.09 : 0.03 + Math.random() * 0.05),
+      born: born + Math.random() * (leg ? 420 : 250),
+      life: leg ? 900 + Math.random() * 1100 : 550 + Math.random() * 700,
+      size: leg ? 1.6 + Math.random() * 3 : 1.2 + Math.random() * 2,
       color: p.sparkles[i % p.sparkles.length],
     });
   }
@@ -86,12 +110,19 @@ export function spawnSparkles(tier: ChestTier, born: number): Sparkle[] {
 
 /** Draw the chest into a VIEW_W×VIEW_H box. `t` is ms since the open tap
  *  (0 = closed idle). `sparkles` is the burst spawned at OPEN_AT (empty until
- *  then). The caller owns the transform/clear and all SFX. */
+ *  then). The caller owns the transform/clear and all SFX.
+ *
+ *  `ambientMs` is a FREE-RUNNING clock for idle motion — it keeps rising whether
+ *  or not the chest has been tapped. It exists because `t` is pinned at 0 while
+ *  closed, which is fine for a chest that just sits there but useless for the
+ *  legendary tier, whose whole character is that it's alive before you touch it.
+ *  Every other tier ignores it, so passing 0 is exactly today's behaviour. */
 export function drawChest(
   ctx: CanvasRenderingContext2D,
   tier: ChestTier,
   t: number,
-  sparkles: Sparkle[]
+  sparkles: Sparkle[],
+  ambientMs = 0
 ): void {
   const p = PALETTES[tier];
 
@@ -119,8 +150,14 @@ export function drawChest(
   ctx.fill();
 
   // Idle aura for the magical tiers (arcane/dragon smoulder even closed).
-  if (tier === "arcane" || tier === "dragon") {
-    paintGlow(ctx, p.glow, 0.16, 46);
+  if (IDLE_AURA_TIERS.has(tier)) {
+    if (tier === "legendary") {
+      // Behind the chest, always alive: rotating rays + a breathing halo, both
+      // swelling as the lid opens and blazing at the reveal.
+      drawLegendaryAura(ctx, p, ambientMs, 1 + openness * 0.8 + burst * 1.1);
+    } else {
+      paintGlow(ctx, p.glow, 0.16, 46);
+    }
   }
 
   // The lid's apparent height is cos(swing): shrinks to a sliver at 90°, then
@@ -247,8 +284,117 @@ export function drawChest(
   ctx.globalAlpha = 1;
 
   // The reveal flash sits in front of everything, then fades to a loot-light.
-  if (burst > 0) paintGlow(ctx, p.glow, 0.22 * burst, 52);
+  if (burst > 0) {
+    paintGlow(ctx, p.glow, (tier === "legendary" ? 0.34 : 0.22) * burst, 52);
+  }
+  // Legendary only: a shockwave ring punches outward as the lid lands.
+  if (tier === "legendary") drawLegendaryShockwave(ctx, p, sinceOpen);
 
+  ctx.restore();
+}
+
+/** The legendary chest's ambient aura, drawn BEHIND the chest: a slowly turning
+ *  fan of light rays, a breathing halo, and a ring of orbiting motes. All three
+ *  are driven by `ambientMs` (free-running) rather than `t`, so the chest is
+ *  visibly alive before anyone taps it — that idle life is what separates a
+ *  capstone from just another colour of chest.
+ *
+ *  `intensity` scales the whole thing (1 = closed idle, up to ~3 at the reveal).
+ *  Deterministic given (ambientMs, intensity) — no Math.random here, so the
+ *  aura never flickers between frames. */
+function drawLegendaryAura(
+  ctx: CanvasRenderingContext2D,
+  p: Palette,
+  ambientMs: number,
+  intensity: number
+): void {
+  const cx = 60;
+  const cy = HINGE_Y;
+  const breathe = 0.5 + 0.5 * Math.sin(ambientMs * 0.0016);
+
+  ctx.save();
+
+  // --- rotating light rays -------------------------------------------------
+  // Two counter-rotating fans so the motion reads as volumetric rather than a
+  // spinning pinwheel.
+  for (const [count, speed, len, alpha] of [
+    [12, 0.00022, 56, 0.16],
+    [8, -0.00014, 40, 0.1],
+  ] as const) {
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(ambientMs * speed);
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * Math.PI * 2;
+      // Alternate spoke length so the fan doesn't look mechanical.
+      const reach = len * (i % 2 === 0 ? 1 : 0.68) * (0.85 + breathe * 0.3);
+      const spread = 0.055;
+      const g = ctx.createLinearGradient(0, 0, Math.cos(a) * reach, Math.sin(a) * reach);
+      g.addColorStop(0, withAlpha(p.glow, alpha * intensity));
+      g.addColorStop(1, withAlpha(p.glow, 0));
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(Math.cos(a - spread) * reach, Math.sin(a - spread) * reach);
+      ctx.lineTo(Math.cos(a + spread) * reach, Math.sin(a + spread) * reach);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // --- breathing halo ------------------------------------------------------
+  paintGlow(ctx, p.glow, (0.13 + breathe * 0.09) * intensity, 44 + breathe * 16);
+
+  // --- orbiting motes ------------------------------------------------------
+  // Indexed, not random: each mote owns a fixed orbit and phase, so they trace
+  // stable ellipses instead of jittering.
+  const motes = 7;
+  for (let i = 0; i < motes; i++) {
+    const phase = (i / motes) * Math.PI * 2;
+    const orbit = ambientMs * 0.0011 + phase;
+    const rx = 34 + (i % 3) * 6;
+    const ry = 13 + (i % 2) * 5;
+    const x = cx + Math.cos(orbit) * rx;
+    const y = cy - 6 + Math.sin(orbit) * ry;
+    // Fade the motes as they pass behind the chest so the orbit reads as 3D.
+    const depth = 0.35 + 0.65 * ((Math.sin(orbit) + 1) / 2);
+    const r = (1.1 + (i % 3) * 0.5) * (0.7 + breathe * 0.5);
+    ctx.globalAlpha = Math.min(1, depth * 0.85 * intensity);
+    ctx.fillStyle = p.sparkles[i % p.sparkles.length];
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+/** Expanding shockwave ring at the reveal — one clean pulse of "something big
+ *  just happened", drawn in front of the chest and gone within ~700ms. */
+function drawLegendaryShockwave(
+  ctx: CanvasRenderingContext2D,
+  p: Palette,
+  sinceOpen: number
+): void {
+  const DUR = 700;
+  if (sinceOpen < 0 || sinceOpen > DUR) return;
+  const k = sinceOpen / DUR;
+  const r = 8 + easeOutBack(Math.min(1, k * 1.15)) * 62;
+  ctx.save();
+  ctx.globalAlpha = (1 - k) * 0.8;
+  ctx.strokeStyle = p.glow;
+  ctx.lineWidth = 3.5 * (1 - k) + 0.6;
+  ctx.beginPath();
+  ctx.ellipse(60, HINGE_Y, r, r * 0.52, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  // A second, faster ring for depth.
+  const r2 = 8 + easeOutBack(Math.min(1, k * 1.6)) * 44;
+  ctx.globalAlpha = (1 - k) * 0.45;
+  ctx.lineWidth = 2 * (1 - k) + 0.4;
+  ctx.beginPath();
+  ctx.ellipse(60, HINGE_Y, r2, r2 * 0.52, 0, 0, Math.PI * 2);
+  ctx.stroke();
   ctx.restore();
 }
 
@@ -314,6 +460,28 @@ function drawBodyDecor(
     ctx.arc(68, 78, 1.2, 0, Math.PI * 2);
     ctx.fillStyle = p.glow;
     ctx.fill();
+  } else if (tier === "legendary") {
+    // Radiant filigree: a sunburst centred under the latch, with two scroll
+    // flourishes. Gold-on-ivory, lit from within.
+    ctx.shadowColor = p.glow;
+    ctx.shadowBlur = 7;
+    ctx.strokeStyle = p.band;
+    ctx.lineWidth = 1.3;
+    for (let i = 0; i < 9; i++) {
+      const a = Math.PI + (i / 8) * Math.PI; // fan across the body face
+      ctx.beginPath();
+      ctx.moveTo(60, 92);
+      ctx.lineTo(60 + Math.cos(a) * 26, 92 + Math.sin(a) * 20);
+      ctx.stroke();
+    }
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = withAlpha(p.bandLight, 0.75);
+    ctx.lineWidth = 1.5;
+    for (const dir of [-1, 1]) {
+      ctx.beginPath();
+      ctx.arc(60 + dir * 17, 80, 7, Math.PI * 0.1, Math.PI * 1.5, dir < 0);
+      ctx.stroke();
+    }
   } else {
     // dragon: overlapping scale rows
     ctx.strokeStyle = "rgba(0,0,0,0.35)";
@@ -362,6 +530,35 @@ function drawLidDecor(
     ctx.beginPath(); // crescent rune
     ctx.arc(60, -11, 6, Math.PI * 0.25, Math.PI * 1.4);
     ctx.stroke();
+  } else if (tier === "legendary") {
+    // An actual crown on the lid — the one silhouette read that survives at
+    // thumbnail size, which is how players will usually first see this chest.
+    ctx.shadowColor = p.glow;
+    ctx.shadowBlur = 8;
+    ctx.fillStyle = p.bandLight;
+    ctx.beginPath();
+    ctx.moveTo(46, -6);
+    ctx.lineTo(46, -14);
+    ctx.lineTo(51, -9);
+    ctx.lineTo(56, -19); // tall centre-left spire
+    ctx.lineTo(60, -11);
+    ctx.lineTo(64, -19);
+    ctx.lineTo(69, -9);
+    ctx.lineTo(74, -14);
+    ctx.lineTo(74, -6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    strokeOutline(ctx);
+    // Gems seated in the band.
+    for (const [gx, gc] of [
+      [52, "#a8e6ff"], [60, "#ffb3f0"], [68, "#c8ffd8"],
+    ] as const) {
+      ctx.fillStyle = gc;
+      ctx.beginPath();
+      ctx.arc(gx, -8, 1.7, 0, Math.PI * 2);
+      ctx.fill();
+    }
   } else {
     // dragon: two horn nubs on the lid crown
     ctx.fillStyle = p.bandLight;
@@ -384,7 +581,28 @@ function drawLatch(
   p: Palette
 ): void {
   ctx.save();
-  if (tier === "dragon") {
+  if (tier === "legendary") {
+    // A faceted star-gem instead of a lock — nothing so mundane as a keyhole.
+    ctx.shadowColor = p.glow;
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = p.latch;
+    ctx.beginPath();
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2 - Math.PI / 2;
+      const r = i % 2 === 0 ? 7.5 : 3.2;
+      const x = 60 + Math.cos(a) * r;
+      const y = 72 + Math.sin(a) * r;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.arc(60, 72, 2, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (tier === "dragon") {
     ctx.fillStyle = p.latch;
     ctx.beginPath();
     ctx.ellipse(60, 72, 7, 5.5, 0, 0, Math.PI * 2);

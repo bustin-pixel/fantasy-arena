@@ -3,17 +3,33 @@
 // the 5-wave boss cadence, and that team-mod boons survive kits that recompute
 // unit stats every tick. Headless like the rest of the engine specs.
 import { describe, it, expect } from "vitest";
-import { MatchController } from "@/engine/MatchController";
 import {
+  MatchController,
+  REROLL_ACTION,
+  SKIP_ACTION,
+} from "@/engine/MatchController";
+import {
+  BOUNTY_WAVE_CAP_FRAC,
   metaHeal,
   reviveUnit,
   stepSimulation,
 } from "@/engine/CombatSystem";
 import { battleState, place, makeDummy, digest } from "./helpers";
 import { RNG } from "@/utils/rng";
-import { rollBoonOffers } from "@/data/boons";
+import {
+  BOONS,
+  boonRarityWeights,
+  ENDLESS_MYTHIC_WAVE,
+  boonStackSummary,
+  rollBoonOffers,
+} from "@/data/boons";
 import { DUNGEON_IDS, getDungeon } from "@/data/dungeons";
-import { ENDLESS_RARE_POOL } from "@/data/endless";
+import {
+  ENDLESS_FINAL_WAVE,
+  ENDLESS_RARE_POOL,
+  endlessBoonDefenseScale,
+  endlessBoonOffenseScale,
+} from "@/data/endless";
 import { getUnitDef } from "@/data/units";
 
 const DECK = ["ogre", "knight", "berserker", "archer"];
@@ -159,6 +175,99 @@ describe("endless — determinism", () => {
     const a = drive(4242, () => 0, 6000);
     const b = drive(4242, () => 1, 6000);
     expect(digest(b.mc.state)).not.toBe(digest(a.mc.state));
+  });
+});
+
+describe("endless — reroll + skip determinism", () => {
+  /** Drive a run answering each intermission from a scripted ACTION log, using
+   *  the same sentinels the real input log uses: >=0 pick, -1 reroll, -2 skip. */
+  function driveActions(seed: number, actions: number[], tickCap = 8000) {
+    const mc = new MatchController(seed, DECK, [], { mode: "endless" });
+    let i = 0;
+    let guard = 0;
+    while (
+      mc.phase !== "defeat" &&
+      mc.phase !== "victory" &&
+      guard < tickCap
+    ) {
+      mc.tick();
+      guard++;
+      if (mc.endlessStatus()?.intermission) {
+        const a = actions[i % actions.length];
+        i++;
+        if (a === REROLL_ACTION) {
+          // A refused reroll must not leave the run stuck in the intermission.
+          if (!mc.rerollBoons()) mc.pickBoon(0);
+        } else if (a === SKIP_ACTION) {
+          mc.skipBoon();
+        } else {
+          mc.pickBoon(a);
+        }
+      }
+    }
+    return mc;
+  }
+
+  it("same seed + same mixed action log => byte-identical end state", () => {
+    const log = [0, REROLL_ACTION, 2, SKIP_ACTION, 1, REROLL_ACTION, 0];
+    const a = driveActions(4242, log);
+    const b = driveActions(4242, log);
+    expect(digest(b.state)).toBe(digest(a.state));
+  });
+
+  it("a reroll diverges the run from the same log without one", () => {
+    const withReroll = driveActions(4242, [0, REROLL_ACTION, 0]);
+    const without = driveActions(4242, [0, 0, 0]);
+    expect(digest(withReroll.state)).not.toBe(digest(without.state));
+  });
+
+  it("rerolls are finite, and a REFUSED reroll consumes no randomness", () => {
+    // The sneaky failure mode: if a refused reroll still drew from the stream,
+    // a run that merely ATTEMPTED one would diverge from one that never tried.
+    const drainThenPick = (seed: number, attempt: boolean) => {
+      const mc = new MatchController(seed, DECK, [], { mode: "endless" });
+      let guard = 0;
+      let spent = false;
+      while (mc.phase !== "defeat" && guard < 8000) {
+        mc.tick();
+        guard++;
+        if (mc.endlessStatus()?.intermission) {
+          if (!spent) {
+            // Burn every banked reroll at the first intermission.
+            while (mc.rerollBoons()) { /* drain */ }
+            expect(mc.endlessStatus()!.rerollsLeft).toBe(0);
+            // Now the contested call: attempt one more (must be refused).
+            if (attempt) expect(mc.rerollBoons()).toBe(false);
+            spent = true;
+          }
+          mc.pickBoon(0);
+        }
+      }
+      return digest(mc.state);
+    };
+    expect(drainThenPick(99, true)).toBe(drainThenPick(99, false));
+  });
+
+  it("skipping heals the warband instead of granting a boon", () => {
+    const mc = new MatchController(777, DECK, [], { mode: "endless" });
+    let guard = 0;
+    while (guard < 8000 && !mc.endlessStatus()?.intermission) {
+      mc.tick();
+      guard++;
+    }
+    expect(mc.endlessStatus()?.intermission).toBeTruthy();
+    // Wound the warband so the skip heal is observable.
+    const band = mc.state.units.filter(
+      (u) => u.team === "player" && u.state !== "dead"
+    );
+    for (const u of band) u.hp = Math.max(1, Math.round(u.maxHp * 0.2));
+    const before = band.map((u) => u.hp);
+    const picksBefore = mc.endlessStatus()!.boonsPicked.length;
+
+    expect(mc.skipBoon()).toBe(true);
+    // No boon was banked, and everyone is healthier.
+    expect(mc.endlessStatus()!.boonsPicked.length).toBe(picksBefore);
+    band.forEach((u, i) => expect(u.hp).toBeGreaterThan(before[i]));
   });
 });
 
@@ -323,16 +432,113 @@ describe("endless — boon offer gating", () => {
     expect(new Set(withDead).size).toBe(3);
   });
 
+  it("rarity odds keep improving with depth instead of freezing at wave 11", () => {
+    // They used to freeze at wave 11: a wave-40 offer had the same odds as a
+    // wave-11 one, so the player's rate of gain stopped improving exactly where
+    // the horde's started accelerating.
+    expect(boonRarityWeights(40).epic).toBeGreaterThan(
+      boonRarityWeights(11).epic
+    );
+    expect(boonRarityWeights(40).common).toBeLessThan(
+      boonRarityWeights(11).common
+    );
+    // Wave 11 itself is unchanged, so nothing below it regresses.
+    expect(boonRarityWeights(11)).toEqual({
+      common: 45,
+      rare: 38,
+      epic: 17,
+      legendary: 0,
+      mythic: 0,
+    });
+    // The five always total exactly 100, stay non-negative, and the deep-tier
+    // share never goes backwards — that last one is the actual contract, and a
+    // clamped (rather than proportionally squeezed) common floor used to break
+    // it right at the cap boundary.
+    let prevDeepShare = -1;
+    for (let w = 1; w <= 120; w++) {
+      const t = boonRarityWeights(w);
+      expect(
+        Math.min(t.common, t.rare, t.epic, t.legendary, t.mythic)
+      ).toBeGreaterThanOrEqual(0);
+      expect(
+        t.common + t.rare + t.epic + t.legendary + t.mythic
+      ).toBeCloseTo(100, 6);
+      const deepShare = t.epic + t.legendary + t.mythic;
+      expect(deepShare).toBeGreaterThanOrEqual(prevDeepShare - 1e-9);
+      prevDeepShare = deepShare;
+    }
+  });
+
+  it("mythic is the rarest tier and never appears before its wave gate", () => {
+    // It must be strictly thinner than legendary wherever both exist, or it
+    // isn't really the top tier — and absent entirely before the gate.
+    expect(boonRarityWeights(ENDLESS_MYTHIC_WAVE - 1).mythic).toBe(0);
+    for (const w of [40, 55, 80, 120]) {
+      const t = boonRarityWeights(w);
+      expect(t.mythic).toBeGreaterThan(0);
+      expect(t.mythic).toBeLessThan(t.legendary);
+    }
+    const mythics = Object.values(BOONS)
+      .filter((b) => b.rarity === "mythic")
+      .map((b) => b.id);
+    expect(mythics.length).toBeGreaterThan(0);
+    for (let seed = 1; seed <= 60; seed++) {
+      const early = rollBoonOffers(30, new RNG(seed), false, new Set(), true);
+      for (const id of early) expect(mythics).not.toContain(id);
+    }
+    let sawMythic = false;
+    for (let seed = 1; seed <= 400 && !sawMythic; seed++) {
+      sawMythic = rollBoonOffers(60, new RNG(seed), false, new Set(), true).some(
+        (id) => mythics.includes(id)
+      );
+    }
+    expect(sawMythic).toBe(true);
+  });
+
+  it("legendary boons are gated out of the early pool by minWave", () => {
+    const legendaries = Object.values(BOONS)
+      .filter((b) => b.rarity === "legendary")
+      .map((b) => b.id);
+    expect(legendaries.length).toBeGreaterThan(0);
+    for (let seed = 1; seed <= 60; seed++) {
+      for (const id of rollBoonOffers(10, new RNG(seed), false, new Set(), true)) {
+        expect(legendaries).not.toContain(id);
+      }
+    }
+    // …and they do show up deep.
+    let sawMythic = false;
+    for (let seed = 1; seed <= 200 && !sawMythic; seed++) {
+      sawMythic = rollBoonOffers(45, new RNG(seed), false, new Set(), true).some(
+        (id) => legendaries.includes(id)
+      );
+    }
+    expect(sawMythic).toBe(true);
+  });
+
+  it("Warlord's Horn is never offered without a battle spell to recharge", () => {
+    for (let seed = 1; seed <= 120; seed++) {
+      const noSpell = rollBoonOffers(45, new RNG(seed), false, new Set(), false);
+      expect(noSpell).not.toContain("warlords_horn");
+    }
+    let sawHorn = false;
+    for (let seed = 1; seed <= 400 && !sawHorn; seed++) {
+      sawHorn = rollBoonOffers(45, new RNG(seed), false, new Set(), true).includes(
+        "warlords_horn"
+      );
+    }
+    expect(sawHorn).toBe(true);
+  });
+
   it("owned unique boons leave the offer pool; stackable ones stay", () => {
     // A second copy of a unique boon (Momentum, Overkill, …) is a no-op, so it
-    // must never be re-offered. Stackable boons may repeat.
-    const uniques = new Set([
-      "overkill",
-      "last_breath",
-      "overheal_ward",
-      "berserkers_rhythm",
-      "momentum",
-    ]);
+    // must never be re-offered. Stackable boons may repeat. DERIVED from the
+    // data rather than hardcoded, so adding a unique can't silently under-test.
+    const uniques = new Set(
+      Object.values(BOONS)
+        .filter((b) => b.unique && b.offerIf == null && (b.minWave ?? 0) <= 12)
+        .map((b) => b.id)
+    );
+    expect(uniques.size).toBeGreaterThan(0);
     for (let seed = 1; seed <= 40; seed++) {
       const offers = rollBoonOffers(12, new RNG(seed), false, uniques);
       for (const id of offers) expect(uniques.has(id)).toBe(false);
@@ -345,6 +551,63 @@ describe("endless — boon offer gating", () => {
       );
     }
     expect(sawUnique).toBe(true);
+  });
+});
+
+describe("endless — flat boons scale with the wave", () => {
+  it("the defense/offense anchors grow, so a flat boon keeps its real value", () => {
+    // The whole point: Bulwark's 60 HP is four skeleton hits at wave 1 and a
+    // rounding error at wave 50 unless it rides the curve.
+    expect(endlessBoonDefenseScale(1)).toBeCloseTo(1, 5);
+    expect(endlessBoonDefenseScale(40)).toBeGreaterThan(
+      endlessBoonDefenseScale(20)
+    );
+    expect(endlessBoonOffenseScale(40)).toBeGreaterThan(
+      endlessBoonOffenseScale(20)
+    );
+  });
+
+  it("boonStackSummary reports the LIVE value at a wave, not the base number", () => {
+    const w1 = boonStackSummary("bulwark", 1, 1).join(" ");
+    const w40 = boonStackSummary("bulwark", 1, 40).join(" ");
+    expect(w1).toContain("60 HP shield");
+    expect(w40).not.toBe(w1);
+    // The wave-40 figure is the base times that wave's defense anchor.
+    const scaled = Math.round(60 * endlessBoonDefenseScale(40));
+    expect(w40).toContain(`${scaled} HP shield`);
+  });
+
+  it("a Bulwark taken on wave 1 is still worth its full value much later", () => {
+    // Drive a real run, always taking Bulwark when offered, and check the shield
+    // the controller actually stamps on the warband tracks the current wave.
+    const mc = new MatchController(31337, DECK, [], { mode: "endless" });
+    let guard = 0;
+    let sawScaled = false;
+    while (guard < 40000 && !sawScaled) {
+      mc.tick();
+      guard++;
+      for (const u of mc.state.units) {
+        if (u.team === "player" && u.state !== "dead") metaHeal(mc.state, u, u.maxHp);
+      }
+      const st = mc.endlessStatus();
+      if (st?.intermission) {
+        const idx = st.intermission.offers.findIndex((o) => o.id === "bulwark");
+        mc.pickBoon(idx >= 0 ? idx : 0);
+        const owned = mc
+          .endlessStatus()!
+          .boonsPicked.find((b) => b.id === "bulwark");
+        if (owned && mc.endlessStatus()!.wave >= 6) {
+          const expected = Math.round(
+            60 * owned.count * endlessBoonDefenseScale(mc.endlessStatus()!.wave)
+          );
+          const shielded = mc.state.units.find(
+            (u) => u.team === "player" && u.shieldHp >= expected
+          );
+          if (expected > 60 && shielded) sawScaled = true;
+        }
+      }
+    }
+    expect(sawScaled).toBe(true);
   });
 });
 
@@ -394,6 +657,92 @@ describe("endless — once-per-battle passives re-arm each wave", () => {
     expect(assassin.effects.some((e) => e.type === "stealth")).toBe(true);
     const ogre = warband.find((u) => u.defId === "ogre")!;
     expect(ogre.ambushReady).toBe(false);
+  });
+});
+
+describe("endless — the wave-100 capstone", () => {
+  /** Drive to a target wave by fiat: top the warband up AND fell every monster
+   *  the instant it lands. Plain god-mode healing is NOT enough to get here —
+   *  taking the first offered boon every time leaves the warband unable to
+   *  out-damage a wave-88 horde, and the stall detector correctly ends the run.
+   *  That's the balance working, but it makes it useless as a way to reach the
+   *  capstone, so this harness removes the fight entirely and tests only the
+   *  capstone plumbing. */
+  function driveToWave(seed: number, target: number) {
+    const mc = new MatchController(seed, DECK, [], { mode: "endless" });
+    let guard = 0;
+    while (
+      mc.phase !== "defeat" &&
+      mc.phase !== "victory" &&
+      guard < 400_000 &&
+      mc.wavesSurvived() < target
+    ) {
+      mc.tick();
+      guard++;
+      for (const u of mc.state.units) {
+        if (u.team === "player") {
+          if (u.state !== "dead") metaHeal(mc.state, u, u.maxHp);
+        } else if (u.state !== "dead") {
+          u.hp = 0;
+          u.state = "dead";
+        }
+      }
+      // Stop AT the target intermission rather than answering it — otherwise
+      // the pick advances to the next wave and the choice beat is missed.
+      if (mc.endlessStatus()?.intermission) {
+        if (mc.wavesSurvived() >= target) break;
+        mc.pickBoon(0);
+      }
+    }
+    return mc;
+  }
+
+  it("finishing is refused before the capstone falls", () => {
+    const mc = new MatchController(4242, DECK, [], { mode: "endless" });
+    expect(mc.finishEndless()).toBe(false); // not even in an intermission
+    let guard = 0;
+    while (guard < 8000 && !mc.endlessStatus()?.intermission) {
+      mc.tick();
+      guard++;
+    }
+    expect(mc.endlessStatus()?.intermission).toBeTruthy();
+    // In an intermission, but nowhere near wave 100.
+    expect(mc.finishEndless()).toBe(false);
+    expect(mc.phase).not.toBe("victory");
+  });
+
+  it("the reserve sentinel stays pinned at 1 even after the capstone", () => {
+    // The mid-run protection must hold by CONSTRUCTION, not by tuning: an empty
+    // field between waves must never be readable as a win, at any wave number.
+    const mc = driveToWave(4242, ENDLESS_FINAL_WAVE);
+    expect(mc.wavesSurvived()).toBeGreaterThanOrEqual(ENDLESS_FINAL_WAVE);
+    expect(mc.state.enemyReserves).toBe(1);
+    // Reaching wave 100 does NOT auto-win — the player still chooses.
+    expect(mc.phase).not.toBe("victory");
+  });
+
+  it("clearing the capstone offers the choice, and claiming it wins the run", () => {
+    const mc = driveToWave(4242, ENDLESS_FINAL_WAVE);
+    const st = mc.endlessStatus()!;
+    expect(st.completedFinalWave).toBe(true);
+    expect(st.atFinalWaveChoice).toBe(true);
+    expect(mc.finishEndless()).toBe(true);
+    expect(mc.phase).toBe("victory"); // the only victory endless can produce
+    expect(mc.wavesSurvived()).toBe(ENDLESS_FINAL_WAVE);
+  });
+
+  it("declining lets the run continue past 100, still flagged as completed", () => {
+    const mc = driveToWave(4242, ENDLESS_FINAL_WAVE);
+    expect(mc.endlessStatus()!.atFinalWaveChoice).toBe(true);
+    mc.pickBoon(0); // press on instead of claiming
+    expect(mc.phase).toBe("battle"); // the run did NOT end
+    // The choice prompt is a one-time beat, but the completion latches.
+    const after = mc.endlessStatus()!;
+    expect(after.completedFinalWave).toBe(true);
+    expect(after.atFinalWaveChoice).toBe(false);
+    expect(after.wave).toBe(ENDLESS_FINAL_WAVE + 1);
+    // …and it can still be banked later.
+    expect(mc.finishEndless()).toBe(false); // mid-wave, not an intermission
   });
 });
 
@@ -511,11 +860,12 @@ describe("endless — proc boon mechanics (via teamMods funnels)", () => {
     expect(ally.hp).toBe(30); // 10 + 20 killHeal
   });
 
-  it("Bounty Hunter grows the slayer's max HP on a kill", () => {
+  it("Bounty Hunter grows the slayer's max HP by a fraction on a kill", () => {
     const s = battleState(36);
-    s.teamMods.player.bountyHp = 5;
+    s.teamMods.player.bountyPct = 0.1; // 10% of max per kill
     const slayer = place(s, "berserker", "player", 200, 300);
     const startMax = slayer.maxHp;
+    slayer.bountyBaseHp = startMax; // as the wave start would set it
     const prey = place(s, "skeleton", "enemy", 200, 350);
     prey.moveSpeed = 0;
     prey.damage = 0;
@@ -526,7 +876,32 @@ describe("endless — proc boon mechanics (via teamMods funnels)", () => {
       guard++;
     }
     expect(prey.state).toBe("dead");
-    expect(slayer.maxHp).toBe(startMax + 5);
+    expect(slayer.maxHp).toBe(startMax + Math.round(startMax * 0.1));
+  });
+
+  it("Bounty Hunter's per-wave cap stops it compounding into invulnerability", () => {
+    // A deep wave is 40 bodies. Uncapped at 10%/kill that is 1.1^40 = 45x max HP
+    // in a single wave; the cap holds it to +25% of the wave's opening max.
+    const s = battleState(40);
+    s.teamMods.player.bountyPct = 0.1;
+    const slayer = place(s, "berserker", "player", 200, 300);
+    const startMax = slayer.maxHp;
+    slayer.bountyBaseHp = startMax;
+    for (let i = 0; i < 12; i++) {
+      const prey = place(s, "skeleton", "enemy", 200 + i, 350);
+      prey.moveSpeed = 0;
+      prey.damage = 0;
+      prey.hp = prey.maxHp = 5;
+      let guard = 0;
+      while (prey.state !== "dead" && guard < 300) {
+        stepSimulation(s);
+        guard++;
+      }
+    }
+    expect(slayer.maxHp).toBeGreaterThan(startMax); // it did pay out
+    expect(slayer.maxHp).toBeLessThanOrEqual(
+      startMax + Math.round(startMax * BOUNTY_WAVE_CAP_FRAC)
+    );
   });
 
   it("Last Breath cheats a fatal blow once, then is spent", () => {

@@ -253,6 +253,11 @@ export interface Unit {
   /** Endless "Last Breath" boon: a per-wave cheat-death charge. The controller
    *  refreshes it each wave start; the damage funnel consumes it on a fatal blow. */
   cheatDeathReady: boolean;
+  /** Endless "Bounty Hunter" boon: max HP gained from bounties THIS wave, and the
+   *  wave's opening max HP that the per-wave cap is measured against. Both are
+   *  reset at each wave start by the EndlessController; 0 everywhere else. */
+  bountyWaveGain: number;
+  bountyBaseHp: number;
   /** Number of split-clones the slime has already spawned (caps splitting). */
   splitsSpawned: number;
   /** Slime Knight rebirth counter: 0 for a fresh knight, +1 each reincarnation.

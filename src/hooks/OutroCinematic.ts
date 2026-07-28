@@ -81,6 +81,9 @@ interface ChestState {
   tier: ChestTier;
   opened: boolean;
   clock: number; // ms since this chest's open tap
+  /** Free-running since the chest was fielded — unlike `clock` it advances while
+   *  the chest is still shut, which is what drives the legendary idle aura. */
+  ambient: number;
   revealed: boolean;
   sparkles: Sparkle[];
   onReveal: (() => void) | null;
@@ -91,6 +94,7 @@ function makeChestState(point: Vec2, tier: ChestTier): ChestState {
     tier,
     opened: false,
     clock: 0,
+    ambient: 0,
     revealed: false,
     sparkles: [],
     onReveal: null,
@@ -234,6 +238,7 @@ export class OutroCinematic {
       t: c.opened ? c.clock : 0,
       opening: c.opened,
       sparkles: c.sparkles,
+      clock: c.ambient,
     }));
   }
 
@@ -330,6 +335,7 @@ export class OutroCinematic {
     // Reward chest(s): advance each opened lid and fire its one-shot reveal the
     // instant it lands (spawning that chest's burst sparkles at the same beat).
     for (const c of this.chestList) {
+      c.ambient += dtMs; // always — an unopened legendary chest still glows
       if (!c.opened) continue;
       c.clock += dtMs;
       if (!c.revealed && c.clock >= OPEN_AT) {

@@ -371,6 +371,236 @@ knowing:
   `onBeforeAttack`, not `onSpawn`). The Silencer's opening stealth is a
   pre-existing casualty of this — unrelated to the revamp.
 
+### 4g. Endless deep retune (2026-07-28) — the sweep baseline
+A playtester reported a hard wall at wave ~40 with "no ramp up after that".
+Confirmed, measured, and now reproducible: **`src/engine/__tests__/endlessSweep.test.ts`**
+(SWEEP-gated, sibling of `winrateSweep`). The 2026-07-11 retune's 320-run sweep
+lived in a scratchpad and was never committed, which is exactly why this
+regressed unnoticed — this one is in the repo. Shared scaffolding (gear ladder,
+player-power tiers, percentile helpers) lives in `__tests__/sweepKit.ts`.
+
+```bash
+SWEEP=1 SWEEP_ONLY=shape npm test -- endlessSweep   # curve table, instant, no sim
+SWEEP=1 npm test -- endlessSweep                    # full matrix + ceiling (~2 min)
+```
+
+**The diagnosis.** `endlessWaveStatMultipliers` multiplied its curve by a doubly
+exponential deep term, `(1.05 + 0.01·(w−25))^(w−25)`. What matters is not its
+size but its *slope*: the waves a stronger warband buys is `≈ ln2 / L′`, where
+`L′` is the local net growth rate at the death point.
+
+| wave | 25 | 30 | 35 | **40** | 45 |
+|---|---|---|---|---|---|
+| waves bought per 2× warband | 17.1 | 2.3 | 1.5 | **1.1** | 0.9 |
+
+At wave 40 **doubling your warband's power buys one wave**. That is the wall, and
+it's why no amount of levelling or gear helped.
+
+**Baseline (4 decks × 3 power tiers × 5 pick policies × 8 seeds, + a 40-seed
+ceiling probe).** Starting power moves the *floor* enormously and the *ceiling*
+not at all — fresh/balanced/first-pick medians ~11, maxed/elite/oracle ~41, but
+every cell lands in 36–41 regardless. The ceiling probe is the clearest picture:
+
+```
+median 41, p75 43, p90 44, max 77
+38,39,39,39,39,40,40,40,40,40,40,40,40,40,40,40,40,40,41,41,41,41,41,41,41,
+41,41,41,43,43,43,43,43,43,43,44,44,45,57,77
+```
+
+37 of 40 seeds inside 38–45. A distribution with no tail *is* a wall, whatever
+the median says.
+
+**Secondary findings the baseline surfaced:**
+- **13–25% of runs die to `timeout`, not to damage** — the run ends on the 120s
+  wave clock while the warband is still alive. But mean wave duration is only
+  13–23s, so this is not general slowness: it's a stalemate (nothing killable in
+  reach) and it reads to a player as a completely arbitrary death.
+- **A shipped crash**, found on the harness's first full run: a flat kit
+  damage-reflect traded against fractional thorns recursed until the stack blew.
+  Fixed in `CombatSystem` (`MAX_DAMAGE_CHAIN`) — see the commit and the
+  `invariants.test.ts` regression. Reachable in the Overgrowth too, not just
+  Endless.
+- **Harness gotcha**: with the default `SWEEP_SEEDS=8`, `p90` and `max` are the
+  same order statistic. Read `p75` for the body of the distribution, or raise the
+  seed count.
+
+### 4h. Endless deep retune (2026-07-28) — what shipped and how it's tuned
+Five changes, in the order they were made and swept (each re-swept on its own so
+every movement is attributable):
+
+1. **The curve** — `endlessWaveStatMultipliers` is now a true exponential
+   (`1.045` hp / `1.031` dmg per wave, tracking the old curve within a few percent
+   through wave 25) × a late super-exponential closer `exp(K·o·(o+1)/2)` past
+   `ENDLESS_SURGE_START`. The per-cycle `step` term is gone (it only added a
+   sawtooth). **Two knobs: `SURGE_START` sets where the median lands, `SURGE_K`
+   sets the spread.** Small K = long tail; the old curve's effective K was ~4×
+   today's, which is what collapsed everyone onto wave 40.
+2. **The wave clock is a stall detector**, not a DPS check. It refreshes whenever
+   the warband makes progress — measured as a high-watermark of enemy HP *removed*
+   (`maxHp − hp` summed), which is what makes it work on a BOSS wave where there
+   is only one thing to kill. A fresh spawn contributes 0 so the trickle can't
+   fake progress; watermarking means a boss that heals back everything you land
+   correctly never registers. Absolute 480s per-wave ceiling behind it.
+3. **Flat boons scale** with the wave (two anchors, `endlessBoonDefenseScale` /
+   `endlessBoonOffenseScale`). The controller stores an UNSCALED base and rebuilds
+   the live value at each wave start — so `applyWaveStartBoons` is now the single
+   writer for `waveShield`/`regen`/`killHeal`/`onHitRiders`. **Bounty Hunter is
+   the exception**: permanent max HP per kill can't ride the enemy curve without
+   compounding into invulnerability, so it became a % of the killer's own max HP
+   with a per-wave cap.
+4. **Rarity odds keep climbing** past wave 11 instead of freezing, plus a
+   `mythic` tier and a `minWave` gate.
+5. **Reroll / skip / five deep-tier boons.** `ascendant` is the tail-maker — the
+   only boon that raises the warband's growth RATE rather than its level.
+
+**Final calibration (`SURGE_START` 22, `SURGE_K` 0.013).** Ceiling probe = elite
+deck, maxed level/gear/commander, perfect drafting, 40 seeds:
+
+| | baseline | after |
+|---|---|---|
+| median | 41 | 55 |
+| p90 | 44 | 71 |
+| max | 77 | 107 |
+| spread | **38–45** | **45–107** |
+| ended by timeout | 5% | 10% |
+
+The spread is the whole point — 7 waves of tail became 62. Across the matrix,
+weak drafts land ~35–45, competent mid-power runs ~40–62, god-runs 70–107.
+
+**Retuning it later:** run `SWEEP=1 SWEEP_ONLY=shape` (instant) for the curve
+table, then the full sweep. Move `SURGE_START` for the median and `SURGE_K` for
+the spread, one at a time. ⚠ **Anything that buffs the player moves the median a
+long way** — adding the boon changes above pushed every run past the harness's
+120-wave cap and needed K to go from 0.005 to 0.013. Always recalibrate LAST.
+
+### 4i. The Legendary Reliquary + the Endless wave-100 capstone (2026-07-28)
+A sixth chest tier above `dragon`, and the run-completion that pays it.
+
+**`legendary` is deliberately NOT in `CHEST_TIER_ORDER`.** That array drives
+`bumpChestTier`, and Elite content bumps **+2** — an Elite Spire first clear
+would otherwise hand out the capstone chest routinely. Excluding it means no
+bump can ever climb in; the tier is reachable exactly two ways:
+- clearing `ENDLESS_FINAL_WAVE` (100) in Endless, and
+- a flat `LEGENDARY_CHEST_DROP_CHANCE` (0.05%, 1-in-2000) on any dungeon chest.
+
+The prize lives **inside** the chest (2500 gold, 250 shards, a guaranteed
+legendary-quality item, a guaranteed unit) rather than alongside it, so it pays
+identically from either source. The 0.05% roll sits at the `makeChest` seam on
+its own XOR-salted stream (`0x1e6e0d` — the house idiom, cf. `0x5eed` Lucky
+Coin), so it perturbs neither the coin roll nor `rollChest`'s stream and every
+legacy chest seed still rolls byte-identically.
+
+**⚠ Three places a new chest tier breaks WITHOUT a compile error:**
+`quests.ts` `VALID_TIERS` (a whitelist — an omission silently nulls persisted
+quest rewards on load), the `.tier-<name>` CSS class (built by template
+literal), and `chestArt.ts`'s `drawBodyDecor`/`drawLidDecor`/`drawLatch`, whose
+terminal `else` is the DRAGON branch — a new tier silently inherits scales and
+horns.
+
+**The capstone, and why it can't cause an accidental victory.** Endless was
+architecturally forbidden from resolving to `victory`: `reservesSentinel` pins
+`enemyReserves` to 1 so the "enemies dead AND no reserves" check can never fire
+(the field is genuinely empty at every intermission). That sentinel is
+**unchanged** — the capstone victory is set *explicitly* by
+`MatchController.finishEndless()`, never inferred from the field, so the mid-run
+protection still holds by construction. The check also sits **before** the
+wave-clock intercept, or the 480s hard cap would steal a slow capstone kill.
+
+Clearing wave 100 doesn't force a stop: declining simply never calls
+`finishEndless`, the waves continue, and the results card still reads
+"conquered" because it keys off the **wave count**, not the phase.
+
+Repeatable on purpose — at ~3.5% of runs even at max power it can't be farmed.
+
+**Art.** `drawChest` gained an optional free-running `ambientMs`, because `t` is
+pinned at 0 while a chest is shut and `ChestSprite` drew one static frame and
+stopped. Only the legendary tier reads it (rotating ray fans, breathing halo,
+orbiting motes); every other tier ignores it, so passing 0 is today's behaviour.
+Verified by reading pixels back (screenshots don't work in the preview pane):
+closed-chest light *outside* the body is 7157 lit px / 149 units for legendary
+vs 4083/70 arcane, 3813/58 dragon, and an unchanged 550/11 for wooden/silver/
+gold; frame-hashing five ambient times gives legendary 5 distinct frames, dragon 1.
+
+**Testing gotcha:** god-mode healing alone canNOT drive a run to wave 100 —
+first-offer drafting leaves the warband unable to out-damage a wave-88 horde and
+the stall detector correctly ends the run. The capstone specs fell every monster
+on spawn; they test the plumbing, not combat.
+
+### 4j. Mythic boons (2026-07-28) — the first tier tuned to a MEASURED target
+The old top boon tier was renamed **mythic → legendary** (so the word matches
+units, items and chests), and a genuinely rarer **mythic** tier sits above it.
+Ladder: common → rare → epic → legendary → mythic.
+
+Mythic is the only content in the repo designed against a number rather than a
+feel: the brief was "raise the chance of reaching wave 100 by ~10 points". The
+`endlessSweep` ceiling probe prints reach odds directly, so it was tuned by
+measurement (200 seeds per iteration, best-play `greedy` policy, max power):
+
+| | before | after |
+|---|---|---|
+| reach wave 100 | 3.5% | **12.0%** |
+| reach wave 90 | 8.0% | 22.5% |
+| reach wave 70 | 34% | 61% |
+| runs that never ended | 0% | 0% |
+
+Three boons, each attacking a different reason deep runs end — **Apotheosis**
+(outgrows the curve: Ascendant's mechanic at ~2× the slope), **Undying Legion**
+(refuses to lose bodies: raises *every* corpse each wave), **Worldbreaker**
+(ignores how fat the horde got: rends a % of the target's max HP).
+
+**⚠ THE LESSON, worth more than the numbers.** Worldbreaker's first cut was an
+uncapped % of max HP. That makes **time-to-kill independent of enemy HP**, which
+silently deletes the entire HP half of the difficulty curve — measured, **69% of
+god-tier runs sailed past wave 300 without dying**, i.e. the immortality problem
+the whole curve design exists to prevent. It now caps at `MAX_HP_REND_CAP_MULT`
+(2×) of the hit it rides on, which keeps the flavour while leaving time-to-kill a
+growing function of enemy HP.
+
+**Any future enemy-relative effect (% max HP, % current HP, flat-per-enemy true
+damage) has this same failure mode and must be bounded by something the PLAYER
+scales, not the enemy.** A fixed-rate player buff always loses to the
+accelerating surge; an enemy-relative one does not.
+
+### 4k. Sweep policies — the archetypes were a strawman (2026-07-28)
+The sweep's drafting policies scored `rarityScore` (0–4) **plus +10 for matching
+the build's preferred axis**. Fit therefore outranked rarity by miles: `bruiser`
+would take a **common** damage boon over a **mythic** Apotheosis. No player
+drafts that way, and it made both archetypes look unplayable.
+
+Fixed by scaling rarity ×10 and capping the fit bonus at `FIT_BONUS` (4) — always
+less than one rarity step, so preference breaks ties between comparable cards but
+never argues you out of a rarer one. Also added three **hybrid** policies that
+steer toward whichever axis the warband is currently short of (using the `owned`
+list, which had been threaded through the policy signature and never used).
+
+Reach-wave-100 odds, 200 seeds each, max power — **no balance change between
+these two columns, only the scoring fix**:
+
+| policy | before | after |
+|---|---|---|
+| hybridOff (2:1 offence, mixed) | — | **26.5%** |
+| turtle | **0%** | 17.5% |
+| hybrid (self-correcting) | — | 17.5% |
+| bruiser | **0%** | 16.5% |
+| hybridDef | — | 15.5% |
+| greedy (chase rarity) | 14.5% | 14.5% |
+| first (take the leftmost) | 12.0% | 12.0% |
+| oracle (rigid "best boons" list) | 4.0% | 4.0% |
+
+**This reversed a conclusion I had already written down.** On the old numbers the
+two dumbest policies won and I recorded that drafting "punished thinking". It
+doesn't: a thought-out mixed build (26.5%) nearly doubles naive rarity-chasing
+(14.5%). The earlier finding was an artifact of the broken scoring.
+
+`oracle` is now the worst policy in the set and that is *informative*, not a bug:
+following a fixed preference ranking regardless of what your warband lacks loses
+badly to adapting. The ceiling probe's default moved from `oracle` to `hybridOff`
+so the headline number reflects good play.
+
+⚠ **Before concluding anything from a sweep policy, check the policy is a fair
+model of a player.** A balance number is only as honest as the behaviour it
+assumes.
+
 ### 5. The Depths spawns bypass the deploy() path
 `WaveController` (the PvE horde director) pushes monsters into `state.units`
 directly — no deck bookkeeping, no deployment records (waves rebuild

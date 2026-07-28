@@ -113,8 +113,11 @@ export interface TeamMods {
   thornsFrac: number;
   /** Bloodfeast: heal the whole team this many HP per kill. */
   killHeal: number;
-  /** Bounty Hunter: killer gains this much permanent max HP per kill. */
-  bountyHp: number;
+  /** Bounty Hunter: killer gains this FRACTION of its own max HP, permanently,
+   *  per kill — capped per wave by BOUNTY_WAVE_CAP_FRAC. A percentage rather than
+   *  a flat number so it keeps pace with a deep run without the flat version's
+   *  runaway (see the note in EndlessController.applyBoon). */
+  bountyPct: number;
   /** Overheal Ward: overheal banks as shield. */
   overheal: boolean;
   /** Last Breath: once-per-wave cheat death (consumes unit.cheatDeathReady). */
@@ -125,6 +128,16 @@ export interface TeamMods {
   rangedLifesteal: number;
   /** Berserker's Rhythm: live attack-speed bonus, ramped by the controller. */
   rhythmBonus: number;
+  /** Siege Train: live outgoing-damage bonus that climbs the longer the current
+   *  wave has run. Ramped by the EndlessController like rhythmBonus; 0 = off. */
+  siegeBonus: number;
+  /** Soul Harvest: live outgoing-damage bonus accumulated from kills this wave.
+   *  Reset each wave start by the EndlessController; 0 = off. */
+  killStackBonus: number;
+  /** Worldbreaker: each hit additionally rends this fraction of the TARGET's max
+   *  HP. Unlike every other damage mod this is enemy-relative, so it does not
+   *  decay against a growing horde. 0 = off. */
+  maxHpRend: number;
   /** Thunderclap / Venom Coating on-hit riders. */
   onHitRiders: TeamRider[];
   /** Compendium slayer bonus: outgoing damage multiplier vs a specific enemy
@@ -159,12 +172,15 @@ export function identityTeamMods(): TeamMods {
     executeBonus: 0,
     thornsFrac: 0,
     killHeal: 0,
-    bountyHp: 0,
+    bountyPct: 0,
     overheal: false,
     lastBreath: false,
     critEveryNth: 0,
     rangedLifesteal: 0,
     rhythmBonus: 0,
+    siegeBonus: 0,
+    killStackBonus: 0,
+    maxHpRend: 0,
     onHitRiders: [],
     slayerVs: {},
     deployShieldFrac: 0,
@@ -336,12 +352,49 @@ function stepItemUpkeep(
 // HP mutation helpers — the ONLY places hp changes.
 // ---------------------------------------------------------------------------
 
+/** Hard cap on how deep a damage REFLECT chain may recurse (see below). Set far
+ *  above any converging chain — a geometric reflect at the harshest fraction in
+ *  the game shrinks to nothing within ~13 bounces even from absurd damage — so
+ *  it only ever truncates a chain that would otherwise never terminate. */
+const MAX_DAMAGE_CHAIN = 24;
+
+/** Bounty Hunter's per-wave ceiling, as a fraction of the killer's max HP at the
+ *  START of the wave. Without it a deep 40-body wave compounds a warband into
+ *  invulnerability; with it the boon stays a strong steady climb. */
+export const BOUNTY_WAVE_CAP_FRAC = 0.25;
+
+/** Worldbreaker's rend may add at most this multiple of the hit it rides on.
+ *  See the note at its use site — without a cap it defeats the whole HP curve. */
+export const MAX_HP_REND_CAP_MULT = 2;
+
 function makeDamageDealer(
   state: SimState,
   makeKitCtx: (subject: Unit, damageContext?: boolean) => KitCtx,
   heal: (target: Unit, amount: number) => void
 ) {
-  return function dealDamage(target: Unit, amount: number, source: Unit): void {
+  // Re-entrancy depth. dealDamage recurses by design: a hit can fire the target's
+  // reflect (Thornmail / Squire's Plate thorns / Runeward feedback), and that
+  // reflect is itself a hit that can fire the ATTACKER's reflect. Fractional
+  // reflects shrink geometrically and converge, which is what the code below
+  // assumed — but a KIT reflect for a FLAT amount never shrinks. The Wildheart's
+  // 6-damage Thorned Hide traded against any thornsFrac ping-ponged until the
+  // call stack blew, hard-crashing the run (reachable in Endless via Thornmail,
+  // and in the Overgrowth via a legendary Squire's Plate). Cap the chain here
+  // rather than trusting every present and future kit to be fraction-based.
+  // Deterministic: a plain counter, no RNG, identical on every replay.
+  let depth = 0;
+
+  function dealDamage(target: Unit, amount: number, source: Unit): void {
+    if (depth >= MAX_DAMAGE_CHAIN) return;
+    depth++;
+    try {
+      resolveDamage(target, amount, source);
+    } finally {
+      depth--;
+    }
+  }
+
+  function resolveDamage(target: Unit, amount: number, source: Unit): void {
     if (target.state === "dead") return;
 
     const kit = getKit(target.defId);
@@ -432,9 +485,15 @@ function makeDamageDealer(
       const pt = packTacticsFrac(state, target);
       if (pt > 0) itemTakenMult *= Math.max(0, 1 - pt);
     }
+    // Endless deep-tier boons: Siege Train ramps with how long this wave has run,
+    // Soul Harvest with how many have died in it. Both turn "this wave is
+    // dragging" into "this wave is getting easier", which is what stops a deep
+    // wave becoming an unwinnable slog. Identity (×1) when both are 0.
+    const rampMult = 1 + srcMods.siegeBonus + srcMods.killStackBonus;
     const scaled =
       effAmount *
       srcMods.dmgMult *
+      rampMult *
       execMult *
       slayerMult *
       magicMult *
@@ -443,7 +502,21 @@ function makeDamageDealer(
       target.damageTakenMult *
       state.teamMods[target.team].damageTakenMult *
       itemTakenMult;
-    let dmg = Math.max(0, Math.round(scaled));
+    // Worldbreaker (Endless mythic): a slice of the TARGET's max HP, added after
+    // every multiplier so it is untouched by them.
+    //
+    // CAPPED AT A MULTIPLE OF YOUR OWN HIT, and that cap is the whole design.
+    // Uncapped, percent-max-HP damage makes time-to-kill INDEPENDENT of enemy
+    // HP — the horde's entire HP curve stops mattering and runs simply never
+    // end (measured: 69% of god-tier runs ran past wave 300 without dying).
+    // Bounding it by `scaled` keeps the flavour — you tear a real chunk out of
+    // anything, however vast — while leaving time-to-kill a growing function of
+    // enemy HP, so the curve still closes every run. Identity when 0.
+    const rend =
+      srcMods.maxHpRend > 0 && source.team !== target.team
+        ? Math.min(target.maxHp * srcMods.maxHpRend, scaled * MAX_HP_REND_CAP_MULT)
+        : 0;
+    let dmg = Math.max(0, Math.round(scaled + rend));
     const shown = dmg; // pre-absorb hit shown as the floating number
 
     // Absorb shield (overhealth) soaks damage before HP.
@@ -525,9 +598,19 @@ function makeDamageDealer(
         // heals the whole warband. Identity when both are 0.
         if (source !== target && source.state !== "dead") {
           const km = state.teamMods[source.team];
-          if (km.bountyHp > 0) {
-            source.maxHp += km.bountyHp;
-            source.hp += km.bountyHp; // grow into the new max
+          if (km.bountyPct > 0) {
+            // Percentage of the killer's OWN max HP, so it keeps pace with a deep
+            // run, but capped per wave: uncapped, a 40-body wave deep in a run
+            // would compound the warband into invulnerability. The counter is
+            // reset each wave by EndlessController.applyWaveStartBoons.
+            const cap = Math.round(source.bountyBaseHp * BOUNTY_WAVE_CAP_FRAC);
+            const room = Math.max(0, cap - source.bountyWaveGain);
+            const gain = Math.min(room, Math.round(source.maxHp * km.bountyPct));
+            if (gain > 0) {
+              source.bountyWaveGain += gain;
+              source.maxHp += gain;
+              source.hp += gain; // grow into the new max
+            }
           }
           if (km.killHeal > 0) {
             for (const ally of state.units) {
@@ -656,7 +739,9 @@ function makeDamageDealer(
       const back = Math.round(shown * feedback.frac);
       if (back > 0) dealDamage(source, back, target);
     }
-  };
+  }
+
+  return dealDamage;
 }
 
 function makeHealer(

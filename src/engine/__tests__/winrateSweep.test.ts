@@ -25,8 +25,8 @@ import { MatchController } from "@/engine/MatchController";
 import { DUNGEON_IDS, getDungeon } from "@/data/dungeons";
 import { tierMonsterLevel, type TierId } from "@/data/tiers";
 import { LEVEL_CAP } from "@/meta/leveling";
-import { makeItemKey } from "@/data/items";
-import type { ItemLoadouts } from "@/types";
+// The gear ladder is shared with endlessSweep — see __tests__/sweepKit.ts.
+import { GEAR_LADDER, gearFor, type GearTier } from "./sweepKit";
 
 // This project's tsconfig has no @types/node, so `process` is untyped. Vitest
 // provides it at runtime — declare a minimal shape just for the SWEEP flag.
@@ -54,33 +54,6 @@ const REFERENCE_DECK = ["knight", "fire_mage", "berserker", "healer"];
  *  past the cap on purpose). Tune target: ~65-75% F1-4, ~50% boss. */
 function intendedLevel(monsterLevel: number, floor: number): number {
   return Math.min(LEVEL_CAP, tierMonsterLevel(monsterLevel, TIER) + 1 + floor);
-}
-
-/** Gear tiers, coarse rungs of the item ladder mapped to a whole-deck loadout.
- *  Weapon = raw damage%, armor = raw HP% — the two that bake into stats, so they
- *  move the winrate the most. "none" is the byte-identical bare build. */
-type GearTier = "none" | "rare2" | "epic1" | "leg1" | "leg2" | "leg3";
-
-const GEAR_LADDER: GearTier[] = ["none", "rare2", "epic1", "leg1", "leg2", "leg3"];
-
-function gearFor(deck: string[], tier: GearTier): ItemLoadouts {
-  if (tier === "none") return {};
-  const [q, s] =
-    tier === "rare2"
-      ? (["rare", 2] as const)
-      : tier === "epic1"
-        ? (["epic", 1] as const)
-        : tier === "leg1"
-          ? (["legendary", 1] as const)
-          : tier === "leg2"
-            ? (["legendary", 2] as const)
-            : (["legendary", 3] as const);
-  const loadout = {
-    weapon: makeItemKey("soldiers_blade", q, s),
-    armor: makeItemKey("squires_plate", q, s),
-    ...(q === "legendary" ? { trinket: makeItemKey("ember_charm", q, s) } : {}),
-  };
-  return Object.fromEntries(deck.map((id) => [id, loadout]));
 }
 
 /** Auto-play one dungeon floor to a terminal phase. Mirrors depths.test's runner:
