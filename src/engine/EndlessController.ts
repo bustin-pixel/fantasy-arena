@@ -27,6 +27,7 @@ import {
   reviveUnit,
   type SimState,
   type TeamMods,
+  type TeamRider,
 } from "./CombatSystem";
 import { getKit } from "./kits/UnitKit";
 import { applyEffect, makeEffect } from "./StatusEffectSystem";
@@ -38,6 +39,7 @@ import {
 } from "@/data/depths";
 import {
   BOONS,
+  boonDescription,
   rollBoonOffers,
   type BoonDef,
   type BoonRarity,
@@ -54,6 +56,8 @@ import {
   ENDLESS_WAVE_HARD_CAP_SEC,
   ENDLESS_WAVE_TIME_SEC,
   dungeonForCycle,
+  endlessBoonDefenseScale,
+  endlessBoonOffenseScale,
   endlessCycle,
   endlessWaveBudget,
   endlessWaveKind,
@@ -117,9 +121,24 @@ export class EndlessController {
   private warbandUids: Set<string> | null = null;
 
   // -- Persistent run modifiers, accumulated from boon picks. ----------------
+  //
+  // NOTE two different disciplines live here, and mixing them up is the easy bug:
+  //   * most boons FOLD ONCE into state.teamMods at pick time (applyBoon), and
+  //   * the wave-scaled ones store an UNSCALED BASE here and are REBUILT from it
+  //     at every wave start (applyWaveStartBoons), so their live value tracks the
+  //     current wave's curve. applyWaveStartBoons is their single writer — never
+  //     fold these into teamMods at pick time or they'll double-apply.
   private intermissionHealPct = ENDLESS_INTERMISSION_HEAL;
-  private regenPerSec = 0;
-  private shieldPerWave = 0;
+  /** Unscaled Mending Aura HP/sec (see endlessBoonDefenseScale). */
+  private regenPerSecBase = 0;
+  /** Unscaled Bulwark shield. */
+  private shieldPerWaveBase = 0;
+  /** Unscaled Bloodfeast heal-per-kill. */
+  private killHealBase = 0;
+  /** Unscaled on-hit riders (Venom Coating's damagePerTick is wave-scaled; the
+   *  status riders like Thunderclap's stun carry no flat number and ride along
+   *  unchanged). */
+  private riderBase: TeamRider[] = [];
   /** Berserker's Rhythm active + its live ramp (ticks since this wave began). */
   private rhythmActive = false;
   private rhythmTicks = 0;
@@ -195,7 +214,13 @@ export class EndlessController {
       wavesCleared: this.wavesCleared,
       intermission:
         this.phase === "intermission" && this.offers
-          ? { wave: this.wavesCleared, offers: this.offers.map(toOffer) }
+          ? {
+              wave: this.wavesCleared,
+              // Described against the wave this pick OPENS, so a scaled boon's
+              // card quotes what it will actually be worth. BoonOffer.description
+              // is already a plain string, so no UI change is needed.
+              offers: this.offers.map((id) => toOffer(id, this.wave + 1)),
+            }
           : null,
       boonsPicked: this.boonTally(),
       momentumStacks: this.momentumActive ? this.momentumStacks : null,
@@ -418,11 +443,13 @@ export class EndlessController {
             this.intermissionHealPct + eff.addPct
           );
           break;
+        // The wave-scaled family: record the UNSCALED base; applyWaveStartBoons
+        // rebuilds the live value against the current wave's curve.
         case "regen":
-          this.regenPerSec += eff.hpPerSec; // takes effect at wave start
+          this.regenPerSecBase += eff.hpPerSec;
           break;
         case "waveShield":
-          this.shieldPerWave += eff.amount; // takes effect at wave start
+          this.shieldPerWaveBase += eff.amount;
           break;
         case "revive":
           this.reviveLowest(state, eff.hpPct);
@@ -435,10 +462,15 @@ export class EndlessController {
           state.teamMods.player.thornsFrac += eff.frac;
           break;
         case "killHeal":
-          state.teamMods.player.killHeal += eff.amount;
+          this.killHealBase += eff.amount; // wave-scaled at wave start
           break;
         case "bounty":
-          state.teamMods.player.bountyHp += eff.hp;
+          // Bounty Hunter grants PERMANENT max HP per kill, so it is the one flat
+          // boon that must NOT ride the enemy curve: scaled naively a wave-70 kill
+          // would grant ~150 max HP, and 40 of them ~6,000, compounding forever —
+          // the exact runaway the deep-end backstop exists to prevent. It scales
+          // off the killer's OWN max HP instead, capped per wave in dealDamage.
+          state.teamMods.player.bountyPct += eff.pctOfMax;
           break;
         case "overheal":
           state.teamMods.player.overheal = true;
@@ -459,7 +491,9 @@ export class EndlessController {
           this.momentumActive = true;
           break;
         case "onHitRider":
-          state.teamMods.player.onHitRiders.push({
+          // Base only — applyWaveStartBoons rebuilds teamMods.onHitRiders so a
+          // rider's flat damagePerTick tracks the wave.
+          this.riderBase.push({
             effectType: eff.effectType,
             everyNth: eff.everyNth,
             durationSec: eff.durationSec,
@@ -495,9 +529,30 @@ export class EndlessController {
   /** Wave-start boons on the living warband: refresh shields, (re)apply the regen
    *  HoT, and arm the Last Breath charge. Also re-arms the units' own once-per-
    *  battle one-shots, resets the rhythm ramp and summons fresh pets. Called at
-   *  the top of every wave. */
+   *  the top of every wave.
+   *
+   *  Also the SINGLE WRITER for the wave-scaled boon family (see the base fields
+   *  above): their live values are rebuilt here from the unscaled bases against
+   *  this wave's curve, so a Bulwark taken at wave 5 is still worth taking at
+   *  wave 50 and the "don't pick the flat ones early" trap is gone. */
   private applyWaveStartBoons(state: SimState): void {
     const lastBreath = state.teamMods.player.lastBreath;
+    const defScale = endlessBoonDefenseScale(this.wave);
+    const shieldPerWave = Math.round(this.shieldPerWaveBase * defScale);
+    const regenPerSec = this.regenPerSecBase * defScale;
+
+    // Rebuild (never accumulate) the scaled team mods for this wave.
+    state.teamMods.player.killHeal = Math.round(this.killHealBase * defScale);
+    if (this.riderBase.length > 0) {
+      const offScale = endlessBoonOffenseScale(this.wave);
+      state.teamMods.player.onHitRiders = this.riderBase.map((r) => ({
+        ...r,
+        damagePerTick:
+          r.damagePerTick == null
+            ? undefined
+            : Math.round(r.damagePerTick * offScale),
+      }));
+    }
     for (const u of this.warbandUnits(state)) {
       if (u.state === "dead") continue;
       if (lastBreath) u.cheatDeathReady = true;
@@ -511,6 +566,9 @@ export class EndlessController {
       u.lastStandUsed = false;
       u.stealthTriggerUsed = false;
       u.resurrectionUsed = false;
+      // Fresh Bounty Hunter allowance, measured against this wave's opening max HP.
+      u.bountyWaveGain = 0;
+      u.bountyBaseHp = u.maxHp;
       if (u.ability === "ambush") {
         u.ambushReady = true;
         applyEffect(
@@ -518,16 +576,16 @@ export class EndlessController {
           makeEffect("stealth", { source: u.uid, durationSec: ENDLESS_WAVE_TIME_SEC })
         );
       }
-      if (this.shieldPerWave > 0) {
-        u.shieldHp = Math.max(u.shieldHp, this.shieldPerWave);
-        u.shieldHpMax = Math.max(u.shieldHpMax, this.shieldPerWave);
+      if (shieldPerWave > 0) {
+        u.shieldHp = Math.max(u.shieldHp, shieldPerWave);
+        u.shieldHpMax = Math.max(u.shieldHpMax, shieldPerWave);
       }
-      if (this.regenPerSec > 0) {
+      if (regenPerSec > 0) {
         applyEffect(
           u,
           makeEffect("regen", {
             source: u.uid,
-            healPerTick: this.regenPerSec,
+            healPerTick: regenPerSec,
             tickIntervalSec: 1,
             durationSec: ENDLESS_WAVE_TIME_SEC,
           })
@@ -633,7 +691,12 @@ function foldTeamMod(mods: TeamMods, field: TeamModField, value: number): void {
   }
 }
 
-function toOffer(id: string): BoonOffer {
+function toOffer(id: string, wave: number): BoonOffer {
   const b = BOONS[id];
-  return { id, name: b.name, rarity: b.rarity, description: b.description };
+  return {
+    id,
+    name: b.name,
+    rarity: b.rarity,
+    description: boonDescription(id, wave),
+  };
 }

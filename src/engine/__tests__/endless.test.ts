@@ -5,15 +5,20 @@
 import { describe, it, expect } from "vitest";
 import { MatchController } from "@/engine/MatchController";
 import {
+  BOUNTY_WAVE_CAP_FRAC,
   metaHeal,
   reviveUnit,
   stepSimulation,
 } from "@/engine/CombatSystem";
 import { battleState, place, makeDummy, digest } from "./helpers";
 import { RNG } from "@/utils/rng";
-import { rollBoonOffers } from "@/data/boons";
+import { boonStackSummary, rollBoonOffers } from "@/data/boons";
 import { DUNGEON_IDS, getDungeon } from "@/data/dungeons";
-import { ENDLESS_RARE_POOL } from "@/data/endless";
+import {
+  ENDLESS_RARE_POOL,
+  endlessBoonDefenseScale,
+  endlessBoonOffenseScale,
+} from "@/data/endless";
 import { getUnitDef } from "@/data/units";
 
 const DECK = ["ogre", "knight", "berserker", "archer"];
@@ -348,6 +353,63 @@ describe("endless — boon offer gating", () => {
   });
 });
 
+describe("endless — flat boons scale with the wave", () => {
+  it("the defense/offense anchors grow, so a flat boon keeps its real value", () => {
+    // The whole point: Bulwark's 60 HP is four skeleton hits at wave 1 and a
+    // rounding error at wave 50 unless it rides the curve.
+    expect(endlessBoonDefenseScale(1)).toBeCloseTo(1, 5);
+    expect(endlessBoonDefenseScale(40)).toBeGreaterThan(
+      endlessBoonDefenseScale(20)
+    );
+    expect(endlessBoonOffenseScale(40)).toBeGreaterThan(
+      endlessBoonOffenseScale(20)
+    );
+  });
+
+  it("boonStackSummary reports the LIVE value at a wave, not the base number", () => {
+    const w1 = boonStackSummary("bulwark", 1, 1).join(" ");
+    const w40 = boonStackSummary("bulwark", 1, 40).join(" ");
+    expect(w1).toContain("60 HP shield");
+    expect(w40).not.toBe(w1);
+    // The wave-40 figure is the base times that wave's defense anchor.
+    const scaled = Math.round(60 * endlessBoonDefenseScale(40));
+    expect(w40).toContain(`${scaled} HP shield`);
+  });
+
+  it("a Bulwark taken on wave 1 is still worth its full value much later", () => {
+    // Drive a real run, always taking Bulwark when offered, and check the shield
+    // the controller actually stamps on the warband tracks the current wave.
+    const mc = new MatchController(31337, DECK, [], { mode: "endless" });
+    let guard = 0;
+    let sawScaled = false;
+    while (guard < 40000 && !sawScaled) {
+      mc.tick();
+      guard++;
+      for (const u of mc.state.units) {
+        if (u.team === "player" && u.state !== "dead") metaHeal(mc.state, u, u.maxHp);
+      }
+      const st = mc.endlessStatus();
+      if (st?.intermission) {
+        const idx = st.intermission.offers.findIndex((o) => o.id === "bulwark");
+        mc.pickBoon(idx >= 0 ? idx : 0);
+        const owned = mc
+          .endlessStatus()!
+          .boonsPicked.find((b) => b.id === "bulwark");
+        if (owned && mc.endlessStatus()!.wave >= 6) {
+          const expected = Math.round(
+            60 * owned.count * endlessBoonDefenseScale(mc.endlessStatus()!.wave)
+          );
+          const shielded = mc.state.units.find(
+            (u) => u.team === "player" && u.shieldHp >= expected
+          );
+          if (expected > 60 && shielded) sawScaled = true;
+        }
+      }
+    }
+    expect(sawScaled).toBe(true);
+  });
+});
+
 describe("endless — once-per-battle passives re-arm each wave", () => {
   it("spent one-shots reset and Ambush re-stealths when the next wave opens", () => {
     const mc = new MatchController(
@@ -511,11 +573,12 @@ describe("endless — proc boon mechanics (via teamMods funnels)", () => {
     expect(ally.hp).toBe(30); // 10 + 20 killHeal
   });
 
-  it("Bounty Hunter grows the slayer's max HP on a kill", () => {
+  it("Bounty Hunter grows the slayer's max HP by a fraction on a kill", () => {
     const s = battleState(36);
-    s.teamMods.player.bountyHp = 5;
+    s.teamMods.player.bountyPct = 0.1; // 10% of max per kill
     const slayer = place(s, "berserker", "player", 200, 300);
     const startMax = slayer.maxHp;
+    slayer.bountyBaseHp = startMax; // as the wave start would set it
     const prey = place(s, "skeleton", "enemy", 200, 350);
     prey.moveSpeed = 0;
     prey.damage = 0;
@@ -526,7 +589,32 @@ describe("endless — proc boon mechanics (via teamMods funnels)", () => {
       guard++;
     }
     expect(prey.state).toBe("dead");
-    expect(slayer.maxHp).toBe(startMax + 5);
+    expect(slayer.maxHp).toBe(startMax + Math.round(startMax * 0.1));
+  });
+
+  it("Bounty Hunter's per-wave cap stops it compounding into invulnerability", () => {
+    // A deep wave is 40 bodies. Uncapped at 10%/kill that is 1.1^40 = 45x max HP
+    // in a single wave; the cap holds it to +25% of the wave's opening max.
+    const s = battleState(40);
+    s.teamMods.player.bountyPct = 0.1;
+    const slayer = place(s, "berserker", "player", 200, 300);
+    const startMax = slayer.maxHp;
+    slayer.bountyBaseHp = startMax;
+    for (let i = 0; i < 12; i++) {
+      const prey = place(s, "skeleton", "enemy", 200 + i, 350);
+      prey.moveSpeed = 0;
+      prey.damage = 0;
+      prey.hp = prey.maxHp = 5;
+      let guard = 0;
+      while (prey.state !== "dead" && guard < 300) {
+        stepSimulation(s);
+        guard++;
+      }
+    }
+    expect(slayer.maxHp).toBeGreaterThan(startMax); // it did pay out
+    expect(slayer.maxHp).toBeLessThanOrEqual(
+      startMax + Math.round(startMax * BOUNTY_WAVE_CAP_FRAC)
+    );
   });
 
   it("Last Breath cheats a fatal blow once, then is spent", () => {

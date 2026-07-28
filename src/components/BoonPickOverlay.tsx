@@ -105,7 +105,9 @@ export function BoonPickOverlay({ wave, offers, boonsPicked, onPick, onRetire }:
               </div>
               <div className="boon-card-desc">{BOONS[info.id].description}</div>
               <ul className="boon-info-lines">
-                {boonStackSummary(info.id, info.count).map((line) => (
+                {/* wave + 1: the scaled boons report the value they'll have on
+                    the wave this pick is about to open, not the one just cleared. */}
+                {boonStackSummary(info.id, info.count, wave + 1).map((line) => (
                   <li key={line}>{line}</li>
                 ))}
               </ul>

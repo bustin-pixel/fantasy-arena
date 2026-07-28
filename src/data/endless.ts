@@ -156,6 +156,29 @@ export function endlessWaveStatMultipliers(wave: number): { hp: number; dmg: num
   };
 }
 
+// -- Boon value scaling -------------------------------------------------------
+// Some boons are denominated in ABSOLUTE hp/damage (Bulwark's 60 HP shield,
+// Mending Aura's 3 HP/sec, Bloodfeast's 12 HP/kill, Venom Coating's 6 dmg/sec).
+// Left flat they are four skeleton-hits at wave 1 and a rounding error at wave
+// 50 — dead cards clogging roughly a third of every deep offer. Scaling them by
+// the horde's own curve keeps their value CONSTANT in the currency that actually
+// matters: hits absorbed, or fraction of an enemy killed.
+//
+// Two anchors because the two kinds of flat value keep pace with different
+// things. The absolute numbers look absurd deep (Bulwark 60 → ~246 at wave 40)
+// but that is exactly right: it absorbs the same number of hits from enemies who
+// hit 3.7× harder.
+
+/** For values that SOAK incoming damage — shields, regen, heal-per-kill. */
+export function endlessBoonDefenseScale(wave: number): number {
+  return endlessWaveStatMultipliers(wave).dmg;
+}
+
+/** For values that must CHEW THROUGH enemy HP — poison and other flat damage. */
+export function endlessBoonOffenseScale(wave: number): number {
+  return endlessWaveStatMultipliers(wave).hp;
+}
+
 /** Fodder budget for a wave (the length dial; the concurrent cap paces it). Much
  *  smaller than a Depths FLOOR budget — a wave is a bite-sized skirmish the 4
  *  reserve-less units clear, heal from, then face a slightly bigger one. Rare and

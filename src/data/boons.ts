@@ -17,7 +17,11 @@
 
 import { RNG } from "@/utils/rng";
 import type { StatusEffectType } from "@/types";
-import { ENDLESS_INTERMISSION_HEAL } from "./endless";
+import {
+  ENDLESS_INTERMISSION_HEAL,
+  endlessBoonDefenseScale,
+  endlessBoonOffenseScale,
+} from "./endless";
 
 export type BoonRarity = "common" | "rare" | "epic";
 
@@ -50,8 +54,11 @@ export type BoonEffect =
   | { type: "thorns"; frac: number }
   /** Bloodfeast: each kill heals the whole warband this many HP. */
   | { type: "killHeal"; amount: number }
-  /** Bounty Hunter: each kill grants the killer this much permanent max HP. */
-  | { type: "bounty"; hp: number }
+  /** Bounty Hunter: each kill grants the killer this FRACTION of its own max HP,
+   *  permanently (capped per wave by BOUNTY_WAVE_CAP_FRAC). A fraction rather than
+   *  a flat number so it keeps pace deep in a run without compounding a warband
+   *  into invulnerability — see EndlessController.applyBoon. */
+  | { type: "bounty"; pctOfMax: number }
   /** Overheal Ward: healing past max HP banks as shield. */
   | { type: "overheal" }
   /** Last Breath: once per wave, a fatal blow leaves the unit at 1 HP. */
@@ -81,8 +88,12 @@ export interface BoonDef {
   id: string;
   name: string;
   rarity: BoonRarity;
-  /** One-line card text. */
+  /** One-line card text. For a wave-scaled boon this is the wave-1 wording and
+   *  would be a lie later, so those boons supply `describe` too. */
   description: string;
+  /** Live card text for a given wave. Present only on the wave-scaled boons;
+   *  `boonDescription` falls back to `description` otherwise. */
+  describe?: (wave: number) => string;
   effects: BoonEffect[];
   /** Offer gate. "allyDead" boons are only offered when a warband unit is down
    *  (and never appear otherwise). */
@@ -141,6 +152,8 @@ export const BOONS: Record<string, BoonDef> = {
     name: "Mending Aura",
     rarity: "common",
     description: "The warband regenerates 3 HP/sec in combat.",
+    describe: (w) =>
+      `The warband regenerates ${Math.round(3 * endlessBoonDefenseScale(w))} HP/sec in combat.`,
     effects: [{ type: "regen", hpPerSec: 3 }],
   },
 
@@ -150,6 +163,8 @@ export const BOONS: Record<string, BoonDef> = {
     name: "Bulwark",
     rarity: "rare",
     description: "The warband starts each wave with a 60 HP shield.",
+    describe: (w) =>
+      `The warband starts each wave with a ${Math.round(60 * endlessBoonDefenseScale(w))} HP shield.`,
     effects: [{ type: "waveShield", amount: 60 }],
   },
   vampirism: {
@@ -232,6 +247,8 @@ export const BOONS: Record<string, BoonDef> = {
     name: "Venom Coating",
     rarity: "rare",
     description: "Every 2nd attack poisons the target (6 dmg/sec for 4s).",
+    describe: (w) =>
+      `Every 2nd attack poisons the target (${Math.round(6 * endlessBoonOffenseScale(w))} dmg/sec for 4s).`,
     effects: [
       {
         type: "onHitRider",
@@ -248,6 +265,8 @@ export const BOONS: Record<string, BoonDef> = {
     name: "Bloodfeast",
     rarity: "rare",
     description: "Each kill heals the whole warband for 12 HP.",
+    describe: (w) =>
+      `Each kill heals the whole warband for ${Math.round(12 * endlessBoonDefenseScale(w))} HP.`,
     effects: [{ type: "killHeal", amount: 12 }],
   },
   thornmail: {
@@ -304,8 +323,8 @@ export const BOONS: Record<string, BoonDef> = {
     id: "bounty_hunter",
     name: "Bounty Hunter",
     rarity: "epic",
-    description: "Each kill grants the slayer +2 permanent max HP.",
-    effects: [{ type: "bounty", hp: 2 }],
+    description: "Each kill permanently grows the slayer's max HP.",
+    effects: [{ type: "bounty", pctOfMax: 0.0015 }],
   },
   last_breath: {
     id: "last_breath",
@@ -351,6 +370,15 @@ export const BOONS: Record<string, BoonDef> = {
 /** Stable insertion order — the offer roller iterates this deterministically. */
 export const ALL_BOON_IDS: string[] = Object.keys(BOONS);
 
+/** A boon's card text for the wave it is about to apply on. The wave-scaled boons
+ *  quote their live number here so the card can't promise "60 HP" when the
+ *  controller is about to stamp 246. */
+export function boonDescription(id: string, wave: number): string {
+  const b = BOONS[id];
+  if (!b) return "";
+  return b.describe ? b.describe(wave) : b.description;
+}
+
 // -- Stack math (info panel) --------------------------------------------------
 // What `count` copies of a boon amount to, as human-readable lines. The math
 // mirrors EXACTLY how each effect folds in the EndlessController/CombatSystem:
@@ -362,11 +390,19 @@ const asPct = (x: number): string => `${Math.round(x * 100)}%`;
 /** Total gain of a per-copy multiplier applied `n` times: (1+v)^n - 1. */
 const compounded = (v: number, n: number): number => Math.pow(1 + v, n) - 1;
 
-export function boonStackSummary(id: string, count: number): string[] {
+export function boonStackSummary(
+  id: string,
+  count: number,
+  wave = 1
+): string[] {
   const boon = BOONS[id];
   if (!boon) return [];
   if (boon.unique) return ["Unique — one copy per run."];
   const lines: string[] = [];
+  // The wave-scaled family reports its LIVE value at `wave` (see
+  // endlessBoonDefenseScale) — a flat "60 HP shield" would be a lie by wave 40.
+  const def = endlessBoonDefenseScale(wave);
+  const off = endlessBoonOffenseScale(wave);
   for (const eff of boon.effects) {
     switch (eff.type) {
       case "teamMod": {
@@ -407,10 +443,14 @@ export function boonStackSummary(id: string, count: number): string[] {
         );
         break;
       case "regen":
-        lines.push(`${eff.hpPerSec * count} HP/sec regeneration in combat`);
+        lines.push(
+          `${Math.round(eff.hpPerSec * count * def)} HP/sec regeneration in combat (scales with the wave)`
+        );
         break;
       case "waveShield":
-        lines.push(`${eff.amount * count} HP shield at each wave start`);
+        lines.push(
+          `${Math.round(eff.amount * count * def)} HP shield at each wave start (scales with the wave)`
+        );
         break;
       case "revive":
         lines.push(`revived ${count === 1 ? "an ally" : `${count} allies`} at ${asPct(eff.hpPct)} HP`);
@@ -424,10 +464,14 @@ export function boonStackSummary(id: string, count: number): string[] {
         lines.push(`reflect ${asPct(eff.frac * count)} of damage taken`);
         break;
       case "killHeal":
-        lines.push(`${eff.amount * count} HP to the warband per kill`);
+        lines.push(
+          `${Math.round(eff.amount * count * def)} HP to the warband per kill (scales with the wave)`
+        );
         break;
       case "bounty":
-        lines.push(`+${eff.hp * count} permanent max HP to the slayer per kill`);
+        lines.push(
+          `+${(eff.pctOfMax * count * 100).toFixed(2)}% permanent max HP to the slayer per kill`
+        );
         break;
       case "rangedLifesteal":
         lines.push(`${asPct(eff.frac * count)} ranged lifesteal`);
@@ -435,9 +479,9 @@ export function boonStackSummary(id: string, count: number): string[] {
       case "onHitRider":
         lines.push(
           eff.damagePerTick != null
-            ? `every ${nth(eff.everyNth)} attack: ${eff.effectType} for ${
-                eff.damagePerTick * count
-              } dmg/sec (${eff.durationSec}s)`
+            ? `every ${nth(eff.everyNth)} attack: ${eff.effectType} for ${Math.round(
+                eff.damagePerTick * count * off
+              )} dmg/sec (${eff.durationSec}s, scales with the wave)`
             : `every ${nth(eff.everyNth)} attack: ${eff.effectType} (${eff.durationSec}s)`
         );
         break;
@@ -446,9 +490,17 @@ export function boonStackSummary(id: string, count: number): string[] {
           `${eff.count * count} compan${eff.count * count === 1 ? "ion" : "ions"} at each wave start`
         );
         break;
-      // crit / overheal / lastBreath / rhythm / momentum are all `unique` and
-      // returned above.
-      default:
+      // crit / overheal / lastBreath / rhythm / momentum are all `unique`, so the
+      // early return above already handled them — but they must still be listed
+      // for the switch to be exhaustive. NO `default` CASE ON PURPOSE: this
+      // function is a hand-maintained mirror of how EndlessController folds each
+      // effect, and a silent default is exactly how the two drift apart. Adding a
+      // BoonEffect variant should be a compile error here.
+      case "crit":
+      case "overheal":
+      case "lastBreath":
+      case "rhythm":
+      case "momentum":
         break;
     }
   }

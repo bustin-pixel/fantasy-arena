@@ -113,8 +113,11 @@ export interface TeamMods {
   thornsFrac: number;
   /** Bloodfeast: heal the whole team this many HP per kill. */
   killHeal: number;
-  /** Bounty Hunter: killer gains this much permanent max HP per kill. */
-  bountyHp: number;
+  /** Bounty Hunter: killer gains this FRACTION of its own max HP, permanently,
+   *  per kill — capped per wave by BOUNTY_WAVE_CAP_FRAC. A percentage rather than
+   *  a flat number so it keeps pace with a deep run without the flat version's
+   *  runaway (see the note in EndlessController.applyBoon). */
+  bountyPct: number;
   /** Overheal Ward: overheal banks as shield. */
   overheal: boolean;
   /** Last Breath: once-per-wave cheat death (consumes unit.cheatDeathReady). */
@@ -159,7 +162,7 @@ export function identityTeamMods(): TeamMods {
     executeBonus: 0,
     thornsFrac: 0,
     killHeal: 0,
-    bountyHp: 0,
+    bountyPct: 0,
     overheal: false,
     lastBreath: false,
     critEveryNth: 0,
@@ -341,6 +344,11 @@ function stepItemUpkeep(
  *  the game shrinks to nothing within ~13 bounces even from absurd damage — so
  *  it only ever truncates a chain that would otherwise never terminate. */
 const MAX_DAMAGE_CHAIN = 24;
+
+/** Bounty Hunter's per-wave ceiling, as a fraction of the killer's max HP at the
+ *  START of the wave. Without it a deep 40-body wave compounds a warband into
+ *  invulnerability; with it the boon stays a strong steady climb. */
+export const BOUNTY_WAVE_CAP_FRAC = 0.25;
 
 function makeDamageDealer(
   state: SimState,
@@ -553,9 +561,19 @@ function makeDamageDealer(
         // heals the whole warband. Identity when both are 0.
         if (source !== target && source.state !== "dead") {
           const km = state.teamMods[source.team];
-          if (km.bountyHp > 0) {
-            source.maxHp += km.bountyHp;
-            source.hp += km.bountyHp; // grow into the new max
+          if (km.bountyPct > 0) {
+            // Percentage of the killer's OWN max HP, so it keeps pace with a deep
+            // run, but capped per wave: uncapped, a 40-body wave deep in a run
+            // would compound the warband into invulnerability. The counter is
+            // reset each wave by EndlessController.applyWaveStartBoons.
+            const cap = Math.round(source.bountyBaseHp * BOUNTY_WAVE_CAP_FRAC);
+            const room = Math.max(0, cap - source.bountyWaveGain);
+            const gain = Math.min(room, Math.round(source.maxHp * km.bountyPct));
+            if (gain > 0) {
+              source.bountyWaveGain += gain;
+              source.maxHp += gain;
+              source.hp += gain; // grow into the new max
+            }
           }
           if (km.killHeal > 0) {
             for (const ally of state.units) {
