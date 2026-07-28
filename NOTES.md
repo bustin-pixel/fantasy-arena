@@ -424,6 +424,55 @@ the median says.
   same order statistic. Read `p75` for the body of the distribution, or raise the
   seed count.
 
+### 4h. Endless deep retune (2026-07-28) — what shipped and how it's tuned
+Five changes, in the order they were made and swept (each re-swept on its own so
+every movement is attributable):
+
+1. **The curve** — `endlessWaveStatMultipliers` is now a true exponential
+   (`1.045` hp / `1.031` dmg per wave, tracking the old curve within a few percent
+   through wave 25) × a late super-exponential closer `exp(K·o·(o+1)/2)` past
+   `ENDLESS_SURGE_START`. The per-cycle `step` term is gone (it only added a
+   sawtooth). **Two knobs: `SURGE_START` sets where the median lands, `SURGE_K`
+   sets the spread.** Small K = long tail; the old curve's effective K was ~4×
+   today's, which is what collapsed everyone onto wave 40.
+2. **The wave clock is a stall detector**, not a DPS check. It refreshes whenever
+   the warband makes progress — measured as a high-watermark of enemy HP *removed*
+   (`maxHp − hp` summed), which is what makes it work on a BOSS wave where there
+   is only one thing to kill. A fresh spawn contributes 0 so the trickle can't
+   fake progress; watermarking means a boss that heals back everything you land
+   correctly never registers. Absolute 480s per-wave ceiling behind it.
+3. **Flat boons scale** with the wave (two anchors, `endlessBoonDefenseScale` /
+   `endlessBoonOffenseScale`). The controller stores an UNSCALED base and rebuilds
+   the live value at each wave start — so `applyWaveStartBoons` is now the single
+   writer for `waveShield`/`regen`/`killHeal`/`onHitRiders`. **Bounty Hunter is
+   the exception**: permanent max HP per kill can't ride the enemy curve without
+   compounding into invulnerability, so it became a % of the killer's own max HP
+   with a per-wave cap.
+4. **Rarity odds keep climbing** past wave 11 instead of freezing, plus a
+   `mythic` tier and a `minWave` gate.
+5. **Reroll / skip / five deep-tier boons.** `ascendant` is the tail-maker — the
+   only boon that raises the warband's growth RATE rather than its level.
+
+**Final calibration (`SURGE_START` 22, `SURGE_K` 0.013).** Ceiling probe = elite
+deck, maxed level/gear/commander, perfect drafting, 40 seeds:
+
+| | baseline | after |
+|---|---|---|
+| median | 41 | 55 |
+| p90 | 44 | 71 |
+| max | 77 | 107 |
+| spread | **38–45** | **45–107** |
+| ended by timeout | 5% | 10% |
+
+The spread is the whole point — 7 waves of tail became 62. Across the matrix,
+weak drafts land ~35–45, competent mid-power runs ~40–62, god-runs 70–107.
+
+**Retuning it later:** run `SWEEP=1 SWEEP_ONLY=shape` (instant) for the curve
+table, then the full sweep. Move `SURGE_START` for the median and `SURGE_K` for
+the spread, one at a time. ⚠ **Anything that buffs the player moves the median a
+long way** — adding the boon changes above pushed every run past the harness's
+120-wave cap and needed K to go from 0.005 to 0.013. Always recalibrate LAST.
+
 ### 5. The Depths spawns bypass the deploy() path
 `WaveController` (the PvE horde director) pushes monsters into `state.units`
 directly — no deck bookkeeping, no deployment records (waves rebuild

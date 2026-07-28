@@ -131,7 +131,7 @@ export const ENDLESS_DMG_GROWTH = 1.031;
 
 /** Where the closer starts to bite — the knob that sets roughly WHERE THE MEDIAN
  *  RUN ENDS. Earlier lowers the median, later raises it. */
-export const ENDLESS_SURGE_START = 24;
+export const ENDLESS_SURGE_START = 22;
 
 /** How fast the closer's growth rate itself accelerates — the knob that sets THE
  *  SPREAD. Small K = a long tail where a great boon stack goes deep; large K =
@@ -140,7 +140,7 @@ export const ENDLESS_SURGE_START = 24;
  *  (37 of 40 sweep seeds inside waves 38–45). Calibration targets, read off
  *  `endlessSweep`'s curve table: L′ ≈ 0.06–0.09 at the median (8–11 waves per
  *  doubling), L′ ≈ 0.25–0.35 at the p95 (2–3 waves per doubling). */
-export const ENDLESS_SURGE_K = 0.005;
+export const ENDLESS_SURGE_K = 0.013;
 
 /** Per-wave stat multipliers for spawned enemies, applied at spawn exactly like
  *  the Depths per-floor multipliers.
