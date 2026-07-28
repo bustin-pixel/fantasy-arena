@@ -601,6 +601,119 @@ so the headline number reflects good play.
 model of a player.** A balance number is only as honest as the behaviour it
 assumes.
 
+### 4l. Endless audit 2 (2026-07-28) — a bounded economy, and toughness that isn't HP
+
+The report: *"too easy from wave 1–88, then the scaling got to insane numbers."*
+Both halves were the same defect — the curve's growth RATE climbed linearly and
+forever, so it was flat for a strong warband until the mid-30s and then ×7.8e13
+by wave 88, past the point where enemy `maxHp` is even an exact integer (2^53
+lands at waves 85–89). Three things came out of fixing it, and two of them
+contradicted the plan we started from.
+
+**1. Player power is now BOUNDED, and that is what lets the curve be gentle.**
+Every previous version of this curve ended in an accelerating "closer", justified
+by: a boon arrives every wave, so against any FIXED rate a stacked build wins
+outright and the run never ends. That was true *of an unbounded boon economy*.
+Now every boon completes — `maxStacks` ranks, each buying an ascending share
+(25/35/40) of the headline on its card, and the copy that reaches 100% is the
+last ever offered — the two rate boons have `capPct`, Bounty Hunter has a
+RUN-total cap (the per-wave cap bounded nothing; +25% a wave is still an
+exponential), and **one legendary plus one mythic is the entire deep allowance**.
+
+⚠ Excluding a tier from the offer POOL is not enough. The weight stays in the
+table, and every roll landing on the dead tier falls through `rollBoonOffers`'
+empty-candidates fallback — a flat draw across everything that ignores the rarity
+curve and can deal a *mythic* on a legendary roll. Zero the weight and
+redistribute (`boonRarityWeights(wave, closed)`), with the pool filter as belt.
+
+⚠ A deep run now genuinely EXHAUSTS the pool, around wave 70. That is the
+intended terminal state, not a bug — but anything that drives a run in a loop
+(the sweep harness, the spec drive helpers) must handle an empty offer set by
+skipping, or it stalls in an intermission it can never answer and reports every
+seed at the same wave with cause `tickcap`. That reads exactly like a difficulty
+wall and is nothing of the kind. It cost an hour.
+
+**2. Small numbers and a wave-70 death are incompatible — by scaling HP.** The
+ceiling probe was blunt: at ×30-by-wave-100, EVERY seed at EVERY power tier, with
+even the deliberately-bad `first` drafting policy, ran to the harness cap and
+never died. A maxed warband (lvl 30 + three legendary items + full commander) is
+~2000× a bare one, so nothing below ~×1000 enemy stats kills it, and ×1000 on the
+HP bar is a boss with millions of HP.
+
+The way out is to stop printing it all on the bar. `endlessWaveToughness` splits
+the curve into visible HP and hidden **damage mitigation**, with
+`shownHpMult / damageTakenMult` exactly equal to the curve's multiplier — so
+effective toughness, time-to-kill, pacing and every sweep number are unchanged
+(measured: median 117 → 112, inside noise) while a wave-70 boss reads 143k
+instead of 8.5m.
+
+⚠ **Mitigation has a hard ceiling of ~80×, and it is not a taste call.** Damage
+is rounded to whole numbers at the funnel; push reduction past that and an
+ordinary hit rounds to ZERO and the monster is literally unkillable. Lifting it
+means making damage fractional first. Known side effect: lifesteal and thorns are
+percentages of damage *dealt*, and dealt damage is now the mitigated number, so
+both are worth less deep. The sweep is tuned with that in place.
+
+**3. More monsters, not bigger ones — but it saturates.** The horde thickens with
+depth (8 → 14 concurrent, budget cap 40 → 120). Concurrency is the pressure dial,
+but it only bites once the budget can field that many bodies: with 40 points in
+the queue there were never 14 monsters to have on the field, and raising one
+without the other did *nothing*. It also saturates around 14 regardless —
+`MAX_MELEE_SURROUND` is 3, so against 4 units only ~12 melee attackers can ever
+be swinging. Swarm size cannot substitute for stats past that point.
+
+**Calibrated** at 100 seeds, `hybridOff`, elite deck, maxed power:
+`median 77, p75 87, p90 97, max 122 | 54% wipe / 46% timeout / 0% capped`,
+reach odds w70 65% · w80 42% · w90 18% · **w100 7%** — against a brief of median
+65–80 and ~10% reach-100. Rates: warm-up 0.035 to wave 10 (waves 1–9 are
+byte-identical to before, so a fresh warband's opening is untouched), ramping to a
+0.114 peak at wave 32, easing to 0.155 forever. **Peak sets the median, sustain
+sets the tail** — they are the two knobs, and the response is steep: 0.112 → 0.130
+moved the median from 89 to 44.
+
+**THE INVARIANT THAT REPLACES THE OLD ONE**: player power must stay bounded. Any
+new boon, item or kit granting SUSTAINED per-wave growth with no ceiling breaks
+the termination argument outright and re-opens the immortal-run hole this mode has
+now fallen into three times. Cap it at the source; do not answer it by steepening
+the curve.
+
+Replay note: old recorded runs no longer replay byte-identically (the offer
+sequence changes once a tier slot is spent). Accepted — solo game, no user-facing
+replay viewer, and nothing pins old logs.
+
+**The stall clock stays — measured, not assumed.** It was ending ~46% of runs,
+which looked like the "dying while winning" failure §4g warns about, so it was
+put on trial properly:
+
+| experiment | median | outcome |
+|---|---|---|
+| clock disabled entirely | **77** | 0% timeout, but **25% of runs never terminate** |
+| stall 45s → 120s, cap 480s → 900s | 74 | 46% → 33% timeout |
+| mitigation removed (diagnostic) | 61 | 46% → **8%** timeout |
+| damage carry, clock untouched | 74 | 46% → 34% timeout |
+| carry + stall 110s / cap 900s | 74 | 33% — *doubling the window bought nothing* |
+
+Three things fall out, and the first is the important one. **The clock was never
+deciding where runs end** — the median is 74–77 in every row, including with the
+clock switched off. It only decided how the ending was LABELLED. Second, most of
+those timeouts were an arithmetic artifact, not a difficulty wall: sub-point hits
+against 98%-mitigated monsters rounded to zero, so the warband literally could not
+damage them (see the carry note in `dealDamage`). Third, what survives is a real
+deadlock — a warband too weak to clear the wave that also refuses to die — and
+more time provably does not resolve it, so a SHORTER clock is strictly better UX
+than a longer one. 45s/480s kept.
+
+⚠ The damage carry is **opt-in per unit** (`Unit.carryDamage`), not global. The
+global version is defensible arithmetic and it fixes Endless just as well, but
+measured over 80 seeds it moved Depths boss-floor winrates by 1–4 points. A fix
+for one mode must not quietly retune two shipped ones — with the flag scoped, the
+whole-dungeon winrate sweep is byte-identical to before the change.
+
+Still open, if the 34% ever feels bad in play: the endless HUD never shows the
+wave clock at all, so a run ending on it is unexplained from the player's side.
+Surfacing the stall countdown once it starts running would turn it from a
+mystery into a fair warning — that is a presentation fix, not a balance one.
+
 ### 5. The Depths spawns bypass the deploy() path
 `WaveController` (the PvE horde director) pushes monsters into `state.units`
 directly — no deck bookkeeping, no deployment records (waves rebuild

@@ -19,7 +19,7 @@ import {
 } from "@/meta/slayer";
 import { RARITIES } from "@/data/rarities";
 import { ITEM_LINES, makeItemKey } from "@/data/items";
-import { BOONS } from "@/data/boons";
+import { BOONS, boonMaxStacks } from "@/data/boons";
 import { rarityColor } from "@/components/BoonPickOverlay";
 import { renderPortrait } from "@/engine/Renderer";
 import { useSpriteEpoch } from "@/hooks/useSpriteEpoch";
@@ -233,7 +233,17 @@ function BoonRow({ boonId }: { boonId: string }) {
         <span className="book-boon-rarity" style={{ color }}>
           {boon.rarity}
         </span>
-        {boon.unique && <span className="book-boon-tag">once per run</span>}
+        {/* How many times this can be taken. For the deep tiers the rule is
+            stronger than "once" — taking ANY legendary closes the legendary tier
+            for the whole run — so that tag REPLACES the count rather than sitting
+            beside it, which just read as the same rule said twice. */}
+        {boon.rarity === "legendary" || boon.rarity === "mythic" ? (
+          <span className="book-boon-tag">one {boon.rarity} per run</span>
+        ) : boonMaxStacks(boon) === 1 ? (
+          <span className="book-boon-tag">once per run</span>
+        ) : (
+          <span className="book-boon-tag">{boonMaxStacks(boon)} ranks</span>
+        )}
         {boon.offerIf === "allyDead" && (
           <span className="book-boon-tag">offered when an ally has fallen</span>
         )}

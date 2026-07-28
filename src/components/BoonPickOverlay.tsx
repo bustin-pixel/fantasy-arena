@@ -6,7 +6,12 @@
 
 import { useState } from "react";
 import type { BoonOffer, BoonTally } from "@/engine/EndlessController";
-import { boonStackSummary, BOONS, type BoonRarity } from "@/data/boons";
+import {
+  boonRankLabel,
+  boonStackSummary,
+  BOONS,
+  type BoonRarity,
+} from "@/data/boons";
 import { playSfx } from "@/audio/sfx";
 
 interface Props {
@@ -26,6 +31,11 @@ interface Props {
   atFinalWaveChoice: boolean;
   /** Bank the run as a completed conquest (capstone only). */
   onFinish: () => void;
+  /** Whether this run has spent its one legendary / one mythic pick. Told to the
+   *  player explicitly, because otherwise the gold cards simply stop appearing
+   *  and that reads as a bug rather than a rule. */
+  legendarySlotUsed: boolean;
+  mythicSlotUsed: boolean;
 }
 
 /** Boon-rarity accent — common reads as steel, rare/epic match the unit palette.
@@ -56,6 +66,8 @@ export function BoonPickOverlay({
   onRetire,
   atFinalWaveChoice,
   onFinish,
+  legendarySlotUsed,
+  mythicSlotUsed,
 }: Props) {
   // Tapping a tally chip opens its stack-math card; tapping it again closes.
   const [infoId, setInfoId] = useState<string | null>(null);
@@ -102,6 +114,24 @@ export function BoonPickOverlay({
         </div>
       )}
 
+      {(legendarySlotUsed || mythicSlotUsed) && (
+        <div className="boon-slots">
+          {legendarySlotUsed && (
+            <span
+              className="boon-slot-chip"
+              style={{ color: rarityColor("legendary") }}
+            >
+              Legendary claimed — one per run
+            </span>
+          )}
+          {mythicSlotUsed && (
+            <span className="boon-slot-chip" style={{ color: rarityColor("mythic") }}>
+              Mythic claimed — one per run
+            </span>
+          )}
+        </div>
+      )}
+
       <div className="boon-cards">
         {offers.map((offer, i) => (
           <button
@@ -116,12 +146,33 @@ export function BoonPickOverlay({
               style={{ color: rarityColor(offer.rarity) }}
             >
               {offer.rarity}
+              {/* Which rank this pick buys. Hidden for one-and-done boons, where
+                  "I of I" would be noise rather than information. */}
+              {offer.maxRank > 1 && (
+                <span className="boon-card-rank">
+                  {" "}
+                  · {boonRankLabel(offer.rank)}/{boonRankLabel(offer.maxRank)}
+                </span>
+              )}
             </span>
             <span className="boon-card-name">{offer.name}</span>
             <span className="boon-card-desc">{offer.description}</span>
           </button>
         ))}
       </div>
+
+      {offers.length === 0 && (
+        // Every boon completed and both deep slots spent — the intended end state
+        // of an economy where everything caps, not a failure. Say so plainly; the
+        // skip button below is still the way out.
+        <div className="boon-empty">
+          <div className="boon-empty-title">Nothing left to learn</div>
+          <div className="boon-empty-sub">
+            Your warband has taken every blessing it can hold. From here it is
+            what you have made it — rest, and go on.
+          </div>
+        </div>
+      )}
 
       <div className="boon-actions">
         <button
@@ -173,7 +224,15 @@ export function BoonPickOverlay({
                 onClick={() => { playSfx("uiSelect"); setInfoId((prev) => (prev === b.id ? null : b.id)); }}
               >
                 {b.name}
-                {b.count > 1 && <strong> ×{b.count}</strong>}
+                {/* Ranks bought of ranks available, so "am I done with this one"
+                    is answerable without opening the card. */}
+                {b.maxRank > 1 && (
+                  <strong>
+                    {" "}
+                    {b.count}/{b.maxRank}
+                  </strong>
+                )}
+                {b.maxRank === 1 && b.count > 1 && <strong> ×{b.count}</strong>}
               </button>
             ))}
           </div>

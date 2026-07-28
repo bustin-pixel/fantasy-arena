@@ -4,34 +4,41 @@ Forward-looking only — what's planned, deferred, and open. For what's already
 **done** and why, read the git history (`git log --oneline`, `gh pr list`) — that's
 the source of truth, so this file deliberately doesn't duplicate it.
 
-> **🔨 BUILT, UNSHIPPED — the Endless deep retune** (branch
-> `feat/endless-deep-retune`, cut from master; NOT merged). Fixes a playtester's
-> "hard wall at wave 40, no ramp after that". The old curve's growth RATE at
-> wave 40 meant doubling your warband's power bought exactly ONE more wave, so
-> 37 of 40 sweep seeds died between waves 38 and 45. Now 45–107.
+> **🔨 BUILT, UNSHIPPED — Endless audit 2** (branch `feat/endless-audit-2`, cut
+> from master at the PR #72 merge; NOT merged). Full handoff:
+> [`docs/handoff-endless-audit-2.md`](docs/handoff-endless-audit-2.md); reasoning
+> in `NOTES.md` §4l. Answers *"too easy from wave 1–88, then the scaling got to
+> insane numbers"* — one defect, since the curve's growth RATE rose linearly
+> forever: flat for a strong warband until the mid-30s, then ×7.8e13 by wave 88,
+> past the point where enemy HP is even an exact integer.
 >
-> Five parts: a reshaped curve (true exponential × a late, gentle
-> super-exponential closer), the wave clock turned into a progress-based **stall
-> detector** (13–25% of runs were dying to the timer while still winning),
-> wave-scaled flat boons, an unfrozen rarity ramp + a `mythic` tier, and
-> reroll/skip + five deep-tier boons (`ascendant` is the tail-maker).
+> **It replaced a doctrine.** Every earlier version of this curve ended in an
+> ever-accelerating closer, justified by "a boon arrives every wave, so any fixed
+> rate eventually loses". True of an UNBOUNDED boon economy — so the economy is
+> bounded instead: every boon completes at a rank cap, the rate boons have
+> `capPct`, Bounty Hunter has a run-total cap, and one legendary plus one mythic
+> is the whole deep allowance. The curve is then free to be a gentle
+> piecewise-linear rate.
 >
-> **Two things to know before touching it.** (1) `NOTES.md` §4h is the tuning
-> guide: `ENDLESS_SURGE_START` moves the median, `ENDLESS_SURGE_K` sets the
-> spread, and **anything that buffs the player must be followed by a
-> recalibration** — the boon changes alone pushed every run past the sweep's
-> 120-wave cap. (2) The sweep harness is committed this time
-> (`engine/__tests__/endlessSweep.test.ts`, `SWEEP=1`); the previous retune's
-> lived in a scratchpad, which is exactly why this regressed unnoticed.
+> **And toughness stopped being HP.** A maxed warband is ~2000× a bare one, so
+> nothing under ~×1000 kills it — which on the bar alone is a boss with millions
+> of HP. `endlessWaveToughness` hides most of it as damage mitigation instead
+> (`shownHpMult / damageTakenMult` is exactly the curve, so it is presentation,
+> not balance): a wave-70 boss reads 143k rather than 8.5m.
 >
-> It also carries a **shipped-crash fix** the harness found on its first full
-> run: a flat kit damage-reflect (Wildheart's Thorned Hide) traded against any
-> fractional thorns recursed until the call stack blew. Reachable on live in the
-> **Overgrowth** via a legendary Squire's Plate — not only in Endless.
+> Measured, 100 seeds: median **74**, reach-100 **10.0%**, 0% truncated.
 >
-> Still open: the reward curve is untouched, so a 100-wave run now pays roughly
-> 2× a 45-wave one in gold/XP and about double the Soul Shards. Left deliberately
-> (god-runs are rare) but worth revisiting if it distorts the economy.
+> **Before touching it:** read the traps in the handoff. The expensive ones —
+> excluding a boon tier from the pool leaks its weight into a flat fallback draw;
+> an exhausted boon pool stalls any loop that only ever picks; mitigation caps at
+> ~80× because damage is rounded to integers; swarm size saturates at
+> `MAX_MELEE_SURROUND`; and **recalibrate LAST**, after every economy change.
+>
+> Still open: nobody has watched a wave (all numbers are headless); 34% of runs
+> still end on the stall clock (genuine deadlocks — more time provably doesn't
+> help, but the HUD never shows the clock, so surfacing it would make those
+> endings legible); and the reward curve is still untouched, so a 100-wave run
+> pays roughly 2× a 45-wave one.
 
 > **✅ The architecture deepening batch SHIPPED** (PR #65, merge `6d5a4e9`,
 > 2026-07-17, deploy hash-verified). Six refactors, no gameplay change, 663 tests.

@@ -42,6 +42,7 @@ import {
 import { clamp, dir, dist } from "@/utils/math";
 import { getUnitDef } from "@/data/units";
 import { EXECUTE_THRESHOLD } from "@/data/boons";
+import { BOUNTY_TOTAL_CAP_FRAC } from "@/data/endless";
 import { createUnit, type ItemCarry } from "@/entities/createUnit";
 import {
   abilityCastTimeTicks,
@@ -516,7 +517,34 @@ function makeDamageDealer(
       srcMods.maxHpRend > 0 && source.team !== target.team
         ? Math.min(target.maxHp * srcMods.maxHpRend, scaled * MAX_HP_REND_CAP_MULT)
         : 0;
-    let dmg = Math.max(0, Math.round(scaled + rend));
+    // Rounding each hit on its own throws away up to half a point every time.
+    // That is nothing against a 300 HP skeleton and EVERYTHING against a target
+    // resisting 98% of what it is hit by: a 0.4-damage hit rounds to zero, the
+    // same hit lands forever, and the fight deadlocks. Measured in Endless, where
+    // deep monsters carry exactly that much mitigation — it was the single
+    // biggest cause of runs ending on the stall clock instead of in a fight
+    // (46% of runs → 8%).
+    //
+    // So heavily-mitigated targets CARRY the remainder between hits instead:
+    // exact, lossless, still whole-number hp, still deterministic. Anything that
+    // can hurt them at all now eventually kills them — which is also what makes
+    // the stall detector honest, since a stall becomes a real deadlock rather
+    // than an arithmetic artifact.
+    //
+    // Deliberately OPT-IN per unit rather than global. Carrying on every target
+    // is defensible arithmetic, but it is not free: measured over 80 seeds it
+    // moved the Depths boss-floor winrates by 1-4 points, and a fix for Endless
+    // has no business quietly retuning two shipped modes. The flag is set exactly
+    // where the mitigation is (EndlessController).
+    const exact = Math.max(0, scaled + rend);
+    let dmg: number;
+    if (target.carryDamage) {
+      target.dmgCarry += exact;
+      dmg = Math.floor(target.dmgCarry);
+      target.dmgCarry -= dmg;
+    } else {
+      dmg = Math.round(exact);
+    }
     const shown = dmg; // pre-absorb hit shown as the floating number
 
     // Absorb shield (overhealth) soaks damage before HP.
@@ -530,7 +558,9 @@ function makeDamageDealer(
     target.hp = Math.max(0, target.hp - dmg);
     target.hitFlash = HIT_FLASH_TICKS;
     target.attackedByUid = source.uid;
-    spawnFloatingText(state, target, `-${shown}`, "damage");
+    // A hit whose whole damage is still sitting in the carry has nothing to
+    // report — "-0" floating off a monster is noise, and it reads as a bug.
+    if (shown > 0) spawnFloatingText(state, target, `-${shown}`, "damage");
 
     // [seam] kit post-hit reaction on a surviving target — gets the ORIGINAL
     // incoming amount (Slime split reads hp thresholds; the Aegis magic bank needs
@@ -600,14 +630,31 @@ function makeDamageDealer(
           const km = state.teamMods[source.team];
           if (km.bountyPct > 0) {
             // Percentage of the killer's OWN max HP, so it keeps pace with a deep
-            // run, but capped per wave: uncapped, a 40-body wave deep in a run
-            // would compound the warband into invulnerability. The counter is
-            // reset each wave by EndlessController.applyWaveStartBoons.
-            const cap = Math.round(source.bountyBaseHp * BOUNTY_WAVE_CAP_FRAC);
-            const room = Math.max(0, cap - source.bountyWaveGain);
-            const gain = Math.min(room, Math.round(source.maxHp * km.bountyPct));
+            // run, under TWO ceilings. The per-wave one stops a 40-body wave
+            // compounding the warband into invulnerability inside a single wave.
+            // The run-total one stops the same thing happening slowly across
+            // fifty of them — +25% a wave is still an exponential, and unbounded
+            // player growth is precisely what the endless curve cannot afford
+            // (see the curve preamble in data/endless.ts). Both are needed: the
+            // wave counter resets every wave, the run ledger never does.
+            const waveRoom = Math.max(
+              0,
+              Math.round(source.bountyBaseHp * BOUNTY_WAVE_CAP_FRAC) -
+                source.bountyWaveGain
+            );
+            const runRoom = Math.max(
+              0,
+              Math.round(source.bountyRunBase * BOUNTY_TOTAL_CAP_FRAC) -
+                source.bountyRunGain
+            );
+            const gain = Math.min(
+              waveRoom,
+              runRoom,
+              Math.round(source.maxHp * km.bountyPct)
+            );
             if (gain > 0) {
               source.bountyWaveGain += gain;
+              source.bountyRunGain += gain;
               source.maxHp += gain;
               source.hp += gain; // grow into the new max
             }

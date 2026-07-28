@@ -258,6 +258,21 @@ export interface Unit {
    *  reset at each wave start by the EndlessController; 0 everywhere else. */
   bountyWaveGain: number;
   bountyBaseHp: number;
+  /** The same boon's RUN-total ledger: max HP gained from bounties across the
+   *  whole run, and the max HP at the run's first wave that BOUNTY_TOTAL_CAP_FRAC
+   *  is measured against. Latched once and never reset — a per-wave cap alone
+   *  still compounds without limit, which is the thing the endless curve cannot
+   *  afford (see the curve preamble in data/endless.ts). */
+  bountyRunGain: number;
+  bountyRunBase: number;
+  /** Opt in to lossless damage: this unit CARRIES sub-point damage between hits
+   *  instead of rounding each one. Set only where a unit resists most of what it
+   *  takes — deep Endless monsters — because without it a hit small enough to
+   *  round to zero lands forever and the wave deadlocks. Left false everywhere
+   *  else so Arena and the Depths keep their shipped arithmetic exactly. */
+  carryDamage: boolean;
+  /** The fraction currently carried (only meaningful when carryDamage). */
+  dmgCarry: number;
   /** Number of split-clones the slime has already spawned (caps splitting). */
   splitsSpawned: number;
   /** Slime Knight rebirth counter: 0 for a fresh knight, +1 each reincarnation.
