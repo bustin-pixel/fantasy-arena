@@ -265,6 +265,14 @@ export interface Unit {
    *  afford (see the curve preamble in data/endless.ts). */
   bountyRunGain: number;
   bountyRunBase: number;
+  /** Opt in to lossless damage: this unit CARRIES sub-point damage between hits
+   *  instead of rounding each one. Set only where a unit resists most of what it
+   *  takes — deep Endless monsters — because without it a hit small enough to
+   *  round to zero lands forever and the wave deadlocks. Left false everywhere
+   *  else so Arena and the Depths keep their shipped arithmetic exactly. */
+  carryDamage: boolean;
+  /** The fraction currently carried (only meaningful when carryDamage). */
+  dmgCarry: number;
   /** Number of split-clones the slime has already spawned (caps splitting). */
   splitsSpawned: number;
   /** Slime Knight rebirth counter: 0 for a fresh knight, +1 each reincarnation.

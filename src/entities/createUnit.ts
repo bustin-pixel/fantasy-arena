@@ -78,6 +78,8 @@ export function createUnit(
     bountyBaseHp: 0,
     bountyRunGain: 0,
     bountyRunBase: 0,
+    carryDamage: false,
+    dmgCarry: 0,
     splitsSpawned: 0,
     rebornStage: 0,
     bossPhase: 0,

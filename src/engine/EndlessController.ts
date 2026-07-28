@@ -878,6 +878,7 @@ export class EndlessController {
         unit.maxHp = Math.round(unit.maxHp * tough.shownHpMult);
         unit.hp = unit.maxHp;
         unit.damageTakenMult = tough.damageTakenMult;
+        unit.carryDamage = true;
         getKit(order.defId)?.onSpawn?.(unit);
         state.units.push(unit);
         this.petUids.add(unit.uid);
@@ -923,6 +924,9 @@ export class EndlessController {
     unit.maxHp = Math.round(unit.maxHp * tough.shownHpMult);
     unit.hp = unit.maxHp;
     unit.damageTakenMult = tough.damageTakenMult;
+    // Mitigated this heavily, rounded damage would round to nothing — see the
+    // carry note in dealDamage. Set together with the mitigation, always.
+    unit.carryDamage = true;
     unit.damage = Math.round(unit.damage * mult.dmg);
     state.units.push(unit);
     this.bestiary.add(defId);

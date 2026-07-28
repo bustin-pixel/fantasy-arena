@@ -681,6 +681,39 @@ Replay note: old recorded runs no longer replay byte-identically (the offer
 sequence changes once a tier slot is spent). Accepted — solo game, no user-facing
 replay viewer, and nothing pins old logs.
 
+**The stall clock stays — measured, not assumed.** It was ending ~46% of runs,
+which looked like the "dying while winning" failure §4g warns about, so it was
+put on trial properly:
+
+| experiment | median | outcome |
+|---|---|---|
+| clock disabled entirely | **77** | 0% timeout, but **25% of runs never terminate** |
+| stall 45s → 120s, cap 480s → 900s | 74 | 46% → 33% timeout |
+| mitigation removed (diagnostic) | 61 | 46% → **8%** timeout |
+| damage carry, clock untouched | 74 | 46% → 34% timeout |
+| carry + stall 110s / cap 900s | 74 | 33% — *doubling the window bought nothing* |
+
+Three things fall out, and the first is the important one. **The clock was never
+deciding where runs end** — the median is 74–77 in every row, including with the
+clock switched off. It only decided how the ending was LABELLED. Second, most of
+those timeouts were an arithmetic artifact, not a difficulty wall: sub-point hits
+against 98%-mitigated monsters rounded to zero, so the warband literally could not
+damage them (see the carry note in `dealDamage`). Third, what survives is a real
+deadlock — a warband too weak to clear the wave that also refuses to die — and
+more time provably does not resolve it, so a SHORTER clock is strictly better UX
+than a longer one. 45s/480s kept.
+
+⚠ The damage carry is **opt-in per unit** (`Unit.carryDamage`), not global. The
+global version is defensible arithmetic and it fixes Endless just as well, but
+measured over 80 seeds it moved Depths boss-floor winrates by 1–4 points. A fix
+for one mode must not quietly retune two shipped ones — with the flag scoped, the
+whole-dungeon winrate sweep is byte-identical to before the change.
+
+Still open, if the 34% ever feels bad in play: the endless HUD never shows the
+wave clock at all, so a run ending on it is unexplained from the player's side.
+Surfacing the stall countdown once it starts running would turn it from a
+mystery into a fair warning — that is a presentation fix, not a balance one.
+
 ### 5. The Depths spawns bypass the deploy() path
 `WaveController` (the PvE horde director) pushes monsters into `state.units`
 directly — no deck bookkeeping, no deployment records (waves rebuild
