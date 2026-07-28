@@ -89,6 +89,10 @@ export interface BattleUiState {
   rhythmBonus: number | null;
   /** Endless: boon rerolls still banked this run. */
   rerollsLeft: number;
+  /** Endless: the capstone wave has been cleared (latches for the run). */
+  endlessCompleted: boolean;
+  /** Endless: this is the one intermission where claim-or-continue is offered. */
+  atFinalWaveChoice: boolean;
   /** The commander's equipped battle spell + charge state (one per battle), or
    *  null when no spell is equipped (no HUD button). */
   commanderSpell: { spell: CommanderSpellId; ready: boolean } | null;
@@ -138,6 +142,8 @@ export interface UseBattleEngine {
   skipBoon: () => void;
   /** Endless: retire at an intermission, banking the cleared waves' rewards. */
   retireEndless: () => void;
+  /** Endless: bank the run as a COMPLETION (legal only past the capstone wave). */
+  finishEndless: () => void;
   /** Endless: waves fully cleared this run (0 outside endless). */
   wavesSurvived: () => number;
   /** Post-victory outro: materialize the reward chest up-field and gather the
@@ -276,6 +282,8 @@ export function useBattleEngine(
       momentumStacks: null,
       rhythmBonus: null,
       rerollsLeft: ENDLESS_REROLLS_START,
+      endlessCompleted: false,
+      atFinalWaveChoice: false,
       commanderSpell: null,
     };
   });
@@ -455,6 +463,8 @@ export function useBattleEngine(
           momentumStacks: est?.momentumStacks ?? null,
           rhythmBonus: est?.rhythmBonus ?? null,
           rerollsLeft: est?.rerollsLeft ?? 0,
+          endlessCompleted: est?.completedFinalWave ?? false,
+          atFinalWaveChoice: est?.atFinalWaveChoice ?? false,
           commanderSpell: c.commanderSpellStatus(),
         });
       }
@@ -555,6 +565,8 @@ export function useBattleEngine(
       intermission: est?.intermission ?? null,
       boonsPicked: est?.boonsPicked ?? prev.boonsPicked,
       rerollsLeft: est?.rerollsLeft ?? prev.rerollsLeft,
+      endlessCompleted: est?.completedFinalWave ?? prev.endlessCompleted,
+      atFinalWaveChoice: est?.atFinalWaveChoice ?? false,
     }));
   }, []);
 
@@ -575,6 +587,15 @@ export function useBattleEngine(
     controllerRef.current?.skipBoon();
     syncEndless();
   }, [syncEndless]);
+
+  /** Bank the run as a COMPLETION (wave-100 capstone only). */
+  const finishEndless = useCallback(() => {
+    const c = controllerRef.current;
+    if (!c) return;
+    if (c.finishEndless()) {
+      setUi((prev) => ({ ...prev, phase: "victory", intermission: null }));
+    }
+  }, []);
 
   const retireEndless = useCallback(() => {
     const c = controllerRef.current;
@@ -684,6 +705,7 @@ export function useBattleEngine(
     rerollBoons,
     skipBoon,
     retireEndless,
+    finishEndless,
     wavesSurvived,
     startOutroChest,
     openOutroChestAt,

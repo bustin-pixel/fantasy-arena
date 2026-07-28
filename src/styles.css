@@ -2514,6 +2514,41 @@ body.modal-open .pager-nav {
   opacity: 0.45;
   cursor: not-allowed;
 }
+/* Wave-100 capstone. Gold and lit, so the one intermission that matters cannot
+   be mistaken for the ninety-nine that came before it. */
+.boon-overlay-conquest {
+  border: 1px solid rgba(201, 162, 39, 0.55);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: radial-gradient(
+    ellipse at 50% 0%,
+    rgba(201, 162, 39, 0.18),
+    rgba(0, 0, 0, 0.35) 70%
+  );
+  box-shadow: 0 0 26px rgba(255, 232, 150, 0.22);
+}
+.boon-overlay-wave.conquest {
+  color: #ffe9a0;
+}
+.boon-overlay-title.conquest {
+  color: #fff3c4;
+  text-shadow: 0 0 14px rgba(255, 220, 120, 0.65);
+}
+.conquest-actions {
+  margin-top: 10px;
+}
+.conquest-claim {
+  font-size: 0.86rem;
+}
+.conquest-hint {
+  margin-top: 8px;
+  opacity: 0.75;
+  font-style: italic;
+}
+.result-card.conquest {
+  border-color: rgba(201, 162, 39, 0.7);
+  box-shadow: 0 0 34px rgba(255, 232, 150, 0.28);
+}
 .boon-tally {
   width: 100%;
   max-width: 340px;

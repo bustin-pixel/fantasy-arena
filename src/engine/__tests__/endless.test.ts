@@ -24,6 +24,7 @@ import {
 } from "@/data/boons";
 import { DUNGEON_IDS, getDungeon } from "@/data/dungeons";
 import {
+  ENDLESS_FINAL_WAVE,
   ENDLESS_RARE_POOL,
   endlessBoonDefenseScale,
   endlessBoonOffenseScale,
@@ -624,6 +625,92 @@ describe("endless — once-per-battle passives re-arm each wave", () => {
     expect(assassin.effects.some((e) => e.type === "stealth")).toBe(true);
     const ogre = warband.find((u) => u.defId === "ogre")!;
     expect(ogre.ambushReady).toBe(false);
+  });
+});
+
+describe("endless — the wave-100 capstone", () => {
+  /** Drive to a target wave by fiat: top the warband up AND fell every monster
+   *  the instant it lands. Plain god-mode healing is NOT enough to get here —
+   *  taking the first offered boon every time leaves the warband unable to
+   *  out-damage a wave-88 horde, and the stall detector correctly ends the run.
+   *  That's the balance working, but it makes it useless as a way to reach the
+   *  capstone, so this harness removes the fight entirely and tests only the
+   *  capstone plumbing. */
+  function driveToWave(seed: number, target: number) {
+    const mc = new MatchController(seed, DECK, [], { mode: "endless" });
+    let guard = 0;
+    while (
+      mc.phase !== "defeat" &&
+      mc.phase !== "victory" &&
+      guard < 400_000 &&
+      mc.wavesSurvived() < target
+    ) {
+      mc.tick();
+      guard++;
+      for (const u of mc.state.units) {
+        if (u.team === "player") {
+          if (u.state !== "dead") metaHeal(mc.state, u, u.maxHp);
+        } else if (u.state !== "dead") {
+          u.hp = 0;
+          u.state = "dead";
+        }
+      }
+      // Stop AT the target intermission rather than answering it — otherwise
+      // the pick advances to the next wave and the choice beat is missed.
+      if (mc.endlessStatus()?.intermission) {
+        if (mc.wavesSurvived() >= target) break;
+        mc.pickBoon(0);
+      }
+    }
+    return mc;
+  }
+
+  it("finishing is refused before the capstone falls", () => {
+    const mc = new MatchController(4242, DECK, [], { mode: "endless" });
+    expect(mc.finishEndless()).toBe(false); // not even in an intermission
+    let guard = 0;
+    while (guard < 8000 && !mc.endlessStatus()?.intermission) {
+      mc.tick();
+      guard++;
+    }
+    expect(mc.endlessStatus()?.intermission).toBeTruthy();
+    // In an intermission, but nowhere near wave 100.
+    expect(mc.finishEndless()).toBe(false);
+    expect(mc.phase).not.toBe("victory");
+  });
+
+  it("the reserve sentinel stays pinned at 1 even after the capstone", () => {
+    // The mid-run protection must hold by CONSTRUCTION, not by tuning: an empty
+    // field between waves must never be readable as a win, at any wave number.
+    const mc = driveToWave(4242, ENDLESS_FINAL_WAVE);
+    expect(mc.wavesSurvived()).toBeGreaterThanOrEqual(ENDLESS_FINAL_WAVE);
+    expect(mc.state.enemyReserves).toBe(1);
+    // Reaching wave 100 does NOT auto-win — the player still chooses.
+    expect(mc.phase).not.toBe("victory");
+  });
+
+  it("clearing the capstone offers the choice, and claiming it wins the run", () => {
+    const mc = driveToWave(4242, ENDLESS_FINAL_WAVE);
+    const st = mc.endlessStatus()!;
+    expect(st.completedFinalWave).toBe(true);
+    expect(st.atFinalWaveChoice).toBe(true);
+    expect(mc.finishEndless()).toBe(true);
+    expect(mc.phase).toBe("victory"); // the only victory endless can produce
+    expect(mc.wavesSurvived()).toBe(ENDLESS_FINAL_WAVE);
+  });
+
+  it("declining lets the run continue past 100, still flagged as completed", () => {
+    const mc = driveToWave(4242, ENDLESS_FINAL_WAVE);
+    expect(mc.endlessStatus()!.atFinalWaveChoice).toBe(true);
+    mc.pickBoon(0); // press on instead of claiming
+    expect(mc.phase).toBe("battle"); // the run did NOT end
+    // The choice prompt is a one-time beat, but the completion latches.
+    const after = mc.endlessStatus()!;
+    expect(after.completedFinalWave).toBe(true);
+    expect(after.atFinalWaveChoice).toBe(false);
+    expect(after.wave).toBe(ENDLESS_FINAL_WAVE + 1);
+    // …and it can still be banked later.
+    expect(mc.finishEndless()).toBe(false); // mid-wave, not an intermission
   });
 });
 

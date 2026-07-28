@@ -22,6 +22,10 @@ interface Props {
   onSkip: () => void;
   /** Retire the run here — bank the rewards for the waves already cleared. */
   onRetire: () => void;
+  /** True at the single intermission after the capstone wave fell. */
+  atFinalWaveChoice: boolean;
+  /** Bank the run as a completed conquest (capstone only). */
+  onFinish: () => void;
 }
 
 /** Boon-rarity accent — common reads as steel, rare/epic match the unit palette.
@@ -48,6 +52,8 @@ export function BoonPickOverlay({
   onReroll,
   onSkip,
   onRetire,
+  atFinalWaveChoice,
+  onFinish,
 }: Props) {
   // Tapping a tally chip opens its stack-math card; tapping it again closes.
   const [infoId, setInfoId] = useState<string | null>(null);
@@ -60,11 +66,39 @@ export function BoonPickOverlay({
 
   return (
     <div className="boon-overlay" role="dialog" aria-label="Choose a boon">
-      <div className="boon-overlay-head">
-        <div className="boon-overlay-wave">Wave {wave} cleared</div>
-        <div className="boon-overlay-title">Choose a Boon</div>
-        <div className="boon-overlay-sub">Your warband recovers between waves.</div>
-      </div>
+      {atFinalWaveChoice ? (
+        // The capstone. Framed as an ending you EARNED, with pressing on offered
+        // as the deliberate choice rather than the default — but still offered,
+        // because the mode is called Endless.
+        <div className="boon-overlay-head boon-overlay-conquest">
+          <div className="boon-overlay-wave conquest">Wave {wave} — the summit</div>
+          <div className="boon-overlay-title conquest">Endless Conquered</div>
+          <div className="boon-overlay-sub">
+            A Legendary Reliquary is yours. Bank it now, or press on — the horde
+            does not stop, and neither does the curve.
+          </div>
+          <div className="boon-actions conquest-actions">
+            <button
+              type="button"
+              className="btn btn-gold boon-action-btn conquest-claim"
+              onClick={() => { playSfx("unlockFanfare"); onFinish(); }}
+            >
+              Claim your Reliquary
+            </button>
+          </div>
+          {/* Continuing needs no button of its own — taking any boon below just
+              opens wave 101, which is exactly what "press on" means. */}
+          <div className="boon-overlay-sub conquest-hint">
+            …or take a boon below and see how far this goes.
+          </div>
+        </div>
+      ) : (
+        <div className="boon-overlay-head">
+          <div className="boon-overlay-wave">Wave {wave} cleared</div>
+          <div className="boon-overlay-title">Choose a Boon</div>
+          <div className="boon-overlay-sub">Your warband recovers between waves.</div>
+        </div>
+      )}
 
       <div className="boon-cards">
         {offers.map((offer, i) => (
