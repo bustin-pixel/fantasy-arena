@@ -237,6 +237,14 @@ function BoonRow({ boonId }: { boonId: string }) {
         {boon.offerIf === "allyDead" && (
           <span className="book-boon-tag">offered when an ally has fallen</span>
         )}
+        {boon.offerIf === "hasSpell" && (
+          <span className="book-boon-tag">needs a battle spell</span>
+        )}
+        {/* The deep tiers are gated by wave; without this the book would list
+            blessings a player could never understand the absence of. */}
+        {boon.minWave != null && (
+          <span className="book-boon-tag">from wave {boon.minWave}</span>
+        )}
       </span>
       <span className="book-boon-desc">{boon.description}</span>
     </div>
