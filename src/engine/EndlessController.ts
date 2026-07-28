@@ -50,6 +50,8 @@ import {
   ENDLESS_RHYTHM_MAX,
   ENDLESS_RHYTHM_PER_SEC,
   ENDLESS_ROTATION_BASE,
+  ENDLESS_STALL_TIME_SEC,
+  ENDLESS_WAVE_HARD_CAP_SEC,
   ENDLESS_WAVE_TIME_SEC,
   dungeonForCycle,
   endlessCycle,
@@ -130,6 +132,22 @@ export class EndlessController {
   private summons: { defId: string; count: number }[] = [];
   /** uids of the pets summoned last wave, cleared + respawned each wave. */
   private petUids = new Set<string>();
+
+  // -- Stall detection (see ENDLESS_STALL_TIME_SEC) ---------------------------
+  /** Ticks elapsed in the current wave, for the absolute hard cap. */
+  private waveTicks = 0;
+  /** High-watermark of total enemy HP REMOVED this wave, summed as `maxHp - hp`
+   *  over every enemy (dead ones sit at hp 0 until the intermission prune, so they
+   *  contribute their whole bar). Two properties make this the right signal:
+   *  a freshly spawned enemy contributes 0, so the trickle can't fake progress;
+   *  and comparing against a watermark rather than the previous frame means a boss
+   *  that heals back everything you land never registers, while chipping one does. */
+  private damageProgress = 0;
+  /** Corpses counted this wave (reset each wave; enemy dead bodies persist until
+   *  the intermission prune, so this is monotone within a wave). */
+  private killsThisWave = 0;
+  /** Spawn queue length at the last progress check. */
+  private lastQueueLen = 0;
 
   /** Ordered boon ids picked (for the tally + replay parity). */
   private picks: string[] = [];
@@ -216,6 +234,8 @@ export class EndlessController {
 
     if (this.phase === "intermission") return; // frozen (guard; shouldn't be reached)
 
+    this.trackProgress(state);
+
     // Berserker's Rhythm: ramp the live attack-speed bonus up over the wave.
     if (this.rhythmActive) {
       this.rhythmTicks++;
@@ -253,6 +273,47 @@ export class EndlessController {
     }
   }
 
+  /** Refresh the stall clock whenever the warband is getting somewhere, and
+   *  enforce the absolute per-wave ceiling. Owns every write to `state.clockTicks`
+   *  during a wave; MatchController still owns the "clock ran out ⇒ run over"
+   *  check, so there is exactly one place a run can end this way.
+   *
+   *  Progress is any of: an enemy died, the spawn queue drained by one, or the
+   *  live enemy HP pool hit a new low for this wave. The last is what makes a
+   *  BOSS wave work — there is only one enemy to kill, so a kill-only rule would
+   *  guillotine any warband that can't burst a boss inside the stall window. */
+  private trackProgress(state: SimState): void {
+    this.waveTicks++;
+    if (this.waveTicks >= secToTicks(ENDLESS_WAVE_HARD_CAP_SEC)) {
+      state.clockTicks = 1; // MatchController ends the run on its next check
+      return;
+    }
+
+    let kills = 0;
+    let removed = 0;
+    for (const u of state.units) {
+      if (u.team !== "enemy") continue;
+      if (u.state === "dead") kills++;
+      removed += u.maxHp - u.hp;
+    }
+
+    const progressed =
+      kills > this.killsThisWave ||
+      this.queue.length < this.lastQueueLen ||
+      removed > this.damageProgress;
+
+    this.killsThisWave = Math.max(this.killsThisWave, kills);
+    this.lastQueueLen = this.queue.length;
+    this.damageProgress = Math.max(this.damageProgress, removed);
+
+    if (progressed) {
+      state.clockTicks = Math.max(
+        state.clockTicks,
+        secToTicks(ENDLESS_STALL_TIME_SEC)
+      );
+    }
+  }
+
   // -- Wave lifecycle ---------------------------------------------------------
 
   private startWave(state: SimState): void {
@@ -260,6 +321,12 @@ export class EndlessController {
     state.clockTicks = secToTicks(ENDLESS_WAVE_TIME_SEC); // fresh per-wave backstop
     state.waveBanner = null;
     this.spawnCooldown = 0;
+    // Fresh stall accounting for the new wave. The previous wave's corpses are
+    // pruned at the intermission, so every counter genuinely restarts at zero.
+    this.waveTicks = 0;
+    this.damageProgress = 0;
+    this.killsThisWave = 0;
+    this.lastQueueLen = Infinity;
 
     const dungeon = dungeonForCycle(this.rotation, endlessCycle(wave));
     const kind = endlessWaveKind(wave);

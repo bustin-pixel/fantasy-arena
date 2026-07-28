@@ -26,8 +26,33 @@ export const ENDLESS_PLAYER_ACTIVE = 4;
 export const ENDLESS_ENEMY_ACTIVE = 8;
 
 /** Per-wave stalemate backstop (seconds). The clock resets to this at each wave
- *  start; running it out ends the run (you couldn't clear the wave in time). */
+ *  start; running it out ends the run. NOTE this is a STALL timer, not a DPS
+ *  check — the EndlessController refreshes it whenever the warband makes progress
+ *  (see ENDLESS_STALL_TIME_SEC), so a slow-but-winning wave is never punished. */
 export const ENDLESS_WAVE_TIME_SEC = 120;
+
+/** How long the warband may make NO progress at all before the run is called.
+ *  "Progress" is defined in EndlessController.trackProgress: an enemy died, the
+ *  spawn queue drained, or the live enemy HP pool hit a new low for this wave.
+ *
+ *  WHY A STALL TIMER: the flat 120s clock was killing runs that were still
+ *  winning. In the 2026-07-28 baseline 13-25% of all runs — and after the curve
+ *  retune 63-100% of STRONG runs — ended in `timeout` rather than a wipe, while
+ *  mean wave duration was only 13-21s. Deep waves aren't slow; a defensive build
+ *  simply can't burst a lone boss inside a fixed two minutes, and dying to a
+ *  hidden timer while visibly winning reads as an arbitrary wall.
+ *
+ *  Deliberately NOT "scale the time limit with the wave": that re-creates the
+ *  problem in a second currency, and any mismatch between the two curves silently
+ *  re-caps the tail. A stall timer is curve-independent — it never punishes a
+ *  wave that is progressing, at any wave number, forever. */
+export const ENDLESS_STALL_TIME_SEC = 45;
+
+/** Absolute per-wave ceiling. The stall timer alone would let an unkillable-but-
+ *  chippable stalemate (a boss regenerating exactly as fast as you damage it,
+ *  making a "new low" every few seconds) run forever. Nothing legitimate takes
+ *  eight minutes on one wave. */
+export const ENDLESS_WAVE_HARD_CAP_SEC = 480;
 
 /** Baseline fraction of MISSING hp healed at each intermission (before the
  *  Field Medicine boon raises it). */
@@ -71,26 +96,63 @@ export function endlessWaveKind(wave: number): EndlessWaveKind {
   return "fodder";
 }
 
-/** Per-wave stat multipliers for spawned enemies. Linear growth WITHIN a cycle
- *  plus a compounding step each COMPLETED cycle. Kept gentle on purpose: the
- *  player has no reserves and only a 30% between-wave heal, so if the horde scaled
- *  as fast as stacked boons the attrition would always win and the boons wouldn't
- *  matter. This lets a well-played, boon-stacked run pull ahead. Wave 5 ≈ 1.28 hp
- *  / 1.16 dmg, wave 10 ≈ 1.7 / 1.4, wave 20 ≈ 2.6 / 1.9. Applied at spawn exactly
- *  like the Depths per-floor multipliers. */
+// -- The wave curve -----------------------------------------------------------
+// READ THIS BEFORE RETUNING. What decides how endless FEELS is not the SIZE of
+// the multiplier at wave N, it is its local SLOPE there. Writing
+//     L(w) = ln(enemyPower(w)) − ln(playerPower(w))
+// a run ends when L crosses the warband's standing advantage, so the extra waves
+// a 2× stronger warband buys is
+//     Δwaves ≈ ln2 / L′(w_end)
+// — governed entirely by the growth RATE at the death point. Get that wrong and
+// no amount of levelling, gear or good boon picks moves the ending wave, which
+// is exactly the "I hit a wall at 40 and nothing helps" report that prompted the
+// 2026-07-28 retune: the old curve's L′ at wave 40 bought ONE wave per doubling.
+//
+// Hence the shape below — a shallow, genuinely exponential stretch (where the
+// variance lives, so a strong run pulls meaningfully ahead) followed by a late,
+// slowly accelerating closer that guarantees every run still ends.
+
+/** Base per-wave compounding. Deliberately reproduces the OLD linear×step curve
+ *  to within a few percent through wave 25, so the early/mid game is untouched by
+ *  the retune — only the deep end moves. */
+export const ENDLESS_HP_GROWTH = 1.045;
+export const ENDLESS_DMG_GROWTH = 1.031;
+
+/** Where the closer starts to bite — the knob that sets roughly WHERE THE MEDIAN
+ *  RUN ENDS. Earlier lowers the median, later raises it. */
+export const ENDLESS_SURGE_START = 24;
+
+/** How fast the closer's growth rate itself accelerates — the knob that sets THE
+ *  SPREAD. Small K = a long tail where a great boon stack goes deep; large K =
+ *  everyone dies on the same wave no matter how strong they are. The old curve's
+ *  effective K was ~4× this, which is what collapsed the distribution into a wall
+ *  (37 of 40 sweep seeds inside waves 38–45). Calibration targets, read off
+ *  `endlessSweep`'s curve table: L′ ≈ 0.06–0.09 at the median (8–11 waves per
+ *  doubling), L′ ≈ 0.25–0.35 at the p95 (2–3 waves per doubling). */
+export const ENDLESS_SURGE_K = 0.005;
+
+/** Per-wave stat multipliers for spawned enemies, applied at spawn exactly like
+ *  the Depths per-floor multipliers.
+ *
+ *  A true exponential × a super-exponential closer past ENDLESS_SURGE_START.
+ *  There is deliberately no per-cycle `step` term any more: a constant exponential
+ *  already makes each cycle harder, and the old step put a visible sawtooth into
+ *  the difficulty (wave 6 jumped 9.4% while wave 7 rose 4.0%). A cycle boundary is
+ *  marked by its boss wave now, not by a stat jump.
+ *
+ *  WHY THE CLOSER MUST BE SUPER-EXPONENTIAL: a boon arrives every single wave, so
+ *  against any FIXED growth rate a stacked multiplicative build eventually wins
+ *  outright — an earlier curve produced literally immortal 500+-wave runs. A rate
+ *  that itself keeps climbing always wins in the end. An endless run must always
+ *  end; it just shouldn't end on the same wave for everyone. */
 export function endlessWaveStatMultipliers(wave: number): { hp: number; dmg: number } {
-  const cyclesDone = Math.floor((wave - 1) / ENDLESS_CYCLE_LEN);
-  const step = Math.pow(1.05, cyclesDone);
-  // Deep-end backstop: past wave 25 the horde compounds per-WAVE with a growth
-  // rate that itself accelerates. A boon arrives every wave, so any FIXED rate
-  // can be outrun by stacked multiplicative picks (Overwhelm ×1.35/wave, Aegis
-  // ×0.8 taken/wave made literally-immortal runs); an accelerating one always
-  // wins in the end — an endless run must always end.
-  const over = Math.max(0, wave - 25);
-  const deep = Math.pow(1.05 + 0.01 * over, over);
+  const over = Math.max(0, wave - ENDLESS_SURGE_START);
+  // Triangular exponent: surge(w)/surge(w−1) === exp(K·over) exactly, so the
+  // per-wave growth rate is a clean linear ramp with no discretization artifact.
+  const surge = Math.exp((ENDLESS_SURGE_K * over * (over + 1)) / 2);
   return {
-    hp: (1 + 0.05 * (wave - 1)) * step * deep,
-    dmg: (1 + 0.03 * (wave - 1)) * step * deep,
+    hp: Math.pow(ENDLESS_HP_GROWTH, wave - 1) * surge,
+    dmg: Math.pow(ENDLESS_DMG_GROWTH, wave - 1) * surge,
   };
 }
 
