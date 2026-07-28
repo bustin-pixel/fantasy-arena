@@ -561,6 +561,46 @@ damage) has this same failure mode and must be bounded by something the PLAYER
 scales, not the enemy.** A fixed-rate player buff always loses to the
 accelerating surge; an enemy-relative one does not.
 
+### 4k. Sweep policies — the archetypes were a strawman (2026-07-28)
+The sweep's drafting policies scored `rarityScore` (0–4) **plus +10 for matching
+the build's preferred axis**. Fit therefore outranked rarity by miles: `bruiser`
+would take a **common** damage boon over a **mythic** Apotheosis. No player
+drafts that way, and it made both archetypes look unplayable.
+
+Fixed by scaling rarity ×10 and capping the fit bonus at `FIT_BONUS` (4) — always
+less than one rarity step, so preference breaks ties between comparable cards but
+never argues you out of a rarer one. Also added three **hybrid** policies that
+steer toward whichever axis the warband is currently short of (using the `owned`
+list, which had been threaded through the policy signature and never used).
+
+Reach-wave-100 odds, 200 seeds each, max power — **no balance change between
+these two columns, only the scoring fix**:
+
+| policy | before | after |
+|---|---|---|
+| hybridOff (2:1 offence, mixed) | — | **26.5%** |
+| turtle | **0%** | 17.5% |
+| hybrid (self-correcting) | — | 17.5% |
+| bruiser | **0%** | 16.5% |
+| hybridDef | — | 15.5% |
+| greedy (chase rarity) | 14.5% | 14.5% |
+| first (take the leftmost) | 12.0% | 12.0% |
+| oracle (rigid "best boons" list) | 4.0% | 4.0% |
+
+**This reversed a conclusion I had already written down.** On the old numbers the
+two dumbest policies won and I recorded that drafting "punished thinking". It
+doesn't: a thought-out mixed build (26.5%) nearly doubles naive rarity-chasing
+(14.5%). The earlier finding was an artifact of the broken scoring.
+
+`oracle` is now the worst policy in the set and that is *informative*, not a bug:
+following a fixed preference ranking regardless of what your warband lacks loses
+badly to adapting. The ceiling probe's default moved from `oracle` to `hybridOff`
+so the headline number reflects good play.
+
+⚠ **Before concluding anything from a sweep policy, check the policy is a fair
+model of a player.** A balance number is only as honest as the behaviour it
+assumes.
+
 ### 5. The Depths spawns bypass the deploy() path
 `WaveController` (the PvE horde director) pushes monsters into `state.units`
 directly — no deck bookkeeping, no deployment records (waves rebuild

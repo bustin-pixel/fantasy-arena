@@ -46,12 +46,16 @@ const RUN = process.env.SWEEP ? describe : describe.skip;
 const SEEDS = Number(process.env.SWEEP_SEEDS ?? 8);
 const CEIL_SEEDS = Number(process.env.SWEEP_SEEDS ?? 40);
 const ONLY = process.env.SWEEP_ONLY; // shape | matrix | ceiling
-/** Override the ceiling probe's drafting policy (default "oracle"). Worth
- *  sweeping more than one: the hand-ordered `oracle` is NOT the strongest line —
- *  plain rarity-chasing (`greedy`) beats it, because tie-breaking by id happens
- *  to stack `ascendant`, and stacking the one boon that raises your growth RATE
- *  is what actually reaches the deepest waves. */
-const CEIL_POLICY = process.env.SWEEP_POLICY ?? "oracle";
+/** Override the ceiling probe's drafting policy. Defaults to `hybridOff`, which
+ *  measurement says is the strongest line — an offence-leaning but genuinely
+ *  MIXED warband that still respects rarity. Sweep more than one: the spread
+ *  between policies is the interesting part, and the default should represent
+ *  good play rather than the best or worst case.
+ *
+ *  Historical note worth keeping: `oracle` (a rigid hand-ordered preference list)
+ *  is the WORST policy in the set by a distance. Following a fixed "best boons"
+ *  ranking regardless of what your warband is short of loses badly to adapting. */
+const CEIL_POLICY = process.env.SWEEP_POLICY ?? "hybridOff";
 /** Hard safety cap. Without it a mis-tuned constant hangs the harness forever —
  *  exactly the runaway the accelerating backstop exists to prevent, so the tool
  *  that measures it must be immune to it. */
@@ -136,7 +140,21 @@ function bestBy(offers: string[], score: (id: string) => number): number {
   return bestIdx;
 }
 
-const rarityScore = (id: string): number => RARITY_RANK[BOONS[id]?.rarity] ?? 0;
+/** Rarity, weighted so it DOMINATES build preference (see FIT_BONUS).
+ *
+ *  This scaling is load-bearing, and it was originally wrong: rarity contributed
+ *  0-4 while the archetype policies added +10 for a matching effect, so "fits my
+ *  build" outranked "is four tiers rarer" — bruiser would take a COMMON damage
+ *  boon over a MYTHIC Apotheosis. No real player drafts that way, and it made the
+ *  archetypes read as unplayable (0% at wave 100) when what was being measured
+ *  was a strawman rather than a build. */
+const rarityScore = (id: string): number =>
+  (RARITY_RANK[BOONS[id]?.rarity] ?? 0) * 10;
+
+/** How far a policy may lean on build fit. Deliberately SMALLER than one rarity
+ *  step, so preference breaks ties between comparable cards but never talks a
+ *  player out of an obviously rarer one. */
+const FIT_BONUS = 4;
 
 /** The hand-ordered "a good player who knows the pool" ranking — the ceiling
  *  probe's policy. Anything not listed falls back to rarity. Compounding and
@@ -172,19 +190,75 @@ const ORACLE_ORDER = [
   "stoneskin",
 ];
 
+/** How lopsided a warband's picks are so far: +1 all offence, −1 all defence, 0
+ *  balanced. Drives the `hybrid` policies, which steer toward whichever axis
+ *  they're short of — the closest thing here to how a person actually drafts. */
+function tilt(owned: string[]): number {
+  let off = 0;
+  let def = 0;
+  for (const id of owned) {
+    if (isOffense(id)) off++;
+    if (isDefense(id)) def++;
+  }
+  const total = off + def;
+  return total === 0 ? 0 : (off - def) / total;
+}
+
 const POLICIES: { id: string; pick: PickPolicy }[] = [
   // The floor, and the control that catches "the sweep measures policy, not curve".
   { id: "first", pick: () => 0 },
   { id: "greedy", pick: (offers) => bestBy(offers, rarityScore) },
+  // The two pure archetypes: rarity first, build preference as the tiebreak.
   {
     id: "bruiser",
     pick: (offers) =>
-      bestBy(offers, (id) => rarityScore(id) + (isOffense(id) ? 10 : 0)),
+      bestBy(offers, (id) => rarityScore(id) + (isOffense(id) ? FIT_BONUS : 0)),
   },
   {
     id: "turtle",
     pick: (offers) =>
-      bestBy(offers, (id) => rarityScore(id) + (isDefense(id) ? 10 : 0)),
+      bestBy(offers, (id) => rarityScore(id) + (isDefense(id) ? FIT_BONUS : 0)),
+  },
+  // -- Hybrids: what people actually build. ---------------------------------
+  // `hybrid` self-corrects — it leans toward whichever axis its existing picks
+  // are short of, so it ends up with a genuinely mixed warband rather than a
+  // pile of one stat. The other two commit to a lean but still respect rarity.
+  {
+    id: "hybrid",
+    pick: (offers, owned) => {
+      const t = tilt(owned);
+      return bestBy(offers, (id) => {
+        let s = rarityScore(id);
+        if (isOffense(id)) s += FIT_BONUS * -t; // over-invested in offence ⇒ penalise
+        if (isDefense(id)) s += FIT_BONUS * t;
+        return s;
+      });
+    },
+  },
+  {
+    id: "hybridOff",
+    pick: (offers, owned) => {
+      // Aims for roughly 2:1 offence, correcting back whenever it drifts.
+      const t = tilt(owned) - 0.33;
+      return bestBy(offers, (id) => {
+        let s = rarityScore(id);
+        if (isOffense(id)) s += FIT_BONUS * -t;
+        if (isDefense(id)) s += FIT_BONUS * t;
+        return s;
+      });
+    },
+  },
+  {
+    id: "hybridDef",
+    pick: (offers, owned) => {
+      const t = tilt(owned) + 0.33; // roughly 2:1 defence
+      return bestBy(offers, (id) => {
+        let s = rarityScore(id);
+        if (isOffense(id)) s += FIT_BONUS * -t;
+        if (isDefense(id)) s += FIT_BONUS * t;
+        return s;
+      });
+    },
   },
   {
     id: "oracle",
