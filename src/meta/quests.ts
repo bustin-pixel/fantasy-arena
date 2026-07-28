@@ -421,12 +421,15 @@ export function questLocation(q: QuestNotice): string | null {
 // Migration sanitizer (the sanitizeShop twin): any junk → a valid state.
 // ---------------------------------------------------------------------------
 
+// Must list EVERY ChestTier: this is a whitelist, so an omission silently nulls
+// a persisted quest reward on load rather than failing to compile.
 const VALID_TIERS: readonly ChestTier[] = [
   "wooden",
   "silver",
   "gold",
   "arcane",
   "dragon",
+  "legendary",
 ];
 const VALID_DIFFICULTIES: readonly QuestDifficulty[] = [
   "easy",

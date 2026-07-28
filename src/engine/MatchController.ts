@@ -994,6 +994,22 @@ export class MatchController {
     return true;
   }
 
+  /** Endless: bank the run as a COMPLETION. The only path that produces a
+   *  "victory" in endless — and it is set explicitly here rather than inferred
+   *  from an empty field, so `reservesSentinel` keeps doing its job unweakened
+   *  and no ordinary intermission can ever be mistaken for a win.
+   *
+   *  Legal only once the capstone wave is down. Declining it (pressing on past
+   *  100) simply never calls this; the run then ends the usual way, and the
+   *  results screen still frames it as completed because `wavesSurvived` is
+   *  past the capstone. */
+  finishEndless(): boolean {
+    if (this.mode !== "endless" || !this.endless?.inIntermission) return false;
+    if (!this.endless.completedFinalWave) return false;
+    this.state.phase = "victory";
+    return true;
+  }
+
   /** Endless read-model for the UI (wave number, live intermission offers, boon
    *  tally), or null outside endless. */
   endlessStatus(): EndlessStatus | null {

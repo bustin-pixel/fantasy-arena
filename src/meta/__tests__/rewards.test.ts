@@ -10,6 +10,9 @@ import {
 } from "@/meta/rewards";
 import {
   bumpChestTier,
+  CHEST_TIER_ORDER,
+  LEGENDARY_CHEST_GOLD,
+  LEGENDARY_CHEST_SHARDS,
   CHEST_GOLD_RANGE,
   CHEST_UNIT_CHANCE,
   DUPLICATE_GOLD,
@@ -29,6 +32,7 @@ import { richChestBump, TREASURE_ROOM_TIERS } from "@/data/encounters";
 import type { TierId } from "@/data/tiers";
 import { ITEM_LINES, signatureLineFor } from "@/data/items";
 import { XP_REWARDS } from "@/meta/leveling";
+import { ENDLESS_FINAL_WAVE } from "@/data/endless";
 import { DECKABLE_UNIT_IDS, getUnitDef } from "@/data/units";
 import { RARITY_ORDER } from "@/data/rarities";
 import {
@@ -571,9 +575,12 @@ describe("economy data sanity (guards designer typos)", () => {
       expect(max).toBeGreaterThanOrEqual(min);
       expect(CHEST_UNIT_CHANCE[tier]).toBeGreaterThanOrEqual(0);
       expect(CHEST_UNIT_CHANCE[tier]).toBeLessThanOrEqual(1);
-      // Tiers are declared in ascending order — better tier, better loot.
+      // Tiers are declared in ascending order — better tier, better loot. Gold
+      // must strictly climb; the unit chance only has to not go BACKWARDS,
+      // because it is a probability that saturated at 1.0 back at dragon — a
+      // guaranteed unit cannot become more guaranteed.
       expect(min).toBeGreaterThan(prevMax);
-      expect(CHEST_UNIT_CHANCE[tier]).toBeGreaterThan(prevChance);
+      expect(CHEST_UNIT_CHANCE[tier]).toBeGreaterThanOrEqual(prevChance);
       prevMax = max;
       prevChance = CHEST_UNIT_CHANCE[tier];
     }
@@ -594,6 +601,63 @@ describe("endless rewards", () => {
     const r = computeBattleRewards({ ...base, wavesSurvived: 7, bestWave: 0 });
     expect(r.gold).toBe(ENDLESS_GOLD.base + ENDLESS_GOLD.perWave * 7);
     expect(r.xp).toBe(XP_REWARDS.endlessBase + XP_REWARDS.endlessPerWave * 7);
+  });
+
+  it("pays the same on a capstone VICTORY as on a defeat", () => {
+    // Endless rewards have always been outcome-independent; wave 100 introduced
+    // the first endless "victory", so pin that it didn't change the payout.
+    const win = computeBattleRewards({
+      ...base, outcome: "victory", wavesSurvived: 40, bestWave: 0,
+    });
+    const loss = computeBattleRewards({ ...base, wavesSurvived: 40, bestWave: 0 });
+    expect(win.gold).toBe(loss.gold);
+    expect(win.xp).toBe(loss.xp);
+    expect(win.chest?.tier).toBe(loss.chest?.tier);
+  });
+
+  it("clearing the capstone wave pays the Legendary Reliquary, every time", () => {
+    // Repeatable by design: at ~3.5% of runs even at max power it can't be
+    // farmed, so a fresh run and a hundredth one both pay it.
+    const first = computeBattleRewards({
+      ...base, wavesSurvived: ENDLESS_FINAL_WAVE, bestWave: 0,
+    });
+    const repeat = computeBattleRewards({
+      ...base, wavesSurvived: ENDLESS_FINAL_WAVE, bestWave: ENDLESS_FINAL_WAVE,
+    });
+    expect(first.chest?.tier).toBe("legendary");
+    expect(repeat.chest?.tier).toBe("legendary"); // no milestone gating
+    // …and it supersedes the milestone chest rather than stacking.
+    const below = computeBattleRewards({
+      ...base, wavesSurvived: ENDLESS_FINAL_WAVE - 1, bestWave: 0,
+    });
+    expect(below.chest?.tier).not.toBe("legendary");
+  });
+
+  it("the Reliquary guarantees a legendary item, 2500 gold and 250 shards", () => {
+    // Seed-independent: the whole point of the capstone is that it never
+    // disappoints, so sweep a spread of seeds rather than trusting one.
+    for (const chestSeed of [1, 42, 1337, 90210, 5555]) {
+      const r = computeBattleRewards({
+        ...base, chestSeed, wavesSurvived: ENDLESS_FINAL_WAVE, bestWave: 0,
+      });
+      const contents = r.chest!.contents;
+      const gold = contents.find((c) => c.kind === "gold");
+      const item = contents.find((c) => c.kind === "item");
+      const shards = contents.find((c) => c.kind === "shards");
+      expect(gold).toMatchObject({ amount: LEGENDARY_CHEST_GOLD });
+      expect(item).toMatchObject({ quality: "legendary" });
+      expect(shards).toMatchObject({ amount: LEGENDARY_CHEST_SHARDS });
+    }
+  });
+
+  it("no chest bump can ever climb INTO the legendary tier", () => {
+    // The tier is excluded from CHEST_TIER_ORDER on purpose: an Elite boss
+    // bumps +2 off dragon, and must clamp there rather than handing out the
+    // capstone chest routinely.
+    expect(bumpChestTier("dragon", 1)).toBe("dragon");
+    expect(bumpChestTier("dragon", 5)).toBe("dragon");
+    expect(bumpChestTier("arcane", 2)).toBe("dragon");
+    expect(CHEST_TIER_ORDER).not.toContain("legendary");
   });
 
   it("flags a new best wave via firstClear", () => {

@@ -31,7 +31,13 @@ interface Props {
 /** Creak pitch per tier (dragon is a heavier lid). */
 const CREAK_RATE: Record<ChestTier, number> = {
   wooden: 1, silver: 1.08, gold: 1.15, arcane: 1.2, dragon: 0.85,
+  legendary: 0.78, // the heaviest lid of all
 };
+
+/** Tiers whose closed state is ANIMATED. Everything else draws one static frame
+ *  and stops (a plain chest just sits there); the legendary chest has a living
+ *  aura, so it needs a rAF loop even before it's tapped. */
+const AMBIENT_TIERS: ReadonlySet<ChestTier> = new Set<ChestTier>(["legendary"]);
 
 /** Extra reveal flavor layered on the shared chestOpen jingle (wooden stays
  *  bare — the plain tier should feel plain). */
@@ -40,6 +46,12 @@ const REVEAL_EXTRA: Partial<Record<ChestTier, () => void>> = {
   gold: () => playSfx("coinShower"),
   arcane: () => playSfx("arcaneWarp"),
   dragon: () => playSfx("roar", 0.75),
+  // Layered on purpose: the capstone should sound like three things at once.
+  legendary: () => {
+    playSfx("unlockFanfare");
+    playSfx("chestShine", 1.25);
+    playSfx("coinShower");
+  },
 };
 
 export function ChestSprite({ tier, opening, onOpened, width = 104 }: Props) {
@@ -68,9 +80,21 @@ export function ChestSprite({ tier, opening, onOpened, width = 104 }: Props) {
 
     if (!opening) {
       openedRef.current = false;
-      setup();
-      drawChest(ctx, tier, 0, []);
-      return;
+      if (!AMBIENT_TIERS.has(tier)) {
+        setup();
+        drawChest(ctx, tier, 0, []);
+        return;
+      }
+      // Ambient tiers idle-animate until tapped.
+      const idleStart = performance.now();
+      let idleRaf = 0;
+      const idleFrame = (now: number) => {
+        setup();
+        drawChest(ctx, tier, 0, [], now - idleStart);
+        idleRaf = requestAnimationFrame(idleFrame);
+      };
+      idleRaf = requestAnimationFrame(idleFrame);
+      return () => cancelAnimationFrame(idleRaf);
     }
 
     // --- opening timeline ---------------------------------------------------
@@ -95,10 +119,11 @@ export function ChestSprite({ tier, opening, onOpened, width = 104 }: Props) {
       }
 
       setup();
-      drawChest(ctx, tier, t, sparkles);
+      drawChest(ctx, tier, t, sparkles, now - start);
 
-      // Keep animating through the sparkle tail, then rest on the final frame.
-      if (t < OPEN_AT + SPARKLE_MS) {
+      // Keep animating through the sparkle tail, then rest on the final frame —
+      // except the ambient tiers, whose aura never stops turning.
+      if (t < OPEN_AT + SPARKLE_MS || AMBIENT_TIERS.has(tier)) {
         raf = requestAnimationFrame(frame);
       }
     };

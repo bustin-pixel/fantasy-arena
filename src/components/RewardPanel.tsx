@@ -70,6 +70,7 @@ export const CHEST_LABEL: Record<ChestTier, string> = {
   gold: "Golden Chest",
   arcane: "Arcane Chest",
   dragon: "Dragon's Hoard",
+  legendary: "Legendary Reliquary",
 };
 
 /** closed → (tap) → opening (sprite animates) → open (contents revealed). */

@@ -53,6 +53,7 @@ import {
   ENDLESS_RHYTHM_PER_SEC,
   ENDLESS_REROLLS_START,
   ENDLESS_REROLL_EVERY_WAVES,
+  ENDLESS_FINAL_WAVE,
   ENDLESS_ROTATION_BASE,
   ENDLESS_SKIP_HEAL_PCT,
   ENDLESS_STALL_TIME_SEC,
@@ -105,6 +106,12 @@ export interface EndlessStatus {
   rhythmBonus: number | null;
   /** Boon rerolls still banked this run. */
   rerollsLeft: number;
+  /** True once the capstone wave has been cleared — drives the "Endless
+   *  Conquered" intermission and the completed framing on the results card. */
+  completedFinalWave: boolean;
+  /** True only at the intermission immediately AFTER the capstone fell, i.e.
+   *  the one moment the claim/continue choice is offered. */
+  atFinalWaveChoice: boolean;
 }
 
 export class EndlessController {
@@ -226,9 +233,20 @@ export class EndlessController {
   }
   /** Enemy-reserve sentinel: always ≥ 1 while the run lives, so the win check
    *  (enemies dead AND reserves ≤ 0) can never fire. An endless run only ends on
-   *  a player wipe or a wave-clock timeout, both handled by MatchController. */
+   *  a player wipe or a wave-clock timeout, both handled by MatchController.
+   *
+   *  DELIBERATELY still unconditional now that wave 100 can be COMPLETED: the
+   *  capstone victory is set explicitly by MatchController, never inferred from
+   *  an empty field. Weakening this to "0 once you've won" would re-open the
+   *  every-intermission-is-a-victory hole it exists to close. */
   get reservesSentinel(): number {
     return 1;
+  }
+
+  /** Whether this run has cleared the capstone wave. Latches true and stays
+   *  true if the player chooses to press on past it. */
+  get completedFinalWave(): boolean {
+    return this.wavesCleared >= ENDLESS_FINAL_WAVE;
   }
   /** The run's compendium ledger: everything encountered (`seen`) and the subset
    *  that died to you (`slain`). Accumulated as we spawn + prune, so it survives
@@ -257,6 +275,9 @@ export class EndlessController {
         ? Math.min(ENDLESS_RHYTHM_MAX, ENDLESS_RHYTHM_PER_SEC * (this.rhythmTicks / TICK_RATE))
         : null,
       rerollsLeft: this.rerollsLeft,
+      completedFinalWave: this.completedFinalWave,
+      atFinalWaveChoice:
+        this.phase === "intermission" && this.wavesCleared === ENDLESS_FINAL_WAVE,
     };
   }
 

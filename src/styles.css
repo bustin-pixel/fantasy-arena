@@ -4259,6 +4259,10 @@ body.modal-open .pager-nav {
 .quest-reward-chest.tier-gold { color: #a87a12; }
 .quest-reward-chest.tier-arcane { color: #6d3fa8; }
 .quest-reward-chest.tier-dragon { color: #a83232; }
+/* Quests never award this tier today, but the class must exist: the chest name
+   is built by template literal, so a missing rule renders with no colour and
+   no build error. */
+.quest-reward-chest.tier-legendary { color: #c9a227; }
 .quest-card-actions {
   display: flex;
   align-items: center;

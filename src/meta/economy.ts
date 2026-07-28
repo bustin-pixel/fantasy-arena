@@ -89,12 +89,25 @@ export function endlessMilestoneChestTier(
 /** Ascending order. Wooden/silver drop from ordinary floors and Depths bosses;
  *  gold from themed-dungeon deep bosses; arcane/dragon cap the dungeon chain
  *  (Deep Forge / Eclipse Spire boss first-clears — bossChestTierFor in
- *  meta/rewards.ts) plus arcane from deep endless milestones. */
-export type ChestTier = "wooden" | "silver" | "gold" | "arcane" | "dragon";
+ *  meta/rewards.ts) plus arcane from deep endless milestones.
+ *
+ *  `legendary` sits above them all and is NOT part of the normal ladder economy:
+ *  it is the Endless wave-100 completion prize, and otherwise a 1-in-2000 lottery
+ *  on any dungeon chest (LEGENDARY_CHEST_DROP_CHANCE). It is deliberately excluded
+ *  from CHEST_TIER_ORDER so no `chestBump` can ever climb into it — an Elite-tier
+ *  boss bumping two rungs off dragon must not hand out the capstone chest. */
+export type ChestTier =
+  | "wooden"
+  | "silver"
+  | "gold"
+  | "arcane"
+  | "dragon"
+  | "legendary";
 
 /** Ascending chest ladder — the ONE ordering shared by the reward fold and
  *  the UI previews (was a rewards.ts local; exported with the tier system so
- *  chest bumps can't drift between the fold and the atlas sheet). */
+ *  chest bumps can't drift between the fold and the atlas sheet).
+ *  NOTE: deliberately stops at dragon; see the `legendary` note above. */
 export const CHEST_TIER_ORDER: readonly ChestTier[] = [
   "wooden",
   "silver",
@@ -102,6 +115,16 @@ export const CHEST_TIER_ORDER: readonly ChestTier[] = [
   "arcane",
   "dragon",
 ];
+
+/** Flat chance that ANY dungeon chest award is replaced by the legendary chest.
+ *  1 in 2000 — a lottery you are not meant to plan around. Rolled on the run's
+ *  seeded RNG, never Math.random. */
+export const LEGENDARY_CHEST_DROP_CHANCE = 0.0005;
+
+/** The legendary chest's fixed payout. Unlike every other tier its gold is a
+ *  flat number rather than a range — this is a ceremony, not a slot machine. */
+export const LEGENDARY_CHEST_GOLD = 2500;
+export const LEGENDARY_CHEST_SHARDS = 250;
 
 /** Climb (or descend) the chest ladder by `steps`, clamped at both ends. */
 export function bumpChestTier(tier: ChestTier, steps: number): ChestTier {
@@ -158,6 +181,7 @@ export const CHEST_UNIT_CHANCE: Record<ChestTier, number> = {
   gold: 0.5,
   arcane: 0.75,
   dragon: 1,
+  legendary: 1,
 };
 
 /** Bonus gold inside a chest, on top of the flat battle gold. */
@@ -167,6 +191,8 @@ export const CHEST_GOLD_RANGE: Record<ChestTier, [number, number]> = {
   gold: [150, 250],
   arcane: [350, 550],
   dragon: [700, 1100],
+  // Fixed, not a range — the capstone pays exactly LEGENDARY_CHEST_GOLD.
+  legendary: [LEGENDARY_CHEST_GOLD, LEGENDARY_CHEST_GOLD],
 };
 
 // Milestone gift units now live on the Dungeon def (`milestoneUnlocks`, read
@@ -186,6 +212,7 @@ export const ITEM_DROP_CHANCE: Record<ChestTier, number> = {
   gold: 0.8,
   arcane: 1,
   dragon: 1,
+  legendary: 1,
 };
 
 /** Item pity: after this many consecutive itemless chests, the next chest is
@@ -202,6 +229,10 @@ export const ITEM_QUALITY_WEIGHTS: Record<ChestTier, Record<Rarity, number>> = {
   gold: { rare: 0.7, epic: 0.3, legendary: 0 },
   arcane: { rare: 0.35, epic: 0.55, legendary: 0.1 },
   dragon: { rare: 0.15, epic: 0.55, legendary: 0.3 },
+  // The whole point of the capstone chest: a guaranteed legendary line. The
+  // weight walk in pickWeightedQuality normalises, so {0,0,1} always lands on
+  // legendary. (It still drops at 1★ — stars only ever come from merging.)
+  legendary: { rare: 0, epic: 0, legendary: 1 },
 };
 
 /** Extra roll on a themed-dungeon BOSS chest for that dungeon's signature
@@ -240,6 +271,14 @@ export const SHARD_CHEST_DRIP: Partial<
 > = {
   arcane: { chance: 0.35, range: [3, 6] },
   dragon: { chance: 0.6, range: [6, 12] },
+  // Guaranteed and fixed. Keeping the shards INSIDE the chest (rather than on
+  // the reward alongside it) is what lets the capstone pay identically whether
+  // it came from the Endless wave-100 clear or the 1-in-2000 dungeon lottery —
+  // the chest IS the prize, wherever it was found.
+  legendary: {
+    chance: 1,
+    range: [LEGENDARY_CHEST_SHARDS, LEGENDARY_CHEST_SHARDS],
+  },
 };
 
 // ---------------------------------------------------------------------------

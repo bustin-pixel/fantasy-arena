@@ -45,6 +45,7 @@ import {
   ITEM_DROP_CHANCE,
   ITEM_PITY_THRESHOLD,
   ITEM_QUALITY_WEIGHTS,
+  LEGENDARY_CHEST_DROP_CHANCE,
   replayGoldFor,
   SHARD_CHEST_DRIP,
   SHARD_REWARDS,
@@ -52,6 +53,7 @@ import {
   TIER_REWARDS,
   type ChestTier,
 } from "./economy";
+import { ENDLESS_FINAL_WAVE } from "@/data/endless";
 import { XP_REWARDS } from "./leveling";
 import {
   computeBattleBestiaryRewards,
@@ -327,8 +329,17 @@ function baseBattleRewards(input: BattleRewardInput): BattleRewards {
     if (rng.next() >= coin.chestUpgradeChance) return chestTier;
     return bumpChestTier(chestTier, 1);
   };
+  /** The 1-in-2000 lottery: any chest award can come up a Legendary Reliquary
+   *  instead. Its own XOR-salted stream (the house idiom — 0x5eed is the Lucky
+   *  Coin, 0xb055 the boss replay), so it perturbs neither the coin roll nor
+   *  rollChest's own stream, and every legacy seed still rolls byte-identically.
+   *  Rolled AFTER the coin upgrade so the two can't interact. */
+  const legendaryRoll = (chestTier: ChestTier): ChestTier => {
+    const rng = new RNG(chestSeed ^ 0x1e6e0d);
+    return rng.next() < LEGENDARY_CHEST_DROP_CHANCE ? "legendary" : chestTier;
+  };
   const makeChest = (chestTier: ChestTier, sigDungeonId?: string): ChestResult => {
-    const t = upgradeTier(chestTier);
+    const t = legendaryRoll(upgradeTier(chestTier));
     return {
       tier: t,
       seed: chestSeed,
@@ -347,7 +358,15 @@ function baseBattleRewards(input: BattleRewardInput): BattleRewards {
   // `firstClear` doubles as "new best wave" for the results copy. Shards pay
   // per FRESH milestone crossed (a 3→12 run banks the 5 AND 10 marks).
   if (mode === "endless") {
-    const tier = endlessMilestoneChestTier(bestWave, wavesSurvived);
+    // Reaching the capstone pays the Legendary Reliquary — EVERY time, not just
+    // the first, since at ~3.5% of runs even at max power it can't be farmed.
+    // It supersedes the milestone chest rather than stacking (one chest per run
+    // is the shape the whole reward path assumes), and the Reliquary is worth
+    // several arcane chests on its own.
+    const tier =
+      wavesSurvived >= ENDLESS_FINAL_WAVE
+        ? ("legendary" as const)
+        : endlessMilestoneChestTier(bestWave, wavesSurvived);
     return {
       gold: boostGold(ENDLESS_GOLD.base + ENDLESS_GOLD.perWave * wavesSurvived),
       xp: XP_REWARDS.endlessBase + XP_REWARDS.endlessPerWave * wavesSurvived,

@@ -16,6 +16,15 @@ import { DUNGEON_IDS, getDungeon, type Dungeon } from "./dungeons";
 
 export const ENDLESS_CYCLE_LEN = 5;
 
+/** The capstone wave. Clearing it COMPLETES the run — the only victory endless
+ *  can produce — and pays the Legendary Reliquary. The player may then bank it
+ *  or press on: nothing stops the waves continuing past here and the curve keeps
+ *  climbing, so "endless" stays honest for anyone who wants it.
+ *
+ *  Meant to be rare — measured at ~3.5% of runs even at max power with ideal
+ *  drafting (NOTES 4h). A trophy, not a checkpoint. */
+export const ENDLESS_FINAL_WAVE = 100;
+
 /** The whole warband is fielded at once (like Depths). */
 export const ENDLESS_PLAYER_ACTIVE = 4;
 
