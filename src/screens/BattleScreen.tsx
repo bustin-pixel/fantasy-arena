@@ -171,6 +171,8 @@ export function BattleScreen({
     inspectUnit,
     enemyLedger,
     pickBoon,
+    rerollBoons,
+    skipBoon,
     retireEndless,
     wavesSurvived,
     startOutroChest,
@@ -748,6 +750,9 @@ export function BattleScreen({
           offers={ui.intermission.offers}
           boonsPicked={ui.boonsPicked}
           onPick={(i) => { playSfx("boonPick"); pickBoon(i); }}
+          rerollsLeft={ui.rerollsLeft}
+          onReroll={rerollBoons}
+          onSkip={() => { playSfx("boonPick"); skipBoon(); }}
           onRetire={() => {
             playSfx("retireBank");
             retiredRef.current = true;

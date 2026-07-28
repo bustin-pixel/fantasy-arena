@@ -14,6 +14,12 @@ interface Props {
   offers: BoonOffer[];
   boonsPicked: BoonTally[];
   onPick: (index: number) => void;
+  /** Rerolls still banked this run (0 disables the button). */
+  rerollsLeft: number;
+  /** Spend a reroll for a fresh set of offers; stays in the intermission. */
+  onReroll: () => void;
+  /** Decline the offers for extra healing instead. */
+  onSkip: () => void;
   /** Retire the run here — bank the rewards for the waves already cleared. */
   onRetire: () => void;
 }
@@ -22,6 +28,8 @@ interface Props {
  *  Exported for the results screen's boon recap chips. */
 export function rarityColor(r: BoonRarity): string {
   switch (r) {
+    case "mythic":
+      return "#f5a524"; // deep-tier gold — reads apart from epic at a glance
     case "epic":
       return "#a855f7";
     case "rare":
@@ -31,11 +39,22 @@ export function rarityColor(r: BoonRarity): string {
   }
 }
 
-export function BoonPickOverlay({ wave, offers, boonsPicked, onPick, onRetire }: Props) {
+export function BoonPickOverlay({
+  wave,
+  offers,
+  boonsPicked,
+  onPick,
+  rerollsLeft,
+  onReroll,
+  onSkip,
+  onRetire,
+}: Props) {
   // Tapping a tally chip opens its stack-math card; tapping it again closes.
   const [infoId, setInfoId] = useState<string | null>(null);
   // Two-tap retire: the first tap arms the confirm, the second banks the run.
   const [confirmRetire, setConfirmRetire] = useState(false);
+  // Two-tap skip as well — a mis-tap here costs a whole boon.
+  const [confirmSkip, setConfirmSkip] = useState(false);
 
   const info = infoId ? boonsPicked.find((b) => b.id === infoId) ?? null : null;
 
@@ -66,6 +85,43 @@ export function BoonPickOverlay({ wave, offers, boonsPicked, onPick, onRetire }:
             <span className="boon-card-desc">{offer.description}</span>
           </button>
         ))}
+      </div>
+
+      <div className="boon-actions">
+        <button
+          type="button"
+          className="btn boon-action-btn"
+          disabled={rerollsLeft <= 0}
+          onClick={() => { playSfx("uiSelect"); onReroll(); }}
+        >
+          ↻ Reroll{rerollsLeft > 0 ? ` (${rerollsLeft})` : ""}
+        </button>
+        {confirmSkip ? (
+          <>
+            <button
+              type="button"
+              className="btn boon-action-btn"
+              onClick={() => { setConfirmSkip(false); onSkip(); }}
+            >
+              Skip for healing
+            </button>
+            <button
+              type="button"
+              className="btn boon-action-btn"
+              onClick={() => { playSfx("uiTap"); setConfirmSkip(false); }}
+            >
+              Cancel
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            className="btn boon-action-btn"
+            onClick={() => { playSfx("uiTap"); setConfirmSkip(true); }}
+          >
+            Skip — heal instead
+          </button>
+        )}
       </div>
 
       {boonsPicked.length > 0 && (

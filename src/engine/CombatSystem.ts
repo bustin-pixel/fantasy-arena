@@ -128,6 +128,12 @@ export interface TeamMods {
   rangedLifesteal: number;
   /** Berserker's Rhythm: live attack-speed bonus, ramped by the controller. */
   rhythmBonus: number;
+  /** Siege Train: live outgoing-damage bonus that climbs the longer the current
+   *  wave has run. Ramped by the EndlessController like rhythmBonus; 0 = off. */
+  siegeBonus: number;
+  /** Soul Harvest: live outgoing-damage bonus accumulated from kills this wave.
+   *  Reset each wave start by the EndlessController; 0 = off. */
+  killStackBonus: number;
   /** Thunderclap / Venom Coating on-hit riders. */
   onHitRiders: TeamRider[];
   /** Compendium slayer bonus: outgoing damage multiplier vs a specific enemy
@@ -168,6 +174,8 @@ export function identityTeamMods(): TeamMods {
     critEveryNth: 0,
     rangedLifesteal: 0,
     rhythmBonus: 0,
+    siegeBonus: 0,
+    killStackBonus: 0,
     onHitRiders: [],
     slayerVs: {},
     deployShieldFrac: 0,
@@ -468,9 +476,15 @@ function makeDamageDealer(
       const pt = packTacticsFrac(state, target);
       if (pt > 0) itemTakenMult *= Math.max(0, 1 - pt);
     }
+    // Endless deep-tier boons: Siege Train ramps with how long this wave has run,
+    // Soul Harvest with how many have died in it. Both turn "this wave is
+    // dragging" into "this wave is getting easier", which is what stops a deep
+    // wave becoming an unwinnable slog. Identity (×1) when both are 0.
+    const rampMult = 1 + srcMods.siegeBonus + srcMods.killStackBonus;
     const scaled =
       effAmount *
       srcMods.dmgMult *
+      rampMult *
       execMult *
       slayerMult *
       magicMult *

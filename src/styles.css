@@ -2484,6 +2484,26 @@ body.modal-open .pager-nav {
   color: var(--stone);
   line-height: 1.3;
 }
+/* Reroll / skip row. `color: inherit` is deliberate and load-bearing: this repo
+   has no global button reset, so a bare <button> paints the UA's black text —
+   which reads black on desktop and WHITE on mobile. See NOTES on that trap. */
+.boon-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 340px;
+}
+.boon-action-btn {
+  color: inherit;
+  font-size: 0.78rem;
+  padding: 7px 12px;
+}
+.boon-action-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
 .boon-tally {
   width: 100%;
   max-width: 340px;

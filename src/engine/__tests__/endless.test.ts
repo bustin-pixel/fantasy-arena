@@ -3,7 +3,11 @@
 // the 5-wave boss cadence, and that team-mod boons survive kits that recompute
 // unit stats every tick. Headless like the rest of the engine specs.
 import { describe, it, expect } from "vitest";
-import { MatchController } from "@/engine/MatchController";
+import {
+  MatchController,
+  REROLL_ACTION,
+  SKIP_ACTION,
+} from "@/engine/MatchController";
 import {
   BOUNTY_WAVE_CAP_FRAC,
   metaHeal,
@@ -12,7 +16,12 @@ import {
 } from "@/engine/CombatSystem";
 import { battleState, place, makeDummy, digest } from "./helpers";
 import { RNG } from "@/utils/rng";
-import { boonStackSummary, rollBoonOffers } from "@/data/boons";
+import {
+  BOONS,
+  boonRarityWeights,
+  boonStackSummary,
+  rollBoonOffers,
+} from "@/data/boons";
 import { DUNGEON_IDS, getDungeon } from "@/data/dungeons";
 import {
   ENDLESS_RARE_POOL,
@@ -164,6 +173,99 @@ describe("endless — determinism", () => {
     const a = drive(4242, () => 0, 6000);
     const b = drive(4242, () => 1, 6000);
     expect(digest(b.mc.state)).not.toBe(digest(a.mc.state));
+  });
+});
+
+describe("endless — reroll + skip determinism", () => {
+  /** Drive a run answering each intermission from a scripted ACTION log, using
+   *  the same sentinels the real input log uses: >=0 pick, -1 reroll, -2 skip. */
+  function driveActions(seed: number, actions: number[], tickCap = 8000) {
+    const mc = new MatchController(seed, DECK, [], { mode: "endless" });
+    let i = 0;
+    let guard = 0;
+    while (
+      mc.phase !== "defeat" &&
+      mc.phase !== "victory" &&
+      guard < tickCap
+    ) {
+      mc.tick();
+      guard++;
+      if (mc.endlessStatus()?.intermission) {
+        const a = actions[i % actions.length];
+        i++;
+        if (a === REROLL_ACTION) {
+          // A refused reroll must not leave the run stuck in the intermission.
+          if (!mc.rerollBoons()) mc.pickBoon(0);
+        } else if (a === SKIP_ACTION) {
+          mc.skipBoon();
+        } else {
+          mc.pickBoon(a);
+        }
+      }
+    }
+    return mc;
+  }
+
+  it("same seed + same mixed action log => byte-identical end state", () => {
+    const log = [0, REROLL_ACTION, 2, SKIP_ACTION, 1, REROLL_ACTION, 0];
+    const a = driveActions(4242, log);
+    const b = driveActions(4242, log);
+    expect(digest(b.state)).toBe(digest(a.state));
+  });
+
+  it("a reroll diverges the run from the same log without one", () => {
+    const withReroll = driveActions(4242, [0, REROLL_ACTION, 0]);
+    const without = driveActions(4242, [0, 0, 0]);
+    expect(digest(withReroll.state)).not.toBe(digest(without.state));
+  });
+
+  it("rerolls are finite, and a REFUSED reroll consumes no randomness", () => {
+    // The sneaky failure mode: if a refused reroll still drew from the stream,
+    // a run that merely ATTEMPTED one would diverge from one that never tried.
+    const drainThenPick = (seed: number, attempt: boolean) => {
+      const mc = new MatchController(seed, DECK, [], { mode: "endless" });
+      let guard = 0;
+      let spent = false;
+      while (mc.phase !== "defeat" && guard < 8000) {
+        mc.tick();
+        guard++;
+        if (mc.endlessStatus()?.intermission) {
+          if (!spent) {
+            // Burn every banked reroll at the first intermission.
+            while (mc.rerollBoons()) { /* drain */ }
+            expect(mc.endlessStatus()!.rerollsLeft).toBe(0);
+            // Now the contested call: attempt one more (must be refused).
+            if (attempt) expect(mc.rerollBoons()).toBe(false);
+            spent = true;
+          }
+          mc.pickBoon(0);
+        }
+      }
+      return digest(mc.state);
+    };
+    expect(drainThenPick(99, true)).toBe(drainThenPick(99, false));
+  });
+
+  it("skipping heals the warband instead of granting a boon", () => {
+    const mc = new MatchController(777, DECK, [], { mode: "endless" });
+    let guard = 0;
+    while (guard < 8000 && !mc.endlessStatus()?.intermission) {
+      mc.tick();
+      guard++;
+    }
+    expect(mc.endlessStatus()?.intermission).toBeTruthy();
+    // Wound the warband so the skip heal is observable.
+    const band = mc.state.units.filter(
+      (u) => u.team === "player" && u.state !== "dead"
+    );
+    for (const u of band) u.hp = Math.max(1, Math.round(u.maxHp * 0.2));
+    const before = band.map((u) => u.hp);
+    const picksBefore = mc.endlessStatus()!.boonsPicked.length;
+
+    expect(mc.skipBoon()).toBe(true);
+    // No boon was banked, and everyone is healthier.
+    expect(mc.endlessStatus()!.boonsPicked.length).toBe(picksBefore);
+    band.forEach((u, i) => expect(u.hp).toBeGreaterThan(before[i]));
   });
 });
 
@@ -328,16 +430,82 @@ describe("endless — boon offer gating", () => {
     expect(new Set(withDead).size).toBe(3);
   });
 
+  it("rarity odds keep improving with depth instead of freezing at wave 11", () => {
+    // They used to freeze at wave 11: a wave-40 offer had the same odds as a
+    // wave-11 one, so the player's rate of gain stopped improving exactly where
+    // the horde's started accelerating.
+    expect(boonRarityWeights(40).epic).toBeGreaterThan(
+      boonRarityWeights(11).epic
+    );
+    expect(boonRarityWeights(40).common).toBeLessThan(
+      boonRarityWeights(11).common
+    );
+    // Wave 11 itself is unchanged, so nothing below it regresses.
+    expect(boonRarityWeights(11)).toEqual({
+      common: 45,
+      rare: 38,
+      epic: 17,
+      mythic: 0,
+    });
+    // The four always total exactly 100, stay non-negative, and the deep-tier
+    // share never goes backwards — that last one is the actual contract, and a
+    // clamped (rather than proportionally squeezed) common floor used to break
+    // it right at the cap boundary.
+    let prevDeepShare = -1;
+    for (let w = 1; w <= 120; w++) {
+      const t = boonRarityWeights(w);
+      expect(Math.min(t.common, t.rare, t.epic, t.mythic)).toBeGreaterThanOrEqual(0);
+      expect(t.common + t.rare + t.epic + t.mythic).toBeCloseTo(100, 6);
+      const deepShare = t.epic + t.mythic;
+      expect(deepShare).toBeGreaterThanOrEqual(prevDeepShare - 1e-9);
+      prevDeepShare = deepShare;
+    }
+  });
+
+  it("mythic boons are gated out of the early pool by minWave", () => {
+    const mythics = Object.values(BOONS)
+      .filter((b) => b.rarity === "mythic")
+      .map((b) => b.id);
+    expect(mythics.length).toBeGreaterThan(0);
+    for (let seed = 1; seed <= 60; seed++) {
+      for (const id of rollBoonOffers(10, new RNG(seed), false, new Set(), true)) {
+        expect(mythics).not.toContain(id);
+      }
+    }
+    // …and they do show up deep.
+    let sawMythic = false;
+    for (let seed = 1; seed <= 200 && !sawMythic; seed++) {
+      sawMythic = rollBoonOffers(45, new RNG(seed), false, new Set(), true).some(
+        (id) => mythics.includes(id)
+      );
+    }
+    expect(sawMythic).toBe(true);
+  });
+
+  it("Warlord's Horn is never offered without a battle spell to recharge", () => {
+    for (let seed = 1; seed <= 120; seed++) {
+      const noSpell = rollBoonOffers(45, new RNG(seed), false, new Set(), false);
+      expect(noSpell).not.toContain("warlords_horn");
+    }
+    let sawHorn = false;
+    for (let seed = 1; seed <= 400 && !sawHorn; seed++) {
+      sawHorn = rollBoonOffers(45, new RNG(seed), false, new Set(), true).includes(
+        "warlords_horn"
+      );
+    }
+    expect(sawHorn).toBe(true);
+  });
+
   it("owned unique boons leave the offer pool; stackable ones stay", () => {
     // A second copy of a unique boon (Momentum, Overkill, …) is a no-op, so it
-    // must never be re-offered. Stackable boons may repeat.
-    const uniques = new Set([
-      "overkill",
-      "last_breath",
-      "overheal_ward",
-      "berserkers_rhythm",
-      "momentum",
-    ]);
+    // must never be re-offered. Stackable boons may repeat. DERIVED from the
+    // data rather than hardcoded, so adding a unique can't silently under-test.
+    const uniques = new Set(
+      Object.values(BOONS)
+        .filter((b) => b.unique && b.offerIf == null && (b.minWave ?? 0) <= 12)
+        .map((b) => b.id)
+    );
+    expect(uniques.size).toBeGreaterThan(0);
     for (let seed = 1; seed <= 40; seed++) {
       const offers = rollBoonOffers(12, new RNG(seed), false, uniques);
       for (const id of offers) expect(uniques.has(id)).toBe(false);

@@ -23,7 +23,11 @@ import {
   endlessBoonOffenseScale,
 } from "./endless";
 
-export type BoonRarity = "common" | "rare" | "epic";
+export type BoonRarity = "common" | "rare" | "epic" | "mythic";
+
+/** Wave from which mythic boons — the deep-run payoffs — start appearing at all.
+ *  Individual boons gate themselves further with `minWave`. */
+export const ENDLESS_MYTHIC_WAVE = 20;
 
 /** Enemies at or below this HP fraction take the Executioner bonus. */
 export const EXECUTE_THRESHOLD = 0.25;
@@ -82,7 +86,19 @@ export type BoonEffect =
       tickIntervalSec?: number;
     }
   /** Kennel Master / War Machine: summon companions at the start of each wave. */
-  | { type: "waveSummon"; defId: string; count: number };
+  | { type: "waveSummon"; defId: string; count: number }
+  // --- mythic / deep tier ---
+  /** Ascendant: an immediate bump, plus MORE of it every wave cleared after. The
+   *  only boon whose RATE improves rather than its level — see BOONS below. */
+  | { type: "ascendant"; basePct: number; perWavePct: number }
+  /** Warlord's Horn: the commander's battle spell recharges every wave. */
+  | { type: "spellRecharge" }
+  /** Phoenix Pact: the first ally to fall each wave returns when it ends. */
+  | { type: "phoenix"; hpPct: number }
+  /** Siege Train: outgoing damage climbs the longer the current wave lasts. */
+  | { type: "siege"; pctPer30Sec: number }
+  /** Soul Harvest: each kill adds outgoing damage for the rest of the wave. */
+  | { type: "killStack"; dmgPct: number };
 
 export interface BoonDef {
   id: string;
@@ -96,11 +112,15 @@ export interface BoonDef {
   describe?: (wave: number) => string;
   effects: BoonEffect[];
   /** Offer gate. "allyDead" boons are only offered when a warband unit is down
-   *  (and never appear otherwise). */
-  offerIf?: "allyDead";
+   *  (and never appear otherwise); "hasSpell" ones only when the commander
+   *  actually has a battle spell equipped, since they'd be a dead card without. */
+  offerIf?: "allyDead" | "hasSpell";
   /** One-time switches (booleans / overwrites in TeamMods): a second copy does
    *  nothing, so once owned the boon is excluded from future offers. */
   unique?: boolean;
+  /** Earliest wave this boon may be offered. THIS is the real gate for the deep
+   *  tier — rarity only sets presentation and weighting. */
+  minWave?: number;
 }
 
 export const BOONS: Record<string, BoonDef> = {
@@ -365,6 +385,67 @@ export const BOONS: Record<string, BoonDef> = {
     description: "Deploy an automated turret at the start of each wave.",
     effects: [{ type: "waveSummon", defId: "turret", count: 1 }],
   },
+
+  // -- Mythic: the deep-run payoffs. ---------------------------------------
+  // Gated behind `minWave` so they never dilute the early pool. These exist to
+  // give a strong, well-drafted run a genuine TAIL — before them every boon was
+  // a one-time multiplier, so a great run and an average one diverged only in
+  // where they started, never in how fast they grew.
+  soul_harvest: {
+    id: "soul_harvest",
+    name: "Soul Harvest",
+    rarity: "epic",
+    minWave: 15,
+    description: "Each kill grants +1% warband damage for the rest of the wave.",
+    effects: [{ type: "killStack", dmgPct: 0.01 }],
+  },
+  warlords_horn: {
+    id: "warlords_horn",
+    name: "Warlord's Horn",
+    rarity: "mythic",
+    minWave: 20,
+    unique: true,
+    // Answers a genuine structural oddity: spellChargeUsed is per-BATTLE and an
+    // endless run is one battle, so a 40-wave run otherwise got exactly one cast.
+    description: "Your commander's battle spell recharges at the start of every wave.",
+    effects: [{ type: "spellRecharge" }],
+    offerIf: "hasSpell",
+  },
+  ascendant: {
+    id: "ascendant",
+    name: "Ascendant",
+    rarity: "mythic",
+    minWave: 25,
+    // THE TAIL-MAKER. Every other boon raises the warband's LEVEL once; this
+    // raises its RATE. Two copies lift per-wave player growth from roughly +11%
+    // to +19%, which is worth many extra waves against a curve whose own rate
+    // climbs — and it is still safely terminating, because a fixed per-wave gain
+    // always loses in the end to a growth rate that keeps accelerating.
+    description:
+      "+12% max HP and damage now — and +2% more of each for every wave you clear afterward.",
+    effects: [{ type: "ascendant", basePct: 0.12, perWavePct: 0.02 }],
+  },
+  phoenix_pact: {
+    id: "phoenix_pact",
+    name: "Phoenix Pact",
+    rarity: "mythic",
+    minWave: 25,
+    unique: true,
+    // Attacks the permanent-attrition problem: losing a unit at wave 25 otherwise
+    // means fighting the steepest part of the curve at three-quarter strength.
+    description: "The first ally to fall each wave returns at 35% HP when the wave ends.",
+    effects: [{ type: "phoenix", hpPct: 0.35 }],
+  },
+  siege_train: {
+    id: "siege_train",
+    name: "Siege Train",
+    rarity: "mythic",
+    minWave: 30,
+    unique: true,
+    description:
+      "+15% damage for every 30 seconds the current wave has lasted. Resets each wave.",
+    effects: [{ type: "siege", pctPer30Sec: 0.15 }],
+  },
 };
 
 /** Stable insertion order — the offer roller iterates this deterministically. */
@@ -496,11 +577,23 @@ export function boonStackSummary(
       // function is a hand-maintained mirror of how EndlessController folds each
       // effect, and a silent default is exactly how the two drift apart. Adding a
       // BoonEffect variant should be a compile error here.
+      case "ascendant":
+        lines.push(
+          `+${asPct(compounded(eff.basePct, count))} max HP and damage banked`,
+          `+${asPct(eff.perWavePct * count)} more of each per wave cleared`
+        );
+        break;
+      case "killStack":
+        lines.push(`+${asPct(eff.dmgPct * count)} damage per kill, resets each wave`);
+        break;
       case "crit":
       case "overheal":
       case "lastBreath":
       case "rhythm":
       case "momentum":
+      case "spellRecharge":
+      case "phoenix":
+      case "siege":
         break;
     }
   }
@@ -514,21 +607,56 @@ function nth(n: number): string {
   return `${n}th`;
 }
 
-/** Rarity odds by wave band — deeper runs weight toward rare/epic. */
+/** Rarity odds by wave — deeper runs weight harder toward rare/epic/mythic.
+ *
+ *  These used to FREEZE at wave 11: a wave-40 offer had exactly the same odds as
+ *  a wave-11 one, so 45% of deep picks were still +10% commons while the horde's
+ *  growth rate was accelerating. The player's rate of gain stopped improving at
+ *  precisely the wave the enemy's started to. They now keep climbing, which is
+ *  half of what gives a strong run its tail.
+ *
+ *  Anchored so wave 11 is unchanged (45/38/17) and nothing regresses below it. */
 export function boonRarityWeights(wave: number): Record<BoonRarity, number> {
-  if (wave >= 11) return { common: 45, rare: 38, epic: 17 };
-  if (wave >= 6) return { common: 60, rare: 30, epic: 10 };
-  return { common: 75, rare: 22, epic: 3 };
+  if (wave < 6) return { common: 75, rare: 22, epic: 3, mythic: 0 };
+  if (wave < 11) return { common: 60, rare: 30, epic: 10, mythic: 0 };
+  // Anchored at wave 11 (over = 0 there), so the old freeze point keeps exactly
+  // its old odds and nothing below it regresses.
+  const over = wave - 11;
+  const mythic = Math.min(22, Math.max(0, (wave - ENDLESS_MYTHIC_WAVE) * 0.8));
+  const epic = Math.min(42, 17 + over * 0.75);
+  // Rare's cap is aligned with epic's (both land at wave ~44). Letting rare keep
+  // climbing after epic had capped stole share back from the deep tiers and made
+  // the epic+mythic share dip slightly — the one thing this curve must not do.
+  const rare = Math.min(43, 38 + over * 0.15);
+  const nonCommon = mythic + epic + rare;
+  // Commons never vanish entirely — a floor of COMMON_FLOOR keeps the small
+  // steady picks in the pool. Squeeze the others PROPORTIONALLY to make room
+  // rather than clamping common, so the four always total exactly 100 and the
+  // deep-tier share stays monotonically increasing (clamping made it dip right
+  // at the boundary, since the implied total drifted past 100).
+  const COMMON_FLOOR = 8;
+  if (nonCommon <= 100 - COMMON_FLOOR) {
+    return { common: 100 - nonCommon, rare, epic, mythic };
+  }
+  const k = (100 - COMMON_FLOOR) / nonCommon;
+  return {
+    common: COMMON_FLOOR,
+    rare: rare * k,
+    epic: epic * k,
+    mythic: mythic * k,
+  };
 }
 
 function rollRarity(wave: number, rng: RNG): BoonRarity {
   const w = boonRarityWeights(wave);
-  const total = w.common + w.rare + w.epic;
+  const total = w.common + w.rare + w.epic + w.mythic;
   let r = rng.next() * total;
   if (r < w.common) return "common";
   r -= w.common;
   if (r < w.rare) return "rare";
-  return "epic";
+  r -= w.rare;
+  if (r < w.epic) return "epic";
+  return "mythic";
 }
 
 /**
@@ -543,12 +671,19 @@ export function rollBoonOffers(
   wave: number,
   rng: RNG,
   hasDead: boolean,
-  owned: ReadonlySet<string> = new Set()
+  owned: ReadonlySet<string> = new Set(),
+  hasSpell = false
 ): string[] {
-  const pool = ALL_BOON_IDS.filter(
-    (id) =>
-      BOONS[id].offerIf == null && !(BOONS[id].unique && owned.has(id))
-  );
+  const pool = ALL_BOON_IDS.filter((id) => {
+    const b = BOONS[id];
+    if (b.unique && owned.has(id)) return false;
+    if ((b.minWave ?? 0) > wave) return false;
+    // "allyDead" boons never come from the pool (the caller forces the slot);
+    // "hasSpell" ones DO, but only when a spell is actually equipped.
+    if (b.offerIf === "allyDead") return false;
+    if (b.offerIf === "hasSpell") return hasSpell;
+    return true;
+  });
   const offers: string[] = [];
   const slots = hasDead ? 2 : 3;
   let guard = 0;

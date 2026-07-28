@@ -74,6 +74,16 @@ import type { TierId } from "@/data/tiers";
  *  driven by an EndlessController. Depths + Endless both field the whole warband. */
 export type MatchMode = "arena" | "depths" | "endless";
 
+// Endless intermission actions that are NOT "pick offer N". The run's input log
+// (`pickIndices`) is an ordered list of what the player did at each intermission,
+// so a reroll and a skip have to appear in it or a replay diverges. They ride as
+// negative sentinels rather than widening the log to a tagged union: that keeps
+// MatchRecord.picks a plain number[], so every previously recorded run still
+// replays byte-identically (old logs contain no negatives) and the replay driver
+// stays a single loop.
+export const REROLL_ACTION = -1;
+export const SKIP_ACTION = -2;
+
 export interface MatchOptions {
   mode?: MatchMode;
   /** Depths floor number (drives wave budget/tier). Ignored in arena. */
@@ -356,7 +366,7 @@ export class MatchController {
         player: ENDLESS_PLAYER_ACTIVE,
         enemy: ENDLESS_ENEMY_ACTIVE,
       };
-      this.endless = new EndlessController(seed);
+      this.endless = new EndlessController(seed, this.commanderSpell != null);
     }
   }
 
@@ -899,6 +909,14 @@ export class MatchController {
         }
         if (this.tickBraceHold()) return; // frozen: survivors bracing for a boss
         this.endless!.step(this.state);
+        // Warlord's Horn: the controller can't reach spellChargeUsed (it lives
+        // here, not on SimState), so it raises a flag we consume. Without this
+        // boon an endless run gets exactly ONE cast, since the charge is
+        // per-battle and a whole run is a single battle.
+        if (this.endless!.spellRearmPending) {
+          this.endless!.spellRearmPending = false;
+          this.spellChargeUsed = false;
+        }
         if (this.maybeBrace()) return; // boss/rare wave telegraphed → brace up
         // Whole warband is fielded once and deaths are final — no reserves.
         this.state.playerReserves = 0;
@@ -945,6 +963,23 @@ export class MatchController {
     if (this.mode !== "endless" || !this.endless) return false;
     const ok = this.endless.pickBoon(this.state, offerIndex);
     if (ok) this.pickIndices.push(offerIndex);
+    return ok;
+  }
+
+  /** Endless: reroll the current offers, spending a banked reroll. Stays in the
+   *  intermission. Logged as REROLL_ACTION — see the sentinel note there. */
+  rerollBoons(): boolean {
+    if (this.mode !== "endless" || !this.endless) return false;
+    const ok = this.endless.rerollBoons(this.state);
+    if (ok) this.pickIndices.push(REROLL_ACTION);
+    return ok;
+  }
+
+  /** Endless: decline this intermission's offers for extra healing instead. */
+  skipBoon(): boolean {
+    if (this.mode !== "endless" || !this.endless) return false;
+    const ok = this.endless.skipBoon(this.state);
+    if (ok) this.pickIndices.push(SKIP_ACTION);
     return ok;
   }
 

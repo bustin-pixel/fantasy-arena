@@ -324,6 +324,7 @@ const BOON_CHAPTER: Record<BoonRarity, string> = {
   common: "Common Boons",
   rare: "Rare Boons",
   epic: "Epic Boons",
+  mythic: "Mythic Boons",
 };
 
 /** The Book of Boons — the full Endless-mode boon catalog, chaptered by

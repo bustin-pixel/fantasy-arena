@@ -51,7 +51,10 @@ import {
   ENDLESS_RARE_POOL,
   ENDLESS_RHYTHM_MAX,
   ENDLESS_RHYTHM_PER_SEC,
+  ENDLESS_REROLLS_START,
+  ENDLESS_REROLL_EVERY_WAVES,
   ENDLESS_ROTATION_BASE,
+  ENDLESS_SKIP_HEAL_PCT,
   ENDLESS_STALL_TIME_SEC,
   ENDLESS_WAVE_HARD_CAP_SEC,
   ENDLESS_WAVE_TIME_SEC,
@@ -100,6 +103,8 @@ export interface EndlessStatus {
   momentumStacks: number | null;
   /** Berserker's Rhythm's live attack-speed bonus (0..max), or null if unowned. */
   rhythmBonus: number | null;
+  /** Boon rerolls still banked this run. */
+  rerollsLeft: number;
 }
 
 export class EndlessController {
@@ -149,6 +154,22 @@ export class EndlessController {
   private momentumStacks = 0;
   /** Wave-start summon orders (Kennel Master wolves, War Machine turret). */
   private summons: { defId: string; count: number }[] = [];
+
+  // -- Mythic deep-tier boons -------------------------------------------------
+  /** Ascendant: total per-wave compounding rate banked (0 = unowned). Applied
+   *  again at every wave start, which is what makes it a RATE rather than a level
+   *  and gives a strong run its tail. */
+  private ascendantPerWave = 0;
+  /** Warlord's Horn: read + cleared by MatchController's endless branch each wave
+   *  (spellChargeUsed lives on the controller, out of reach from here). */
+  spellRearmPending = false;
+  private spellRechargeOwned = false;
+  /** Phoenix Pact revive fraction (0 = unowned). */
+  private phoenixHpPct = 0;
+  /** Siege Train ramp per 30s of wave (0 = unowned). */
+  private siegePctPer30Sec = 0;
+  /** Soul Harvest damage per kill for the rest of the wave (0 = unowned). */
+  private killStackPct = 0;
   /** uids of the pets summoned last wave, cleared + respawned each wave. */
   private petUids = new Set<string>();
 
@@ -170,6 +191,9 @@ export class EndlessController {
 
   /** Ordered boon ids picked (for the tally + replay parity). */
   private picks: string[] = [];
+  /** Rerolls banked. Starts at ENDLESS_REROLLS_START, +1 every
+   *  ENDLESS_REROLL_EVERY_WAVES cleared; never regenerates otherwise. */
+  private rerollsLeft = ENDLESS_REROLLS_START;
   /** Enemy defIds encountered this run (ledger; survives corpse pruning). */
   private bestiary = new Set<string>();
   /** Every enemy killed this run, recorded as corpses are pruned (the compendium
@@ -178,10 +202,15 @@ export class EndlessController {
    *  its own side. */
   private slainLog: string[] = [];
 
-  constructor(seed: number) {
+  /** Whether the commander brought a battle spell — gates Warlord's Horn out of
+   *  the pool entirely when there is no spell for it to recharge. */
+  private hasSpell: boolean;
+
+  constructor(seed: number, hasSpell = false) {
     // Own stream, xor-mixed so it never shares draws with the sim RNG.
     this.rng = new RNG((seed ^ 0xe17d1e55) >>> 0);
     this.rotation = this.rng.shuffle(ENDLESS_ROTATION_BASE);
+    this.hasSpell = hasSpell;
   }
 
   // -- Public read model ------------------------------------------------------
@@ -227,6 +256,7 @@ export class EndlessController {
       rhythmBonus: this.rhythmActive
         ? Math.min(ENDLESS_RHYTHM_MAX, ENDLESS_RHYTHM_PER_SEC * (this.rhythmTicks / TICK_RATE))
         : null,
+      rerollsLeft: this.rerollsLeft,
     };
   }
 
@@ -268,6 +298,17 @@ export class EndlessController {
         ENDLESS_RHYTHM_MAX,
         ENDLESS_RHYTHM_PER_SEC * (this.rhythmTicks / TICK_RATE)
       );
+    }
+    // Siege Train: outgoing damage climbs with the wave's elapsed time, and Soul
+    // Harvest with its body count (killsThisWave is maintained by trackProgress
+    // just above). Both are uncapped by design — they are the deep game's answer
+    // to a wave that would otherwise become an unwinnable slog.
+    if (this.siegePctPer30Sec > 0) {
+      state.teamMods.player.siegeBonus =
+        this.siegePctPer30Sec * (this.waveTicks / TICK_RATE / 30);
+    }
+    if (this.killStackPct > 0) {
+      state.teamMods.player.killStackBonus = this.killStackPct * this.killsThisWave;
     }
 
     if (this.phase === "telegraph") {
@@ -382,6 +423,9 @@ export class EndlessController {
     this.wavesCleared = this.wave;
     this.pruneDeadEnemies(state);
 
+    // A fresh reroll every so many waves cleared.
+    if (this.wave % ENDLESS_REROLL_EVERY_WAVES === 0) this.rerollsLeft++;
+
     // Momentum: a clean wave (no warband death) grants a permanent damage bump.
     // Checked before the heal so a dead unit still counts as a death this wave.
     if (
@@ -398,6 +442,13 @@ export class EndlessController {
         (1 + ENDLESS_MOMENTUM_PER_WAVE * (this.momentumStacks - 1));
     }
 
+    // Phoenix Pact: one fallen ally comes back as the wave closes. Ordered
+    // deliberately — AFTER the Momentum check, so a death still breaks Momentum
+    // (you were saved, not spared), and BEFORE the heal so the returned unit gets
+    // topped up with everyone else. It also lands before rollBoonOffers, so a
+    // phoenixed warband correctly stops forcing Second Chance into the offer.
+    if (this.phoenixHpPct > 0) this.reviveLowest(state, this.phoenixHpPct);
+
     // Baseline (+ Field Medicine) recovery on the living warband.
     for (const u of this.warbandUnits(state)) {
       if (u.state === "dead") continue;
@@ -406,8 +457,61 @@ export class EndlessController {
     }
 
     const hasDead = this.warbandUnits(state).some((u) => u.state === "dead");
-    this.offers = rollBoonOffers(this.wave, this.rng, hasDead, new Set(this.picks));
+    this.offers = rollBoonOffers(
+      this.wave,
+      this.rng,
+      hasDead,
+      new Set(this.picks),
+      this.hasSpell
+    );
     this.phase = "intermission";
+  }
+
+  /** Reroll the current offer set. Stays in the intermission — the wave does NOT
+   *  advance — so the run's input log records it as its own action.
+   *
+   *  DETERMINISM: this simply draws from the same RNG stream again. `this.rng` is
+   *  a stream, not a hash of the wave, so the second draw naturally differs and
+   *  the run stays a pure function of (seed, ordered inputs). Deliberately NO
+   *  per-attempt counter — that would make the Nth reroll independent of how many
+   *  draws earlier rolls consumed, which is a strictly weaker guarantee. Also
+   *  deliberately no "reroll until the set differs" loop: extra draws, a new
+   *  edge case, and with the widened rarity table an identical reroll is
+   *  vanishingly unlikely anyway.
+   *
+   *  Returns false when refused, and a refusal must consume NO randomness — see
+   *  the guard order below, and the spec that pins it. */
+  rerollBoons(state: SimState): boolean {
+    if (this.phase !== "intermission" || !this.offers) return false;
+    if (this.rerollsLeft <= 0) return false;
+    this.rerollsLeft--;
+    const hasDead = this.warbandUnits(state).some((u) => u.state === "dead");
+    this.offers = rollBoonOffers(
+      this.wave,
+      this.rng,
+      hasDead,
+      new Set(this.picks),
+      this.hasSpell
+    );
+    return true;
+  }
+
+  /** Decline every offer in exchange for extra recovery, and open the next wave.
+   *  Same shape as pickBoon (advances the run), so the input log stays a flat
+   *  ordered list of actions. */
+  skipBoon(state: SimState): boolean {
+    if (this.phase !== "intermission" || !this.offers) return false;
+    for (const u of this.warbandUnits(state)) {
+      if (u.state === "dead") continue;
+      const missing = u.maxHp - u.hp;
+      if (missing > 0) {
+        metaHeal(state, u, Math.round(missing * ENDLESS_SKIP_HEAL_PCT));
+      }
+    }
+    this.offers = null;
+    this.wave += 1;
+    this.startWave(state);
+    return true;
   }
 
   /** Apply the chosen offer and open the next wave. Returns false if not in an
@@ -505,6 +609,27 @@ export class EndlessController {
         case "waveSummon":
           this.summons.push({ defId: eff.defId, count: eff.count });
           break;
+        // --- mythic deep tier ---
+        case "ascendant":
+          // The base lands immediately; the per-wave part is re-applied at every
+          // subsequent wave start (see applyWaveStartBoons).
+          this.applyMaxHp(state, eff.basePct);
+          foldTeamMod(state.teamMods.player, "dmgMult", eff.basePct);
+          this.ascendantPerWave += eff.perWavePct;
+          break;
+        case "spellRecharge":
+          this.spellRechargeOwned = true;
+          this.spellRearmPending = true; // and again at every wave start
+          break;
+        case "phoenix":
+          this.phoenixHpPct = Math.max(this.phoenixHpPct, eff.hpPct);
+          break;
+        case "siege":
+          this.siegePctPer30Sec = eff.pctPer30Sec;
+          break;
+        case "killStack":
+          this.killStackPct += eff.dmgPct;
+          break;
       }
     }
   }
@@ -540,6 +665,18 @@ export class EndlessController {
     const defScale = endlessBoonDefenseScale(this.wave);
     const shieldPerWave = Math.round(this.shieldPerWaveBase * defScale);
     const regenPerSec = this.regenPerSecBase * defScale;
+
+    // Ascendant: the compounding tick. Applied every wave, so owning it raises
+    // the warband's growth RATE rather than its level.
+    if (this.ascendantPerWave > 0) {
+      this.applyMaxHp(state, this.ascendantPerWave);
+      foldTeamMod(state.teamMods.player, "dmgMult", this.ascendantPerWave);
+    }
+    // Warlord's Horn re-arms the commander's spell; MatchController reads this.
+    if (this.spellRechargeOwned) this.spellRearmPending = true;
+    // Fresh per-wave ramps for Siege Train / Soul Harvest.
+    state.teamMods.player.siegeBonus = 0;
+    state.teamMods.player.killStackBonus = 0;
 
     // Rebuild (never accumulate) the scaled team mods for this wave.
     state.teamMods.player.killHeal = Math.round(this.killHealBase * defScale);

@@ -66,6 +66,17 @@ export const ENDLESS_RHYTHM_MAX = 0.6;
 /** Momentum: damage multiplier gained per wave cleared without a warband death. */
 export const ENDLESS_MOMENTUM_PER_WAVE = 0.05;
 
+/** Boon rerolls a run starts with, and how often it earns another. Per-run, no
+ *  regeneration — a resource to spend, not a slot machine. */
+export const ENDLESS_REROLLS_START = 2;
+export const ENDLESS_REROLL_EVERY_WAVES = 10;
+
+/** Skipping a boon heals this extra fraction of missing HP instead. Makes "none
+ *  of these help me" a real choice — survival now, power later — and gives the
+ *  permanent-attrition problem a second answer besides Second Chance. Shares the
+ *  0.9 clamp with the intermission heal. */
+export const ENDLESS_SKIP_HEAL_PCT = 0.25;
+
 /** The approved themed-dungeon rare minibosses (wave 3 of each cycle). */
 export const ENDLESS_RARE_POOL: readonly string[] = [
   "lich",
