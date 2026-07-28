@@ -473,6 +473,59 @@ the spread, one at a time. ⚠ **Anything that buffs the player moves the median
 long way** — adding the boon changes above pushed every run past the harness's
 120-wave cap and needed K to go from 0.005 to 0.013. Always recalibrate LAST.
 
+### 4i. The Legendary Reliquary + the Endless wave-100 capstone (2026-07-28)
+A sixth chest tier above `dragon`, and the run-completion that pays it.
+
+**`legendary` is deliberately NOT in `CHEST_TIER_ORDER`.** That array drives
+`bumpChestTier`, and Elite content bumps **+2** — an Elite Spire first clear
+would otherwise hand out the capstone chest routinely. Excluding it means no
+bump can ever climb in; the tier is reachable exactly two ways:
+- clearing `ENDLESS_FINAL_WAVE` (100) in Endless, and
+- a flat `LEGENDARY_CHEST_DROP_CHANCE` (0.05%, 1-in-2000) on any dungeon chest.
+
+The prize lives **inside** the chest (2500 gold, 250 shards, a guaranteed
+legendary-quality item, a guaranteed unit) rather than alongside it, so it pays
+identically from either source. The 0.05% roll sits at the `makeChest` seam on
+its own XOR-salted stream (`0x1e6e0d` — the house idiom, cf. `0x5eed` Lucky
+Coin), so it perturbs neither the coin roll nor `rollChest`'s stream and every
+legacy chest seed still rolls byte-identically.
+
+**⚠ Three places a new chest tier breaks WITHOUT a compile error:**
+`quests.ts` `VALID_TIERS` (a whitelist — an omission silently nulls persisted
+quest rewards on load), the `.tier-<name>` CSS class (built by template
+literal), and `chestArt.ts`'s `drawBodyDecor`/`drawLidDecor`/`drawLatch`, whose
+terminal `else` is the DRAGON branch — a new tier silently inherits scales and
+horns.
+
+**The capstone, and why it can't cause an accidental victory.** Endless was
+architecturally forbidden from resolving to `victory`: `reservesSentinel` pins
+`enemyReserves` to 1 so the "enemies dead AND no reserves" check can never fire
+(the field is genuinely empty at every intermission). That sentinel is
+**unchanged** — the capstone victory is set *explicitly* by
+`MatchController.finishEndless()`, never inferred from the field, so the mid-run
+protection still holds by construction. The check also sits **before** the
+wave-clock intercept, or the 480s hard cap would steal a slow capstone kill.
+
+Clearing wave 100 doesn't force a stop: declining simply never calls
+`finishEndless`, the waves continue, and the results card still reads
+"conquered" because it keys off the **wave count**, not the phase.
+
+Repeatable on purpose — at ~3.5% of runs even at max power it can't be farmed.
+
+**Art.** `drawChest` gained an optional free-running `ambientMs`, because `t` is
+pinned at 0 while a chest is shut and `ChestSprite` drew one static frame and
+stopped. Only the legendary tier reads it (rotating ray fans, breathing halo,
+orbiting motes); every other tier ignores it, so passing 0 is today's behaviour.
+Verified by reading pixels back (screenshots don't work in the preview pane):
+closed-chest light *outside* the body is 7157 lit px / 149 units for legendary
+vs 4083/70 arcane, 3813/58 dragon, and an unchanged 550/11 for wooden/silver/
+gold; frame-hashing five ambient times gives legendary 5 distinct frames, dragon 1.
+
+**Testing gotcha:** god-mode healing alone canNOT drive a run to wave 100 —
+first-offer drafting leaves the warband unable to out-damage a wave-88 horde and
+the stall detector correctly ends the run. The capstone specs fell every monster
+on spawn; they test the plumbing, not combat.
+
 ### 5. The Depths spawns bypass the deploy() path
 `WaveController` (the PvE horde director) pushes monsters into `state.units`
 directly — no deck bookkeeping, no deployment records (waves rebuild
