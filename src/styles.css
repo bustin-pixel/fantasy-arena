@@ -3078,6 +3078,10 @@ body.modal-open .pager-nav {
   border: 1px solid rgba(236, 227, 207, 0.22);
   background: rgba(10, 8, 5, 0.5);
   cursor: pointer;
+  /* A <button> does not inherit colour — without this the empty-slot glyph
+     falls back to the UA's `buttontext` and paints BLACK at 0.4 opacity on a
+     near-black plate, i.e. invisible. See .equip-option for the full note. */
+  color: inherit;
 }
 .art-slot.open {
   border-color: #ece3cf;
@@ -3127,6 +3131,16 @@ body.modal-open .pager-nav {
   cursor: pointer;
   text-align: left;
   width: 100%;
+  /* A <button> inherits neither colour nor font family. Without these the row
+     falls back to the UA's `buttontext` + Arial, and .equip-option-desc — the
+     only line here with no colour of its own (the name carries an inline
+     rarity colour, the action an explicit green) — paints BLACK on a
+     near-black plate. `buttontext` is a SYSTEM colour, so a browser that
+     force-darkens form controls (common on mobile) renders it white while
+     desktop renders it black: the same build looked fine on a phone and
+     unreadable on a desktop. Inherit so it never depends on the UA again. */
+  color: inherit;
+  font-family: inherit;
 }
 .equip-option.current {
   border-color: #86efac;
