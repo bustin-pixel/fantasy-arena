@@ -46,6 +46,12 @@ const RUN = process.env.SWEEP ? describe : describe.skip;
 const SEEDS = Number(process.env.SWEEP_SEEDS ?? 8);
 const CEIL_SEEDS = Number(process.env.SWEEP_SEEDS ?? 40);
 const ONLY = process.env.SWEEP_ONLY; // shape | matrix | ceiling
+/** Override the ceiling probe's drafting policy (default "oracle"). Worth
+ *  sweeping more than one: the hand-ordered `oracle` is NOT the strongest line —
+ *  plain rarity-chasing (`greedy`) beats it, because tie-breaking by id happens
+ *  to stack `ascendant`, and stacking the one boon that raises your growth RATE
+ *  is what actually reaches the deepest waves. */
+const CEIL_POLICY = process.env.SWEEP_POLICY ?? "oracle";
 /** Hard safety cap. Without it a mis-tuned constant hangs the harness forever —
  *  exactly the runaway the accelerating backstop exists to prevent, so the tool
  *  that measures it must be immune to it. */
@@ -420,7 +426,7 @@ RUN("endless sweep", () => {
     () => {
       const deck = DECKS.find((d) => d.id === "elite")!.deck;
       const tier = POWER_TIERS.find((t) => t.id === "maxed")!;
-      const policy = POLICIES.find((p) => p.id === "oracle")!.pick;
+      const policy = POLICIES.find((p) => p.id === CEIL_POLICY)!.pick;
       const runs: EndlessRunResult[] = [];
       for (let seed = 1; seed <= CEIL_SEEDS; seed++) {
         runs.push(playEndless({ seed, deck, tier, policy }));
@@ -428,9 +434,20 @@ RUN("endless sweep", () => {
       const s = aggregate(runs);
       // eslint-disable-next-line no-console
       console.log(
-        `\nCeiling probe (${CEIL_SEEDS} seeds): median ${s.median}, p75 ${s.p75}, ` +
+        `\nCeiling probe (${CEIL_SEEDS} seeds, policy=${CEIL_POLICY}): median ${s.median}, p75 ${s.p75}, ` +
           `p90 ${s.p90}, max ${s.max} | ${s.wipePct}% wipe / ${s.timeoutPct}% timeout / ${s.capPct}% tickcap`
       );
+      // "What are the odds of reaching wave N" — the question players actually
+      // ask, and the one a median alone can't answer.
+      const waves = runs.map((r) => r.wavesCleared);
+      const odds = [40, 50, 60, 70, 80, 90, 100]
+        .map((n) => {
+          const hit = waves.filter((w) => w >= n).length;
+          return `w${n}: ${((hit / waves.length) * 100).toFixed(1)}% (${hit}/${waves.length})`;
+        })
+        .join("  ");
+      // eslint-disable-next-line no-console
+      console.log("reach odds — " + odds);
       // The distribution itself, not just summary stats — a wall shows up as a
       // tight cluster even when the median looks reasonable.
       // eslint-disable-next-line no-console
