@@ -19,6 +19,7 @@ import { RNG } from "@/utils/rng";
 import {
   BOONS,
   boonRarityWeights,
+  ENDLESS_MYTHIC_WAVE,
   boonStackSummary,
   rollBoonOffers,
 } from "@/data/boons";
@@ -446,38 +447,69 @@ describe("endless — boon offer gating", () => {
       common: 45,
       rare: 38,
       epic: 17,
+      legendary: 0,
       mythic: 0,
     });
-    // The four always total exactly 100, stay non-negative, and the deep-tier
+    // The five always total exactly 100, stay non-negative, and the deep-tier
     // share never goes backwards — that last one is the actual contract, and a
     // clamped (rather than proportionally squeezed) common floor used to break
     // it right at the cap boundary.
     let prevDeepShare = -1;
     for (let w = 1; w <= 120; w++) {
       const t = boonRarityWeights(w);
-      expect(Math.min(t.common, t.rare, t.epic, t.mythic)).toBeGreaterThanOrEqual(0);
-      expect(t.common + t.rare + t.epic + t.mythic).toBeCloseTo(100, 6);
-      const deepShare = t.epic + t.mythic;
+      expect(
+        Math.min(t.common, t.rare, t.epic, t.legendary, t.mythic)
+      ).toBeGreaterThanOrEqual(0);
+      expect(
+        t.common + t.rare + t.epic + t.legendary + t.mythic
+      ).toBeCloseTo(100, 6);
+      const deepShare = t.epic + t.legendary + t.mythic;
       expect(deepShare).toBeGreaterThanOrEqual(prevDeepShare - 1e-9);
       prevDeepShare = deepShare;
     }
   });
 
-  it("mythic boons are gated out of the early pool by minWave", () => {
+  it("mythic is the rarest tier and never appears before its wave gate", () => {
+    // It must be strictly thinner than legendary wherever both exist, or it
+    // isn't really the top tier — and absent entirely before the gate.
+    expect(boonRarityWeights(ENDLESS_MYTHIC_WAVE - 1).mythic).toBe(0);
+    for (const w of [40, 55, 80, 120]) {
+      const t = boonRarityWeights(w);
+      expect(t.mythic).toBeGreaterThan(0);
+      expect(t.mythic).toBeLessThan(t.legendary);
+    }
     const mythics = Object.values(BOONS)
       .filter((b) => b.rarity === "mythic")
       .map((b) => b.id);
     expect(mythics.length).toBeGreaterThan(0);
     for (let seed = 1; seed <= 60; seed++) {
+      const early = rollBoonOffers(30, new RNG(seed), false, new Set(), true);
+      for (const id of early) expect(mythics).not.toContain(id);
+    }
+    let sawMythic = false;
+    for (let seed = 1; seed <= 400 && !sawMythic; seed++) {
+      sawMythic = rollBoonOffers(60, new RNG(seed), false, new Set(), true).some(
+        (id) => mythics.includes(id)
+      );
+    }
+    expect(sawMythic).toBe(true);
+  });
+
+  it("legendary boons are gated out of the early pool by minWave", () => {
+    const legendaries = Object.values(BOONS)
+      .filter((b) => b.rarity === "legendary")
+      .map((b) => b.id);
+    expect(legendaries.length).toBeGreaterThan(0);
+    for (let seed = 1; seed <= 60; seed++) {
       for (const id of rollBoonOffers(10, new RNG(seed), false, new Set(), true)) {
-        expect(mythics).not.toContain(id);
+        expect(legendaries).not.toContain(id);
       }
     }
     // …and they do show up deep.
     let sawMythic = false;
     for (let seed = 1; seed <= 200 && !sawMythic; seed++) {
       sawMythic = rollBoonOffers(45, new RNG(seed), false, new Set(), true).some(
-        (id) => mythics.includes(id)
+        (id) => legendaries.includes(id)
       );
     }
     expect(sawMythic).toBe(true);

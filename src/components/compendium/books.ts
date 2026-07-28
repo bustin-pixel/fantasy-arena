@@ -324,6 +324,7 @@ const BOON_CHAPTER: Record<BoonRarity, string> = {
   common: "Common Boons",
   rare: "Rare Boons",
   epic: "Epic Boons",
+  legendary: "Legendary Boons",
   mythic: "Mythic Boons",
 };
 

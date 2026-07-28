@@ -526,6 +526,41 @@ first-offer drafting leaves the warband unable to out-damage a wave-88 horde and
 the stall detector correctly ends the run. The capstone specs fell every monster
 on spawn; they test the plumbing, not combat.
 
+### 4j. Mythic boons (2026-07-28) — the first tier tuned to a MEASURED target
+The old top boon tier was renamed **mythic → legendary** (so the word matches
+units, items and chests), and a genuinely rarer **mythic** tier sits above it.
+Ladder: common → rare → epic → legendary → mythic.
+
+Mythic is the only content in the repo designed against a number rather than a
+feel: the brief was "raise the chance of reaching wave 100 by ~10 points". The
+`endlessSweep` ceiling probe prints reach odds directly, so it was tuned by
+measurement (200 seeds per iteration, best-play `greedy` policy, max power):
+
+| | before | after |
+|---|---|---|
+| reach wave 100 | 3.5% | **12.0%** |
+| reach wave 90 | 8.0% | 22.5% |
+| reach wave 70 | 34% | 61% |
+| runs that never ended | 0% | 0% |
+
+Three boons, each attacking a different reason deep runs end — **Apotheosis**
+(outgrows the curve: Ascendant's mechanic at ~2× the slope), **Undying Legion**
+(refuses to lose bodies: raises *every* corpse each wave), **Worldbreaker**
+(ignores how fat the horde got: rends a % of the target's max HP).
+
+**⚠ THE LESSON, worth more than the numbers.** Worldbreaker's first cut was an
+uncapped % of max HP. That makes **time-to-kill independent of enemy HP**, which
+silently deletes the entire HP half of the difficulty curve — measured, **69% of
+god-tier runs sailed past wave 300 without dying**, i.e. the immortality problem
+the whole curve design exists to prevent. It now caps at `MAX_HP_REND_CAP_MULT`
+(2×) of the hit it rides on, which keeps the flavour while leaving time-to-kill a
+growing function of enemy HP.
+
+**Any future enemy-relative effect (% max HP, % current HP, flat-per-enemy true
+damage) has this same failure mode and must be bounded by something the PLAYER
+scales, not the enemy.** A fixed-rate player buff always loses to the
+accelerating surge; an enemy-relative one does not.
+
 ### 5. The Depths spawns bypass the deploy() path
 `WaveController` (the PvE horde director) pushes monsters into `state.units`
 directly — no deck bookkeeping, no deployment records (waves rebuild

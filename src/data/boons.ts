@@ -23,11 +23,24 @@ import {
   endlessBoonOffenseScale,
 } from "./endless";
 
-export type BoonRarity = "common" | "rare" | "epic" | "mythic";
+export type BoonRarity =
+  | "common"
+  | "rare"
+  | "epic"
+  | "legendary"
+  | "mythic";
 
-/** Wave from which mythic boons — the deep-run payoffs — start appearing at all.
+/** Wave from which legendary boons — the deep-run payoffs — start appearing at all.
  *  Individual boons gate themselves further with `minWave`. */
-export const ENDLESS_MYTHIC_WAVE = 20;
+export const ENDLESS_LEGENDARY_WAVE = 20;
+
+/** Wave from which MYTHIC boons can appear. The rarest tier in the game and the
+ *  only one designed against a measured target rather than a feel: they exist to
+ *  lift the odds of actually reaching ENDLESS_FINAL_WAVE by roughly ten
+ *  percentage points (see NOTES 4j — the endlessSweep ceiling probe prints the
+ *  reach odds these were tuned against). Deliberately late and deliberately thin
+ *  in the offer table: a run that draws one should feel like it was chosen. */
+export const ENDLESS_MYTHIC_WAVE = 35;
 
 /** Enemies at or below this HP fraction take the Executioner bonus. */
 export const EXECUTE_THRESHOLD = 0.25;
@@ -87,18 +100,24 @@ export type BoonEffect =
     }
   /** Kennel Master / War Machine: summon companions at the start of each wave. */
   | { type: "waveSummon"; defId: string; count: number }
-  // --- mythic / deep tier ---
+  // --- legendary / deep tier ---
   /** Ascendant: an immediate bump, plus MORE of it every wave cleared after. The
    *  only boon whose RATE improves rather than its level — see BOONS below. */
   | { type: "ascendant"; basePct: number; perWavePct: number }
   /** Warlord's Horn: the commander's battle spell recharges every wave. */
   | { type: "spellRecharge" }
-  /** Phoenix Pact: the first ally to fall each wave returns when it ends. */
-  | { type: "phoenix"; hpPct: number }
+  /** Phoenix Pact / Undying Legion: fallen allies return when the wave ends.
+   *  `all` raises EVERY corpse rather than one. */
+  | { type: "phoenix"; hpPct: number; all?: boolean }
   /** Siege Train: outgoing damage climbs the longer the current wave lasts. */
   | { type: "siege"; pctPer30Sec: number }
   /** Soul Harvest: each kill adds outgoing damage for the rest of the wave. */
-  | { type: "killStack"; dmgPct: number };
+  | { type: "killStack"; dmgPct: number }
+  // --- mythic ---
+  /** Worldbreaker: every hit also tears out a fraction of the target's MAX HP.
+   *  The one effect in the game that does NOT care how fat the horde has got —
+   *  which is precisely why it moves the odds of reaching the final wave. */
+  | { type: "maxHpRend"; frac: number };
 
 export interface BoonDef {
   id: string;
@@ -386,7 +405,7 @@ export const BOONS: Record<string, BoonDef> = {
     effects: [{ type: "waveSummon", defId: "turret", count: 1 }],
   },
 
-  // -- Mythic: the deep-run payoffs. ---------------------------------------
+  // -- Legendary: the deep-run payoffs. ---------------------------------------
   // Gated behind `minWave` so they never dilute the early pool. These exist to
   // give a strong, well-drafted run a genuine TAIL — before them every boon was
   // a one-time multiplier, so a great run and an average one diverged only in
@@ -402,7 +421,7 @@ export const BOONS: Record<string, BoonDef> = {
   warlords_horn: {
     id: "warlords_horn",
     name: "Warlord's Horn",
-    rarity: "mythic",
+    rarity: "legendary",
     minWave: 20,
     unique: true,
     // Answers a genuine structural oddity: spellChargeUsed is per-BATTLE and an
@@ -414,7 +433,7 @@ export const BOONS: Record<string, BoonDef> = {
   ascendant: {
     id: "ascendant",
     name: "Ascendant",
-    rarity: "mythic",
+    rarity: "legendary",
     minWave: 25,
     // THE TAIL-MAKER. Every other boon raises the warband's LEVEL once; this
     // raises its RATE. Two copies lift per-wave player growth from roughly +11%
@@ -428,7 +447,7 @@ export const BOONS: Record<string, BoonDef> = {
   phoenix_pact: {
     id: "phoenix_pact",
     name: "Phoenix Pact",
-    rarity: "mythic",
+    rarity: "legendary",
     minWave: 25,
     unique: true,
     // Attacks the permanent-attrition problem: losing a unit at wave 25 otherwise
@@ -439,12 +458,55 @@ export const BOONS: Record<string, BoonDef> = {
   siege_train: {
     id: "siege_train",
     name: "Siege Train",
-    rarity: "mythic",
+    rarity: "legendary",
     minWave: 30,
     unique: true,
     description:
       "+15% damage for every 30 seconds the current wave has lasted. Resets each wave.",
     effects: [{ type: "siege", pctPer30Sec: 0.15 }],
+  },
+
+  // -- Mythic: the rarest tier, tuned against a measured target. -----------
+  // These exist to lift the odds of actually REACHING wave 100 by roughly ten
+  // percentage points, and each attacks a different reason deep runs end:
+  // Apotheosis outgrows the curve, Undying Legion refuses to lose bodies to it,
+  // Worldbreaker ignores how fat it has made the horde. Their numbers were
+  // sweep-calibrated, not eyeballed — see NOTES 4j.
+  apotheosis: {
+    id: "apotheosis",
+    name: "Apotheosis",
+    rarity: "mythic",
+    minWave: ENDLESS_MYTHIC_WAVE,
+    // Ascendant's big sibling: the same rate mechanic, two and a half times the
+    // slope. Since the run's ending wave is governed by the NET growth rate, a
+    // rate boon is the single most efficient way to buy depth.
+    description:
+      "+18% max HP and damage now — and +4% more of each for every wave you clear afterward.",
+    effects: [{ type: "ascendant", basePct: 0.18, perWavePct: 0.042 }],
+  },
+  undying_legion: {
+    id: "undying_legion",
+    name: "Undying Legion",
+    rarity: "mythic",
+    minWave: 40,
+    unique: true,
+    // Attrition is what actually ends most deep runs: you lose one unit at wave
+    // 60 and fight the rest at three-quarter strength. This ends that entirely.
+    description: "Every fallen ally rises again at the end of each wave.",
+    effects: [{ type: "phoenix", hpPct: 0.5, all: true }],
+  },
+  worldbreaker: {
+    id: "worldbreaker",
+    name: "Worldbreaker",
+    rarity: "mythic",
+    minWave: 45,
+    unique: true,
+    // The answer to HP sponges. Every other damage boon is a multiplier on YOUR
+    // numbers and so loses to an exponential; this one scales with the ENEMY, so
+    // a wave-90 monster takes the same number of hits as a wave-9 one. It is also
+    // the direct cure for the stall-clock deaths that end late runs.
+    description: "Every hit also rends 2% of the target's maximum health.",
+    effects: [{ type: "maxHpRend", frac: 0.02 }],
   },
 };
 
@@ -586,6 +648,11 @@ export function boonStackSummary(
       case "killStack":
         lines.push(`+${asPct(eff.dmgPct * count)} damage per kill, resets each wave`);
         break;
+      case "maxHpRend":
+        lines.push(
+          `every hit rends ${asPct(eff.frac * count)} of the target's max HP`
+        );
+        break;
       case "crit":
       case "overheal":
       case "lastBreath":
@@ -607,7 +674,7 @@ function nth(n: number): string {
   return `${n}th`;
 }
 
-/** Rarity odds by wave — deeper runs weight harder toward rare/epic/mythic.
+/** Rarity odds by wave — deeper runs weight harder toward rare/epic/legendary.
  *
  *  These used to FREEZE at wave 11: a wave-40 offer had exactly the same odds as
  *  a wave-11 one, so 45% of deep picks were still +10% commons while the horde's
@@ -617,45 +684,55 @@ function nth(n: number): string {
  *
  *  Anchored so wave 11 is unchanged (45/38/17) and nothing regresses below it. */
 export function boonRarityWeights(wave: number): Record<BoonRarity, number> {
-  if (wave < 6) return { common: 75, rare: 22, epic: 3, mythic: 0 };
-  if (wave < 11) return { common: 60, rare: 30, epic: 10, mythic: 0 };
+  if (wave < 6) {
+    return { common: 75, rare: 22, epic: 3, legendary: 0, mythic: 0 };
+  }
+  if (wave < 11) {
+    return { common: 60, rare: 30, epic: 10, legendary: 0, mythic: 0 };
+  }
   // Anchored at wave 11 (over = 0 there), so the old freeze point keeps exactly
   // its old odds and nothing below it regresses.
   const over = wave - 11;
-  const mythic = Math.min(22, Math.max(0, (wave - ENDLESS_MYTHIC_WAVE) * 0.8));
+  const legendary = Math.min(22, Math.max(0, (wave - ENDLESS_LEGENDARY_WAVE) * 0.8));
+  // Mythic starts later and climbs slower than anything else, and caps low — it
+  // is meant to be the tier you remember drawing, not one you plan around.
+  const mythic = Math.min(12, Math.max(0, (wave - ENDLESS_MYTHIC_WAVE) * 0.55));
   const epic = Math.min(42, 17 + over * 0.75);
   // Rare's cap is aligned with epic's (both land at wave ~44). Letting rare keep
   // climbing after epic had capped stole share back from the deep tiers and made
-  // the epic+mythic share dip slightly — the one thing this curve must not do.
+  // the deep share dip slightly — the one thing this curve must not do.
   const rare = Math.min(43, 38 + over * 0.15);
-  const nonCommon = mythic + epic + rare;
+  const nonCommon = mythic + legendary + epic + rare;
   // Commons never vanish entirely — a floor of COMMON_FLOOR keeps the small
   // steady picks in the pool. Squeeze the others PROPORTIONALLY to make room
-  // rather than clamping common, so the four always total exactly 100 and the
+  // rather than clamping common, so the five always total exactly 100 and the
   // deep-tier share stays monotonically increasing (clamping made it dip right
   // at the boundary, since the implied total drifted past 100).
   const COMMON_FLOOR = 8;
   if (nonCommon <= 100 - COMMON_FLOOR) {
-    return { common: 100 - nonCommon, rare, epic, mythic };
+    return { common: 100 - nonCommon, rare, epic, legendary, mythic };
   }
   const k = (100 - COMMON_FLOOR) / nonCommon;
   return {
     common: COMMON_FLOOR,
     rare: rare * k,
     epic: epic * k,
+    legendary: legendary * k,
     mythic: mythic * k,
   };
 }
 
 function rollRarity(wave: number, rng: RNG): BoonRarity {
   const w = boonRarityWeights(wave);
-  const total = w.common + w.rare + w.epic + w.mythic;
+  const total = w.common + w.rare + w.epic + w.legendary + w.mythic;
   let r = rng.next() * total;
   if (r < w.common) return "common";
   r -= w.common;
   if (r < w.rare) return "rare";
   r -= w.rare;
   if (r < w.epic) return "epic";
+  r -= w.epic;
+  if (r < w.legendary) return "legendary";
   return "mythic";
 }
 

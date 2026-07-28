@@ -85,7 +85,8 @@ const RARITY_RANK: Record<string, number> = {
   common: 0,
   rare: 1,
   epic: 2,
-  mythic: 3,
+  legendary: 3,
+  mythic: 4,
 };
 
 /** Does this boon carry any effect matching `pred`? */
@@ -141,6 +142,9 @@ const rarityScore = (id: string): number => RARITY_RANK[BOONS[id]?.rarity] ?? 0;
  *  probe's policy. Anything not listed falls back to rarity. Compounding and
  *  multiplicative picks first; flat/situational last. */
 const ORACLE_ORDER = [
+  "apotheosis",
+  "undying_legion",
+  "worldbreaker",
   "ascendant",
   "phoenix_pact",
   "siege_train",

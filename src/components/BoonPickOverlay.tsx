@@ -33,6 +33,8 @@ interface Props {
 export function rarityColor(r: BoonRarity): string {
   switch (r) {
     case "mythic":
+      return "#4de2e8"; // radiant cyan — the one tier that isn't warm
+    case "legendary":
       return "#f5a524"; // deep-tier gold — reads apart from epic at a glance
     case "epic":
       return "#a855f7";

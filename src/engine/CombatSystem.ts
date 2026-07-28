@@ -134,6 +134,10 @@ export interface TeamMods {
   /** Soul Harvest: live outgoing-damage bonus accumulated from kills this wave.
    *  Reset each wave start by the EndlessController; 0 = off. */
   killStackBonus: number;
+  /** Worldbreaker: each hit additionally rends this fraction of the TARGET's max
+   *  HP. Unlike every other damage mod this is enemy-relative, so it does not
+   *  decay against a growing horde. 0 = off. */
+  maxHpRend: number;
   /** Thunderclap / Venom Coating on-hit riders. */
   onHitRiders: TeamRider[];
   /** Compendium slayer bonus: outgoing damage multiplier vs a specific enemy
@@ -176,6 +180,7 @@ export function identityTeamMods(): TeamMods {
     rhythmBonus: 0,
     siegeBonus: 0,
     killStackBonus: 0,
+    maxHpRend: 0,
     onHitRiders: [],
     slayerVs: {},
     deployShieldFrac: 0,
@@ -358,6 +363,10 @@ const MAX_DAMAGE_CHAIN = 24;
  *  invulnerability; with it the boon stays a strong steady climb. */
 export const BOUNTY_WAVE_CAP_FRAC = 0.25;
 
+/** Worldbreaker's rend may add at most this multiple of the hit it rides on.
+ *  See the note at its use site — without a cap it defeats the whole HP curve. */
+export const MAX_HP_REND_CAP_MULT = 2;
+
 function makeDamageDealer(
   state: SimState,
   makeKitCtx: (subject: Unit, damageContext?: boolean) => KitCtx,
@@ -493,7 +502,21 @@ function makeDamageDealer(
       target.damageTakenMult *
       state.teamMods[target.team].damageTakenMult *
       itemTakenMult;
-    let dmg = Math.max(0, Math.round(scaled));
+    // Worldbreaker (Endless mythic): a slice of the TARGET's max HP, added after
+    // every multiplier so it is untouched by them.
+    //
+    // CAPPED AT A MULTIPLE OF YOUR OWN HIT, and that cap is the whole design.
+    // Uncapped, percent-max-HP damage makes time-to-kill INDEPENDENT of enemy
+    // HP — the horde's entire HP curve stops mattering and runs simply never
+    // end (measured: 69% of god-tier runs ran past wave 300 without dying).
+    // Bounding it by `scaled` keeps the flavour — you tear a real chunk out of
+    // anything, however vast — while leaving time-to-kill a growing function of
+    // enemy HP, so the curve still closes every run. Identity when 0.
+    const rend =
+      srcMods.maxHpRend > 0 && source.team !== target.team
+        ? Math.min(target.maxHp * srcMods.maxHpRend, scaled * MAX_HP_REND_CAP_MULT)
+        : 0;
+    let dmg = Math.max(0, Math.round(scaled + rend));
     const shown = dmg; // pre-absorb hit shown as the floating number
 
     // Absorb shield (overhealth) soaks damage before HP.

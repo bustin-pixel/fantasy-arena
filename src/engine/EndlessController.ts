@@ -162,7 +162,7 @@ export class EndlessController {
   /** Wave-start summon orders (Kennel Master wolves, War Machine turret). */
   private summons: { defId: string; count: number }[] = [];
 
-  // -- Mythic deep-tier boons -------------------------------------------------
+  // -- Legendary deep-tier boons -------------------------------------------------
   /** Ascendant: total per-wave compounding rate banked (0 = unowned). Applied
    *  again at every wave start, which is what makes it a RATE rather than a level
    *  and gives a strong run its tail. */
@@ -173,6 +173,8 @@ export class EndlessController {
   private spellRechargeOwned = false;
   /** Phoenix Pact revive fraction (0 = unowned). */
   private phoenixHpPct = 0;
+  /** Undying Legion: raise EVERY corpse each wave, not just the first to fall. */
+  private phoenixAll = false;
   /** Siege Train ramp per 30s of wave (0 = unowned). */
   private siegePctPer30Sec = 0;
   /** Soul Harvest damage per kill for the rest of the wave (0 = unowned). */
@@ -468,7 +470,15 @@ export class EndlessController {
     // (you were saved, not spared), and BEFORE the heal so the returned unit gets
     // topped up with everyone else. It also lands before rollBoonOffers, so a
     // phoenixed warband correctly stops forcing Second Chance into the offer.
-    if (this.phoenixHpPct > 0) this.reviveLowest(state, this.phoenixHpPct);
+    if (this.phoenixHpPct > 0) {
+      if (this.phoenixAll) {
+        for (const u of this.warbandUnits(state)) {
+          if (u.state === "dead") reviveUnit(state, u, this.phoenixHpPct);
+        }
+      } else {
+        this.reviveLowest(state, this.phoenixHpPct);
+      }
+    }
 
     // Baseline (+ Field Medicine) recovery on the living warband.
     for (const u of this.warbandUnits(state)) {
@@ -630,7 +640,7 @@ export class EndlessController {
         case "waveSummon":
           this.summons.push({ defId: eff.defId, count: eff.count });
           break;
-        // --- mythic deep tier ---
+        // --- legendary deep tier ---
         case "ascendant":
           // The base lands immediately; the per-wave part is re-applied at every
           // subsequent wave start (see applyWaveStartBoons).
@@ -644,6 +654,10 @@ export class EndlessController {
           break;
         case "phoenix":
           this.phoenixHpPct = Math.max(this.phoenixHpPct, eff.hpPct);
+          if (eff.all) this.phoenixAll = true;
+          break;
+        case "maxHpRend":
+          state.teamMods.player.maxHpRend += eff.frac;
           break;
         case "siege":
           this.siegePctPer30Sec = eff.pctPer30Sec;
