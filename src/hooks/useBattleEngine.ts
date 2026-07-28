@@ -93,6 +93,11 @@ export interface BattleUiState {
   endlessCompleted: boolean;
   /** Endless: this is the one intermission where claim-or-continue is offered. */
   atFinalWaveChoice: boolean;
+  /** Endless: exclusive deep-tier slots already spent this run (one legendary and
+   *  one mythic, ever). Surfaced so the pick overlay can say so rather than
+   *  leaving the player wondering why those cards stopped appearing. */
+  legendarySlotUsed: boolean;
+  mythicSlotUsed: boolean;
   /** The commander's equipped battle spell + charge state (one per battle), or
    *  null when no spell is equipped (no HUD button). */
   commanderSpell: { spell: CommanderSpellId; ready: boolean } | null;
@@ -284,6 +289,8 @@ export function useBattleEngine(
       rerollsLeft: ENDLESS_REROLLS_START,
       endlessCompleted: false,
       atFinalWaveChoice: false,
+      legendarySlotUsed: false,
+      mythicSlotUsed: false,
       commanderSpell: null,
     };
   });
@@ -465,6 +472,8 @@ export function useBattleEngine(
           rerollsLeft: est?.rerollsLeft ?? 0,
           endlessCompleted: est?.completedFinalWave ?? false,
           atFinalWaveChoice: est?.atFinalWaveChoice ?? false,
+          legendarySlotUsed: est?.legendarySlotUsed ?? false,
+          mythicSlotUsed: est?.mythicSlotUsed ?? false,
           commanderSpell: c.commanderSpellStatus(),
         });
       }
@@ -567,6 +576,8 @@ export function useBattleEngine(
       rerollsLeft: est?.rerollsLeft ?? prev.rerollsLeft,
       endlessCompleted: est?.completedFinalWave ?? prev.endlessCompleted,
       atFinalWaveChoice: est?.atFinalWaveChoice ?? false,
+      legendarySlotUsed: est?.legendarySlotUsed ?? prev.legendarySlotUsed,
+      mythicSlotUsed: est?.mythicSlotUsed ?? prev.mythicSlotUsed,
     }));
   }, []);
 

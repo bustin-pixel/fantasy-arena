@@ -760,6 +760,8 @@ export function BattleScreen({
           onReroll={rerollBoons}
           onSkip={() => { playSfx("boonPick"); skipBoon(); }}
           atFinalWaveChoice={ui.atFinalWaveChoice}
+          legendarySlotUsed={ui.legendarySlotUsed}
+          mythicSlotUsed={ui.mythicSlotUsed}
           onFinish={() => {
             // A completion, not a retirement — the results card reads the
             // difference off endlessWaves, so nothing else needs flagging.

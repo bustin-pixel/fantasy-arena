@@ -2472,6 +2472,54 @@ body.modal-open .pager-nav {
   text-transform: uppercase;
   letter-spacing: 0.12em;
 }
+/* Which rank of a stack-to-cap boon this card is selling. Inherits the rarity
+   colour from its parent, dimmed — it's a qualifier, not a headline. */
+.boon-card-rank {
+  opacity: 0.75;
+  font-weight: 700;
+}
+/* "Legendary claimed — one per run". Colour comes from rarityColor inline; the
+   background is set HERE and not left to inherit, because a bare chip lands on
+   the UA's own surface and reads as invisible on one platform or the other. */
+.boon-slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  justify-content: center;
+  margin: 0 0 0.6rem;
+}
+.boon-slot-chip {
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 0.22rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(12, 10, 8, 0.72);
+  border: 1px solid currentColor;
+}
+/* The pool is exhausted — every boon completed, both deep slots spent. */
+.boon-empty {
+  text-align: center;
+  padding: 1rem 1.2rem;
+  margin: 0 auto 0.6rem;
+  max-width: 26rem;
+  border: 1px solid rgba(180, 150, 100, 0.35);
+  border-radius: 10px;
+  background: rgba(12, 10, 8, 0.55);
+}
+.boon-empty-title {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--parchment);
+}
+.boon-empty-sub {
+  font-size: 0.82rem;
+  color: var(--parchment-dim, #cbbb99);
+  margin-top: 0.3rem;
+  line-height: 1.35;
+}
 .boon-card-name {
   font-family: var(--font-display);
   font-size: 1.25rem;
