@@ -4,6 +4,35 @@ Forward-looking only — what's planned, deferred, and open. For what's already
 **done** and why, read the git history (`git log --oneline`, `gh pr list`) — that's
 the source of truth, so this file deliberately doesn't duplicate it.
 
+> **🔨 BUILT, UNSHIPPED — the Endless deep retune** (branch
+> `feat/endless-deep-retune`, cut from master; NOT merged). Fixes a playtester's
+> "hard wall at wave 40, no ramp after that". The old curve's growth RATE at
+> wave 40 meant doubling your warband's power bought exactly ONE more wave, so
+> 37 of 40 sweep seeds died between waves 38 and 45. Now 45–107.
+>
+> Five parts: a reshaped curve (true exponential × a late, gentle
+> super-exponential closer), the wave clock turned into a progress-based **stall
+> detector** (13–25% of runs were dying to the timer while still winning),
+> wave-scaled flat boons, an unfrozen rarity ramp + a `mythic` tier, and
+> reroll/skip + five deep-tier boons (`ascendant` is the tail-maker).
+>
+> **Two things to know before touching it.** (1) `NOTES.md` §4h is the tuning
+> guide: `ENDLESS_SURGE_START` moves the median, `ENDLESS_SURGE_K` sets the
+> spread, and **anything that buffs the player must be followed by a
+> recalibration** — the boon changes alone pushed every run past the sweep's
+> 120-wave cap. (2) The sweep harness is committed this time
+> (`engine/__tests__/endlessSweep.test.ts`, `SWEEP=1`); the previous retune's
+> lived in a scratchpad, which is exactly why this regressed unnoticed.
+>
+> It also carries a **shipped-crash fix** the harness found on its first full
+> run: a flat kit damage-reflect (Wildheart's Thorned Hide) traded against any
+> fractional thorns recursed until the call stack blew. Reachable on live in the
+> **Overgrowth** via a legendary Squire's Plate — not only in Endless.
+>
+> Still open: the reward curve is untouched, so a 100-wave run now pays roughly
+> 2× a 45-wave one in gold/XP and about double the Soul Shards. Left deliberately
+> (god-runs are rare) but worth revisiting if it distorts the economy.
+
 > **✅ The architecture deepening batch SHIPPED** (PR #65, merge `6d5a4e9`,
 > 2026-07-17, deploy hash-verified). Six refactors, no gameplay change, 663 tests.
 > Two hazards it left behind that are worth knowing before you touch the area:
