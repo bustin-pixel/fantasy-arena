@@ -18,17 +18,30 @@ import { battleState, place, makeDummy, digest } from "./helpers";
 import { RNG } from "@/utils/rng";
 import {
   BOONS,
+  boonMaxStacks,
   boonRarityWeights,
+  boonSlotsUsed,
+  boonStackFraction,
+  boonStackStep,
   ENDLESS_MYTHIC_WAVE,
   boonStackSummary,
   rollBoonOffers,
 } from "@/data/boons";
 import { DUNGEON_IDS, getDungeon } from "@/data/dungeons";
 import {
+  BOUNTY_TOTAL_CAP_FRAC,
   ENDLESS_FINAL_WAVE,
+  ENDLESS_PEAK_WAVE,
+  ENDLESS_RAMP_START,
   ENDLESS_RARE_POOL,
+  ENDLESS_RATE_EARLY,
+  ENDLESS_RATE_PEAK,
+  ENDLESS_RATE_SUSTAIN,
+  ENDLESS_TAPER_END,
   endlessBoonDefenseScale,
   endlessBoonOffenseScale,
+  endlessWaveGrowthRate,
+  endlessWaveStatMultipliers,
 } from "@/data/endless";
 import { getUnitDef } from "@/data/units";
 
@@ -483,12 +496,12 @@ describe("endless — boon offer gating", () => {
       .map((b) => b.id);
     expect(mythics.length).toBeGreaterThan(0);
     for (let seed = 1; seed <= 60; seed++) {
-      const early = rollBoonOffers(30, new RNG(seed), false, new Set(), true);
+      const early = rollBoonOffers(30, new RNG(seed), false, [], true);
       for (const id of early) expect(mythics).not.toContain(id);
     }
     let sawMythic = false;
     for (let seed = 1; seed <= 400 && !sawMythic; seed++) {
-      sawMythic = rollBoonOffers(60, new RNG(seed), false, new Set(), true).some(
+      sawMythic = rollBoonOffers(60, new RNG(seed), false, [], true).some(
         (id) => mythics.includes(id)
       );
     }
@@ -501,14 +514,14 @@ describe("endless — boon offer gating", () => {
       .map((b) => b.id);
     expect(legendaries.length).toBeGreaterThan(0);
     for (let seed = 1; seed <= 60; seed++) {
-      for (const id of rollBoonOffers(10, new RNG(seed), false, new Set(), true)) {
+      for (const id of rollBoonOffers(10, new RNG(seed), false, [], true)) {
         expect(legendaries).not.toContain(id);
       }
     }
     // …and they do show up deep.
     let sawMythic = false;
     for (let seed = 1; seed <= 200 && !sawMythic; seed++) {
-      sawMythic = rollBoonOffers(45, new RNG(seed), false, new Set(), true).some(
+      sawMythic = rollBoonOffers(45, new RNG(seed), false, [], true).some(
         (id) => legendaries.includes(id)
       );
     }
@@ -517,46 +530,247 @@ describe("endless — boon offer gating", () => {
 
   it("Warlord's Horn is never offered without a battle spell to recharge", () => {
     for (let seed = 1; seed <= 120; seed++) {
-      const noSpell = rollBoonOffers(45, new RNG(seed), false, new Set(), false);
+      const noSpell = rollBoonOffers(45, new RNG(seed), false, [], false);
       expect(noSpell).not.toContain("warlords_horn");
     }
     let sawHorn = false;
     for (let seed = 1; seed <= 400 && !sawHorn; seed++) {
-      sawHorn = rollBoonOffers(45, new RNG(seed), false, new Set(), true).includes(
+      sawHorn = rollBoonOffers(45, new RNG(seed), false, [], true).includes(
         "warlords_horn"
       );
     }
     expect(sawHorn).toBe(true);
   });
 
-  it("owned unique boons leave the offer pool; stackable ones stay", () => {
+  it("owned unique boons leave the offer pool; unfinished ranks stay", () => {
     // A second copy of a unique boon (Momentum, Overkill, …) is a no-op, so it
-    // must never be re-offered. Stackable boons may repeat. DERIVED from the
-    // data rather than hardcoded, so adding a unique can't silently under-test.
-    const uniques = new Set(
-      Object.values(BOONS)
-        .filter((b) => b.unique && b.offerIf == null && (b.minWave ?? 0) <= 12)
-        .map((b) => b.id)
-    );
-    expect(uniques.size).toBeGreaterThan(0);
+    // must never be re-offered. A RANKED boon may repeat until it completes.
+    // DERIVED from the data rather than hardcoded, so adding a unique can't
+    // silently under-test.
+    const uniques = Object.values(BOONS)
+      .filter(
+        (b) =>
+          boonMaxStacks(b) === 1 && b.offerIf == null && (b.minWave ?? 0) <= 12
+      )
+      .map((b) => b.id);
+    expect(uniques.length).toBeGreaterThan(0);
     for (let seed = 1; seed <= 40; seed++) {
       const offers = rollBoonOffers(12, new RNG(seed), false, uniques);
-      for (const id of offers) expect(uniques.has(id)).toBe(false);
+      for (const id of offers) expect(uniques).not.toContain(id);
     }
     // Sanity: with nothing owned, uniques CAN appear (find at least one).
     let sawUnique = false;
     for (let seed = 1; seed <= 40 && !sawUnique; seed++) {
       sawUnique = rollBoonOffers(12, new RNG(seed), false).some((id) =>
-        uniques.has(id)
+        uniques.includes(id)
       );
     }
     expect(sawUnique).toBe(true);
+  });
+
+  it("a boon leaves the pool for good once all its ranks are bought", () => {
+    // The load-bearing half of the bounded-economy argument: every boon finishes.
+    const ranked = Object.values(BOONS).find(
+      (b) => boonMaxStacks(b) === 3 && (b.minWave ?? 0) <= 12
+    );
+    expect(ranked).toBeDefined();
+    const id = ranked!.id;
+    // One short of complete it is still offerable…
+    const partial = Array(boonMaxStacks(ranked!) - 1).fill(id);
+    let sawPartial = false;
+    for (let seed = 1; seed <= 200 && !sawPartial; seed++) {
+      sawPartial = rollBoonOffers(12, new RNG(seed), false, partial).includes(id);
+    }
+    expect(sawPartial).toBe(true);
+    // …and completed it is gone, at any depth.
+    const complete = Array(boonMaxStacks(ranked!)).fill(id);
+    for (let seed = 1; seed <= 200; seed++) {
+      expect(rollBoonOffers(12, new RNG(seed), false, complete)).not.toContain(id);
+      expect(rollBoonOffers(70, new RNG(seed), false, complete, true)).not.toContain(id);
+    }
+  });
+
+  it("ranks buy ascending shares of the headline and complete at exactly 100%", () => {
+    for (const boon of Object.values(BOONS)) {
+      const max = boonMaxStacks(boon);
+      let cum = 0;
+      let prev = 0;
+      for (let i = 0; i < max; i++) {
+        const step = boonStackStep(boon, i);
+        expect(step.frac).toBeGreaterThan(0);
+        // "Starts small": no rank ever adds less than the one before it.
+        expect(step.frac).toBeGreaterThanOrEqual(prev - 1e-9);
+        expect(step.cumBefore).toBeCloseTo(cum, 9);
+        cum += step.frac;
+        expect(step.cumAfter).toBeCloseTo(cum, 9);
+        prev = step.frac;
+      }
+      // The whole headline, never more — this is the cap the curve relies on.
+      expect(cum).toBeCloseTo(1, 9);
+      expect(boonStackFraction(boon, max)).toBeCloseTo(1, 9);
+    }
+  });
+});
+
+describe("endless — exclusive legendary/mythic tier slots", () => {
+  const idsOfRarity = (r: string) =>
+    Object.values(BOONS)
+      .filter((b) => b.rarity === r)
+      .map((b) => b.id);
+
+  it("taking a legendary closes the whole legendary tier, mythic untouched", () => {
+    // Deliberately uses ASCENDANT — a boon that used to be freely stackable — so
+    // this pins the rule as "the rarity slot is spent", not merely "unique".
+    const legendaries = idsOfRarity("legendary");
+    const mythics = idsOfRarity("mythic");
+    let sawMythic = false;
+    for (let seed = 1; seed <= 200; seed++) {
+      const offers = rollBoonOffers(70, new RNG(seed), false, ["ascendant"], true);
+      for (const id of offers) expect(legendaries).not.toContain(id);
+      if (offers.some((id) => mythics.includes(id))) sawMythic = true;
+    }
+    expect(sawMythic).toBe(true); // the other slot is still live
+  });
+
+  it("taking a mythic closes the whole mythic tier, legendary untouched", () => {
+    const legendaries = idsOfRarity("legendary");
+    const mythics = idsOfRarity("mythic");
+    let sawLegendary = false;
+    for (let seed = 1; seed <= 200; seed++) {
+      const offers = rollBoonOffers(70, new RNG(seed), false, ["worldbreaker"], true);
+      for (const id of offers) expect(mythics).not.toContain(id);
+      if (offers.some((id) => legendaries.includes(id))) sawLegendary = true;
+    }
+    expect(sawLegendary).toBe(true);
+  });
+
+  it("a closed tier's weight is redistributed, never leaked to the flat fallback", () => {
+    // THE REGRESSION THIS EXISTS FOR. Excluding a tier from the POOL alone leaves
+    // its weight in the table; every roll landing there falls through to
+    // rollBoonOffers' empty-candidates fallback, which draws flat across the whole
+    // pool — ignoring the rarity curve, and able to deal a MYTHIC on a legendary
+    // roll. With both slots spent that would be doubly wrong.
+    const deep = [...idsOfRarity("legendary"), ...idsOfRarity("mythic")];
+    for (let seed = 1; seed <= 300; seed++) {
+      const offers = rollBoonOffers(
+        80,
+        new RNG(seed),
+        false,
+        ["ascendant", "worldbreaker"],
+        true
+      );
+      expect(offers.length).toBe(3);
+      expect(new Set(offers).size).toBe(3);
+      for (const id of offers) expect(deep).not.toContain(id);
+    }
+    // And the weights themselves stay a valid distribution.
+    const closed = boonRarityWeights(80, { legendary: true, mythic: true });
+    expect(closed.legendary).toBe(0);
+    expect(closed.mythic).toBe(0);
+    expect(
+      closed.common + closed.rare + closed.epic + closed.legendary + closed.mythic
+    ).toBeCloseTo(100, 6);
+    // Redistributed PROPORTIONALLY: the survivors keep their relative shape.
+    const open = boonRarityWeights(80);
+    expect(closed.epic / closed.rare).toBeCloseTo(open.epic / open.rare, 6);
+    // One slot closed still leaves the other's weight alone in relative terms.
+    const halfClosed = boonRarityWeights(80, { legendary: true, mythic: false });
+    expect(halfClosed.legendary).toBe(0);
+    expect(halfClosed.mythic).toBeGreaterThan(0);
+  });
+
+  it("the forced revive slot still fills when both deep tiers are spent", () => {
+    for (let seed = 1; seed <= 60; seed++) {
+      const offers = rollBoonOffers(
+        80,
+        new RNG(seed),
+        true,
+        ["ascendant", "worldbreaker"],
+        true
+      );
+      expect(offers).toContain("second_chance");
+      expect(offers.length).toBe(3);
+      expect(new Set(offers).size).toBe(3);
+    }
+  });
+
+  it("boonSlotsUsed reads the tiers off the pick log", () => {
+    expect(boonSlotsUsed([])).toEqual({ legendary: false, mythic: false });
+    expect(boonSlotsUsed(["hardy", "aegis"])).toEqual({
+      legendary: false,
+      mythic: false,
+    });
+    expect(boonSlotsUsed(["hardy", "siege_train"])).toEqual({
+      legendary: true,
+      mythic: false,
+    });
+    expect(boonSlotsUsed(["apotheosis", "phoenix_pact"])).toEqual({
+      legendary: true,
+      mythic: true,
+    });
+  });
+});
+
+describe("endless — the wave curve", () => {
+  it("waves 1–9 stay a warm-up, then the rate ramps and settles", () => {
+    // Endless unlocks mid-progression, so the opening waves are deliberately a
+    // warm-up a fresh, ungeared warband can survive: flat at the base rate until
+    // the ramp starts. After that the rate climbs to its peak and tapers to the
+    // sustain rate it keeps forever.
+    for (let w = 1; w <= ENDLESS_RAMP_START; w++) {
+      expect(endlessWaveGrowthRate(w)).toBeCloseTo(ENDLESS_RATE_EARLY, 9);
+    }
+    expect(endlessWaveGrowthRate(ENDLESS_RAMP_START + 1)).toBeGreaterThan(
+      ENDLESS_RATE_EARLY
+    );
+    expect(endlessWaveGrowthRate(ENDLESS_PEAK_WAVE)).toBeCloseTo(
+      ENDLESS_RATE_PEAK,
+      9
+    );
+    for (const w of [ENDLESS_TAPER_END, 80, 150, 400]) {
+      expect(endlessWaveGrowthRate(w)).toBeCloseTo(ENDLESS_RATE_SUSTAIN, 9);
+    }
+    // Strictly positive forever — this is what guarantees a bounded warband
+    // eventually loses, now that the curve no longer accelerates without limit.
+    expect(ENDLESS_RATE_SUSTAIN).toBeGreaterThan(0);
+  });
+
+  it("the multiplier climbs monotonically and stays a readable number", () => {
+    // THE COMPLAINT THIS FIXES: the previous curve reached x7.8e13 by wave 88 —
+    // past the point where enemy maxHp is even an exact integer — and hit
+    // Infinity by wave 349. Deep waves must stay numbers a player can read off
+    // an HP bar: a boss (~3000 base HP) in the tens of thousands, not the
+    // billions.
+    let prev = 0;
+    for (let w = 1; w <= 200; w++) {
+      const m = endlessWaveStatMultipliers(w);
+      expect(Number.isFinite(m.hp)).toBe(true);
+      expect(m.hp).toBeGreaterThan(prev);
+      expect(m.hp).toBe(m.dmg); // the axes move together, by design
+      prev = m.hp;
+    }
+    const atCapstone = endlessWaveStatMultipliers(ENDLESS_FINAL_WAVE).hp;
+    expect(atCapstone).toBeGreaterThan(15);
+    expect(atCapstone).toBeLessThan(60);
+    // Integer arithmetic stays exact by a wide margin, even for the fattest boss
+    // deep past the capstone (2^53 is where Math.round stops being trustworthy).
+    expect(endlessWaveStatMultipliers(200).hp * 10_000).toBeLessThan(2 ** 40);
+  });
+
+  it("the first ten waves are the same fight they always were", () => {
+    // A retune of the deep end must not quietly move the early game a fresh
+    // warband is balanced against.
+    expect(endlessWaveStatMultipliers(1).hp).toBeCloseTo(1, 9);
+    expect(endlessWaveStatMultipliers(10).hp).toBeCloseTo(
+      Math.exp(9 * ENDLESS_RATE_EARLY),
+      9
+    );
   });
 });
 
 describe("endless — flat boons scale with the wave", () => {
   it("the defense/offense anchors grow, so a flat boon keeps its real value", () => {
-    // The whole point: Bulwark's 60 HP is four skeleton hits at wave 1 and a
+    // The whole point: Bulwark's flat HP is a few skeleton hits at wave 1 and a
     // rounding error at wave 50 unless it rides the curve.
     expect(endlessBoonDefenseScale(1)).toBeCloseTo(1, 5);
     expect(endlessBoonDefenseScale(40)).toBeGreaterThan(
@@ -568,13 +782,22 @@ describe("endless — flat boons scale with the wave", () => {
   });
 
   it("boonStackSummary reports the LIVE value at a wave, not the base number", () => {
+    // Rank 1 of 3 owns a quarter of Bulwark's 155 HP headline; the panel quotes
+    // that share against the wave's anchor, not the completed number and not the
+    // wave-1 number. Derived from the data so a rebalance can't rot the spec.
+    const headline = (BOONS.bulwark.effects[0] as { amount: number }).amount;
+    const share = boonStackFraction(BOONS.bulwark, 1);
     const w1 = boonStackSummary("bulwark", 1, 1).join(" ");
     const w40 = boonStackSummary("bulwark", 1, 40).join(" ");
-    expect(w1).toContain("60 HP shield");
+    expect(w1).toContain(`${Math.round(headline * share)} HP shield`);
     expect(w40).not.toBe(w1);
-    // The wave-40 figure is the base times that wave's defense anchor.
-    const scaled = Math.round(60 * endlessBoonDefenseScale(40));
+    // The wave-40 figure is that same share times the wave's defense anchor.
+    const scaled = Math.round(headline * share * endlessBoonDefenseScale(40));
     expect(w40).toContain(`${scaled} HP shield`);
+    // And a completed Bulwark is the whole headline.
+    expect(boonStackSummary("bulwark", 3, 1).join(" ")).toContain(
+      `${headline} HP shield`
+    );
   });
 
   it("a Bulwark taken on wave 1 is still worth its full value much later", () => {
@@ -597,13 +820,16 @@ describe("endless — flat boons scale with the wave", () => {
           .endlessStatus()!
           .boonsPicked.find((b) => b.id === "bulwark");
         if (owned && mc.endlessStatus()!.wave >= 6) {
+          // The ranks bought so far, against this wave's anchor.
+          const base = (BOONS.bulwark.effects[0] as { amount: number }).amount;
+          const held = base * boonStackFraction(BOONS.bulwark, owned.count);
           const expected = Math.round(
-            60 * owned.count * endlessBoonDefenseScale(mc.endlessStatus()!.wave)
+            held * endlessBoonDefenseScale(mc.endlessStatus()!.wave)
           );
           const shielded = mc.state.units.find(
             (u) => u.team === "player" && u.shieldHp >= expected
           );
-          if (expected > 60 && shielded) sawScaled = true;
+          if (expected > held && shielded) sawScaled = true;
         }
       }
     }
@@ -689,9 +915,17 @@ describe("endless — the wave-100 capstone", () => {
       }
       // Stop AT the target intermission rather than answering it — otherwise
       // the pick advances to the next wave and the choice beat is missed.
-      if (mc.endlessStatus()?.intermission) {
+      const inter = mc.endlessStatus()?.intermission;
+      if (inter) {
         if (mc.wavesSurvived() >= target) break;
-        mc.pickBoon(0);
+        // Past roughly wave 70 a picks-everything run has COMPLETED the entire
+        // boon pool — every boon capped, both deep slots spent — and the
+        // intermission legitimately has nothing left to offer. That is the
+        // intended terminal state of a bounded economy, not a stall, so take the
+        // heal and press on. (Before the rank caps this loop could pick forever,
+        // which is exactly the unbounded growth the curve can no longer afford.)
+        if (inter.offers.length > 0) mc.pickBoon(0);
+        else mc.skipBoon();
       }
     }
     return mc;
@@ -734,7 +968,11 @@ describe("endless — the wave-100 capstone", () => {
   it("declining lets the run continue past 100, still flagged as completed", () => {
     const mc = driveToWave(4242, ENDLESS_FINAL_WAVE);
     expect(mc.endlessStatus()!.atFinalWaveChoice).toBe(true);
-    mc.pickBoon(0); // press on instead of claiming
+    // Press on instead of claiming. A run this deep has completed the whole boon
+    // pool, so "press on" is the heal rather than a pick — either way the wave
+    // advances and the capstone stays banked.
+    if (mc.endlessStatus()!.intermission!.offers.length > 0) mc.pickBoon(0);
+    else mc.skipBoon();
     expect(mc.phase).toBe("battle"); // the run did NOT end
     // The choice prompt is a one-time beat, but the completion latches.
     const after = mc.endlessStatus()!;
@@ -866,6 +1104,7 @@ describe("endless — proc boon mechanics (via teamMods funnels)", () => {
     const slayer = place(s, "berserker", "player", 200, 300);
     const startMax = slayer.maxHp;
     slayer.bountyBaseHp = startMax; // as the wave start would set it
+    slayer.bountyRunBase = startMax; // …and the run baseline, latched at wave 1
     const prey = place(s, "skeleton", "enemy", 200, 350);
     prey.moveSpeed = 0;
     prey.damage = 0;
@@ -887,6 +1126,7 @@ describe("endless — proc boon mechanics (via teamMods funnels)", () => {
     const slayer = place(s, "berserker", "player", 200, 300);
     const startMax = slayer.maxHp;
     slayer.bountyBaseHp = startMax;
+    slayer.bountyRunBase = startMax * 100; // run cap far away; isolate the wave cap
     for (let i = 0; i < 12; i++) {
       const prey = place(s, "skeleton", "enemy", 200 + i, 350);
       prey.moveSpeed = 0;
@@ -901,6 +1141,39 @@ describe("endless — proc boon mechanics (via teamMods funnels)", () => {
     expect(slayer.maxHp).toBeGreaterThan(startMax); // it did pay out
     expect(slayer.maxHp).toBeLessThanOrEqual(
       startMax + Math.round(startMax * BOUNTY_WAVE_CAP_FRAC)
+    );
+  });
+
+  it("Bounty Hunter's RUN cap bounds it across waves, not just within one", () => {
+    // The per-wave cap alone bounds nothing: +25% every wave is still an
+    // exponential, just a polite one, and unbounded player growth is exactly what
+    // forces an enemy curve steep enough to make deep numbers unreadable. Simulate
+    // many waves by refreshing the WAVE allowance repeatedly (as the controller
+    // does) and check the RUN ledger still holds the line.
+    const s = battleState(41);
+    s.teamMods.player.bountyPct = 0.1;
+    const slayer = place(s, "berserker", "player", 200, 300);
+    const startMax = slayer.maxHp;
+    slayer.bountyRunBase = startMax;
+    for (let wave = 0; wave < 30; wave++) {
+      slayer.bountyWaveGain = 0; // as applyWaveStartBoons does
+      slayer.bountyBaseHp = slayer.maxHp;
+      for (let i = 0; i < 4; i++) {
+        const prey = place(s, "skeleton", "enemy", 200 + i, 350);
+        prey.moveSpeed = 0;
+        prey.damage = 0;
+        prey.hp = prey.maxHp = 5;
+        let guard = 0;
+        while (prey.state !== "dead" && guard < 300) {
+          stepSimulation(s);
+          guard++;
+        }
+      }
+    }
+    // Uncapped this would be ~1.1^120; the run ledger holds it to one doubling.
+    expect(slayer.maxHp).toBeGreaterThan(startMax);
+    expect(slayer.maxHp).toBeLessThanOrEqual(
+      startMax + Math.round(startMax * BOUNTY_TOTAL_CAP_FRAC)
     );
   });
 

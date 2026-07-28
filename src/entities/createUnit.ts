@@ -76,6 +76,8 @@ export function createUnit(
     cheatDeathReady: false,
     bountyWaveGain: 0,
     bountyBaseHp: 0,
+    bountyRunGain: 0,
+    bountyRunBase: 0,
     splitsSpawned: 0,
     rebornStage: 0,
     bossPhase: 0,

@@ -42,6 +42,7 @@ import {
 import { clamp, dir, dist } from "@/utils/math";
 import { getUnitDef } from "@/data/units";
 import { EXECUTE_THRESHOLD } from "@/data/boons";
+import { BOUNTY_TOTAL_CAP_FRAC } from "@/data/endless";
 import { createUnit, type ItemCarry } from "@/entities/createUnit";
 import {
   abilityCastTimeTicks,
@@ -600,14 +601,31 @@ function makeDamageDealer(
           const km = state.teamMods[source.team];
           if (km.bountyPct > 0) {
             // Percentage of the killer's OWN max HP, so it keeps pace with a deep
-            // run, but capped per wave: uncapped, a 40-body wave deep in a run
-            // would compound the warband into invulnerability. The counter is
-            // reset each wave by EndlessController.applyWaveStartBoons.
-            const cap = Math.round(source.bountyBaseHp * BOUNTY_WAVE_CAP_FRAC);
-            const room = Math.max(0, cap - source.bountyWaveGain);
-            const gain = Math.min(room, Math.round(source.maxHp * km.bountyPct));
+            // run, under TWO ceilings. The per-wave one stops a 40-body wave
+            // compounding the warband into invulnerability inside a single wave.
+            // The run-total one stops the same thing happening slowly across
+            // fifty of them — +25% a wave is still an exponential, and unbounded
+            // player growth is precisely what the endless curve cannot afford
+            // (see the curve preamble in data/endless.ts). Both are needed: the
+            // wave counter resets every wave, the run ledger never does.
+            const waveRoom = Math.max(
+              0,
+              Math.round(source.bountyBaseHp * BOUNTY_WAVE_CAP_FRAC) -
+                source.bountyWaveGain
+            );
+            const runRoom = Math.max(
+              0,
+              Math.round(source.bountyRunBase * BOUNTY_TOTAL_CAP_FRAC) -
+                source.bountyRunGain
+            );
+            const gain = Math.min(
+              waveRoom,
+              runRoom,
+              Math.round(source.maxHp * km.bountyPct)
+            );
             if (gain > 0) {
               source.bountyWaveGain += gain;
+              source.bountyRunGain += gain;
               source.maxHp += gain;
               source.hp += gain; // grow into the new max
             }

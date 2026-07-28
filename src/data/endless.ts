@@ -126,65 +126,94 @@ export function endlessWaveKind(wave: number): EndlessWaveKind {
 // — governed entirely by the growth RATE at the death point. Get that wrong and
 // no amount of levelling, gear or good boon picks moves the ending wave, which
 // is exactly the "I hit a wall at 40 and nothing helps" report that prompted the
-// 2026-07-28 retune: the old curve's L′ at wave 40 bought ONE wave per doubling.
+// first retune.
 //
-// Hence the shape below — a shallow, genuinely exponential stretch (where the
-// variance lives, so a strong run pulls meaningfully ahead) followed by a late,
-// slowly accelerating closer that guarantees every run still ends.
+// WHY THIS IS NOW A RATE CURVE, NOT A CLOSER. Every previous version of this file
+// ended with an accelerating "closer" whose growth rate climbed without limit,
+// and the justification was always the same: a boon arrives every wave, so
+// against any FIXED rate a stacked build eventually wins outright and the run
+// never ends. That was TRUE — of an unbounded boon economy. It is no longer the
+// economy we have. Every boon completes at a hard rank cap, the two rate boons
+// have `capPct`, Bounty Hunter has BOUNTY_TOTAL_CAP_FRAC, and one legendary plus
+// one mythic is the entire deep allowance (see boons.ts). Total player power is
+// therefore BOUNDED: a finished warband stops growing, and any positive enemy
+// rate then ends the run on its own.
+//
+// That is what buys the readable numbers. The old accelerating closer reached
+// ×7.8e13 by wave 88 — past the point where enemy HP is even an exact integer —
+// purely to out-run a player who could grow forever. Against a bounded player a
+// gentle rate suffices, and wave 100 lands around ×30 instead: a boss with tens
+// of thousands of HP, a number you can read off the bar.
+//
+// THE INVARIANT THAT REPLACES IT: player power must stay bounded. Any new boon
+// (or item, or kit) that grants SUSTAINED per-wave growth with no ceiling breaks
+// the termination argument outright and the immortal-run hole re-opens — this
+// mode has fallen into it twice. Cap it at the source; do not answer it here by
+// steepening the curve. See NOTES 4l.
 
-/** Base per-wave compounding.
- *
- *  **The PRODUCT of these two sets how deep runs go; the SPLIT between them sets
- *  how those runs END.** They were 1.045 hp / 1.031 dmg, which by wave 100 left
- *  the horde ×78 tankier but only ×20 deadlier — four times harder to kill than
- *  it was to survive. That lopsidedness is why deep runs died on the stall clock,
- *  unable to chew through a wave, rather than being overrun: enemies out-tanked
- *  the warband's DPS long before they could actually threaten it.
- *
- *  Now balanced. 1.038 × 1.038 = 1.07744 against the old 1.045 × 1.031 = 1.07740
- *  — the same combined growth to within 0.005%, so the difficulty curve and the
- *  depth a run reaches are unchanged by construction; only the manner of death
- *  moves. Keep them equal, and change the PRODUCT (not one side) if you ever want
- *  to move the reach odds. */
-export const ENDLESS_HP_GROWTH = 1.038;
-export const ENDLESS_DMG_GROWTH = 1.038;
+/** Per-wave growth rate of the warm-up, waves 1..ENDLESS_RAMP_START. Waves this
+ *  early are a warm-up on purpose: endless unlocks mid-progression and a fresh,
+ *  ungeared warband has to be able to find its feet. Deliberately left at the
+ *  previous curve's opening rate so the first ten waves are unchanged. */
+export const ENDLESS_RATE_EARLY = 0.035;
 
-/** Where the closer starts to bite — the knob that sets roughly WHERE THE MEDIAN
- *  RUN ENDS. Earlier lowers the median, later raises it. */
-export const ENDLESS_SURGE_START = 22;
+/** The hardest the curve ever climbs, reached at ENDLESS_PEAK_WAVE — THE KNOB
+ *  THAT SETS THE MEDIAN. This is the mid-game squeeze that the last curve did not
+ *  have: it cruised flat to wave 22 and then fell off a cliff, so a strong run
+ *  felt like nothing was happening right up until everything did. */
+export const ENDLESS_RATE_PEAK = 0.055;
 
-/** How fast the closer's growth rate itself accelerates — the knob that sets THE
- *  SPREAD. Small K = a long tail where a great boon stack goes deep; large K =
- *  everyone dies on the same wave no matter how strong they are. The old curve's
- *  effective K was ~4× this, which is what collapsed the distribution into a wall
- *  (37 of 40 sweep seeds inside waves 38–45). Calibration targets, read off
- *  `endlessSweep`'s curve table: L′ ≈ 0.06–0.09 at the median (8–11 waves per
- *  doubling), L′ ≈ 0.25–0.35 at the p95 (2–3 waves per doubling). */
-export const ENDLESS_SURGE_K = 0.013;
+/** The rate the curve settles to past ENDLESS_TAPER_END and keeps forever — THE
+ *  KNOB THAT SETS THE TAIL, and with it the odds of reaching the capstone. It is
+ *  also what guarantees termination, so it must stay strictly positive and
+ *  comfortably above zero: a bounded warband loses to any constant drain, but the
+ *  smaller this is the longer that takes. At 0.026 per axis a completed build
+ *  buys roughly 13 waves per doubling of banked surplus. */
+export const ENDLESS_RATE_SUSTAIN = 0.026;
+
+/** Where the ramp out of the warm-up begins, where it peaks, and where it has
+ *  finished tapering to the sustain rate. Moving these shifts WHEN the mid-game
+ *  squeeze is felt without changing how hard it squeezes. */
+export const ENDLESS_RAMP_START = 10;
+export const ENDLESS_PEAK_WAVE = 32;
+export const ENDLESS_TAPER_END = 55;
+
+/** Per-axis log growth rate for the step INTO `wave` — a warm-up plateau, a
+ *  linear ramp to the peak, a linear taper, then flat forever. Piecewise-linear
+ *  on purpose: the rate itself is what the player feels, so it is the thing that
+ *  should be smooth and legible, not the multiplier it integrates to. */
+export function endlessWaveGrowthRate(wave: number): number {
+  if (wave <= ENDLESS_RAMP_START) return ENDLESS_RATE_EARLY;
+  if (wave <= ENDLESS_PEAK_WAVE) {
+    const t = (wave - ENDLESS_RAMP_START) / (ENDLESS_PEAK_WAVE - ENDLESS_RAMP_START);
+    return ENDLESS_RATE_EARLY + (ENDLESS_RATE_PEAK - ENDLESS_RATE_EARLY) * t;
+  }
+  if (wave <= ENDLESS_TAPER_END) {
+    const t = (wave - ENDLESS_PEAK_WAVE) / (ENDLESS_TAPER_END - ENDLESS_PEAK_WAVE);
+    return ENDLESS_RATE_PEAK + (ENDLESS_RATE_SUSTAIN - ENDLESS_RATE_PEAK) * t;
+  }
+  return ENDLESS_RATE_SUSTAIN;
+}
 
 /** Per-wave stat multipliers for spawned enemies, applied at spawn exactly like
  *  the Depths per-floor multipliers.
  *
- *  A true exponential × a super-exponential closer past ENDLESS_SURGE_START.
- *  There is deliberately no per-cycle `step` term any more: a constant exponential
- *  already makes each cycle harder, and the old step put a visible sawtooth into
- *  the difficulty (wave 6 jumped 9.4% while wave 7 rose 4.0%). A cycle boundary is
- *  marked by its boss wave now, not by a stat jump.
+ *  HP and damage move together, deliberately. The SPLIT between them sets how
+ *  runs end (they were 1.045/1.031, which left the horde four times harder to
+ *  kill than to survive, so deep runs died on the stall clock rather than being
+ *  overrun); the PRODUCT sets how deep runs go. Keep them equal and move the
+ *  rates above if you want to move the depth.
  *
- *  WHY THE CLOSER MUST BE SUPER-EXPONENTIAL: a boon arrives every single wave, so
- *  against any FIXED growth rate a stacked multiplicative build eventually wins
- *  outright — an earlier curve produced literally immortal 500+-wave runs. A rate
- *  that itself keeps climbing always wins in the end. An endless run must always
- *  end; it just shouldn't end on the same wave for everyone. */
+ *  There is also deliberately no per-cycle `step` term: a constant exponential
+ *  already makes each cycle harder, and the old step put a visible sawtooth into
+ *  the difficulty. A cycle boundary is marked by its boss wave, not a stat jump. */
 export function endlessWaveStatMultipliers(wave: number): { hp: number; dmg: number } {
-  const over = Math.max(0, wave - ENDLESS_SURGE_START);
-  // Triangular exponent: surge(w)/surge(w−1) === exp(K·over) exactly, so the
-  // per-wave growth rate is a clean linear ramp with no discretization artifact.
-  const surge = Math.exp((ENDLESS_SURGE_K * over * (over + 1)) / 2);
-  return {
-    hp: Math.pow(ENDLESS_HP_GROWTH, wave - 1) * surge,
-    dmg: Math.pow(ENDLESS_DMG_GROWTH, wave - 1) * surge,
-  };
+  // Summed rather than closed-form: the rate is piecewise-linear over INTEGER
+  // waves, so this is the exact integral, and 100 additions per spawn is free.
+  let exponent = 0;
+  for (let w = 2; w <= wave; w++) exponent += endlessWaveGrowthRate(w);
+  const mult = Math.exp(exponent);
+  return { hp: mult, dmg: mult };
 }
 
 // -- Boon value scaling -------------------------------------------------------
@@ -209,6 +238,16 @@ export function endlessBoonDefenseScale(wave: number): number {
 export function endlessBoonOffenseScale(wave: number): number {
   return endlessWaveStatMultipliers(wave).hp;
 }
+
+/** Bounty Hunter's RUN-TOTAL ceiling: the most max HP a single unit may ever gain
+ *  from bounties, as a fraction of its max HP at the run's first wave.
+ *
+ *  The per-wave cap (BOUNTY_WAVE_CAP_FRAC) alone bounds nothing — +25% a wave IS
+ *  exponential growth, just a politer exponential, and unbounded player growth is
+ *  exactly what forces a curve steep enough to make deep-wave numbers unreadable.
+ *  This is the second half of that cap and the reason the boon can stay generous
+ *  early. See the curve preamble above. */
+export const BOUNTY_TOTAL_CAP_FRAC = 1.0;
 
 /** Fodder budget for a wave (the length dial; the concurrent cap paces it). Much
  *  smaller than a Depths FLOOR budget — a wave is a bite-sized skirmish the 4

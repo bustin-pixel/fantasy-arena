@@ -39,10 +39,16 @@ import {
 } from "@/data/depths";
 import {
   BOONS,
+  boonCopiesOwned,
   boonDescription,
+  boonIntStep,
+  boonMaxStacks,
+  boonSlotsUsed,
+  boonStackStep,
   rollBoonOffers,
   type BoonDef,
   type BoonRarity,
+  type BoonStackStep,
   type TeamModField,
 } from "@/data/boons";
 import {
@@ -77,20 +83,26 @@ const SPAWN_Y = 18;
  *  spent AND the field is empty. */
 type WavePhase = "telegraph" | "spawning" | "clearing" | "intermission";
 
-/** A boon offer surfaced to the UI. */
+/** A boon offer surfaced to the UI. `description` is this RANK's own share of the
+ *  boon, not the completed thing — what you are buying, not what you'd end up
+ *  with. `rank`/`maxRank` let the card say which of the two it is. */
 export interface BoonOffer {
   id: string;
   name: string;
   rarity: BoonRarity;
   description: string;
+  rank: number;
+  maxRank: number;
 }
 
-/** A tally row for the "your boons" strip. */
+/** A tally row for the "your boons" strip. `count` of `maxRank` ranks bought —
+ *  equal means the boon is complete and will never be offered again. */
 export interface BoonTally {
   id: string;
   name: string;
   rarity: BoonRarity;
   count: number;
+  maxRank: number;
 }
 
 /** Read-model handed to the React layer each snapshot. */
@@ -112,6 +124,12 @@ export interface EndlessStatus {
   /** True only at the intermission immediately AFTER the capstone fell, i.e.
    *  the one moment the claim/continue choice is offered. */
   atFinalWaveChoice: boolean;
+  /** The exclusive deep-tier slots this run has spent. A run may take ONE
+   *  legendary and ONE mythic boon, ever; once taken, that whole tier stops being
+   *  offered. Surfaced so the pick overlay can say so rather than leaving the
+   *  player wondering why the gold cards dried up. */
+  legendarySlotUsed: boolean;
+  mythicSlotUsed: boolean;
 }
 
 export class EndlessController {
@@ -165,8 +183,14 @@ export class EndlessController {
   // -- Legendary deep-tier boons -------------------------------------------------
   /** Ascendant: total per-wave compounding rate banked (0 = unowned). Applied
    *  again at every wave start, which is what makes it a RATE rather than a level
-   *  and gives a strong run its tail. */
+   *  and gives a strong run its tail — until `ascendantAccruedPct` reaches
+   *  `ascendantCapPct`, at which point the warband is as grown as it will ever be.
+   *  That ceiling is load-bearing, not flavour: it is what makes total player
+   *  power finite, and a finite player is the only reason the wave curve can be
+   *  gentle enough to keep deep-run numbers readable. See data/endless.ts. */
   private ascendantPerWave = 0;
+  private ascendantCapPct = 0;
+  private ascendantAccruedPct = 0;
   /** Warlord's Horn: read + cleared by MatchController's endless branch each wave
    *  (spellChargeUsed lives on the controller, out of reach from here). */
   spellRearmPending = false;
@@ -258,6 +282,7 @@ export class EndlessController {
   }
 
   status(): EndlessStatus {
+    const slots = boonSlotsUsed(this.picks);
     return {
       wave: this.wave,
       wavesCleared: this.wavesCleared,
@@ -268,7 +293,9 @@ export class EndlessController {
               // Described against the wave this pick OPENS, so a scaled boon's
               // card quotes what it will actually be worth. BoonOffer.description
               // is already a plain string, so no UI change is needed.
-              offers: this.offers.map((id) => toOffer(id, this.wave + 1)),
+              offers: this.offers.map((id) =>
+                toOffer(id, this.wave + 1, boonCopiesOwned(this.picks, id))
+              ),
             }
           : null,
       boonsPicked: this.boonTally(),
@@ -280,6 +307,8 @@ export class EndlessController {
       completedFinalWave: this.completedFinalWave,
       atFinalWaveChoice:
         this.phase === "intermission" && this.wavesCleared === ENDLESS_FINAL_WAVE,
+      legendarySlotUsed: slots.legendary,
+      mythicSlotUsed: slots.mythic,
     };
   }
 
@@ -288,7 +317,7 @@ export class EndlessController {
     for (const id of this.picks) counts.set(id, (counts.get(id) ?? 0) + 1);
     return [...counts.entries()].map(([id, count]) => {
       const b = BOONS[id];
-      return { id, name: b.name, rarity: b.rarity, count };
+      return { id, name: b.name, rarity: b.rarity, count, maxRank: boonMaxStacks(b) };
     });
   }
 
@@ -492,7 +521,7 @@ export class EndlessController {
       this.wave,
       this.rng,
       hasDead,
-      new Set(this.picks),
+      this.picks,
       this.hasSpell
     );
     this.phase = "intermission";
@@ -521,7 +550,7 @@ export class EndlessController {
       this.wave,
       this.rng,
       hasDead,
-      new Set(this.picks),
+      this.picks,
       this.hasSpell
     );
     return true;
@@ -553,7 +582,8 @@ export class EndlessController {
     const boon = BOONS[this.offers[offerIndex]];
     if (!boon) return false;
 
-    this.applyBoon(state, boon);
+    // Which RANK this copy is decides how much of the boon it buys.
+    this.applyBoon(state, boon, boonStackStep(boon, boonCopiesOwned(this.picks, boon.id)));
     this.picks.push(boon.id);
     this.offers = null;
     this.wave += 1;
@@ -563,49 +593,62 @@ export class EndlessController {
 
   // -- Boon application -------------------------------------------------------
 
-  private applyBoon(state: SimState, boon: BoonDef): void {
+  /** Apply ONE RANK of a boon. `step` is that rank's share of the boon's headline
+   *  (see boonStackStep) — every number below is scaled by it, so three ranks of
+   *  Hardy add up to the +26% its card promises and there is no fourth.
+   *
+   *  The multiplicative fields drift a hair above the headline, because the
+   *  controller folds each rank separately ((1+.065)(1+.091)(1+.104) = 1.283 for a
+   *  1.26 headline) rather than solving for the exact product. Two percent on a
+   *  bounded total is not worth the arithmetic; boonStackSummary mirrors the same
+   *  folds so the panel and the sim never disagree about what you own. */
+  private applyBoon(state: SimState, boon: BoonDef, step: BoonStackStep): void {
+    const f = step.frac;
     for (const eff of boon.effects) {
       switch (eff.type) {
         case "teamMod":
-          foldTeamMod(state.teamMods.player, eff.field, eff.value);
+          foldTeamMod(state.teamMods.player, eff.field, eff.value * f);
           break;
         case "maxHp":
-          this.applyMaxHp(state, eff.pct);
+          this.applyMaxHp(state, eff.pct * f);
           break;
         case "intermissionHeal":
           this.intermissionHealPct = Math.min(
             0.9,
-            this.intermissionHealPct + eff.addPct
+            this.intermissionHealPct + eff.addPct * f
           );
           break;
         // The wave-scaled family: record the UNSCALED base; applyWaveStartBoons
         // rebuilds the live value against the current wave's curve.
         case "regen":
-          this.regenPerSecBase += eff.hpPerSec;
+          this.regenPerSecBase += eff.hpPerSec * f;
           break;
         case "waveShield":
-          this.shieldPerWaveBase += eff.amount;
+          this.shieldPerWaveBase += eff.amount * f;
           break;
         case "revive":
+          // Never rank-scaled: half a revive is not a thing, and the boon that
+          // carries this is the force-offered one that pays full value every time.
           this.reviveLowest(state, eff.hpPct);
           break;
         // --- slice-2 proc / mechanic boons ---
         case "execute":
-          state.teamMods.player.executeBonus += eff.bonus;
+          state.teamMods.player.executeBonus += eff.bonus * f;
           break;
         case "thorns":
-          state.teamMods.player.thornsFrac += eff.frac;
+          state.teamMods.player.thornsFrac += eff.frac * f;
           break;
         case "killHeal":
-          this.killHealBase += eff.amount; // wave-scaled at wave start
+          this.killHealBase += eff.amount * f; // wave-scaled at wave start
           break;
         case "bounty":
           // Bounty Hunter grants PERMANENT max HP per kill, so it is the one flat
           // boon that must NOT ride the enemy curve: scaled naively a wave-70 kill
           // would grant ~150 max HP, and 40 of them ~6,000, compounding forever —
           // the exact runaway the deep-end backstop exists to prevent. It scales
-          // off the killer's OWN max HP instead, capped per wave in dealDamage.
-          state.teamMods.player.bountyPct += eff.pctOfMax;
+          // off the killer's OWN max HP instead, capped per wave AND per run in
+          // dealDamage (the per-wave cap alone is still an exponential).
+          state.teamMods.player.bountyPct += eff.pctOfMax * f;
           break;
         case "overheal":
           state.teamMods.player.overheal = true;
@@ -617,7 +660,7 @@ export class EndlessController {
           state.teamMods.player.critEveryNth = eff.everyNth;
           break;
         case "rangedLifesteal":
-          state.teamMods.player.rangedLifesteal += eff.frac;
+          state.teamMods.player.rangedLifesteal += eff.frac * f;
           break;
         case "rhythm":
           this.rhythmActive = true;
@@ -625,28 +668,50 @@ export class EndlessController {
         case "momentum":
           this.momentumActive = true;
           break;
-        case "onHitRider":
+        case "onHitRider": {
           // Base only — applyWaveStartBoons rebuilds teamMods.onHitRiders so a
-          // rider's flat damagePerTick tracks the wave.
-          this.riderBase.push({
-            effectType: eff.effectType,
-            everyNth: eff.everyNth,
-            durationSec: eff.durationSec,
-            magnitude: eff.magnitude,
-            damagePerTick: eff.damagePerTick,
-            tickIntervalSec: eff.tickIntervalSec,
-          });
+          // rider's flat damagePerTick tracks the wave. A second RANK deepens the
+          // rider it already owns rather than pushing a duplicate: two entries
+          // with the same cadence would fire twice per proc, which is a different
+          // (and much stronger) boon than the card describes.
+          const existing = this.riderBase.find(
+            (r) => r.effectType === eff.effectType && r.everyNth === eff.everyNth
+          );
+          if (existing && eff.damagePerTick != null) {
+            existing.damagePerTick = (existing.damagePerTick ?? 0) + eff.damagePerTick * f;
+          } else if (!existing) {
+            this.riderBase.push({
+              effectType: eff.effectType,
+              everyNth: eff.everyNth,
+              durationSec: eff.durationSec,
+              magnitude: eff.magnitude,
+              damagePerTick:
+                eff.damagePerTick == null ? undefined : eff.damagePerTick * f,
+              tickIntervalSec: eff.tickIntervalSec,
+            });
+          }
           break;
-        case "waveSummon":
-          this.summons.push({ defId: eff.defId, count: eff.count });
+        }
+        case "waveSummon": {
+          // Whole bodies only: the rank's share is rounded off the running total
+          // so N ranks summon exactly the headline count, never N+1.
+          const add = boonIntStep(eff.count, step);
+          if (add > 0) {
+            const owned = this.summons.find((s) => s.defId === eff.defId);
+            if (owned) owned.count += add;
+            else this.summons.push({ defId: eff.defId, count: add });
+          }
           break;
+        }
         // --- legendary deep tier ---
         case "ascendant":
           // The base lands immediately; the per-wave part is re-applied at every
-          // subsequent wave start (see applyWaveStartBoons).
-          this.applyMaxHp(state, eff.basePct);
-          foldTeamMod(state.teamMods.player, "dmgMult", eff.basePct);
-          this.ascendantPerWave += eff.perWavePct;
+          // subsequent wave start (see applyWaveStartBoons) until it has accrued
+          // its cap, which is what keeps total player power finite.
+          this.applyMaxHp(state, eff.basePct * f);
+          foldTeamMod(state.teamMods.player, "dmgMult", eff.basePct * f);
+          this.ascendantPerWave += eff.perWavePct * f;
+          this.ascendantCapPct += eff.capPct * f;
           break;
         case "spellRecharge":
           this.spellRechargeOwned = true;
@@ -657,13 +722,13 @@ export class EndlessController {
           if (eff.all) this.phoenixAll = true;
           break;
         case "maxHpRend":
-          state.teamMods.player.maxHpRend += eff.frac;
+          state.teamMods.player.maxHpRend += eff.frac * f;
           break;
         case "siege":
           this.siegePctPer30Sec = eff.pctPer30Sec;
           break;
         case "killStack":
-          this.killStackPct += eff.dmgPct;
+          this.killStackPct += eff.dmgPct * f;
           break;
       }
     }
@@ -702,10 +767,20 @@ export class EndlessController {
     const regenPerSec = this.regenPerSecBase * defScale;
 
     // Ascendant: the compounding tick. Applied every wave, so owning it raises
-    // the warband's growth RATE rather than its level.
+    // the warband's growth RATE rather than its level — but only until it has
+    // paid out `ascendantCapPct` in total. After that the tick is a no-op and the
+    // warband is finished growing while the horde is not, which is exactly how an
+    // endless run is guaranteed to end now that the curve itself is gentle.
     if (this.ascendantPerWave > 0) {
-      this.applyMaxHp(state, this.ascendantPerWave);
-      foldTeamMod(state.teamMods.player, "dmgMult", this.ascendantPerWave);
+      const grant = Math.min(
+        this.ascendantPerWave,
+        this.ascendantCapPct - this.ascendantAccruedPct
+      );
+      if (grant > 0) {
+        this.ascendantAccruedPct += grant;
+        this.applyMaxHp(state, grant);
+        foldTeamMod(state.teamMods.player, "dmgMult", grant);
+      }
     }
     // Warlord's Horn re-arms the commander's spell; MatchController reads this.
     if (this.spellRechargeOwned) this.spellRearmPending = true;
@@ -741,6 +816,9 @@ export class EndlessController {
       // Fresh Bounty Hunter allowance, measured against this wave's opening max HP.
       u.bountyWaveGain = 0;
       u.bountyBaseHp = u.maxHp;
+      // The RUN-total allowance is latched once, at the first wave, and never
+      // refreshed — that is the whole point of it (see BOUNTY_TOTAL_CAP_FRAC).
+      if (u.bountyRunBase === 0) u.bountyRunBase = u.maxHp;
       if (u.ability === "ambush") {
         u.ambushReady = true;
         applyEffect(
@@ -863,12 +941,17 @@ function foldTeamMod(mods: TeamMods, field: TeamModField, value: number): void {
   }
 }
 
-function toOffer(id: string, wave: number): BoonOffer {
+function toOffer(id: string, wave: number, copiesOwned: number): BoonOffer {
   const b = BOONS[id];
+  const maxRank = boonMaxStacks(b);
   return {
     id,
     name: b.name,
     rarity: b.rarity,
-    description: boonDescription(id, wave),
+    description: boonDescription(id, wave, boonStackStep(b, copiesOwned)),
+    // Clamped because Second Chance is force-offered and deliberately repeatable,
+    // so its copy count can outrun its (nominal) single rank.
+    rank: Math.min(copiesOwned + 1, maxRank),
+    maxRank,
   };
 }
