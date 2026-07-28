@@ -336,12 +336,40 @@ function stepItemUpkeep(
 // HP mutation helpers — the ONLY places hp changes.
 // ---------------------------------------------------------------------------
 
+/** Hard cap on how deep a damage REFLECT chain may recurse (see below). Set far
+ *  above any converging chain — a geometric reflect at the harshest fraction in
+ *  the game shrinks to nothing within ~13 bounces even from absurd damage — so
+ *  it only ever truncates a chain that would otherwise never terminate. */
+const MAX_DAMAGE_CHAIN = 24;
+
 function makeDamageDealer(
   state: SimState,
   makeKitCtx: (subject: Unit, damageContext?: boolean) => KitCtx,
   heal: (target: Unit, amount: number) => void
 ) {
-  return function dealDamage(target: Unit, amount: number, source: Unit): void {
+  // Re-entrancy depth. dealDamage recurses by design: a hit can fire the target's
+  // reflect (Thornmail / Squire's Plate thorns / Runeward feedback), and that
+  // reflect is itself a hit that can fire the ATTACKER's reflect. Fractional
+  // reflects shrink geometrically and converge, which is what the code below
+  // assumed — but a KIT reflect for a FLAT amount never shrinks. The Wildheart's
+  // 6-damage Thorned Hide traded against any thornsFrac ping-ponged until the
+  // call stack blew, hard-crashing the run (reachable in Endless via Thornmail,
+  // and in the Overgrowth via a legendary Squire's Plate). Cap the chain here
+  // rather than trusting every present and future kit to be fraction-based.
+  // Deterministic: a plain counter, no RNG, identical on every replay.
+  let depth = 0;
+
+  function dealDamage(target: Unit, amount: number, source: Unit): void {
+    if (depth >= MAX_DAMAGE_CHAIN) return;
+    depth++;
+    try {
+      resolveDamage(target, amount, source);
+    } finally {
+      depth--;
+    }
+  }
+
+  function resolveDamage(target: Unit, amount: number, source: Unit): void {
     if (target.state === "dead") return;
 
     const kit = getKit(target.defId);
@@ -656,7 +684,9 @@ function makeDamageDealer(
       const back = Math.round(shown * feedback.frac);
       if (back > 0) dealDamage(source, back, target);
     }
-  };
+  }
+
+  return dealDamage;
 }
 
 function makeHealer(
