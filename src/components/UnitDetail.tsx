@@ -491,6 +491,10 @@ export function UnitDetail({
             </div>
             {pickerSlot ? (
               <EquipPicker
+                // Remount per slot: the list scrolls now, and React would
+                // otherwise reuse the instance and carry one slot's scroll
+                // offset into the next.
+                key={pickerSlot}
                 slot={pickerSlot}
                 defId={defId}
                 items={items!}

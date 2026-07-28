@@ -3114,6 +3114,31 @@ body.modal-open .pager-nav {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  /* Cap the list instead of letting it set the modal's height. A full Bag can
+     hold 60+ pieces for one slot, which grew .detail-modal to ~4300px of
+     scroll for a 727px viewport. Four rows @53px + three 6px gaps = 230, plus
+     a gap and a half-row peek so a fifth item is visibly clipped — a hard cut
+     at exactly four reads as "the list ends here". Under five items this cap
+     is never reached, so short lists render exactly as before. */
+  max-height: 262px;
+  overflow-y: auto;
+  /* Don't hand the scroll off to .detail-modal on overscroll — on a phone
+     that yanks the whole panel the moment the list bottoms out. */
+  overscroll-behavior: contain;
+  /* Keep the bar off the row content rather than overlapping the text. */
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: #57432c transparent;
+}
+.equip-picker::-webkit-scrollbar {
+  width: 6px;
+}
+.equip-picker::-webkit-scrollbar-track {
+  background: transparent;
+}
+.equip-picker::-webkit-scrollbar-thumb {
+  background: #57432c;
+  border-radius: 3px;
 }
 .equip-picker-empty {
   font-size: 0.78rem;
