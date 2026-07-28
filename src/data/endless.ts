@@ -132,11 +132,22 @@ export function endlessWaveKind(wave: number): EndlessWaveKind {
 // variance lives, so a strong run pulls meaningfully ahead) followed by a late,
 // slowly accelerating closer that guarantees every run still ends.
 
-/** Base per-wave compounding. Deliberately reproduces the OLD linear×step curve
- *  to within a few percent through wave 25, so the early/mid game is untouched by
- *  the retune — only the deep end moves. */
-export const ENDLESS_HP_GROWTH = 1.045;
-export const ENDLESS_DMG_GROWTH = 1.031;
+/** Base per-wave compounding.
+ *
+ *  **The PRODUCT of these two sets how deep runs go; the SPLIT between them sets
+ *  how those runs END.** They were 1.045 hp / 1.031 dmg, which by wave 100 left
+ *  the horde ×78 tankier but only ×20 deadlier — four times harder to kill than
+ *  it was to survive. That lopsidedness is why deep runs died on the stall clock,
+ *  unable to chew through a wave, rather than being overrun: enemies out-tanked
+ *  the warband's DPS long before they could actually threaten it.
+ *
+ *  Now balanced. 1.038 × 1.038 = 1.07744 against the old 1.045 × 1.031 = 1.07740
+ *  — the same combined growth to within 0.005%, so the difficulty curve and the
+ *  depth a run reaches are unchanged by construction; only the manner of death
+ *  moves. Keep them equal, and change the PRODUCT (not one side) if you ever want
+ *  to move the reach odds. */
+export const ENDLESS_HP_GROWTH = 1.038;
+export const ENDLESS_DMG_GROWTH = 1.038;
 
 /** Where the closer starts to bite — the knob that sets roughly WHERE THE MEDIAN
  *  RUN ENDS. Earlier lowers the median, later raises it. */
