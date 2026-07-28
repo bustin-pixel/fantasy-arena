@@ -371,6 +371,59 @@ knowing:
   `onBeforeAttack`, not `onSpawn`). The Silencer's opening stealth is a
   pre-existing casualty of this — unrelated to the revamp.
 
+### 4g. Endless deep retune (2026-07-28) — the sweep baseline
+A playtester reported a hard wall at wave ~40 with "no ramp up after that".
+Confirmed, measured, and now reproducible: **`src/engine/__tests__/endlessSweep.test.ts`**
+(SWEEP-gated, sibling of `winrateSweep`). The 2026-07-11 retune's 320-run sweep
+lived in a scratchpad and was never committed, which is exactly why this
+regressed unnoticed — this one is in the repo. Shared scaffolding (gear ladder,
+player-power tiers, percentile helpers) lives in `__tests__/sweepKit.ts`.
+
+```bash
+SWEEP=1 SWEEP_ONLY=shape npm test -- endlessSweep   # curve table, instant, no sim
+SWEEP=1 npm test -- endlessSweep                    # full matrix + ceiling (~2 min)
+```
+
+**The diagnosis.** `endlessWaveStatMultipliers` multiplied its curve by a doubly
+exponential deep term, `(1.05 + 0.01·(w−25))^(w−25)`. What matters is not its
+size but its *slope*: the waves a stronger warband buys is `≈ ln2 / L′`, where
+`L′` is the local net growth rate at the death point.
+
+| wave | 25 | 30 | 35 | **40** | 45 |
+|---|---|---|---|---|---|
+| waves bought per 2× warband | 17.1 | 2.3 | 1.5 | **1.1** | 0.9 |
+
+At wave 40 **doubling your warband's power buys one wave**. That is the wall, and
+it's why no amount of levelling or gear helped.
+
+**Baseline (4 decks × 3 power tiers × 5 pick policies × 8 seeds, + a 40-seed
+ceiling probe).** Starting power moves the *floor* enormously and the *ceiling*
+not at all — fresh/balanced/first-pick medians ~11, maxed/elite/oracle ~41, but
+every cell lands in 36–41 regardless. The ceiling probe is the clearest picture:
+
+```
+median 41, p75 43, p90 44, max 77
+38,39,39,39,39,40,40,40,40,40,40,40,40,40,40,40,40,40,41,41,41,41,41,41,41,
+41,41,41,43,43,43,43,43,43,43,44,44,45,57,77
+```
+
+37 of 40 seeds inside 38–45. A distribution with no tail *is* a wall, whatever
+the median says.
+
+**Secondary findings the baseline surfaced:**
+- **13–25% of runs die to `timeout`, not to damage** — the run ends on the 120s
+  wave clock while the warband is still alive. But mean wave duration is only
+  13–23s, so this is not general slowness: it's a stalemate (nothing killable in
+  reach) and it reads to a player as a completely arbitrary death.
+- **A shipped crash**, found on the harness's first full run: a flat kit
+  damage-reflect traded against fractional thorns recursed until the stack blew.
+  Fixed in `CombatSystem` (`MAX_DAMAGE_CHAIN`) — see the commit and the
+  `invariants.test.ts` regression. Reachable in the Overgrowth too, not just
+  Endless.
+- **Harness gotcha**: with the default `SWEEP_SEEDS=8`, `p90` and `max` are the
+  same order statistic. Read `p75` for the body of the distribution, or raise the
+  seed count.
+
 ### 5. The Depths spawns bypass the deploy() path
 `WaveController` (the PvE horde director) pushes monsters into `state.units`
 directly — no deck bookkeeping, no deployment records (waves rebuild
