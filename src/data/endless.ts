@@ -28,11 +28,44 @@ export const ENDLESS_FINAL_WAVE = 100;
 /** The whole warband is fielded at once (like Depths). */
 export const ENDLESS_PLAYER_ACTIVE = 4;
 
-/** Concurrent enemy cap — deliberately BELOW the Depths' 12. Endless gives the
- *  player no reserves (dead is dead), so the swarm must stay a fair 4-vs-N fight
- *  rather than a 4-vs-12 grind. The wave budget below is the length dial; this is
- *  the pressure dial. */
+/** Concurrent enemy cap at the start of a run — deliberately BELOW the Depths' 12.
+ *  Endless gives the player no reserves (dead is dead), so the early swarm must
+ *  stay a fair 4-vs-N fight rather than a 4-vs-12 grind. The wave budget below is
+ *  the length dial; this is the PRESSURE dial. */
 export const ENDLESS_ENEMY_ACTIVE = 8;
+
+/** …and what it grows to, deep in a run. THE OTHER HALF OF THE DIFFICULTY, and
+ *  the reason the stat curve gets to stay gentle.
+ *
+ *  A 4-unit warband fighting 8 at once is outnumbered 2:1; at 15 it is nearly
+ *  4:1, and being outnumbered is worth vastly more than the same pressure
+ *  delivered as bigger numbers on fewer bodies — combat here is Lanchester-ish, so
+ *  concentration beats magnitude. The sweep is blunt about it: a maxed warband
+ *  shrugged off a stat curve four ORDERS of magnitude steeper than this one and
+ *  ran to the harness cap, because 8 attackers simply cannot land enough hits per
+ *  second no matter how hard each one hits.
+ *
+ *  This is the honest way to make deep waves lethal while keeping every number on
+ *  screen readable: send more of them, not bigger ones. Raising this is also far
+ *  cheaper for the player to READ than another zero on an HP bar. */
+export const ENDLESS_ENEMY_ACTIVE_DEEP = 14;
+
+/** Waves over which the concurrent cap ramps from ENDLESS_ENEMY_ACTIVE to
+ *  ENDLESS_ENEMY_ACTIVE_DEEP. Starts after the warm-up so the opening waves are
+ *  untouched, and finishes about where the stat curve reaches its own peak. */
+export const ENDLESS_SWARM_START = 12;
+export const ENDLESS_SWARM_FULL = 55;
+
+/** Concurrent enemies allowed at `wave`. Whole bodies, so it steps rather than
+ *  slides — the player sees the horde thicken every few waves. */
+export function endlessEnemyActive(wave: number): number {
+  if (wave <= ENDLESS_SWARM_START) return ENDLESS_ENEMY_ACTIVE;
+  if (wave >= ENDLESS_SWARM_FULL) return ENDLESS_ENEMY_ACTIVE_DEEP;
+  const t = (wave - ENDLESS_SWARM_START) / (ENDLESS_SWARM_FULL - ENDLESS_SWARM_START);
+  return Math.round(
+    ENDLESS_ENEMY_ACTIVE + (ENDLESS_ENEMY_ACTIVE_DEEP - ENDLESS_ENEMY_ACTIVE) * t
+  );
+}
 
 /** Per-wave stalemate backstop (seconds). The clock resets to this at each wave
  *  start; running it out ends the run. NOTE this is a STALL timer, not a DPS
@@ -161,7 +194,7 @@ export const ENDLESS_RATE_EARLY = 0.035;
  *  THAT SETS THE MEDIAN. This is the mid-game squeeze that the last curve did not
  *  have: it cruised flat to wave 22 and then fell off a cliff, so a strong run
  *  felt like nothing was happening right up until everything did. */
-export const ENDLESS_RATE_PEAK = 0.055;
+export const ENDLESS_RATE_PEAK = 0.114;
 
 /** The rate the curve settles to past ENDLESS_TAPER_END and keeps forever — THE
  *  KNOB THAT SETS THE TAIL, and with it the odds of reaching the capstone. It is
@@ -169,7 +202,7 @@ export const ENDLESS_RATE_PEAK = 0.055;
  *  comfortably above zero: a bounded warband loses to any constant drain, but the
  *  smaller this is the longer that takes. At 0.026 per axis a completed build
  *  buys roughly 13 waves per doubling of banked surplus. */
-export const ENDLESS_RATE_SUSTAIN = 0.026;
+export const ENDLESS_RATE_SUSTAIN = 0.155;
 
 /** Where the ramp out of the warm-up begins, where it peaks, and where it has
  *  finished tapering to the sustain rate. Moving these shifts WHEN the mid-game
@@ -216,6 +249,56 @@ export function endlessWaveStatMultipliers(wave: number): { hp: number; dmg: num
   return { hp: mult, dmg: mult };
 }
 
+// -- How toughness is SPLIT between HP and mitigation -------------------------
+// The curve above says how tough a wave-N monster must be. It does NOT say that
+// the toughness has to be printed on the HP bar, and printing all of it there is
+// what made deep waves unreadable: a maxed warband only dies once the horde is
+// ~2000x its base stats, which on the bar alone means a boss with millions of HP.
+//
+// So most of it becomes DAMAGE MITIGATION instead. Effective toughness is
+// identical — `shownHpMult / damageTakenMult` is exactly the curve's multiplier,
+// so time-to-kill, pacing and every sweep number are unchanged — but the bar
+// reads in the tens of thousands where it used to read in the millions, and the
+// floating damage numbers shrink to match. Nothing about the FIGHT changes; only
+// the digits do.
+//
+// WHY THERE IS A FLOOR ON MITIGATION: damage is rounded to whole numbers at the
+// funnel. Push reduction far enough and an ordinary hit rounds to ZERO and the
+// monster becomes literally unkillable — so mitigation can only ever hide about
+// 40x of toughness, and anything past that has to go back onto the bar. That is a
+// hard engine constraint, not a tuning preference; lifting it means making damage
+// fractional first.
+//
+// KNOWN SIDE EFFECT: lifesteal and thorns are percentages of damage DEALT, and
+// dealt damage is now the mitigated number, so both are worth less against
+// heavily-resistant deep monsters than they were. That is a real balance shift
+// and the sweep is tuned with it in place.
+
+/** Exponent that splits the curve between the visible bar and hidden mitigation.
+ *  1.0 = all HP (the old behaviour), lower = more of it hidden as resistance.
+ *  Chosen so mitigation reaches its floor around the wave a strong run ends, which
+ *  is exactly where the numbers most needed shrinking. */
+export const ENDLESS_HP_SHOWN_POWER = 0.52;
+
+/** Least fraction of incoming damage a scaled monster may take — the rounding
+ *  floor described above. 0.025 is a 40x reduction. */
+export const ENDLESS_MIN_DAMAGE_TAKEN = 0.012;
+
+/** The curve's toughness for `wave`, split into what the bar shows and what the
+ *  monster resists. `shownHpMult / damageTakenMult` always equals the curve's own
+ *  multiplier, so this is presentation, not balance. */
+export function endlessWaveToughness(wave: number): {
+  shownHpMult: number;
+  damageTakenMult: number;
+} {
+  const total = endlessWaveStatMultipliers(wave).hp;
+  const damageTakenMult = Math.max(
+    ENDLESS_MIN_DAMAGE_TAKEN,
+    Math.pow(total, ENDLESS_HP_SHOWN_POWER - 1)
+  );
+  return { shownHpMult: total * damageTakenMult, damageTakenMult };
+}
+
 // -- Boon value scaling -------------------------------------------------------
 // Some boons are denominated in ABSOLUTE hp/damage (Bulwark's 60 HP shield,
 // Mending Aura's 3 HP/sec, Bloodfeast's 12 HP/kill, Venom Coating's 6 dmg/sec).
@@ -229,14 +312,32 @@ export function endlessWaveStatMultipliers(wave: number): { hp: number; dmg: num
 // but that is exactly right: it absorbs the same number of hits from enemies who
 // hit 3.7× harder.
 
+/** How closely an anchored boon FOLLOWS the curve, as an exponent on the wave
+ *  multiplier. This is not a cosmetic dial — it decides whether runs end at all.
+ *
+ *  At 1.0 an anchored boon is exactly curve-NEUTRAL: a Bulwark shield always
+ *  soaks the same number of enemy hits, at wave 5 and at wave 500, because both
+ *  sides of the comparison are the identical multiplier. A warband whose defence
+ *  is mostly anchored therefore cannot be out-scaled by ANY curve, however steep
+ *  or gentle — and the sweep proved it, with every seed at every power tier and
+ *  even the WORST drafting policy running to the harness cap and never dying.
+ *  Bounded multipliers were not enough on their own; this was the leak.
+ *
+ *  At 0.88 an anchored boon keeps almost all of its value (it still grows ~×12
+ *  by wave 100, versus ×30 for the horde) but gives up a little ground every
+ *  wave. That slow erosion is what turns "strong forever" into "strong for a
+ *  long time", and it is the pressure that actually ends a completed build's run.
+ *  Below ~0.8 the old "don't pick the flat ones late" trap comes back. */
+export const ENDLESS_ANCHOR_FOLLOW = 0.88;
+
 /** For values that SOAK incoming damage — shields, regen, heal-per-kill. */
 export function endlessBoonDefenseScale(wave: number): number {
-  return endlessWaveStatMultipliers(wave).dmg;
+  return Math.pow(endlessWaveStatMultipliers(wave).dmg, ENDLESS_ANCHOR_FOLLOW);
 }
 
 /** For values that must CHEW THROUGH enemy HP — poison and other flat damage. */
 export function endlessBoonOffenseScale(wave: number): number {
-  return endlessWaveStatMultipliers(wave).hp;
+  return Math.pow(endlessWaveStatMultipliers(wave).hp, ENDLESS_ANCHOR_FOLLOW);
 }
 
 /** Bounty Hunter's RUN-TOTAL ceiling: the most max HP a single unit may ever gain
@@ -254,8 +355,19 @@ export const BOUNTY_TOTAL_CAP_FRAC = 1.0;
  *  reserve-less units clear, heal from, then face a slightly bigger one. Rare and
  *  boss waves ignore this; their single unit spawns alone. */
 export function endlessWaveBudget(wave: number): number {
-  return Math.min(40, 5 + 2 * wave);
+  return Math.min(ENDLESS_BUDGET_MAX, 5 + 2 * wave);
 }
+
+/** The most a single fodder wave may ever be worth. Was 40, which saturated at
+ *  wave 18 — every fodder wave from there to infinity had an IDENTICAL body
+ *  count, and the only thing that ever changed again was the stat multiplier.
+ *  That is also why raising the concurrent cap alone did nothing: with 40 points
+ *  of monsters in the queue there were never 15 bodies to have on the field.
+ *
+ *  Now it keeps climbing to wave ~68. Together with endlessEnemyActive this makes
+ *  a deep wave genuinely a HORDE rather than the same eight monsters wearing
+ *  bigger numbers, and it is what lets the stat curve stay readable. */
+export const ENDLESS_BUDGET_MAX = 120;
 
 /** The dungeon a cycle draws its fodder pool + boss from. `rotation` is the
  *  per-run-shuffled DUNGEON_IDS; cycle c uses rotation[(c-1) % len]. */

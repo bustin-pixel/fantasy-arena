@@ -28,6 +28,7 @@ import { BOONS, type BoonEffect } from "@/data/boons";
 import {
   ENDLESS_WAVE_TIME_SEC,
   endlessWaveStatMultipliers,
+  endlessWaveToughness,
 } from "@/data/endless";
 import { TICK_RATE, secToTicks } from "@/utils/constants";
 import {
@@ -367,9 +368,19 @@ function playEndless({ seed, deck, tier, policy }: RunCfg): EndlessRunResult {
     }
     if (st.intermission) {
       const offers = st.intermission.offers.map((o) => o.id);
-      const idx = policy(offers, picks, st.wave);
-      picks.push(offers[idx] ?? offers[0]);
-      mc.pickBoon(idx);
+      if (offers.length === 0) {
+        // A deep run COMPLETES the boon pool — every boon at its rank cap, both
+        // deep-tier slots spent — and from there the intermission has nothing
+        // left to sell. Take the heal and press on. Without this the run stalls
+        // in an intermission it can never answer and every seed reports the same
+        // wave with cause `tickcap`, which reads exactly like a difficulty wall
+        // and is nothing of the kind.
+        mc.skipBoon();
+      } else {
+        const idx = policy(offers, picks, st.wave);
+        picks.push(offers[idx] ?? offers[0]);
+        mc.pickBoon(idx);
+      }
     }
     if (mc.wavesSurvived() >= MAX_WAVE) {
       hitMaxWave = true;
@@ -438,16 +449,26 @@ RUN("endless sweep", () => {
   it("prints the curve shape (no simulation — this is the approval table)", () => {
     const rows: Record<string, Record<string, string>> = {};
     let prev = endlessWaveStatMultipliers(1);
-    for (let w = 1; w <= 80; w++) {
+    // Runs past 80 all the way through the capstone and beyond: the table is the
+    // approval artifact for a retune, and it used to stop before the region the
+    // retune was actually about.
+    for (let w = 1; w <= 130; w++) {
       const m = endlessWaveStatMultipliers(w);
       const gHp = w === 1 ? 1 : m.hp / prev.hp;
       const gDmg = w === 1 ? 1 : m.dmg / prev.dmg;
       // Combined power growth — the quantity a boon pick has to beat each wave.
       const lPrime = Math.log(gHp * gDmg);
       if (w <= 12 || w % 5 === 0) {
+        // What the PLAYER sees is not the curve — most of a deep monster's
+        // toughness rides as mitigation, so the bar is far smaller than `hp`.
+        // A retune has to be approved on both: the fight comes from `hp`, the
+        // legibility complaint comes from `boss hp`.
+        const t = endlessWaveToughness(w);
         rows[`w${w}`] = {
           hp: m.hp < 1000 ? m.hp.toFixed(2) : m.hp.toExponential(2),
-          dmg: m.dmg < 1000 ? m.dmg.toFixed(2) : m.dmg.toExponential(2),
+          "boss hp": Math.round(3000 * t.shownHpMult).toLocaleString("en-US"),
+          "fodder hp": Math.round(60 * t.shownHpMult).toLocaleString("en-US"),
+          "takes dmg": `${(t.damageTakenMult * 100).toFixed(1)}%`,
           "hp growth": `${((gHp - 1) * 100).toFixed(1)}%`,
           "L'": lPrime.toFixed(3),
           "waves per 2x": lPrime > 0.001 ? (Math.LN2 / lPrime).toFixed(1) : "inf",

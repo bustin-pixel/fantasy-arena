@@ -31,6 +31,7 @@ import { DUNGEON_IDS, getDungeon } from "@/data/dungeons";
 import {
   BOUNTY_TOTAL_CAP_FRAC,
   ENDLESS_FINAL_WAVE,
+  ENDLESS_MIN_DAMAGE_TAKEN,
   ENDLESS_PEAK_WAVE,
   ENDLESS_RAMP_START,
   ENDLESS_RARE_POOL,
@@ -42,6 +43,7 @@ import {
   endlessBoonOffenseScale,
   endlessWaveGrowthRate,
   endlessWaveStatMultipliers,
+  endlessWaveToughness,
 } from "@/data/endless";
 import { getUnitDef } from "@/data/units";
 
@@ -735,12 +737,7 @@ describe("endless — the wave curve", () => {
     expect(ENDLESS_RATE_SUSTAIN).toBeGreaterThan(0);
   });
 
-  it("the multiplier climbs monotonically and stays a readable number", () => {
-    // THE COMPLAINT THIS FIXES: the previous curve reached x7.8e13 by wave 88 —
-    // past the point where enemy maxHp is even an exact integer — and hit
-    // Infinity by wave 349. Deep waves must stay numbers a player can read off
-    // an HP bar: a boss (~3000 base HP) in the tens of thousands, not the
-    // billions.
+  it("the multiplier climbs monotonically and never runs away", () => {
     let prev = 0;
     for (let w = 1; w <= 200; w++) {
       const m = endlessWaveStatMultipliers(w);
@@ -749,12 +746,35 @@ describe("endless — the wave curve", () => {
       expect(m.hp).toBe(m.dmg); // the axes move together, by design
       prev = m.hp;
     }
-    const atCapstone = endlessWaveStatMultipliers(ENDLESS_FINAL_WAVE).hp;
-    expect(atCapstone).toBeGreaterThan(15);
-    expect(atCapstone).toBeLessThan(60);
-    // Integer arithmetic stays exact by a wide margin, even for the fattest boss
-    // deep past the capstone (2^53 is where Math.round stops being trustworthy).
-    expect(endlessWaveStatMultipliers(200).hp * 10_000).toBeLessThan(2 ** 40);
+  });
+
+  it("splits toughness into a readable bar plus mitigation, losing nothing", () => {
+    // THE READABILITY COMPLAINT THIS FIXES. A maxed warband only dies once the
+    // horde is ~2000x its base stats — that is measured, not chosen — and printing
+    // all of it on the HP bar is what produced the unreadable deep numbers. Most
+    // of it rides as mitigation instead, so the bar shrinks by two orders of
+    // magnitude while the FIGHT is bit-for-bit identical.
+    for (let w = 1; w <= 150; w++) {
+      const t = endlessWaveToughness(w);
+      const raw = endlessWaveStatMultipliers(w).hp;
+      // The invariant that makes this presentation rather than balance.
+      expect(t.shownHpMult / t.damageTakenMult).toBeCloseTo(raw, 6);
+      expect(t.damageTakenMult).toBeGreaterThanOrEqual(ENDLESS_MIN_DAMAGE_TAKEN);
+      expect(t.damageTakenMult).toBeLessThanOrEqual(1);
+      expect(t.shownHpMult).toBeGreaterThanOrEqual(1);
+    }
+    // Wave 1 is untouched: full bar, no resistance.
+    expect(endlessWaveToughness(1).shownHpMult).toBeCloseTo(1, 9);
+    expect(endlessWaveToughness(1).damageTakenMult).toBeCloseTo(1, 9);
+    // Around where a strong run actually ends (~77), a ~3000 HP boss reads in the
+    // hundreds of thousands rather than the hundreds of millions.
+    const bossAt = (w: number) => 3000 * endlessWaveToughness(w).shownHpMult;
+    expect(bossAt(70)).toBeLessThan(400_000);
+    expect(bossAt(ENDLESS_FINAL_WAVE)).toBeLessThan(20_000_000);
+    // Integer arithmetic stays exact by a wide margin past any reachable wave
+    // (2^53 is where Math.round stops being trustworthy). No sweep run has ever
+    // passed ~125; this holds to 150 with orders of magnitude to spare.
+    expect(bossAt(150)).toBeLessThan(2 ** 53 / 1000);
   });
 
   it("the first ten waves are the same fight they always were", () => {

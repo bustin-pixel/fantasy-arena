@@ -262,76 +262,125 @@ const pctFine = (x: number): string => {
 const flat = (base: number, frac: number, scale: number): number =>
   Math.max(1, Math.round(base * frac * scale));
 
+/** HEADLINE VALUES — a completed boon, all ranks bought. THE tuning surface.
+ *
+ *  Gathered here rather than inlined because they are retuned as a SET: they have
+ *  to add up to a warband that the wave curve can still eventually out-grow, and
+ *  the sweep measures the sum, not any one line. The first pass at this economy
+ *  set them ~2.5x their old per-copy values and the ceiling probe was unambiguous
+ *  — every seed, every power tier, even the deliberately-bad `first` drafting
+ *  policy, ran to the harness cap without dying. A bounded warband still has to
+ *  be bounded by a number the curve can pass.
+ *
+ *  Rule of thumb when retuning: a COMPLETE build is worth roughly e^4 combined
+ *  (offence x defence) on top of meta progression, and the curve reaches that
+ *  around wave 75. Move these and you move the median; re-run the ceiling probe.
+ *  Each is spent over `maxStacks` ranks (25/35/40), so a first rank is a quarter
+ *  of what you see here. */
+const H = {
+  hardy: 0.12,
+  sharpened: 0.12,
+  quickened: 0.12,
+  fleetfoot: 0.12,
+  stoneskin: 0.1,
+  fieldMedicine: 0.18,
+  mendingAura: 4,
+  bulwark: 75,
+  vampirism: 0.1,
+  warBanner: 0.24,
+  juggernaut: 0.24,
+  marksmans: 0.1,
+  venom: 6,
+  bloodfeast: 15,
+  thornmail: 0.22,
+  recklessDmg: 0.34,
+  recklessTax: 0.17,
+  kennel: 2,
+  titansHp: 0.34,
+  titansDmg: 0.12,
+  bloodlustSpeed: 0.24,
+  bloodlustLifesteal: 0.12,
+  aegis: 0.22,
+  overwhelm: 0.4,
+  executioner: 0.45,
+  bounty: 0.0018,
+  warMachine: 2,
+  soulHarvest: 0.012,
+} as const;
+
 export const BOONS: Record<string, BoonDef> = {
   // -- Common: one small stat bump each. -----------------------------------
-  // Every number below is a COMPLETED boon — three ranks of Hardy is +26% max HP,
-  // and there is no fourth. They read bigger than the old per-copy values because
-  // they replaced an unbounded stack: the old +10% was per copy, forever.
+  // Every number below is a COMPLETED boon — three ranks of Hardy is +12% max HP,
+  // and there is no fourth. That is the same figure the old single copy gave, but
+  // where the old one was +10% PER COPY FOREVER, this one is the whole account.
   hardy: {
     id: "hardy",
     name: "Hardy",
     rarity: "common",
     maxStacks: 3,
-    description: "+26% max HP to the whole warband (and heal the gain).",
+    description: `+${asPct(H.hardy)} max HP to the whole warband (and heal the gain).`,
     describe: (_w, s) =>
-      `+${pctFine(0.26 * s.frac)} max HP to the whole warband (and heal the gain).`,
-    effects: [{ type: "maxHp", pct: 0.26 }],
+      `+${pctFine(H.hardy * s.frac)} max HP to the whole warband (and heal the gain).`,
+    effects: [{ type: "maxHp", pct: H.hardy }],
   },
   sharpened: {
     id: "sharpened",
     name: "Sharpened Steel",
     rarity: "common",
     maxStacks: 3,
-    description: "+26% attack damage to the whole warband.",
-    describe: (_w, s) => `+${pctFine(0.26 * s.frac)} attack damage to the whole warband.`,
-    effects: [{ type: "teamMod", field: "dmgMult", value: 0.26 }],
+    description: `+${asPct(H.sharpened)} attack damage to the whole warband.`,
+    describe: (_w, s) =>
+      `+${pctFine(H.sharpened * s.frac)} attack damage to the whole warband.`,
+    effects: [{ type: "teamMod", field: "dmgMult", value: H.sharpened }],
   },
   quickened: {
     id: "quickened",
     name: "Quickened",
     rarity: "common",
     maxStacks: 3,
-    description: "+26% attack speed to the whole warband.",
-    describe: (_w, s) => `+${pctFine(0.26 * s.frac)} attack speed to the whole warband.`,
-    effects: [{ type: "teamMod", field: "atkDelayMult", value: 0.26 }],
+    description: `+${asPct(H.quickened)} attack speed to the whole warband.`,
+    describe: (_w, s) =>
+      `+${pctFine(H.quickened * s.frac)} attack speed to the whole warband.`,
+    effects: [{ type: "teamMod", field: "atkDelayMult", value: H.quickened }],
   },
   fleetfoot: {
     id: "fleetfoot",
     name: "Fleetfoot",
     rarity: "common",
     maxStacks: 3,
-    description: "+26% move speed to the whole warband.",
-    describe: (_w, s) => `+${pctFine(0.26 * s.frac)} move speed to the whole warband.`,
-    effects: [{ type: "teamMod", field: "moveSpeedMult", value: 0.26 }],
+    description: `+${asPct(H.fleetfoot)} move speed to the whole warband.`,
+    describe: (_w, s) =>
+      `+${pctFine(H.fleetfoot * s.frac)} move speed to the whole warband.`,
+    effects: [{ type: "teamMod", field: "moveSpeedMult", value: H.fleetfoot }],
   },
   stoneskin: {
     id: "stoneskin",
     name: "Stoneskin",
     rarity: "common",
     maxStacks: 3,
-    description: "The warband takes 20% less damage.",
-    describe: (_w, s) => `The warband takes ${pctFine(0.2 * s.frac)} less damage.`,
-    effects: [{ type: "teamMod", field: "damageTakenMult", value: 0.2 }],
+    description: `The warband takes ${asPct(H.stoneskin)} less damage.`,
+    describe: (_w, s) => `The warband takes ${pctFine(H.stoneskin * s.frac)} less damage.`,
+    effects: [{ type: "teamMod", field: "damageTakenMult", value: H.stoneskin }],
   },
   field_medicine: {
     id: "field_medicine",
     name: "Field Medicine",
     rarity: "common",
     maxStacks: 3,
-    description: "Heal an extra 36% of missing HP between waves.",
+    description: `Heal an extra ${asPct(H.fieldMedicine)} of missing HP between waves.`,
     describe: (_w, s) =>
-      `Heal an extra ${pctFine(0.36 * s.frac)} of missing HP between waves.`,
-    effects: [{ type: "intermissionHeal", addPct: 0.36 }],
+      `Heal an extra ${pctFine(H.fieldMedicine * s.frac)} of missing HP between waves.`,
+    effects: [{ type: "intermissionHeal", addPct: H.fieldMedicine }],
   },
   mending_aura: {
     id: "mending_aura",
     name: "Mending Aura",
     rarity: "common",
     maxStacks: 3,
-    description: "The warband regenerates 8 HP/sec in combat.",
+    description: `The warband regenerates ${H.mendingAura} HP/sec in combat.`,
     describe: (w, s) =>
-      `The warband regenerates ${flat(8, s.frac, endlessBoonDefenseScale(w))} HP/sec in combat.`,
-    effects: [{ type: "regen", hpPerSec: 8 }],
+      `The warband regenerates ${flat(H.mendingAura, s.frac, endlessBoonDefenseScale(w))} HP/sec in combat.`,
+    effects: [{ type: "regen", hpPerSec: H.mendingAura }],
   },
 
   // -- Rare: one meaningful mechanic each. ---------------------------------
@@ -340,38 +389,40 @@ export const BOONS: Record<string, BoonDef> = {
     name: "Bulwark",
     rarity: "rare",
     maxStacks: 3,
-    description: "The warband starts each wave with a 155 HP shield.",
+    description: `The warband starts each wave with a ${H.bulwark} HP shield.`,
     describe: (w, s) =>
-      `The warband starts each wave with a ${flat(155, s.frac, endlessBoonDefenseScale(w))} HP shield.`,
-    effects: [{ type: "waveShield", amount: 155 }],
+      `The warband starts each wave with a ${flat(H.bulwark, s.frac, endlessBoonDefenseScale(w))} HP shield.`,
+    effects: [{ type: "waveShield", amount: H.bulwark }],
   },
   vampirism: {
     id: "vampirism",
     name: "Vampirism",
     rarity: "rare",
     maxStacks: 3,
-    description: "Melee attacks heal for 20% of the damage dealt.",
-    describe: (_w, s) => `Melee attacks heal for ${pctFine(0.2 * s.frac)} of the damage dealt.`,
-    effects: [{ type: "teamMod", field: "lifestealBonus", value: 0.2 }],
+    description: `Melee attacks heal for ${asPct(H.vampirism)} of the damage dealt.`,
+    describe: (_w, s) =>
+      `Melee attacks heal for ${pctFine(H.vampirism * s.frac)} of the damage dealt.`,
+    effects: [{ type: "teamMod", field: "lifestealBonus", value: H.vampirism }],
   },
   war_banner: {
     id: "war_banner",
     name: "War Banner",
     rarity: "rare",
     maxStacks: 3,
-    description: "+50% attack damage to the whole warband.",
-    describe: (_w, s) => `+${pctFine(0.5 * s.frac)} attack damage to the whole warband.`,
-    effects: [{ type: "teamMod", field: "dmgMult", value: 0.5 }],
+    description: `+${asPct(H.warBanner)} attack damage to the whole warband.`,
+    describe: (_w, s) =>
+      `+${pctFine(H.warBanner * s.frac)} attack damage to the whole warband.`,
+    effects: [{ type: "teamMod", field: "dmgMult", value: H.warBanner }],
   },
   juggernaut: {
     id: "juggernaut",
     name: "Juggernaut",
     rarity: "rare",
     maxStacks: 3,
-    description: "+50% max HP to the whole warband (and heal the gain).",
+    description: `+${asPct(H.juggernaut)} max HP to the whole warband (and heal the gain).`,
     describe: (_w, s) =>
-      `+${pctFine(0.5 * s.frac)} max HP to the whole warband (and heal the gain).`,
-    effects: [{ type: "maxHp", pct: 0.5 }],
+      `+${pctFine(H.juggernaut * s.frac)} max HP to the whole warband (and heal the gain).`,
+    effects: [{ type: "maxHp", pct: H.juggernaut }],
   },
   second_chance: {
     id: "second_chance",
@@ -391,12 +442,12 @@ export const BOONS: Record<string, BoonDef> = {
     name: "Titan's Blood",
     rarity: "epic",
     maxStacks: 2,
-    description: "+52% max HP and +18% damage to the whole warband.",
+    description: `+${asPct(H.titansHp)} max HP and +${asPct(H.titansDmg)} damage to the whole warband.`,
     describe: (_w, s) =>
-      `+${pctFine(0.52 * s.frac)} max HP and +${pctFine(0.18 * s.frac)} damage to the whole warband.`,
+      `+${pctFine(H.titansHp * s.frac)} max HP and +${pctFine(H.titansDmg * s.frac)} damage to the whole warband.`,
     effects: [
-      { type: "maxHp", pct: 0.52 },
-      { type: "teamMod", field: "dmgMult", value: 0.18 },
+      { type: "maxHp", pct: H.titansHp },
+      { type: "teamMod", field: "dmgMult", value: H.titansDmg },
     ],
   },
   bloodlust: {
@@ -404,12 +455,12 @@ export const BOONS: Record<string, BoonDef> = {
     name: "Bloodlust",
     rarity: "epic",
     maxStacks: 2,
-    description: "+35% attack speed and 18% melee lifesteal.",
+    description: `+${asPct(H.bloodlustSpeed)} attack speed and ${asPct(H.bloodlustLifesteal)} melee lifesteal.`,
     describe: (_w, s) =>
-      `+${pctFine(0.35 * s.frac)} attack speed and ${pctFine(0.18 * s.frac)} melee lifesteal.`,
+      `+${pctFine(H.bloodlustSpeed * s.frac)} attack speed and ${pctFine(H.bloodlustLifesteal * s.frac)} melee lifesteal.`,
     effects: [
-      { type: "teamMod", field: "atkDelayMult", value: 0.35 },
-      { type: "teamMod", field: "lifestealBonus", value: 0.18 },
+      { type: "teamMod", field: "atkDelayMult", value: H.bloodlustSpeed },
+      { type: "teamMod", field: "lifestealBonus", value: H.bloodlustLifesteal },
     ],
   },
   aegis: {
@@ -417,18 +468,19 @@ export const BOONS: Record<string, BoonDef> = {
     name: "Aegis",
     rarity: "epic",
     maxStacks: 2,
-    description: "The warband takes 34% less damage.",
-    describe: (_w, s) => `The warband takes ${pctFine(0.34 * s.frac)} less damage.`,
-    effects: [{ type: "teamMod", field: "damageTakenMult", value: 0.34 }],
+    description: `The warband takes ${asPct(H.aegis)} less damage.`,
+    describe: (_w, s) => `The warband takes ${pctFine(H.aegis * s.frac)} less damage.`,
+    effects: [{ type: "teamMod", field: "damageTakenMult", value: H.aegis }],
   },
   overwhelm: {
     id: "overwhelm",
     name: "Overwhelm",
     rarity: "epic",
     maxStacks: 2,
-    description: "+60% attack damage to the whole warband.",
-    describe: (_w, s) => `+${pctFine(0.6 * s.frac)} attack damage to the whole warband.`,
-    effects: [{ type: "teamMod", field: "dmgMult", value: 0.6 }],
+    description: `+${asPct(H.overwhelm)} attack damage to the whole warband.`,
+    describe: (_w, s) =>
+      `+${pctFine(H.overwhelm * s.frac)} attack damage to the whole warband.`,
+    effects: [{ type: "teamMod", field: "dmgMult", value: H.overwhelm }],
   },
 
   // -- Slice 2: proc / mechanic boons (build-defining). --------------------
@@ -438,25 +490,26 @@ export const BOONS: Record<string, BoonDef> = {
     name: "Marksman's Focus",
     rarity: "rare",
     maxStacks: 3,
-    description: "Ranged attacks heal for 20% of the damage dealt.",
-    describe: (_w, s) => `Ranged attacks heal for ${pctFine(0.2 * s.frac)} of the damage dealt.`,
-    effects: [{ type: "rangedLifesteal", frac: 0.2 }],
+    description: `Ranged attacks heal for ${asPct(H.marksmans)} of the damage dealt.`,
+    describe: (_w, s) =>
+      `Ranged attacks heal for ${pctFine(H.marksmans * s.frac)} of the damage dealt.`,
+    effects: [{ type: "rangedLifesteal", frac: H.marksmans }],
   },
   venom_coating: {
     id: "venom_coating",
     name: "Venom Coating",
     rarity: "rare",
     maxStacks: 2,
-    description: "Every 2nd attack poisons the target (11 dmg/sec for 4s).",
+    description: `Every 2nd attack poisons the target (${H.venom} dmg/sec for 4s).`,
     describe: (w, s) =>
-      `Every 2nd attack poisons the target (${flat(11, s.frac, endlessBoonOffenseScale(w))} dmg/sec for 4s).`,
+      `Every 2nd attack poisons the target (${flat(H.venom, s.frac, endlessBoonOffenseScale(w))} dmg/sec for 4s).`,
     effects: [
       {
         type: "onHitRider",
         effectType: "poison",
         everyNth: 2,
         durationSec: 4,
-        damagePerTick: 11,
+        damagePerTick: H.venom,
         tickIntervalSec: 1,
       },
     ],
@@ -466,32 +519,32 @@ export const BOONS: Record<string, BoonDef> = {
     name: "Bloodfeast",
     rarity: "rare",
     maxStacks: 3,
-    description: "Each kill heals the whole warband for 31 HP.",
+    description: `Each kill heals the whole warband for ${H.bloodfeast} HP.`,
     describe: (w, s) =>
-      `Each kill heals the whole warband for ${flat(31, s.frac, endlessBoonDefenseScale(w))} HP.`,
-    effects: [{ type: "killHeal", amount: 31 }],
+      `Each kill heals the whole warband for ${flat(H.bloodfeast, s.frac, endlessBoonDefenseScale(w))} HP.`,
+    effects: [{ type: "killHeal", amount: H.bloodfeast }],
   },
   thornmail: {
     id: "thornmail",
     name: "Thornmail",
     rarity: "rare",
     maxStacks: 2,
-    description: "Reflect 36% of the damage your warband takes back at attackers.",
+    description: `Reflect ${asPct(H.thornmail)} of the damage your warband takes back at attackers.`,
     describe: (_w, s) =>
-      `Reflect ${pctFine(0.36 * s.frac)} of the damage your warband takes back at attackers.`,
-    effects: [{ type: "thorns", frac: 0.36 }],
+      `Reflect ${pctFine(H.thornmail * s.frac)} of the damage your warband takes back at attackers.`,
+    effects: [{ type: "thorns", frac: H.thornmail }],
   },
   reckless: {
     id: "reckless",
     name: "Reckless",
     rarity: "rare",
     maxStacks: 2,
-    description: "+52% damage, but your warband takes 26% more damage.",
+    description: `+${asPct(H.recklessDmg)} damage, but your warband takes ${asPct(H.recklessTax)} more damage.`,
     describe: (_w, s) =>
-      `+${pctFine(0.52 * s.frac)} damage, but your warband takes ${pctFine(0.26 * s.frac)} more damage.`,
+      `+${pctFine(H.recklessDmg * s.frac)} damage, but your warband takes ${pctFine(H.recklessTax * s.frac)} more damage.`,
     effects: [
-      { type: "teamMod", field: "dmgMult", value: 0.52 },
-      { type: "teamMod", field: "damageTakenMult", value: -0.26 },
+      { type: "teamMod", field: "dmgMult", value: H.recklessDmg },
+      { type: "teamMod", field: "damageTakenMult", value: -H.recklessTax },
     ],
   },
   overkill: {
@@ -507,12 +560,12 @@ export const BOONS: Record<string, BoonDef> = {
     name: "Kennel Master",
     rarity: "rare",
     maxStacks: 2,
-    description: "Start each wave with two spirit wolves at your side.",
+    description: `Start each wave with ${H.kennel} spirit wolves at your side.`,
     describe: (_w, s) => {
-      const n = boonIntStep(2, s);
+      const n = boonIntStep(H.kennel, s);
       return `Start each wave with ${n === 1 ? "a spirit wolf" : `${n} spirit wolves`} at your side.`;
     },
-    effects: [{ type: "waveSummon", defId: "wolf", count: 2 }],
+    effects: [{ type: "waveSummon", defId: "wolf", count: H.kennel }],
   },
 
   // Epic — build payoffs.
@@ -533,10 +586,10 @@ export const BOONS: Record<string, BoonDef> = {
     name: "Executioner",
     rarity: "epic",
     maxStacks: 2,
-    description: "+70% damage to enemies below 25% HP.",
+    description: `+${asPct(H.executioner)} damage to enemies below ${asPct(EXECUTE_THRESHOLD)} HP.`,
     describe: (_w, s) =>
-      `+${pctFine(0.7 * s.frac)} damage to enemies below ${asPct(EXECUTE_THRESHOLD)} HP.`,
-    effects: [{ type: "execute", bonus: 0.7 }],
+      `+${pctFine(H.executioner * s.frac)} damage to enemies below ${asPct(EXECUTE_THRESHOLD)} HP.`,
+    effects: [{ type: "execute", bonus: H.executioner }],
   },
   bounty_hunter: {
     id: "bounty_hunter",
@@ -544,7 +597,7 @@ export const BOONS: Record<string, BoonDef> = {
     rarity: "epic",
     maxStacks: 2,
     description: "Each kill permanently grows the slayer's max HP.",
-    effects: [{ type: "bounty", pctOfMax: 0.0026 }],
+    effects: [{ type: "bounty", pctOfMax: H.bounty }],
   },
   last_breath: {
     id: "last_breath",
@@ -583,12 +636,12 @@ export const BOONS: Record<string, BoonDef> = {
     name: "War Machine",
     rarity: "epic",
     maxStacks: 2,
-    description: "Deploy two automated turrets at the start of each wave.",
+    description: `Deploy ${H.warMachine} automated turrets at the start of each wave.`,
     describe: (_w, s) => {
-      const n = boonIntStep(2, s);
+      const n = boonIntStep(H.warMachine, s);
       return `Deploy ${n === 1 ? "an automated turret" : `${n} automated turrets`} at the start of each wave.`;
     },
-    effects: [{ type: "waveSummon", defId: "turret", count: 2 }],
+    effects: [{ type: "waveSummon", defId: "turret", count: H.warMachine }],
   },
 
   // -- Legendary: the deep-run payoffs. ---------------------------------------
@@ -609,10 +662,10 @@ export const BOONS: Record<string, BoonDef> = {
     rarity: "epic",
     minWave: 15,
     maxStacks: 2,
-    description: "Each kill grants +1.8% warband damage for the rest of the wave.",
+    description: `Each kill grants +${pctFine(H.soulHarvest)} warband damage for the rest of the wave.`,
     describe: (_w, s) =>
-      `Each kill grants +${pctFine(0.018 * s.frac)} warband damage for the rest of the wave.`,
-    effects: [{ type: "killStack", dmgPct: 0.018 }],
+      `Each kill grants +${pctFine(H.soulHarvest * s.frac)} warband damage for the rest of the wave.`,
+    effects: [{ type: "killStack", dmgPct: H.soulHarvest }],
   },
   warlords_horn: {
     id: "warlords_horn",
@@ -640,9 +693,9 @@ export const BOONS: Record<string, BoonDef> = {
     // this mode has twice had to dig itself out of. Thirty waves of growth, then
     // you have what you have.
     description:
-      "+12% max HP and damage now — and +2% more of each per wave cleared, up to +60%.",
+      "+12% max HP and damage now — and +2% more of each per wave cleared, up to +35%.",
     effects: [
-      { type: "ascendant", basePct: 0.12, perWavePct: 0.02, capPct: 0.6 },
+      { type: "ascendant", basePct: 0.12, perWavePct: 0.02, capPct: 0.35 },
     ],
   },
   phoenix_pact: {
@@ -687,9 +740,9 @@ export const BOONS: Record<string, BoonDef> = {
     // and since one legendary and one mythic is the whole allowance, owning this
     // AND Ascendant is the deepest a warband can ever grow.
     description:
-      "+18% max HP and damage now — and +4.2% more of each per wave cleared, up to +150%.",
+      "+18% max HP and damage now — and +4.2% more of each per wave cleared, up to +80%.",
     effects: [
-      { type: "ascendant", basePct: 0.18, perWavePct: 0.042, capPct: 1.5 },
+      { type: "ascendant", basePct: 0.18, perWavePct: 0.042, capPct: 0.8 },
     ],
   },
   undying_legion: {

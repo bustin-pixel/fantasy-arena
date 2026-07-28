@@ -69,9 +69,11 @@ import {
   endlessBoonDefenseScale,
   endlessBoonOffenseScale,
   endlessCycle,
+  endlessEnemyActive,
   endlessWaveBudget,
   endlessWaveKind,
   endlessWaveStatMultipliers,
+  endlessWaveToughness,
   themedRareFor,
 } from "@/data/endless";
 
@@ -439,6 +441,11 @@ export class EndlessController {
     state.clockTicks = secToTicks(ENDLESS_WAVE_TIME_SEC); // fresh per-wave backstop
     state.waveBanner = null;
     this.spawnCooldown = 0;
+    // The horde THICKENS with depth as well as hardening. Read at every spawn
+    // (see the cap check in step), so re-stamping it here is all it takes.
+    // This is half the deep-run difficulty — see ENDLESS_ENEMY_ACTIVE_DEEP for
+    // why it does more work than the stat curve ever could.
+    state.activeCaps.enemy = endlessEnemyActive(wave);
     // Fresh stall accounting for the new wave. The previous wave's corpses are
     // pruned at the intermission, so every counter genuinely restarts at zero.
     this.waveTicks = 0;
@@ -859,14 +866,18 @@ export class EndlessController {
       state.units = state.units.filter((u) => !this.petUids.has(u.uid));
       this.petUids.clear();
     }
-    const mult = endlessWaveStatMultipliers(this.wave);
+    // Same HP/mitigation split the horde gets, so a wolf stays as durable
+    // relative to the wave as it always was without carrying a millionaire's
+    // health bar around the field.
+    const tough = endlessWaveToughness(this.wave);
     for (const order of this.summons) {
       for (let i = 0; i < order.count; i++) {
         const x = this.rng.float(80, FIELD_WIDTH - 80);
         const y = this.rng.float(FIELD_HEIGHT - 90, FIELD_HEIGHT - 40);
         const unit = createUnit(order.defId, "player", { x, y });
-        unit.maxHp = Math.round(unit.maxHp * mult.hp);
+        unit.maxHp = Math.round(unit.maxHp * tough.shownHpMult);
         unit.hp = unit.maxHp;
+        unit.damageTakenMult = tough.damageTakenMult;
         getKit(order.defId)?.onSpawn?.(unit);
         state.units.push(unit);
         this.petUids.add(unit.uid);
@@ -906,8 +917,12 @@ export class EndlessController {
     const x = this.rng.float(60, FIELD_WIDTH - 60);
     const unit = createUnit(defId, "enemy", { x, y: SPAWN_Y });
     const mult = endlessWaveStatMultipliers(this.wave);
-    unit.maxHp = Math.round(unit.maxHp * mult.hp);
+    // Most of a deep monster's toughness rides as MITIGATION rather than HP, so
+    // the bar stays readable while the fight is unchanged (endlessWaveToughness).
+    const tough = endlessWaveToughness(this.wave);
+    unit.maxHp = Math.round(unit.maxHp * tough.shownHpMult);
     unit.hp = unit.maxHp;
+    unit.damageTakenMult = tough.damageTakenMult;
     unit.damage = Math.round(unit.damage * mult.dmg);
     state.units.push(unit);
     this.bestiary.add(defId);
