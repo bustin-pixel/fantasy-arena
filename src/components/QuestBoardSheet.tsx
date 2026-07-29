@@ -46,7 +46,8 @@ import { rollChest, type ChestContent } from "@/meta/rewards";
 import { dayIndexLocal, monthIndexLocal, weekIndexLocal } from "@/meta/shop";
 import { generateSeed } from "@/utils/rng";
 import { getUnitDef } from "@/data/units";
-import { ITEM_LINES } from "@/data/items";
+import { ITEM_LINES, makeItemKey } from "@/data/items";
+import { ItemIcon } from "@/components/ItemIcon";
 import { RARITIES } from "@/data/rarities";
 import { ChestSprite } from "@/components/ChestSprite";
 import { CHEST_LABEL } from "@/components/RewardPanel";
@@ -304,6 +305,13 @@ export function QuestBoardSheet({ onClose }: Props) {
                         resolveRelicPick(lineId);
                       }}
                     >
+                      {/* You're choosing between three relics — show what
+                          they look like, not just what they're called. */}
+                      <ItemIcon
+                        itemKey={makeItemKey(lineId, pendingPick.quality, 1)}
+                        size={44}
+                        hideStars
+                      />
                       <span
                         className="relic-pick-name"
                         style={{ color: RARITIES[pendingPick.quality].color }}
@@ -784,11 +792,17 @@ function ContentLine({ entry }: { entry: ChestContent }) {
   if (entry.kind === "item") {
     const line = ITEM_LINES[entry.lineId];
     return (
-      <li className="reward-entry reward-unlock">
-        <span style={{ color: RARITIES[entry.quality].color }}>
-          {line?.name ?? entry.lineId} ★1
-        </span>{" "}
-        — sent to your Bag
+      <li className="reward-entry reward-unlock reward-item">
+        <ItemIcon
+          itemKey={makeItemKey(entry.lineId, entry.quality, 1)}
+          size={38}
+        />
+        <span>
+          <span style={{ color: RARITIES[entry.quality].color }}>
+            {line?.name ?? entry.lineId} ★1
+          </span>{" "}
+          — sent to your Bag
+        </span>
       </li>
     );
   }

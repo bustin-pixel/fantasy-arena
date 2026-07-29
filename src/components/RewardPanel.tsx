@@ -26,7 +26,8 @@ import {
 } from "@/meta/commander";
 import { getUnitDef } from "@/data/units";
 import { RARITIES } from "@/data/rarities";
-import { ITEM_LINES } from "@/data/items";
+import { ITEM_LINES, makeItemKey } from "@/data/items";
+import { ItemIcon } from "@/components/ItemIcon";
 import { ChestSprite } from "@/components/ChestSprite";
 import { renderPortrait } from "@/engine/Renderer";
 import { useSpriteEpoch } from "@/hooks/useSpriteEpoch";
@@ -208,11 +209,19 @@ export function RewardPanel({ rewards, mode, dungeonId = "depths", tier = "norma
             if (entry.kind === "item") {
               const line = ITEM_LINES[entry.lineId];
               return (
-                <li key={i} className="reward-entry reward-unlock">
-                  <span style={{ color: RARITIES[entry.quality].color }}>
-                    {line?.name ?? entry.lineId} ★1
-                  </span>{" "}
-                  — sent to your Bag
+                <li key={i} className="reward-entry reward-unlock reward-item">
+                  {/* Same treatment as the on-floor reveal: the drawn icon
+                      first, then the rarity-coloured name. */}
+                  <ItemIcon
+                    itemKey={makeItemKey(entry.lineId, entry.quality, 1)}
+                    size={38}
+                  />
+                  <span>
+                    <span style={{ color: RARITIES[entry.quality].color }}>
+                      {line?.name ?? entry.lineId} ★1
+                    </span>{" "}
+                    — sent to your Bag
+                  </span>
                 </li>
               );
             }

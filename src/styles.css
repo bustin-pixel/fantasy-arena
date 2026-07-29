@@ -2038,6 +2038,16 @@ body.modal-open .pager-nav {
   font-size: 0.9rem;
   color: #f3e3c2;
 }
+/* Item rows show the drawn icon beside the name — the same read the on-floor
+   chest reveal gives, so loot looks like itself wherever it's opened. */
+.reward-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.reward-item .item-icon {
+  flex: 0 0 auto;
+}
 .reward-unlock {
   font-weight: 700;
 }
