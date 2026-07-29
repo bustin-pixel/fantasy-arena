@@ -4184,7 +4184,14 @@ body.modal-open .pager-nav {
 .quest-board {
   max-width: 460px;
   width: min(94vw, 460px);
-  max-height: 86vh;
+  /* A FIXED height, not a max-: the sheet must not resize as you switch tabs
+     (Monthly is a single card, Daily is a dozen). The px cap keeps a tall
+     desktop viewport from stretching it into a mostly-empty column; on a
+     phone the vh term wins and this is the height it always had. */
+  height: min(86vh, 720px);
+  /* The body is the only scroller — without this the fixed height would let
+     the modal's own overflow-y:auto add a second scrollbar. */
+  overflow: hidden;
   display: flex;
   flex-direction: column;
 }
@@ -4193,6 +4200,8 @@ body.modal-open .pager-nav {
   align-items: center;
   justify-content: space-between;
   padding: 14px 44px 8px 16px;
+  /* Fixed rows must not be squeezed by the scroller below them. */
+  flex: 0 0 auto;
 }
 .quest-board-title {
   font-family: var(--font-display);
@@ -4206,6 +4215,11 @@ body.modal-open .pager-nav {
   color: var(--gold);
 }
 .quest-board-body {
+  /* Takes whatever height the head/tabs/pinned rows leave. min-height:0 is
+     load-bearing: without it a flex child refuses to shrink below its content
+     and scrolls the whole sheet instead of itself. */
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   padding: 0 14px 16px;
 }
