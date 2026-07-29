@@ -6,6 +6,8 @@ import {
   applyShopPurchase,
   applyShopReroll,
   dayIndexLocal,
+  monthIndexLocal,
+  weekIndexLocal,
   normalizeShopDay,
   rollDailyStock,
   SHOP_SLOT_COUNT,
@@ -173,5 +175,55 @@ describe("dayIndexLocal", () => {
     expect(dayIndexLocal(morning)).toBe(dayIndexLocal(night));
     expect(dayIndexLocal(morning)).not.toBe(dayIndexLocal(tomorrow));
     expect(dayIndexLocal(monthEdgeA)).not.toBe(dayIndexLocal(monthEdgeB));
+  });
+});
+
+describe("weekIndexLocal", () => {
+  it("anchors the boundary on Monday", () => {
+    // 2026-07-26 is a Sunday; the 27th is the Monday that starts a new week.
+    const sunday = new Date(2026, 6, 26, 23, 59, 59);
+    const monday = new Date(2026, 6, 27, 0, 0, 1);
+    expect(weekIndexLocal(sunday)).not.toBe(weekIndexLocal(monday));
+    expect(weekIndexLocal(monday)).toBe(weekIndexLocal(sunday) + 1);
+  });
+
+  it("holds steady from Monday through the following Sunday", () => {
+    const monday = new Date(2026, 6, 27);
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(2026, 6, 27 + i);
+      expect(weekIndexLocal(d)).toBe(weekIndexLocal(monday));
+    }
+    expect(weekIndexLocal(new Date(2026, 7, 3))).toBe(
+      weekIndexLocal(monday) + 1
+    );
+  });
+
+  it("consecutive Mondays differ by exactly 1, across a month edge", () => {
+    // The packed dayIndexLocal jumps at month ends; a real week count must not.
+    expect(weekIndexLocal(new Date(2026, 6, 27))).toBe(
+      weekIndexLocal(new Date(2026, 7, 3)) - 1
+    );
+  });
+
+  it("a DST transition can't split a week", () => {
+    // US DST springs forward Sun 2026-03-08 — mid-week for a Monday anchor.
+    const monday = new Date(2026, 2, 2);
+    const acrossDst = new Date(2026, 2, 8);
+    expect(weekIndexLocal(acrossDst)).toBe(weekIndexLocal(monday));
+  });
+});
+
+describe("monthIndexLocal", () => {
+  it("is stable within a month and increments across the 1st", () => {
+    expect(monthIndexLocal(new Date(2026, 6, 1))).toBe(
+      monthIndexLocal(new Date(2026, 6, 31))
+    );
+    expect(monthIndexLocal(new Date(2026, 7, 1))).toBe(
+      monthIndexLocal(new Date(2026, 6, 31)) + 1
+    );
+    // Year rollover stays contiguous.
+    expect(monthIndexLocal(new Date(2027, 0, 1))).toBe(
+      monthIndexLocal(new Date(2026, 11, 31)) + 1
+    );
   });
 });

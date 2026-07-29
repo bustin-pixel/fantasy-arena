@@ -382,12 +382,40 @@ export const QUEST_GOLD_RANGE: Record<QuestDifficulty, [number, number]> = {
 
 /** Chest tier paid on claim — every quest pays a chest (locked design
  *  decision: harder notices climb the tier ladder, capped at gold; arcane/
- *  dragon stay dungeon-capstone achievements). */
+ *  dragon stay dungeon-capstone achievements). The weekly SWEEP below is the
+ *  one sanctioned exception to the dragon half of that rule. */
 export const QUEST_CHEST_TIER: Record<QuestDifficulty, ChestTier> = {
   easy: "wooden",
   medium: "silver",
   hard: "gold",
 };
+
+// ---------------------------------------------------------------------------
+// Weekly contracts + the monthly saga (meta/questCycles.ts). The daily board
+// above is the workhorse loop; these are the longer cadences layered on top.
+// Weekly GOALS live next to the kind pool in questCycles.ts (the QUEST_GOALS
+// precedent — a goal is part of the ask, not an economy dial); the money and
+// the chest tiers live here with every other payout.
+// ---------------------------------------------------------------------------
+
+/** Contracts pinned per week. Auto-active — there is no accept step, so this
+ *  is both the board size and the slot budget. */
+export const WEEKLY_QUEST_COUNT = 3;
+
+/** Flat gold per contract, rolled at board-roll time. Roughly 4× a hard daily:
+ *  a contract is ~5-7 dailies of work. */
+export const WEEKLY_GOLD_RANGE: [number, number] = [350, 500];
+
+/** Chest per contract. Matches the hard-daily grade — the WEEK's escalation is
+ *  the sweep below, not a fatter per-quest chest. */
+export const WEEKLY_CHEST_TIER: ChestTier = "gold";
+
+/** Clearing all WEEKLY_QUEST_COUNT contracts in one week pays the sweep bonus.
+ *  This is the one REPEATABLE dragon chest in the economy — it deliberately
+ *  softens the "arcane/dragon stay dungeon-capstone achievements" rule above,
+ *  because a perfect week is itself a capstone. The Reliquary (legendary) stays
+ *  out of reach: it is the monthly saga's finale and the Endless wave-100 prize. */
+export const WEEKLY_SWEEP_CHEST_TIER: ChestTier = "dragon";
 
 // ---------------------------------------------------------------------------
 // Bestiary rewards — the payouts for discovering, mastering, and completing the

@@ -143,8 +143,10 @@ export interface QuestSaveSlice {
   gold: number;
   quests: QuestSaveState;
   unlockedUnits: string[];
-  bestiary: Record<string, { encountered: boolean }>;
-  dungeons: Record<string, { highestClearedFloor: number }>;
+  // Optional-valued so a BestiaryMap (whose entries may be absent) satisfies
+  // this structurally; boardCtx already reads it defensively.
+  bestiary: Record<string, { encountered: boolean } | undefined>;
+  dungeons: Record<string, { highestClearedFloor: number } | undefined>;
 }
 
 /** Board-roll context from a save slice (the one impure-ish edge — reads the

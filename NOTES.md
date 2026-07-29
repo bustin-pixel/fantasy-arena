@@ -987,6 +987,52 @@ gotchas live in both component headers: `Application.init()` is async (the
 textures (`texCache`, and the smith's `iconTexCache`) are module-scope +
 shared across mounts, so `app.destroy` must NOT pass `texture: true`.
 
+### 10b. Weekly contracts + the monthly saga (save v18, 2026-07-28)
+
+`meta/questCycles.ts` layers two longer cadences over the daily board. Same
+"derive, normalize lazily, gate on committed state" discipline as §10, with
+three deliberate departures worth knowing before you touch it:
+
+- **Weekly contracts are PERSISTED, not derived.** They carry progress, and
+  re-deriving on read would let a mid-week unlock (a new unit, a newly seen
+  enemy) silently re-target a contract already in flight. Daily *offers* stay
+  derived; only these snapshots are stored.
+- **The tick happens in `applyBattleGrant`, which NORMALIZES first.** A battle
+  fought after Monday rollover by a player who hasn't opened the board rolls
+  the new week's contracts and credits them in the same atomic write. Drop that
+  normalize and progress silently vanishes for anyone who plays before
+  visiting the board. `BattleGrantCtx.cycles` is REQUIRED for the same reason —
+  an optional field that a caller forgets is exactly this bug.
+- **`endless_waves` is CUMULATIVE**, unlike the daily `endless_wave` kind's
+  single-run high-water mark. Two kinds, two semantics, one letter apart.
+
+Claim gates are re-derived from the normalized state, never trusted from the
+UI: a board left open across midnight Monday would otherwise show a live sweep
+button and pay a Dragon's Hoard against a fresh, empty board. Sweep eligibility
+tests `quests.every(q => claimed.includes(q.id))` rather than comparing
+lengths, so a duplicate or stale id can't fake a perfect week.
+
+**Economy consequence, deliberate:** the weekly sweep makes the Dragon's Hoard
+*repeatable* — softening the "arcane/dragon stay dungeon-capstone achievements"
+rule in `economy.ts`. Dragon chests carry a 30% legendary-quality item weight,
+so that weight is now weekly-farmable by anyone clearing all three contracts.
+Accepted; the Reliquary (legendary) stays out of reach of both the bump ladder
+and the weekly loop.
+
+**Every legendary chest now pays a relic CHOICE, not a rolled item.**
+`rollChest` emits `{kind:"item_choice", options}` (one line per slot, so the
+three are always distinct) for the `legendary` tier only — every other tier's
+RNG stream, and so every legacy seed, is untouched. `foldChestContents` banks it
+as a `pendingPicks` queue rather than granting an item, because the reveal
+contains a decision the fold can't make; `resolvePendingPick` grants at 1★ when
+the player chooses. Two traps this creates: `nextItemPity` must count
+`item_choice` as an item (otherwise the richest chest in the game BUMPS the
+dry-streak counter), and the queue must stay a queue — a single slot would let
+a second Reliquary erase an unclaimed, already-paid-for pick.
+
+Specs: `meta/__tests__/questCycles.test.ts`; clock helpers in `shop.test.ts`;
+v18 cases in `state/__tests__/persistence.test.ts`.
+
 ### 11. The Blacksmith is stateless meta
 
 The Forge (BlacksmithScreen + `meta/blacksmith.ts`) replaced the Bag as the

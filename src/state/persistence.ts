@@ -13,6 +13,14 @@ import { TOTAL_XP_CAP } from "@/meta/leveling";
 import { sanitizeItems, sanitizeLoadouts } from "@/meta/inventory";
 import { sanitizeShop, type ShopState } from "@/meta/shop";
 import { sanitizeQuests, type QuestSaveState } from "@/meta/quests";
+import {
+  sanitizeMonthlySaga,
+  sanitizePendingPicks,
+  sanitizeWeeklyQuests,
+  type MonthlySagaState,
+  type WeeklyQuestState,
+} from "@/meta/questCycles";
+import type { PendingPick } from "@/meta/rewards";
 import { DEFAULT_AVATAR_ID, isAvatarUnlocked } from "@/meta/avatars";
 import {
   computeRetroBestiaryRewards,
@@ -191,6 +199,18 @@ export interface PlayerSave {
    *  from branch investment (the title rule); cleared on load if the pick is
    *  no longer unlocked. (Save v17.) */
   equippedSpell: SpellId | null;
+  /** The week's contracts + their claim ledger. Unlike the daily board these
+   *  ARE stored: they carry progress, and re-deriving them on read would let a
+   *  mid-week unlock silently re-target a contract already in flight. Rolled
+   *  and rolled over in meta/questCycles. (Save v18.) */
+  weeklyQuests: WeeklyQuestState;
+  /** The monthly saga's position in its chain. The theme itself is derived
+   *  from the month index, never stored. (Save v18.) */
+  monthlySaga: MonthlySagaState;
+  /** Unresolved Legendary Reliquary relic choices, oldest first. A queue rather
+   *  than one slot so a second Reliquary can't overwrite an unclaimed pick.
+   *  (Save v18.) */
+  pendingPicks: PendingPick[];
 }
 
 // The key names the storage SLOT, not the schema — the version lives inside
@@ -198,7 +218,7 @@ export interface PlayerSave {
 const KEY = "fantasy-arena/save/v1";
 
 export const DEFAULT_SAVE: PlayerSave = {
-  version: 17,
+  version: 18,
   username: "Champion",
   avatarId: DEFAULT_AVATAR_ID,
   deck: [...STARTER_UNIT_IDS],
@@ -222,6 +242,9 @@ export const DEFAULT_SAVE: PlayerSave = {
   commanderXp: 0,
   talents: {},
   equippedSpell: null,
+  weeklyQuests: { week: -1, quests: [], claimed: [], sweepClaimed: false },
+  monthlySaga: { month: -1, stage: 0, progress: 0 },
+  pendingPicks: [],
 };
 
 export function loadSave(): PlayerSave {
@@ -367,6 +390,14 @@ export function migrateSave(parsed: Partial<PlayerSave> | null): PlayerSave {
     merged.talents
   );
 
+  // v18: weekly contracts, the monthly saga, and pending Reliquary relic
+  // choices. All three rebuild defensively from whatever is on disk; older
+  // saves land on the "never seen" states, which the first normalize turns
+  // into a live board. No retro-grant — a cycle that never ran owes nothing.
+  merged.weeklyQuests = sanitizeWeeklyQuests(parsed.weeklyQuests);
+  merged.monthlySaga = sanitizeMonthlySaga(parsed.monthlySaga);
+  merged.pendingPicks = sanitizePendingPicks(parsed.pendingPicks);
+
   // Grandfathering: saves from before the unlock system keep every unit that
   // exists today — EXCEPT quest-locked ones, whose purchase must always be
   // earned via the quest. Only this one-time boundary is generous; post-v3
@@ -448,6 +479,16 @@ function structuredCloneSave(save: PlayerSave): PlayerSave {
     },
     monsterKills: { ...save.monsterKills },
     talents: { ...save.talents },
+    weeklyQuests: {
+      ...save.weeklyQuests,
+      quests: save.weeklyQuests.quests.map((q) => ({ ...q })),
+      claimed: [...save.weeklyQuests.claimed],
+    },
+    monthlySaga: { ...save.monthlySaga },
+    pendingPicks: save.pendingPicks.map((p) => ({
+      ...p,
+      options: [...p.options],
+    })),
   };
 }
 

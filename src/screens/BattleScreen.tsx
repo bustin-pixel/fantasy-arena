@@ -48,6 +48,7 @@ import {
 } from "@/meta/commander";
 import { RewardPanel } from "@/components/RewardPanel";
 import { generateSeed } from "@/utils/rng";
+import { monthIndexLocal, weekIndexLocal } from "@/meta/shop";
 import { playStinger, setMusicTrack } from "@/audio/music";
 import { GameIcon } from "@/components/icons/GameIcon";
 import { playSfx } from "@/audio/sfx";
@@ -513,6 +514,9 @@ export function BattleScreen({
         // Compendium reveals fold here too (see the grant's bestiary branch).
         seen,
         tier,
+        // Weekly/monthly cycle indices — the clock is read HERE (the impure
+        // edge) so every fold downstream stays pure and testable.
+        cycles: { week: weekIndexLocal(), month: monthIndexLocal() },
       });
       setRewards(bundle);
       rewardsRef.current = bundle;
@@ -573,7 +577,18 @@ export function BattleScreen({
         // dungeon cleared (completion is the first boss kill only).
         firstClear: false,
       },
-      { mode, floor, dungeonId, deck, outcome: "victory", tier }
+      // A treasure room reports mode "depths" + a victory, so it credits the
+      // depths_clears / tier_wins contracts — consistent with the daily board,
+      // which already counts treasure rooms the same way.
+      {
+        mode,
+        floor,
+        dungeonId,
+        deck,
+        outcome: "victory",
+        tier,
+        cycles: { week: weekIndexLocal(), month: monthIndexLocal() },
+      }
     );
     playSfx("questSting");
     setTreasureBanner(true);

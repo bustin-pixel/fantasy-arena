@@ -34,6 +34,9 @@ const baseSave = (over: Partial<BattleGrantSlice> = {}): BattleGrantSlice => ({
   itemPity: 0,
   monsterKills: {},
   bestiary: {},
+  weeklyQuests: { week: -1, quests: [], claimed: [], sweepClaimed: false },
+  monthlySaga: { month: -1, stage: 0, progress: 0 },
+  pendingPicks: [],
   ...over,
 });
 
@@ -58,6 +61,7 @@ const ctx = (over: Partial<BattleGrantCtx> = {}): BattleGrantCtx => ({
   mode: "depths",
   floor: 1,
   dungeonId: "depths",
+  cycles: { week: 2900, month: 24318 },
   ...over,
 });
 
