@@ -745,23 +745,28 @@ function ClaimCeremony({
       >
         <div className="quest-ceremony-title">{title}</div>
         {gold > 0 && <div className="quest-ceremony-gold">+{gold} gold</div>}
-        <button
-          type="button"
-          className={`reward-chest${phase === "closed" ? "" : " opened"}`}
-          onClick={() => phase === "closed" && onPhase("opening")}
-          aria-label={`Open ${CHEST_LABEL[chestTier]}`}
-        >
-          <ChestSprite
-            tier={chestTier}
-            opening={phase !== "closed"}
-            onOpened={() => onPhase("open")}
-          />
-          <span className="reward-chest-label">
-            {phase === "closed"
-              ? `Open ${CHEST_LABEL[chestTier]}`
-              : CHEST_LABEL[chestTier]}
-          </span>
-        </button>
+        {/* Once the lid lands the chest gives way to its loot, standing where
+            the chest stood — the floor's reveal, minus the overlap a panel
+            would suffer from floating it upward. */}
+        {phase !== "open" && (
+          <button
+            type="button"
+            className={`reward-chest${phase === "closed" ? "" : " opened"}`}
+            onClick={() => phase === "closed" && onPhase("opening")}
+            aria-label={`Open ${CHEST_LABEL[chestTier]}`}
+          >
+            <ChestSprite
+              tier={chestTier}
+              opening={phase !== "closed"}
+              onOpened={() => onPhase("open")}
+            />
+            <span className="reward-chest-label">
+              {phase === "closed"
+                ? `Open ${CHEST_LABEL[chestTier]}`
+                : CHEST_LABEL[chestTier]}
+            </span>
+          </button>
+        )}
         {phase === "open" && (
           <>
             <ChestLoot contents={contents} iconSize={48} />

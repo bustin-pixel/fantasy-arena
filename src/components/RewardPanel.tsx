@@ -166,7 +166,10 @@ export function RewardPanel({ rewards, mode, dungeonId = "depths", tier = "norma
 
       {rewards.bestiary && <BestiaryRewards bestiary={rewards.bestiary} />}
 
-      {rewards.chest && !hideChest && (
+      {/* The loot REPLACES the chest once the lid lands — the floor's motion
+          (rise + glow, nothing boxed) without floating over the XP list above,
+          which the arena floor never has to contend with. */}
+      {rewards.chest && !hideChest && chestPhase !== "open" && (
         <button
           className={`reward-chest${chestPhase === "closed" ? "" : " opened"}`}
           onClick={() =>
@@ -188,8 +191,6 @@ export function RewardPanel({ rewards, mode, dungeonId = "depths", tier = "norma
       )}
 
       {rewards.chest && !hideChest && chestPhase === "open" && (
-        /* The loot floats out of the chest exactly as it does on the dungeon
-           floor — no boxed list underneath. ChestLoot is the shared source. */
         <ChestLoot contents={rewards.chest.contents} iconSize={48} />
       )}
     </div>
