@@ -741,10 +741,15 @@ function ClaimCeremony({
     >
       <div
         className="quest-ceremony-inner"
-        onClick={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          // Once the loot is up, a tap ANYWHERE dismisses — including on the
+          // panel itself, which otherwise swallows the backdrop's handler.
+          // Before that the tap belongs to the chest, so it must not close.
+          e.stopPropagation();
+          if (phase === "open") onDone();
+        }}
       >
         <div className="quest-ceremony-title">{title}</div>
-        {gold > 0 && <div className="quest-ceremony-gold">+{gold} gold</div>}
         {/* Once the lid lands the chest gives way to its loot, standing where
             the chest stood — the floor's reveal, minus the overlap a panel
             would suffer from floating it upward. */}
@@ -769,10 +774,10 @@ function ClaimCeremony({
         )}
         {phase === "open" && (
           <>
-            <ChestLoot contents={contents} iconSize={48} />
-            <button type="button" className="quest-btn claim" onClick={onDone}>
-              Done
-            </button>
+            {/* The flat contract gold rides INSIDE the reveal's single total,
+                so the ceremony never shows two gold figures. */}
+            <ChestLoot contents={contents} iconSize={48} extraGold={gold} />
+            <div className="chest-loot-hint">tap to continue</div>
           </>
         )}
       </div>

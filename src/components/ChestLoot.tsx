@@ -30,15 +30,19 @@ interface Props {
   contents: readonly ChestContent[];
   /** Icon size — the floor reveal sits over the arena and can afford more. */
   iconSize?: number;
+  /** Gold paid ALONGSIDE the chest (a quest's flat reward). Folded into the
+   *  one total below rather than shown as its own line: two gold figures in
+   *  one reveal reads as a bug, and the player only cares what they earned. */
+  extraGold?: number;
 }
 
-export function ChestLoot({ contents, iconSize = 54 }: Props) {
-  // Chest gold = direct gold + any owned-duplicate refund, counted as one
-  // number (the player doesn't care which half was a duplicate).
+export function ChestLoot({ contents, iconSize = 54, extraGold = 0 }: Props) {
+  // One number: chest gold + any owned-duplicate refund + whatever was paid
+  // alongside it. Nobody cares which slice came from where.
   const gold = contents.reduce(
     (s, e) =>
       s + (e.kind === "gold" ? e.amount : e.kind === "duplicate" ? e.gold : 0),
-    0
+    extraGold
   );
   const shards = contents.reduce(
     (s, e) => s + (e.kind === "shards" ? e.amount : 0),

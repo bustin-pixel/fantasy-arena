@@ -2137,7 +2137,8 @@ body.modal-open .pager-nav {
   font-size: 1rem;
   filter: drop-shadow(0 0 4px rgba(192, 132, 252, 0.85));
 }
-.floor-loot-hint {
+.floor-loot-hint,
+.chest-loot-hint {
   margin-top: 2px;
   font-size: 0.62rem;
   letter-spacing: 0.04em;
@@ -4579,11 +4580,6 @@ body.modal-open .pager-nav {
   font-weight: 800;
   color: var(--gold);
   letter-spacing: 0.03em;
-}
-.quest-ceremony-gold {
-  font-size: 0.9rem;
-  font-weight: 800;
-  color: var(--gold);
 }
 
 /* ---- The Forge (BlacksmithScreen) -------------------------------------------
