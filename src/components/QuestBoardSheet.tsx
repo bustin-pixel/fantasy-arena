@@ -28,8 +28,10 @@ import {
   isFinalStage,
   normalizeSaga,
   normalizeWeekly,
+  sagaStageClaimable,
   sweepEarned,
   themeForMonth,
+  weeklyClaimable,
   weeklyCtx,
   type WeeklyQuest,
 } from "@/meta/questCycles";
@@ -82,6 +84,17 @@ const WEEKLY_TITLE: Record<WeeklyQuest["kind"], string> = {
   weekly_clears: "Contract Broker",
 };
 
+/** The board's three cadences. Tabs rather than stacked sections: with the
+ *  daily notices, three contracts and a saga all on one 86vh scroller, the
+ *  longer cadences sat below the fold and were easy to miss entirely. */
+type BoardTab = "daily" | "weekly" | "monthly";
+
+const TAB_LABEL: Record<BoardTab, string> = {
+  daily: "Daily",
+  weekly: "Weekly",
+  monthly: "Monthly",
+};
+
 /** The in-flight claim ceremony (set AFTER the save fold committed). One shape
  *  for every source — daily, weekly, sweep, saga finale — so they can't drift. */
 interface Ceremony {
@@ -109,6 +122,7 @@ export function QuestBoardSheet({ onClose }: Props) {
   } = useGameState();
   const [confirmAbandon, setConfirmAbandon] = useState<string | null>(null);
   const [ceremony, setCeremony] = useState<Ceremony | null>(null);
+  const [tab, setTab] = useState<BoardTab>("daily");
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -150,6 +164,15 @@ export function QuestBoardSheet({ onClose }: Props) {
   const stage = currentStage(saga);
   const pendingPick = save.pendingPicks[0] ?? null;
   const slotsFree = active.length < QUEST_ACTIVE_MAX;
+
+  // Tabs hide what used to be one scroll away, so each one carries its own pip
+  // — otherwise a finished contract behind an unselected tab is invisible and
+  // the Home FAB's dot says "something is ready" without saying where.
+  const tabAlert: Record<BoardTab, boolean> = {
+    daily: active.some((q) => q.progress >= q.goal),
+    weekly: weeklyClaimable(weekly) || sweepEarned(weekly),
+    monthly: sagaStageClaimable(saga),
+  };
   const cost = refreshCost(board.refreshes);
   const canRefresh = save.gold >= cost;
 
@@ -256,45 +279,72 @@ export function QuestBoardSheet({ onClose }: Props) {
           </span>
         </div>
 
-        <div className="quest-board-body">
-          {pendingPick && (
-            <section>
-              <h3 className="quest-section-title">Choose Your Relic</h3>
-              <div className="quest-card saga">
-                <div className="quest-card-ask">
-                  The Reliquary is open. Keep one:
-                </div>
-                <div className="relic-pick-row">
-                  {pendingPick.options.map((lineId) => {
-                    const line = ITEM_LINES[lineId];
-                    return (
-                      <button
-                        key={lineId}
-                        type="button"
-                        className="relic-pick"
-                        onClick={() => {
-                          playSfx("unlockFanfare");
-                          resolveRelicPick(lineId);
-                        }}
-                      >
-                        <span
-                          className="relic-pick-name"
-                          style={{ color: RARITIES[pendingPick.quality].color }}
-                        >
-                          {line?.name ?? lineId}
-                        </span>
-                        <span className="relic-pick-sub">
-                          {pendingPick.quality} ★1
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
+        {/* Pinned ABOVE the tabs, not inside one: an unresolved relic is a
+            reward already paid for, and burying it behind a tab would make it
+            easier to forget than it was as a stacked section. */}
+        {pendingPick && (
+          <div className="quest-board-pinned">
+            <div className="quest-card saga">
+              <div className="quest-card-top">
+                <span className="quest-card-title">Choose Your Relic</span>
               </div>
-            </section>
-          )}
+              <div className="quest-card-ask">
+                The Reliquary is open. Keep one:
+              </div>
+              <div className="relic-pick-row">
+                {pendingPick.options.map((lineId) => {
+                  const line = ITEM_LINES[lineId];
+                  return (
+                    <button
+                      key={lineId}
+                      type="button"
+                      className="relic-pick"
+                      onClick={() => {
+                        playSfx("unlockFanfare");
+                        resolveRelicPick(lineId);
+                      }}
+                    >
+                      <span
+                        className="relic-pick-name"
+                        style={{ color: RARITIES[pendingPick.quality].color }}
+                      >
+                        {line?.name ?? lineId}
+                      </span>
+                      <span className="relic-pick-sub">
+                        {pendingPick.quality} ★1
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
 
-          {active.length > 0 && (
+        <div className="quest-tabs" role="tablist" aria-label="Quest cadence">
+          {(["daily", "weekly", "monthly"] as BoardTab[]).map((t) => (
+            <button
+              key={t}
+              type="button"
+              role="tab"
+              aria-selected={tab === t}
+              className={`quest-tab${tab === t ? " active" : ""}`}
+              onClick={() => {
+                if (t === tab) return;
+                playSfx("uiTap");
+                setTab(t);
+              }}
+            >
+              {TAB_LABEL[t]}
+              {tabAlert[t] && <span className="quest-tab-dot" />}
+            </button>
+          ))}
+        </div>
+
+        {/* key={tab} remounts the scroller so a switch always lands at the top
+            rather than inheriting the previous tab's scroll offset. */}
+        <div className="quest-board-body" key={tab}>
+          {tab === "daily" && active.length > 0 && (
             <section>
               <h3 className="quest-section-title">
                 Accepted ({active.length}/{QUEST_ACTIVE_MAX})
@@ -382,6 +432,7 @@ export function QuestBoardSheet({ onClose }: Props) {
             </section>
           )}
 
+          {tab === "daily" && (
           <section>
             <div className="quest-offers-head">
               <h3 className="quest-section-title">Notices</h3>
@@ -431,10 +482,12 @@ export function QuestBoardSheet({ onClose }: Props) {
               </div>
             ))}
           </section>
+          )}
 
+          {tab === "weekly" && (
           <section>
             <h3 className="quest-section-title">
-              Weekly Contracts <span className="quest-section-note">resets Monday</span>
+              Contracts <span className="quest-section-note">resets Monday</span>
             </h3>
             {weekly.quests.map((q) => {
               const claimed = weekly.claimed.includes(q.id);
@@ -536,7 +589,9 @@ export function QuestBoardSheet({ onClose }: Props) {
               )}
             </div>
           </section>
+          )}
 
+          {tab === "monthly" && (
           <section>
             <h3 className="quest-section-title">
               Saga of the Month{" "}
@@ -615,6 +670,7 @@ export function QuestBoardSheet({ onClose }: Props) {
               )}
             </div>
           </section>
+          )}
         </div>
 
         {ceremony && (

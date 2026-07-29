@@ -4346,6 +4346,58 @@ body.modal-open .pager-nav {
 .quest-reward-chest.tier-legendary { color: #c9a227; }
 .quest-reward-shards { color: #6d3fa8; font-weight: 800; }
 
+/* ---- the board's cadence tabs ------------------------------------------ */
+
+.quest-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 2px 16px 10px;
+  flex: 0 0 auto;
+}
+.quest-tab {
+  position: relative;
+  flex: 1;
+  font-family: inherit;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  /* Buttons don't inherit colour: without an explicit value the label paints
+     the UA's black, which reads as invisible on this parchment. */
+  color: #6b5636;
+  background: rgba(0, 0, 0, 0.09);
+  border: 1.5px solid #6b5636;
+  border-radius: 999px;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+.quest-tab:hover:not(.active) {
+  background: rgba(0, 0, 0, 0.16);
+}
+.quest-tab.active {
+  color: #2b1d0e;
+  background: linear-gradient(180deg, #f2d98a, #dcbb5c);
+  border-color: #a87a12;
+}
+/* A tab hides its contents, so a claimable behind an unselected one needs to
+   announce itself here — the Home FAB's pip only says "somewhere". */
+.quest-tab-dot {
+  position: absolute;
+  top: 3px;
+  right: 7px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #b3261e;
+  box-shadow: 0 0 0 1.5px #f6ecd2;
+}
+
+/* The relic choice sits above the tabs — see the sheet's comment. */
+.quest-board-pinned {
+  flex: 0 0 auto;
+  padding: 0 14px;
+}
+
 /* ---- weekly contracts + the monthly saga ------------------------------- */
 
 .quest-section-note {
