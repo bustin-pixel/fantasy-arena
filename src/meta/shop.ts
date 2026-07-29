@@ -57,6 +57,25 @@ export function dayIndexLocal(d: Date = new Date()): number {
   return d.getFullYear() * 512 + d.getMonth() * 32 + d.getDate();
 }
 
+/** Monday-anchored week as a comparable integer, for the weekly contracts.
+ *
+ *  NOTE dayIndexLocal above is a PACKED (y,m,d) triple, not a day count —
+ *  arithmetic on it is meaningless, so a week can't be derived by dividing it.
+ *  This builds a real epoch-day count instead: Date.UTC over the LOCAL calendar
+ *  fields, so a DST shift (which moves the wall clock, not the date) can never
+ *  split a week. Epoch day 0 was a Thursday, so +3 lands the boundary on
+ *  Monday. Consecutive weeks differ by exactly 1. */
+export function weekIndexLocal(d: Date = new Date()): number {
+  const epochDay =
+    Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000;
+  return Math.floor((epochDay + 3) / 7);
+}
+
+/** Local calendar month as a comparable integer, for the monthly saga. */
+export function monthIndexLocal(d: Date = new Date()): number {
+  return d.getFullYear() * 12 + d.getMonth();
+}
+
 /** Disperse (dayIndex, rerolls) into one 32-bit seed. Knuth multiplicative
  *  hash so consecutive days don't produce correlated Mulberry32 streams. */
 function stockSeed(dayIndex: number, rerolls: number): number {

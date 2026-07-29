@@ -11,7 +11,12 @@ import {
 } from "@/meta/commander";
 import { endlessBestWave, highestClearedFloorOf } from "@/state/persistence";
 import { titleLabel } from "@/meta/bestiaryRewards";
-import { dayIndexLocal } from "@/meta/shop";
+import { dayIndexLocal, monthIndexLocal, weekIndexLocal } from "@/meta/shop";
+import {
+  sagaStageClaimable,
+  sweepEarned,
+  weeklyClaimable,
+} from "@/meta/questCycles";
 import { forgeableStackCount } from "@/meta/blacksmith";
 import type { BattleMode } from "@/hooks/useBattleEngine";
 import { GameIcon } from "@/components/icons/GameIcon";
@@ -54,9 +59,17 @@ export function HomeScreen({
   const newStock = save.shop.day !== dayIndexLocal();
   // Quest pip: fresh notices today (board day is stale) OR an accepted quest
   // is ready to claim. Opening the board clears the day half.
+  // Extended for the longer cadences: a fresh week or month, a finished
+  // contract or saga stage, or a Reliquary relic still unchosen all light it.
   const questAlert =
     save.quests.day !== dayIndexLocal() ||
-    save.quests.active.some((q) => q.progress >= q.goal);
+    save.quests.active.some((q) => q.progress >= q.goal) ||
+    save.weeklyQuests.week !== weekIndexLocal() ||
+    weeklyClaimable(save.weeklyQuests) ||
+    sweepEarned(save.weeklyQuests) ||
+    save.monthlySaga.month !== monthIndexLocal() ||
+    sagaStageClaimable(save.monthlySaga) ||
+    save.pendingPicks.length > 0;
   // A single unit is enough to battle — the engine fields whatever you bring
   // (readiness is min(deckSize, activeCap)); an empty deck is the only block.
   const ready = save.deck.length >= 1;

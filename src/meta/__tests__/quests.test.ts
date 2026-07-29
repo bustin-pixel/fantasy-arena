@@ -28,6 +28,7 @@ import {
   QUEST_BOARD_SIZE,
   QUEST_REFRESH_COST,
 } from "@/meta/economy";
+import type { PendingPick } from "@/meta/rewards";
 import { DUNGEONS } from "@/data/dungeons";
 import { getUnitDef } from "@/data/units";
 
@@ -59,6 +60,7 @@ function makeSave() {
     dungeons: { depths: { highestClearedFloor: 0 } },
     quests: { day: -1, refreshes: 0, taken: [], active: [] as ActiveQuest[] },
     itemPity: 0,
+    pendingPicks: [] as PendingPick[],
   };
 }
 

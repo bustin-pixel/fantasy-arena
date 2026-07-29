@@ -23,12 +23,25 @@ import {
   type QuestNotice,
 } from "@/meta/quests";
 import {
+  currentStage,
+  describeWeekly,
+  isFinalStage,
+  normalizeSaga,
+  normalizeWeekly,
+  sweepEarned,
+  themeForMonth,
+  weeklyCtx,
+  type WeeklyQuest,
+} from "@/meta/questCycles";
+import {
   ITEM_PITY_THRESHOLD,
   QUEST_ACTIVE_MAX,
+  WEEKLY_SWEEP_CHEST_TIER,
+  type ChestTier,
   type QuestDifficulty,
 } from "@/meta/economy";
 import { rollChest, type ChestContent } from "@/meta/rewards";
-import { dayIndexLocal } from "@/meta/shop";
+import { dayIndexLocal, monthIndexLocal, weekIndexLocal } from "@/meta/shop";
 import { generateSeed } from "@/utils/rng";
 import { getUnitDef } from "@/data/units";
 import { ITEM_LINES } from "@/data/items";
@@ -57,9 +70,25 @@ const KIND_TITLE: Record<QuestNotice["kind"], string> = {
   endless_wave: "Hold the Line",
 };
 
-/** The in-flight claim ceremony (set AFTER the save fold committed). */
+/** Flavor headers for the weekly contracts. */
+const WEEKLY_TITLE: Record<WeeklyQuest["kind"], string> = {
+  arena_wins: "War Season",
+  depths_clears: "Spelunker's Season",
+  slay_any: "The Grand Hunt",
+  endless_waves: "Endless Endurance",
+  tier_wins: "Elite Campaigner",
+  gold_earned: "Fortune Seeker",
+  daily_clears: "Faithful Regular",
+  weekly_clears: "Contract Broker",
+};
+
+/** The in-flight claim ceremony (set AFTER the save fold committed). One shape
+ *  for every source — daily, weekly, sweep, saga finale — so they can't drift. */
 interface Ceremony {
-  quest: ActiveQuest;
+  title: string;
+  /** Flat gold line; omitted when 0 (the sweep's gold is inside the chest). */
+  gold: number;
+  chestTier: ChestTier;
   contents: ChestContent[];
   phase: "closed" | "opening" | "open";
 }
@@ -72,6 +101,11 @@ export function QuestBoardSheet({ onClose }: Props) {
     abandonQuest,
     refreshQuestBoard,
     claimQuest,
+    visitQuestCycles,
+    claimWeeklyQuest,
+    claimWeeklySweep,
+    claimSagaStage,
+    resolveRelicPick,
   } = useGameState();
   const [confirmAbandon, setConfirmAbandon] = useState<string | null>(null);
   const [ceremony, setCeremony] = useState<Ceremony | null>(null);
@@ -91,9 +125,13 @@ export function QuestBoardSheet({ onClose }: Props) {
   // Opening the board rolls its day forward (clears the Home FAB pip). The
   // impure edge (local clock) stays out here, like visitShop.
   const todayIdx = dayIndexLocal();
+  const weekIdx = weekIndexLocal();
+  const monthIdx = monthIndexLocal();
+  const cycles = { week: weekIdx, month: monthIdx };
   useEffect(() => {
     visitQuestBoard(todayIdx);
-    // Mount-only: the board day only moves when the sheet (re)opens.
+    visitQuestCycles(weekIdx, monthIdx);
+    // Mount-only: the periods only move when the sheet (re)opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -104,6 +142,13 @@ export function QuestBoardSheet({ onClose }: Props) {
     (n) => !board.taken.includes(n.id)
   );
   const active = board.active;
+  // Weekly + saga also render from their NORMALIZED state, so the pre-commit
+  // render already shows this week's contracts rather than last week's.
+  const weekly = normalizeWeekly(save.weeklyQuests, weekIdx, weeklyCtx(save));
+  const saga = normalizeSaga(save.monthlySaga, monthIdx);
+  const theme = themeForMonth(monthIdx);
+  const stage = currentStage(saga);
+  const pendingPick = save.pendingPicks[0] ?? null;
   const slotsFree = active.length < QUEST_ACTIVE_MAX;
   const cost = refreshCost(board.refreshes);
   const canRefresh = save.gold >= cost;
@@ -120,18 +165,77 @@ export function QuestBoardSheet({ onClose }: Props) {
     refreshQuestBoard(todayIdx);
   };
 
+  // Roll a chest with the live pity counter on a fresh drop-time seed. Always
+  // called BEFORE the fold that grants it — roll-first, fold-pure.
+  const rollFor = (tier: ChestTier) =>
+    rollChest(generateSeed(), tier, save.unlockedUnits, {
+      forceItem: save.itemPity >= ITEM_PITY_THRESHOLD,
+    });
+
   const claim = (quest: ActiveQuest) => {
-    // Roll first (fresh drop-time seed + the live pity counter), commit the
-    // fold, THEN stage the ceremony — grant-then-reveal.
-    const contents = rollChest(
-      generateSeed(),
-      quest.chestTier,
-      save.unlockedUnits,
-      { forceItem: save.itemPity >= ITEM_PITY_THRESHOLD }
-    );
-    claimQuest(quest.id, contents);
+    if (ceremony) return;
+    const contents = rollFor(quest.chestTier);
+    claimQuest(quest.id, contents, cycles);
     playSfx("coinShower");
-    setCeremony({ quest, contents, phase: "closed" });
+    setCeremony({
+      title: "Quest complete!",
+      gold: quest.gold,
+      chestTier: quest.chestTier,
+      contents,
+      phase: "closed",
+    });
+  };
+
+  // Every handler below re-checks its own precondition and bails while a
+  // ceremony is up: a double-tap would otherwise roll a second chest whose
+  // fold no-ops on the gate, revealing loot that was never granted.
+  const claimWeekly = (quest: WeeklyQuest) => {
+    if (ceremony) return;
+    if (quest.progress < quest.goal || weekly.claimed.includes(quest.id)) return;
+    const contents = rollFor(quest.chestTier);
+    claimWeeklyQuest(quest.id, contents, cycles);
+    playSfx("coinShower");
+    setCeremony({
+      title: "Contract fulfilled!",
+      gold: quest.gold,
+      chestTier: quest.chestTier,
+      contents,
+      phase: "closed",
+    });
+  };
+
+  const claimSweep = () => {
+    if (ceremony || !sweepEarned(weekly)) return;
+    const contents = rollFor(WEEKLY_SWEEP_CHEST_TIER);
+    claimWeeklySweep(contents, cycles);
+    playSfx("coinShower");
+    setCeremony({
+      title: "A perfect week!",
+      gold: 0, // the hoard's gold rides inside its contents
+      chestTier: WEEKLY_SWEEP_CHEST_TIER,
+      contents,
+      phase: "closed",
+    });
+  };
+
+  const claimStage = () => {
+    if (ceremony || !stage || saga.progress < stage.goal) return;
+    if (!isFinalStage(saga)) {
+      // Non-final stages pay fixed gold/shards — nothing to roll, no chest.
+      claimSagaStage(cycles, []);
+      playSfx("questSting");
+      return;
+    }
+    const contents = rollFor("legendary");
+    claimSagaStage(cycles, contents);
+    playSfx("coinShower");
+    setCeremony({
+      title: `${theme.title} — complete!`,
+      gold: 0,
+      chestTier: "legendary",
+      contents,
+      phase: "closed",
+    });
   };
 
   return (
@@ -153,6 +257,43 @@ export function QuestBoardSheet({ onClose }: Props) {
         </div>
 
         <div className="quest-board-body">
+          {pendingPick && (
+            <section>
+              <h3 className="quest-section-title">Choose Your Relic</h3>
+              <div className="quest-card saga">
+                <div className="quest-card-ask">
+                  The Reliquary is open. Keep one:
+                </div>
+                <div className="relic-pick-row">
+                  {pendingPick.options.map((lineId) => {
+                    const line = ITEM_LINES[lineId];
+                    return (
+                      <button
+                        key={lineId}
+                        type="button"
+                        className="relic-pick"
+                        onClick={() => {
+                          playSfx("unlockFanfare");
+                          resolveRelicPick(lineId);
+                        }}
+                      >
+                        <span
+                          className="relic-pick-name"
+                          style={{ color: RARITIES[pendingPick.quality].color }}
+                        >
+                          {line?.name ?? lineId}
+                        </span>
+                        <span className="relic-pick-sub">
+                          {pendingPick.quality} ★1
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </section>
+          )}
+
           {active.length > 0 && (
             <section>
               <h3 className="quest-section-title">
@@ -290,6 +431,190 @@ export function QuestBoardSheet({ onClose }: Props) {
               </div>
             ))}
           </section>
+
+          <section>
+            <h3 className="quest-section-title">
+              Weekly Contracts <span className="quest-section-note">resets Monday</span>
+            </h3>
+            {weekly.quests.map((q) => {
+              const claimed = weekly.claimed.includes(q.id);
+              const done = q.progress >= q.goal;
+              const frac = Math.min(1, q.progress / q.goal);
+              return (
+                <div
+                  key={q.id}
+                  className={`quest-card weekly${done ? " complete" : ""}${
+                    claimed ? " collected" : ""
+                  }`}
+                >
+                  <div className="quest-card-top">
+                    <span className="quest-card-title">
+                      {WEEKLY_TITLE[q.kind]}
+                    </span>
+                    <span className="quest-stamp weekly">
+                      {claimed ? "COLLECTED" : done ? "COMPLETE" : "Weekly"}
+                    </span>
+                  </div>
+                  <div className="quest-card-ask">{describeWeekly(q)}</div>
+                  <div className="quest-progress">
+                    <div className="quest-progress-bar">
+                      <div
+                        className="quest-progress-fill"
+                        style={{ width: `${frac * 100}%` }}
+                      />
+                    </div>
+                    <span className="quest-progress-num">
+                      {Math.min(q.progress, q.goal).toLocaleString()} /{" "}
+                      {q.goal.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="quest-reward-line">
+                    <span className="quest-reward-gold">
+                      <GameIcon name="gold" /> {q.gold}
+                    </span>
+                    <span className={`quest-reward-chest tier-${q.chestTier}`}>
+                      {CHEST_LABEL[q.chestTier]}
+                    </span>
+                  </div>
+                  {done && !claimed && (
+                    <div className="quest-card-actions">
+                      <button
+                        type="button"
+                        className="quest-btn claim"
+                        onClick={() => claimWeekly(q)}
+                      >
+                        Claim
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* The sweep: all contracts cleared pays a Dragon's Hoard. */}
+            <div
+              className={`quest-card sweep${
+                weekly.sweepClaimed ? " collected" : ""
+              }`}
+            >
+              <div className="quest-card-top">
+                <span className="quest-card-title">Weekly Sweep</span>
+                <span className="quest-stamp sweep">
+                  {weekly.sweepClaimed ? "COLLECTED" : "Bonus"}
+                </span>
+              </div>
+              <div className="quest-card-ask">
+                Complete every contract this week
+              </div>
+              <div className="quest-sweep-pips">
+                {weekly.quests.map((q) => (
+                  <span
+                    key={q.id}
+                    className={`quest-sweep-pip${
+                      weekly.claimed.includes(q.id) ? " lit" : ""
+                    }`}
+                  />
+                ))}
+              </div>
+              <div className="quest-reward-line">
+                <span
+                  className={`quest-reward-chest tier-${WEEKLY_SWEEP_CHEST_TIER}`}
+                >
+                  {CHEST_LABEL[WEEKLY_SWEEP_CHEST_TIER]}
+                </span>
+              </div>
+              {sweepEarned(weekly) && (
+                <div className="quest-card-actions">
+                  <button
+                    type="button"
+                    className="quest-btn claim"
+                    onClick={claimSweep}
+                  >
+                    Claim
+                  </button>
+                </div>
+              )}
+            </div>
+          </section>
+
+          <section>
+            <h3 className="quest-section-title">
+              Saga of the Month{" "}
+              <span className="quest-section-note">resets on the 1st</span>
+            </h3>
+            <div className="quest-card saga">
+              <div className="quest-card-top">
+                <span className="quest-card-title">{theme.title}</span>
+                <span className="quest-saga-dots">
+                  {theme.stages.map((_, i) => (
+                    <span
+                      key={i}
+                      className={`quest-saga-dot${
+                        i < saga.stage ? " done" : i === saga.stage ? " live" : ""
+                      }`}
+                    />
+                  ))}
+                </span>
+              </div>
+              <div className="quest-card-where">{theme.flavor}</div>
+              {stage ? (
+                <>
+                  <div className="quest-card-ask">
+                    Stage {saga.stage + 1} of {theme.stages.length} — {stage.desc}
+                  </div>
+                  <div className="quest-progress">
+                    <div className="quest-progress-bar">
+                      <div
+                        className="quest-progress-fill"
+                        style={{
+                          width: `${
+                            Math.min(1, saga.progress / stage.goal) * 100
+                          }%`,
+                        }}
+                      />
+                    </div>
+                    <span className="quest-progress-num">
+                      {Math.min(saga.progress, stage.goal).toLocaleString()} /{" "}
+                      {stage.goal.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="quest-reward-line">
+                    {isFinalStage(saga) ? (
+                      <span className="quest-reward-chest tier-legendary">
+                        {CHEST_LABEL.legendary}
+                      </span>
+                    ) : (
+                      <>
+                        <span className="quest-reward-gold">
+                          <GameIcon name="gold" /> {stage.gold}
+                        </span>
+                        {stage.shards > 0 && (
+                          <span className="quest-reward-shards">
+                            {stage.shards} Soul Shards
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </div>
+                  {saga.progress >= stage.goal && (
+                    <div className="quest-card-actions">
+                      <button
+                        type="button"
+                        className="quest-btn claim"
+                        onClick={claimStage}
+                      >
+                        Claim
+                      </button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="quest-card-ask">
+                  Saga complete — a new tale begins on the 1st.
+                </div>
+              )}
+            </div>
+          </section>
         </div>
 
         {ceremony && (
@@ -342,7 +667,7 @@ function ClaimCeremony({
   onPhase: (phase: Ceremony["phase"]) => void;
   onDone: () => void;
 }) {
-  const { quest, contents, phase } = ceremony;
+  const { title, gold, chestTier, contents, phase } = ceremony;
   return (
     // Everything was granted before the veil went up, so dismissing at any
     // point (except mid lid-swing) is loss-free.
@@ -354,23 +679,23 @@ function ClaimCeremony({
         className="quest-ceremony-inner"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="quest-ceremony-title">Quest complete!</div>
-        <div className="quest-ceremony-gold">+{quest.gold} gold</div>
+        <div className="quest-ceremony-title">{title}</div>
+        {gold > 0 && <div className="quest-ceremony-gold">+{gold} gold</div>}
         <button
           type="button"
           className={`reward-chest${phase === "closed" ? "" : " opened"}`}
           onClick={() => phase === "closed" && onPhase("opening")}
-          aria-label={`Open ${CHEST_LABEL[quest.chestTier]}`}
+          aria-label={`Open ${CHEST_LABEL[chestTier]}`}
         >
           <ChestSprite
-            tier={quest.chestTier}
+            tier={chestTier}
             opening={phase !== "closed"}
             onOpened={() => onPhase("open")}
           />
           <span className="reward-chest-label">
             {phase === "closed"
-              ? `Open ${CHEST_LABEL[quest.chestTier]}`
-              : CHEST_LABEL[quest.chestTier]}
+              ? `Open ${CHEST_LABEL[chestTier]}`
+              : CHEST_LABEL[chestTier]}
           </span>
         </button>
         {phase === "open" && (
@@ -411,6 +736,15 @@ function ContentLine({ entry }: { entry: ChestContent }) {
       </li>
     );
   }
+  if (entry.kind === "item_choice")
+    return (
+      <li className="reward-entry reward-unlock">
+        <span style={{ color: RARITIES[entry.quality].color }}>
+          A relic of your choosing
+        </span>{" "}
+        — pick one below
+      </li>
+    );
   const def = getUnitDef(entry.unitId);
   if (entry.kind === "duplicate")
     return (

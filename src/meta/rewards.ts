@@ -71,7 +71,12 @@ export type ChestContent =
   | { kind: "unit"; unitId: string }
   | { kind: "duplicate"; unitId: string; gold: number }
   | { kind: "item"; lineId: string; quality: ItemQuality }
-  | { kind: "shards"; amount: number };
+  | { kind: "shards"; amount: number }
+  /** The Reliquary's relic: three lines (one per slot), the player keeps one.
+   *  Unlike every other entry this one can't be granted by the fold — it
+   *  becomes a PENDING PICK on the save and only turns into an item when the
+   *  player chooses. See foldChestContents. */
+  | { kind: "item_choice"; options: string[]; quality: ItemQuality };
 
 export interface ChestResult {
   tier: ChestTier;
@@ -153,9 +158,22 @@ export function rollChest(
   const itemHit = rng.next() < ITEM_DROP_CHANCE[tier];
   if (itemHit || opts?.forceItem) {
     const quality = pickWeightedQuality(rng, tier);
-    const slot = ITEM_SLOTS[rng.int(0, ITEM_SLOTS.length - 1)];
-    const pool = BASE_LINES_BY_SLOT[slot];
-    contents.push({ kind: "item", lineId: pool[rng.int(0, pool.length - 1)], quality });
+    if (tier === "legendary") {
+      // The Reliquary offers a CHOICE instead of a single roll: one line per
+      // slot, so the three are always distinct (the pools are disjoint) and
+      // the player is never asked to choose between three trinkets. Only this
+      // branch draws differently, so every other tier's stream — and so every
+      // legacy chest seed — still rolls byte-identically.
+      const options = ITEM_SLOTS.map((slot) => {
+        const pool = BASE_LINES_BY_SLOT[slot];
+        return pool[rng.int(0, pool.length - 1)];
+      });
+      contents.push({ kind: "item_choice", options, quality });
+    } else {
+      const slot = ITEM_SLOTS[rng.int(0, ITEM_SLOTS.length - 1)];
+      const pool = BASE_LINES_BY_SLOT[slot];
+      contents.push({ kind: "item", lineId: pool[rng.int(0, pool.length - 1)], quality });
+    }
   }
 
   // Themed-dungeon signature line: one extra roll on that dungeon's boss chest.
@@ -564,11 +582,21 @@ export function computeTreasureRewards(input: {
 }
 
 /** The save slice chest contents fold into — PlayerSave satisfies it. */
+/** A Reliquary relic waiting to be chosen. Queued (not a single slot) so two
+ *  Reliquaries won before either is resolved can't overwrite each other — an
+ *  unresolved pick is a PAID entitlement and must never be silently dropped. */
+export interface PendingPick {
+  options: string[];
+  quality: ItemQuality;
+}
+
 export interface ChestGrantSlice {
   gold: number;
   soulShards: number;
   items: Record<string, number>;
   unlockedUnits: string[];
+  /** Unresolved Reliquary relic choices, oldest first. (Save v18.) */
+  pendingPicks: PendingPick[];
 }
 
 /** Fold rolled chest contents into a save slice — the ONE place a chest's
@@ -583,17 +611,49 @@ export function foldChestContents<S extends ChestGrantSlice>(
   let soulShards = save.soulShards;
   const items = { ...save.items };
   const unlocked = new Set(save.unlockedUnits);
+  const pendingPicks = [...save.pendingPicks];
   for (const entry of contents) {
     if (entry.kind === "gold") gold += entry.amount;
     else if (entry.kind === "duplicate") gold += entry.gold;
     else if (entry.kind === "unit") unlocked.add(entry.unitId);
     else if (entry.kind === "shards") soulShards += entry.amount;
-    else {
+    else if (entry.kind === "item_choice") {
+      // Grant-then-reveal, one level up: what commits here is the ENTITLEMENT,
+      // not the item — the reveal contains a decision the fold can't make. The
+      // item itself lands in resolvePendingPick once the player chooses, so
+      // dismissing the ceremony mid-pick loses nothing.
+      pendingPicks.push({ options: [...entry.options], quality: entry.quality });
+    } else {
       const key = makeItemKey(entry.lineId, entry.quality, 1);
       items[key] = (items[key] ?? 0) + 1;
     }
   }
-  return { ...save, gold, soulShards, items, unlockedUnits: [...unlocked] };
+  return {
+    ...save,
+    gold,
+    soulShards,
+    items,
+    unlockedUnits: [...unlocked],
+    pendingPicks,
+  };
+}
+
+/** Resolve the OLDEST pending relic choice by keeping `lineId`. Pure and
+ *  idempotent-per-state: the gate reads committed state, so a StrictMode
+ *  re-run (or a double-tap) can't grant twice. Returns `save` unchanged when
+ *  there's nothing pending or the line wasn't on offer. */
+export function resolvePendingPick<S extends ChestGrantSlice>(
+  save: S,
+  lineId: string
+): S {
+  const [pick, ...rest] = save.pendingPicks;
+  if (!pick || !pick.options.includes(lineId)) return save;
+  const key = makeItemKey(lineId, pick.quality, 1);
+  return {
+    ...save,
+    items: { ...save.items, [key]: (save.items[key] ?? 0) + 1 },
+    pendingPicks: rest,
+  };
 }
 
 /** The pity counter's step: no chest → unchanged; itemless chest → +1;
@@ -603,5 +663,10 @@ export function nextItemPity(
   chestContents: readonly ChestContent[] | null
 ): number {
   if (!chestContents) return prev;
-  return chestContents.some((e) => e.kind === "item") ? 0 : prev + 1;
+  // An item_choice IS the chest's item (the player just hasn't picked which
+  // one yet) — counting it as itemless would let the richest chest in the game
+  // BUMP the pity counter.
+  return chestContents.some((e) => e.kind === "item" || e.kind === "item_choice")
+    ? 0
+    : prev + 1;
 }

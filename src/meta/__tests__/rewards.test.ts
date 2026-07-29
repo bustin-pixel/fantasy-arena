@@ -30,7 +30,12 @@ import {
 } from "@/meta/economy";
 import { richChestBump, TREASURE_ROOM_TIERS } from "@/data/encounters";
 import type { TierId } from "@/data/tiers";
-import { ITEM_LINES, signatureLineFor } from "@/data/items";
+import {
+  BASE_LINES_BY_SLOT,
+  ITEM_LINES,
+  ITEM_SLOTS,
+  signatureLineFor,
+} from "@/data/items";
 import { XP_REWARDS } from "@/meta/leveling";
 import { ENDLESS_FINAL_WAVE } from "@/data/endless";
 import { DECKABLE_UNIT_IDS, getUnitDef } from "@/data/units";
@@ -633,7 +638,7 @@ describe("endless rewards", () => {
     expect(below.chest?.tier).not.toBe("legendary");
   });
 
-  it("the Reliquary guarantees a legendary item, 2500 gold and 250 shards", () => {
+  it("the Reliquary guarantees a legendary relic CHOICE, 2500 gold and 250 shards", () => {
     // Seed-independent: the whole point of the capstone is that it never
     // disappoints, so sweep a spread of seeds rather than trusting one.
     for (const chestSeed of [1, 42, 1337, 90210, 5555]) {
@@ -642,11 +647,21 @@ describe("endless rewards", () => {
       });
       const contents = r.chest!.contents;
       const gold = contents.find((c) => c.kind === "gold");
-      const item = contents.find((c) => c.kind === "item");
+      const choice = contents.find((c) => c.kind === "item_choice");
       const shards = contents.find((c) => c.kind === "shards");
       expect(gold).toMatchObject({ amount: LEGENDARY_CHEST_GOLD });
-      expect(item).toMatchObject({ quality: "legendary" });
       expect(shards).toMatchObject({ amount: LEGENDARY_CHEST_SHARDS });
+      // The relic is offered, not rolled: one line per slot, so the three are
+      // always distinct and never three trinkets.
+      expect(choice).toMatchObject({ quality: "legendary" });
+      const options = (choice as { options: string[] }).options;
+      expect(options).toHaveLength(ITEM_SLOTS.length);
+      expect(new Set(options).size).toBe(ITEM_SLOTS.length);
+      for (const [i, slot] of ITEM_SLOTS.entries()) {
+        expect(BASE_LINES_BY_SLOT[slot]).toContain(options[i]);
+      }
+      // A plain `item` would mean the choice regressed to a single roll.
+      expect(contents.some((c) => c.kind === "item")).toBe(false);
     }
   });
 

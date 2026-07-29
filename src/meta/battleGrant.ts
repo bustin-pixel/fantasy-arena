@@ -23,6 +23,16 @@ import {
 } from "@/meta/bestiaryRewards";
 import { tickQuestProgress, type QuestSaveState } from "@/meta/quests";
 import {
+  normalizeSaga,
+  normalizeWeekly,
+  tickSagaProgress,
+  tickWeeklyProgress,
+  weeklyCtx,
+  type CycleIdx,
+  type MonthlySagaState,
+  type WeeklyQuestState,
+} from "@/meta/questCycles";
+import {
   foldChestContents,
   nextItemPity,
   type BattleRewards,
@@ -31,6 +41,8 @@ import {
 
 /** The save slice a battle grant folds into — PlayerSave satisfies it. */
 export interface BattleGrantSlice extends ChestGrantSlice {
+  weeklyQuests: WeeklyQuestState;
+  monthlySaga: MonthlySagaState;
   unitXp: Record<string, number>;
   commanderXp: number;
   monsterKills: Record<string, number>;
@@ -65,6 +77,11 @@ export interface BattleGrantCtx {
    *  the first-clear fold: Normal marks highestClearedFloor + gifts; Hard/
    *  Elite flip their clearedTiers flag. */
   tier?: TierId;
+  /** Current week/month indices, computed at the UI's impure clock edge.
+   *  REQUIRED, not optional, on purpose: a caller that silently skipped it
+   *  would drop weekly and saga progress for any battle fought without opening
+   *  the quest board first — exactly the bug this field exists to prevent. */
+  cycles: CycleIdx;
 }
 
 export function applyBattleGrant<S extends BattleGrantSlice>(
@@ -113,6 +130,7 @@ export function applyBattleGrant<S extends BattleGrantSlice>(
         save.soulShards + rewards.shards + (rewards.bestiary?.shards ?? 0),
       items: save.items,
       unlockedUnits: save.unlockedUnits,
+      pendingPicks: save.pendingPicks,
     },
     rewards.chest?.contents ?? []
   );
@@ -129,13 +147,38 @@ export function applyBattleGrant<S extends BattleGrantSlice>(
     activeQuests === save.quests.active
       ? save.quests
       : { ...save.quests, active: activeQuests };
+  const tier = ctx.tier ?? "normal";
+  // Weekly contracts + the monthly saga. Both NORMALIZE here before ticking,
+  // which is load-bearing: a battle fought after Monday rollover by a player
+  // who hasn't opened the board yet rolls the new week's contracts and credits
+  // them in this same atomic write, instead of throwing the progress away. The
+  // roll is derived from the pre-battle save, so it's deterministic per state
+  // and a StrictMode double-invoke lands identically.
+  const cycleFacts = {
+    mode: ctx.mode,
+    outcome: ctx.outcome ?? "draw",
+    deck: ctx.deck ?? [],
+    slain: ctx.slain ?? [],
+    wavesSurvived: ctx.wavesSurvived ?? 0,
+    tier,
+    // Total gold this grant moved: flat battle gold, bestiary payouts, chest
+    // gold and duplicate conversions all included, measured once as a delta.
+    goldEarned: folded.gold - save.gold,
+  } as const;
+  const weeklyQuests = tickWeeklyProgress(
+    normalizeWeekly(save.weeklyQuests, ctx.cycles.week, weeklyCtx(save)),
+    cycleFacts
+  );
+  const monthlySaga = tickSagaProgress(
+    normalizeSaga(save.monthlySaga, ctx.cycles.month),
+    cycleFacts
+  );
   // Endless: fold the run's depth into the best-wave high-water mark.
   const endless =
     ctx.mode === "endless"
       ? { bestWave: Math.max(save.endless.bestWave, ctx.wavesSurvived ?? 0) }
       : save.endless;
   let dungeons = save.dungeons;
-  const tier = ctx.tier ?? "normal";
   if (ctx.mode === "depths" && rewards.firstClear) {
     const prev = save.dungeons[ctx.dungeonId] ?? { highestClearedFloor: 0 };
     if (tier === "normal") {
@@ -187,6 +230,9 @@ export function applyBattleGrant<S extends BattleGrantSlice>(
     questUnlocks: [...questUnlocks],
     endless,
     quests,
+    weeklyQuests,
+    monthlySaga,
+    pendingPicks: folded.pendingPicks,
     itemPity: nextItemPity(save.itemPity, rewards.chest?.contents ?? null),
   };
 }

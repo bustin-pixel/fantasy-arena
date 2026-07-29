@@ -216,6 +216,16 @@ export function RewardPanel({ rewards, mode, dungeonId = "depths", tier = "norma
                 </li>
               );
             }
+            if (entry.kind === "item_choice") {
+              return (
+                <li key={i} className="reward-entry reward-unlock">
+                  <span style={{ color: RARITIES[entry.quality].color }}>
+                    A relic of your choosing
+                  </span>{" "}
+                  — waiting on the quest board
+                </li>
+              );
+            }
             const def = getUnitDef(entry.unitId);
             if (entry.kind === "duplicate") {
               return (

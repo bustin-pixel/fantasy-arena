@@ -40,9 +40,19 @@ import {
   applyAbandonQuest,
   applyAcceptQuest,
   applyBoardRefresh,
-  applyClaimQuest,
   normalizeQuestBoard,
 } from "@/meta/quests";
+import {
+  applyClaimDaily,
+  applyClaimSagaStage,
+  applyClaimWeekly,
+  applyClaimWeeklySweep,
+  normalizeSaga,
+  normalizeWeekly,
+  weeklyCtx,
+  type CycleIdx,
+} from "@/meta/questCycles";
+import { resolvePendingPick } from "@/meta/rewards";
 import {
   questForUnlock,
   QUEST_LOCKED_UNITS,
@@ -152,7 +162,28 @@ interface GameStateValue {
   /** Claim a completed quest: pays its gold + the pre-rolled chest contents
    *  (rolled in the sheet, RNG-before-fold like battle rewards) in one atomic
    *  write, steps the item-pity counter, and retires the quest. */
-  claimQuest: (questId: string, chestContents: ChestContent[]) => void;
+  claimQuest: (
+    questId: string,
+    chestContents: ChestContent[],
+    cycles: CycleIdx
+  ) => void;
+  /** Roll the weekly contracts and the monthly saga forward (clears their
+   *  "new period" pips). Rolling over discards unclaimed contract rewards. */
+  visitQuestCycles: (weekIdx: number, monthIdx: number) => void;
+  /** Claim a finished weekly contract: gold + the pre-rolled chest, and credit
+   *  the saga's weekly_clears stage. */
+  claimWeeklyQuest: (
+    questId: string,
+    chestContents: ChestContent[],
+    cycles: CycleIdx
+  ) => void;
+  /** Collect the all-contracts-cleared sweep bonus (a Dragon's Hoard). */
+  claimWeeklySweep: (chestContents: ChestContent[], cycles: CycleIdx) => void;
+  /** Claim the saga's current stage. Non-final stages pay fixed gold/shards and
+   *  ignore `chestContents`; the finale folds the pre-rolled Reliquary. */
+  claimSagaStage: (cycles: CycleIdx, chestContents: ChestContent[]) => void;
+  /** Keep `lineId` from the oldest pending Reliquary relic choice. */
+  resolveRelicPick: (lineId: string) => void;
   /** Spend one commander talent point on a talent rank. No-op unless the
    *  point exists and the talent's tier gate is met — meta/commander. */
   spendTalentPoint: (talentId: string) => void;
@@ -308,8 +339,40 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
     setSave((s) => applyBoardRefresh(s, todayIdx));
   // The chest was rolled in the sheet BEFORE this fold (grant-then-reveal),
   // so the updater stays pure; the active-quest gate makes re-runs no-op.
-  const claimQuest = (questId: string, chestContents: ChestContent[]) =>
-    setSave((s) => applyClaimQuest(s, questId, chestContents));
+  const claimQuest = (
+    questId: string,
+    chestContents: ChestContent[],
+    cycles: CycleIdx
+  ) => setSave((s) => applyClaimDaily(s, questId, chestContents, cycles));
+
+  // ---- weekly contracts + monthly saga — folds live in meta/questCycles.
+  // Same discipline: chests are rolled in the sheet before the fold, and every
+  // fold re-derives its gate from the normalized state.
+  const visitQuestCycles = (weekIdx: number, monthIdx: number) =>
+    setSave((s) => {
+      const weeklyQuests = normalizeWeekly(
+        s.weeklyQuests,
+        weekIdx,
+        weeklyCtx(s)
+      );
+      const monthlySaga = normalizeSaga(s.monthlySaga, monthIdx);
+      return weeklyQuests === s.weeklyQuests && monthlySaga === s.monthlySaga
+        ? s
+        : { ...s, weeklyQuests, monthlySaga };
+    });
+  const claimWeeklyQuest = (
+    questId: string,
+    chestContents: ChestContent[],
+    cycles: CycleIdx
+  ) => setSave((s) => applyClaimWeekly(s, questId, chestContents, cycles));
+  const claimWeeklySweep = (
+    chestContents: ChestContent[],
+    cycles: CycleIdx
+  ) => setSave((s) => applyClaimWeeklySweep(s, chestContents, cycles));
+  const claimSagaStage = (cycles: CycleIdx, chestContents: ChestContent[]) =>
+    setSave((s) => applyClaimSagaStage(s, cycles, chestContents));
+  const resolveRelicPick = (lineId: string) =>
+    setSave((s) => resolvePendingPick(s, lineId));
 
   // ---- commander — the tree rules live in meta/commander (pure); these
   // wrappers bind them to setSave. Points are always DERIVED from the level.
@@ -411,6 +474,11 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
         abandonQuest,
         refreshQuestBoard,
         claimQuest,
+        visitQuestCycles,
+        claimWeeklyQuest,
+        claimWeeklySweep,
+        claimSagaStage,
+        resolveRelicPick,
         spendTalentPoint,
         respecTalents,
         setEquippedSpell,
