@@ -45,9 +45,9 @@ import {
 import { rollChest, type ChestContent } from "@/meta/rewards";
 import { dayIndexLocal, monthIndexLocal, weekIndexLocal } from "@/meta/shop";
 import { generateSeed } from "@/utils/rng";
-import { getUnitDef } from "@/data/units";
 import { ITEM_LINES, makeItemKey } from "@/data/items";
 import { ItemIcon } from "@/components/ItemIcon";
+import { ChestLoot } from "@/components/ChestLoot";
 import { RARITIES } from "@/data/rarities";
 import { ChestSprite } from "@/components/ChestSprite";
 import { CHEST_LABEL } from "@/components/RewardPanel";
@@ -764,11 +764,7 @@ function ClaimCeremony({
         </button>
         {phase === "open" && (
           <>
-            <ul className="reward-contents">
-              {contents.map((entry, i) => (
-                <ContentLine key={i} entry={entry} />
-              ))}
-            </ul>
+            <ChestLoot contents={contents} iconSize={48} />
             <button type="button" className="quest-btn claim" onClick={onDone}>
               Done
             </button>
@@ -779,54 +775,3 @@ function ClaimCeremony({
   );
 }
 
-/** One chest-content line — mirrors the RewardPanel reveal copy. */
-function ContentLine({ entry }: { entry: ChestContent }) {
-  if (entry.kind === "gold")
-    return <li className="reward-entry">+{entry.amount} gold</li>;
-  if (entry.kind === "shards")
-    return (
-      <li className="reward-entry reward-shards">
-        +{entry.amount} Soul Shards
-      </li>
-    );
-  if (entry.kind === "item") {
-    const line = ITEM_LINES[entry.lineId];
-    return (
-      <li className="reward-entry reward-unlock reward-item">
-        <ItemIcon
-          itemKey={makeItemKey(entry.lineId, entry.quality, 1)}
-          size={38}
-        />
-        <span>
-          <span style={{ color: RARITIES[entry.quality].color }}>
-            {line?.name ?? entry.lineId} ★1
-          </span>{" "}
-          — sent to your Bag
-        </span>
-      </li>
-    );
-  }
-  if (entry.kind === "item_choice")
-    return (
-      <li className="reward-entry reward-unlock">
-        <span style={{ color: RARITIES[entry.quality].color }}>
-          A relic of your choosing
-        </span>{" "}
-        — pick one below
-      </li>
-    );
-  const def = getUnitDef(entry.unitId);
-  if (entry.kind === "duplicate")
-    return (
-      <li className="reward-entry">
-        <span style={{ color: RARITIES[def.rarity].color }}>{def.name}</span>{" "}
-        (owned) → +{entry.gold} gold
-      </li>
-    );
-  return (
-    <li className="reward-entry reward-unlock">
-      <span style={{ color: RARITIES[def.rarity].color }}>{def.name}</span>{" "}
-      unlocked!
-    </li>
-  );
-}

@@ -2022,35 +2022,6 @@ body.modal-open .pager-nav {
 .reward-chest-label {
   line-height: 1.2;
 }
-.reward-contents {
-  list-style: none;
-  margin: 0;
-  padding: 10px 16px;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(245, 179, 1, 0.3);
-  border-radius: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  animation: fade 0.4s ease;
-}
-.reward-entry {
-  font-size: 0.9rem;
-  color: #f3e3c2;
-}
-/* Item rows show the drawn icon beside the name — the same read the on-floor
-   chest reveal gives, so loot looks like itself wherever it's opened. */
-.reward-item {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-}
-.reward-item .item-icon {
-  flex: 0 0 auto;
-}
-.reward-unlock {
-  font-weight: 700;
-}
 
 /* ---- On-floor loot reveal (floats up out of the arena chest) ------------- */
 .floor-loot {
@@ -2075,14 +2046,26 @@ body.modal-open .pager-nav {
     transform: translate(-50%, -100%);
   }
 }
-.floor-loot-item {
+/* ---- chest loot -------------------------------------------------------- */
+/* The shared reveal (components/ChestLoot): loot floats free, never boxed.
+   Used by the on-floor dungeon chest AND the results / quest-claim panels, so
+   an item looks the same wherever it was opened. The .floor-loot wrapper above
+   only positions it over the arena. */
+.chest-loot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+.chest-loot-item {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  animation: floor-loot-item-rise 0.9s ease-out both;
+  animation: chest-loot-item-rise 0.9s ease-out both;
 }
-@keyframes floor-loot-item-rise {
+@keyframes chest-loot-item-rise {
   from {
     transform: translateY(14px) scale(0.8);
     opacity: 0;
@@ -2092,10 +2075,10 @@ body.modal-open .pager-nav {
     opacity: 1;
   }
 }
-.floor-loot-item .item-icon {
-  animation: floor-loot-glow 1.4s ease-in-out infinite;
+.chest-loot-item .item-icon {
+  animation: chest-loot-glow 1.4s ease-in-out infinite;
 }
-@keyframes floor-loot-glow {
+@keyframes chest-loot-glow {
   0%,
   100% {
     filter: drop-shadow(0 0 8px rgba(255, 224, 138, 0.55));
@@ -2104,14 +2087,20 @@ body.modal-open .pager-nav {
     filter: drop-shadow(0 0 16px rgba(255, 224, 138, 0.95));
   }
 }
-.floor-loot-name {
-  font-size: 0.8rem;
+.chest-loot-name {
+  font-size: 0.86rem;
   font-weight: 700;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
   white-space: nowrap;
 }
-.floor-loot-gold,
-.floor-loot-shards {
+.chest-loot-sub {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #cbbb96;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+}
+.chest-loot-gold,
+.chest-loot-shards {
   font-size: 1rem;
   font-weight: 700;
   color: var(--gold);
@@ -2119,18 +2108,20 @@ body.modal-open .pager-nav {
   display: flex;
   align-items: center;
   gap: 6px;
+  animation: chest-loot-item-rise 0.9s ease-out both;
 }
-.floor-loot-gold .coin {
+.chest-loot-gold .coin {
   color: #f5b301;
-  font-size: 0.8rem;
-  text-shadow: 0 0 6px rgba(245, 179, 1, 0.9);
+  font-size: 1rem;
+  filter: drop-shadow(0 0 4px rgba(245, 179, 1, 0.85));
 }
-.floor-loot-shards {
+.chest-loot-shards {
   color: #b39ddb;
 }
-.floor-loot-shards .shard-gem {
+.chest-loot-shards .shard-gem {
   color: #b39ddb;
-  font-size: 0.8rem;
+  font-size: 1rem;
+  filter: drop-shadow(0 0 4px rgba(192, 132, 252, 0.85));
 }
 .floor-loot-hint {
   margin-top: 2px;
@@ -6520,14 +6511,12 @@ body.modal-open .pager-nav {
    size up from the old glyph sizes — a drawn coin has a mint-mark and a
    drawn shard has facets, and both died below ~14px. */
 .gold-pill .coin,
-.reward-gold .coin,
-.floor-loot-gold .coin {
+.reward-gold .coin {
   font-size: 1rem;
   filter: drop-shadow(0 0 4px rgba(245, 179, 1, 0.85));
 }
 .shard-gem,
-.reward-shards .shard-gem,
-.floor-loot-shards .shard-gem {
+.reward-shards .shard-gem {
   font-size: 1rem;
   filter: drop-shadow(0 0 4px rgba(192, 132, 252, 0.85));
 }

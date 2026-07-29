@@ -10,12 +10,7 @@
 import { useEffect, useRef } from "react";
 import type { ChestContent } from "@/meta/rewards";
 import { fieldTransform } from "@/utils/constants";
-import { ITEM_LINES, makeItemKey } from "@/data/items";
-import { RARITIES } from "@/data/rarities";
-import { getUnitDef } from "@/data/units";
-import { ItemIcon } from "@/components/ItemIcon";
-import { GameIcon } from "@/components/icons/GameIcon";
-import { useCountUp } from "@/hooks/useCountUp";
+import { ChestLoot } from "@/components/ChestLoot";
 
 interface Props {
   contents: ChestContent[];
@@ -27,27 +22,10 @@ interface Props {
   onDismiss: () => void;
 }
 
-type ItemEntry = Extract<ChestContent, { kind: "item" }>;
-type UnitEntry = Extract<ChestContent, { kind: "unit" }>;
-
 export function FloorLootReveal({ contents, anchor, bufW, bufH, onDismiss }: Props) {
   const { scale, offsetX, offsetY } = fieldTransform(bufW, bufH);
   const leftPct = ((offsetX + anchor.x * scale) / bufW) * 100;
   const topPct = ((offsetY + anchor.y * scale) / bufH) * 100;
-
-  // Chest gold = direct gold + any owned-duplicate refund.
-  const gold = contents.reduce(
-    (s, e) =>
-      s + (e.kind === "gold" ? e.amount : e.kind === "duplicate" ? e.gold : 0),
-    0
-  );
-  const shards = contents.reduce(
-    (s, e) => s + (e.kind === "shards" ? e.amount : 0),
-    0
-  );
-  const items = contents.filter((e): e is ItemEntry => e.kind === "item");
-  const units = contents.filter((e): e is UnitEntry => e.kind === "unit");
-  const shownGold = useCountUp(gold, true);
 
   // Linger so the loot registers, then move on (a tap skips ahead). MOUNT-ONLY:
   // BattleScreen re-renders ~6×/s, so depending on `onDismiss` (a fresh closure
@@ -68,50 +46,7 @@ export function FloorLootReveal({ contents, anchor, bufW, bufH, onDismiss }: Pro
       role="button"
       aria-label="Continue"
     >
-      {items.map((it, i) => (
-        <div key={`i${i}`} className="floor-loot-item">
-          <ItemIcon itemKey={makeItemKey(it.lineId, it.quality, 1)} size={54} />
-          <span
-            className="floor-loot-name"
-            style={{ color: RARITIES[it.quality].color }}
-          >
-            {ITEM_LINES[it.lineId]?.name ?? it.lineId} ★1
-          </span>
-        </div>
-      ))}
-
-      {units.map((u, i) => {
-        const def = getUnitDef(u.unitId);
-        return (
-          <div key={`u${i}`} className="floor-loot-item">
-            <span
-              className="floor-loot-name"
-              style={{ color: RARITIES[def.rarity].color }}
-            >
-              {def.name} unlocked!
-            </span>
-          </div>
-        );
-      })}
-
-      {gold > 0 && (
-        <div className="floor-loot-gold">
-          <span className="coin" aria-hidden>
-            <GameIcon name="gold" />
-          </span>{" "}
-          +{shownGold} gold
-        </div>
-      )}
-
-      {shards > 0 && (
-        <div className="floor-loot-shards">
-          <span className="shard-gem" aria-hidden>
-            <GameIcon name="shard" />
-          </span>{" "}
-          +{shards} Soul Shards
-        </div>
-      )}
-
+      <ChestLoot contents={contents} />
       <div className="floor-loot-hint">tap to continue</div>
     </div>
   );

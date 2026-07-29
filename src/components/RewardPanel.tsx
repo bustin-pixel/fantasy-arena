@@ -25,9 +25,7 @@ import {
   commanderXpIntoLevel,
 } from "@/meta/commander";
 import { getUnitDef } from "@/data/units";
-import { RARITIES } from "@/data/rarities";
-import { ITEM_LINES, makeItemKey } from "@/data/items";
-import { ItemIcon } from "@/components/ItemIcon";
+import { ChestLoot } from "@/components/ChestLoot";
 import { ChestSprite } from "@/components/ChestSprite";
 import { renderPortrait } from "@/engine/Renderer";
 import { useSpriteEpoch } from "@/hooks/useSpriteEpoch";
@@ -190,72 +188,9 @@ export function RewardPanel({ rewards, mode, dungeonId = "depths", tier = "norma
       )}
 
       {rewards.chest && !hideChest && chestPhase === "open" && (
-        <ul className="reward-contents">
-          {rewards.chest.contents.map((entry, i) => {
-            if (entry.kind === "gold") {
-              return (
-                <li key={i} className="reward-entry">
-                  +{entry.amount} gold
-                </li>
-              );
-            }
-            if (entry.kind === "shards") {
-              return (
-                <li key={i} className="reward-entry reward-shards">
-                  +{entry.amount} Soul Shards
-                </li>
-              );
-            }
-            if (entry.kind === "item") {
-              const line = ITEM_LINES[entry.lineId];
-              return (
-                <li key={i} className="reward-entry reward-unlock reward-item">
-                  {/* Same treatment as the on-floor reveal: the drawn icon
-                      first, then the rarity-coloured name. */}
-                  <ItemIcon
-                    itemKey={makeItemKey(entry.lineId, entry.quality, 1)}
-                    size={38}
-                  />
-                  <span>
-                    <span style={{ color: RARITIES[entry.quality].color }}>
-                      {line?.name ?? entry.lineId} ★1
-                    </span>{" "}
-                    — sent to your Bag
-                  </span>
-                </li>
-              );
-            }
-            if (entry.kind === "item_choice") {
-              return (
-                <li key={i} className="reward-entry reward-unlock">
-                  <span style={{ color: RARITIES[entry.quality].color }}>
-                    A relic of your choosing
-                  </span>{" "}
-                  — waiting on the quest board
-                </li>
-              );
-            }
-            const def = getUnitDef(entry.unitId);
-            if (entry.kind === "duplicate") {
-              return (
-                <li key={i} className="reward-entry">
-                  <span style={{ color: RARITIES[def.rarity].color }}>
-                    {def.name}
-                  </span>{" "}
-                  (owned) → +{entry.gold} gold
-                </li>
-              );
-            }
-            return (
-              <li key={i} className="reward-entry reward-unlock">
-                <span style={{ color: RARITIES[def.rarity].color }}>
-                  {def.name}
-                </span>{" "}
-                unlocked!
-              </li>
-            );
-          })}
-        </ul>
+        /* The loot floats out of the chest exactly as it does on the dungeon
+           floor — no boxed list underneath. ChestLoot is the shared source. */
+        <ChestLoot contents={rewards.chest.contents} iconSize={48} />
       )}
     </div>
   );
